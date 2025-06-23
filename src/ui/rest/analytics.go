@@ -7,15 +7,6 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
-	"github.com/gofiber/fiber/v2"
-)
-
-package rest
-
-import (
-	"time"
-	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -33,7 +24,7 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 		token = c.Get("X-Auth-Token")
 	}
 	
-	userRepo := repository.NewUserRepository()
+	userRepo := repository.GetUserRepository()
 	session, err := userRepo.GetSession(token)
 	if err != nil {
 		// Fallback to header for now
@@ -55,8 +46,7 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 	case "7":
 		daysInt = 7
 	case "30":
-		daysInt = 30
-	case "90":
+		daysInt = 30	case "90":
 		daysInt = 90
 	}
 	
@@ -103,8 +93,7 @@ func (handler *App) GetCustomAnalyticsData(c *fiber.Ctx) error {
 	
 	endDate, err := time.Parse("2006-01-02", endStr)
 	if err != nil {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
+		return c.Status(400).JSON(utils.ResponseData{			Status:  400,
 			Code:    "BAD_REQUEST", 
 			Message: "Invalid end date format",
 		})
@@ -151,8 +140,7 @@ func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fib
 		}
 	}
 	
-	// Read chat storage file
-	file, err := os.Open(config.PathChatStorage)
+	// Read chat storage file	file, err := os.Open(config.PathChatStorage)
 	if err != nil {
 		// Return empty data if file doesn't exist
 		metrics := fiber.Map{
@@ -199,8 +187,7 @@ func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fib
 				today := time.Now().Format("2006-01-02")
 				if daily, exists := dailyMap[today]; exists {
 					received := daily["received"].(int)
-					read := daily["read"].(int)
-					replied := daily["replied"].(int)
+					read := daily["read"].(int)					replied := daily["replied"].(int)
 					
 					daily["received"] = received + 1
 					if leadsReceived%10 < 7 {
@@ -247,7 +234,6 @@ func convertDailyMapToSlice(dailyMap map[string]fiber.Map, startDate, endDate ti
 	
 	return dailyData
 }
-
 // GetConnectedDevices returns real connected devices
 func (handler *App) GetConnectedDevices(c *fiber.Ctx) error {
 	// Get user from session
@@ -256,7 +242,7 @@ func (handler *App) GetConnectedDevices(c *fiber.Ctx) error {
 		token = c.Get("X-Auth-Token")
 	}
 	
-	userRepo := repository.NewUserRepository()
+	userRepo := repository.GetUserRepository()
 	session, err := userRepo.GetSession(token)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
