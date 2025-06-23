@@ -6,7 +6,6 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/google/uuid"
 )
 
