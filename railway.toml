@@ -6,8 +6,6 @@ dockerfilePath = "docker/golang.Dockerfile"
 startCommand = "/app/whatsapp rest"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-healthcheckPath = "/"
-healthcheckTimeout = 300
 
 [[services]]
 name = "whatsapp-go"

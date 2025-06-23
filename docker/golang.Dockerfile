@@ -21,7 +21,10 @@ WORKDIR /app
 # Copy compiled from builder.
 COPY --from=builder /app/whatsapp /app/whatsapp
 
-# Expose port
+# Create necessary directories
+RUN mkdir -p /app/storages /app/statics/qrcode /app/statics/media /app/statics/senditems
+
+# Expose port (Railway will override this with PORT env var)
 EXPOSE 3000
 
 # Run the binary.

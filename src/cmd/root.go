@@ -69,7 +69,10 @@ func init() {
 // initEnvConfig loads configuration from environment variables
 func initEnvConfig() {
 	// Application settings
-	if envPort := viper.GetString("APP_PORT"); envPort != "" {
+	// Railway provides PORT env var, so check it first
+	if envPort := viper.GetString("PORT"); envPort != "" {
+		config.AppPort = envPort
+	} else if envPort := viper.GetString("APP_PORT"); envPort != "" {
 		config.AppPort = envPort
 	}
 	if envDebug := viper.GetBool("APP_DEBUG"); envDebug {
