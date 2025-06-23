@@ -28,8 +28,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	})
 	app.Get("/login", rest.AppLoginView)
 	app.Get("/register", rest.RegisterView)
-	app.Get("/dashboard", rest.DashboardView)
-	
+	app.Get("/dashboard", rest.DashboardView)	
 	// Auth API endpoints
 	app.Post("/api/login", rest.HandleLogin)
 	app.Post("/api/register", rest.HandleRegister)
@@ -66,7 +65,6 @@ func (handler *App) Login(c *fiber.Ctx) error {
 		},
 	})
 }
-
 func (handler *App) LoginWithCode(c *fiber.Ctx) error {
 	pairCode, err := handler.Service.LoginWithCode(c.UserContext(), c.Query("phone"))
 	utils.PanicIfNeeded(err)
@@ -104,7 +102,6 @@ func (handler *App) Reconnect(c *fiber.Ctx) error {
 		Results: nil,
 	})
 }
-
 func (handler *App) Devices(c *fiber.Ctx) error {
 	devices, err := handler.Service.FetchDevices(c.UserContext())
 	utils.PanicIfNeeded(err)
@@ -116,6 +113,7 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 		Results: devices,
 	})
 }
+
 // AppLoginView serves the login page
 func (handler *App) AppLoginView(c *fiber.Ctx) error {
 	// Serve login page from embedded filesystem
@@ -136,14 +134,15 @@ func (handler *App) RegisterView(c *fiber.Ctx) error {
 func (handler *App) AppDevicesView(c *fiber.Ctx) error {
 	return c.Redirect("/dashboard")
 }
-
 // DashboardView serves the main dashboard
 func (handler *App) DashboardView(c *fiber.Ctx) error {
 	// Serve dashboard from embedded filesystem
 	return c.Render("views/dashboard", fiber.Map{
 		"Title": "Dashboard - WhatsApp Analytics",
 	})
-}// HandleLogin processes login requests
+}
+
+// HandleLogin processes login requests
 func (handler *App) HandleLogin(c *fiber.Ctx) error {
 	var loginReq struct {
 		Email    string `json:"email"`
@@ -176,22 +175,20 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 	}
 	
 	return c.JSON(fiber.Map{
-		"success": true,
+		"status": "success",
 		"message": "Login successful",
+		"token": session.Token,
 		"user": fiber.Map{
 			"id":       user.ID,
 			"email":    user.Email,
 			"fullName": user.FullName,
 		},
-		"token": session.Token,
 	})
 }
-
 // HandleRegister processes registration requests
 func (handler *App) HandleRegister(c *fiber.Ctx) error {
 	var registerReq struct {
 		FullName string `json:"fullname"`
-		Username string `json:"username"`
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
@@ -208,18 +205,23 @@ func (handler *App) HandleRegister(c *fiber.Ctx) error {
 	// Create user
 	user, err := userRepo.CreateUser(registerReq.Email, registerReq.FullName, registerReq.Password)
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			return c.Status(409).JSON(fiber.Map{
+				"error": "Email already registered",
+			})
+		}
 		return c.Status(400).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 	
 	return c.JSON(fiber.Map{
-		"success": true,
+		"status": "success",
 		"message": "Registration successful",
 		"user": fiber.Map{
 			"id":       user.ID,
 			"email":    user.Email,
-			"fullname": user.FullName,
+			"fullName": user.FullName,
 		},
 	})
 }
@@ -287,85 +289,5 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status": "healthy",
 		"health": health,
-	})
-}
-
-// HandleLogin processes login requests
-func (handler *App) HandleLogin(c *fiber.Ctx) error {
-	var loginReq struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	
-	if err := c.BodyParser(&loginReq); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request",
-		})
-	}
-	
-	// Validate credentials
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
-	if err != nil {
-		return c.Status(401).JSON(fiber.Map{
-			"error": "Invalid email or password",
-		})
-	}
-	
-	// Create session
-	session, err := userRepo.CreateSession(user.ID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to create session",
-		})
-	}
-	
-	return c.JSON(fiber.Map{
-		"status": "success",
-		"token": session.Token,
-		"user": fiber.Map{
-			"id": user.ID,
-			"email": user.Email,
-			"fullName": user.FullName,
-		},
-	})
-}
-
-// HandleRegister processes registration requests
-func (handler *App) HandleRegister(c *fiber.Ctx) error {
-	var registerReq struct {
-		FullName string `json:"fullname"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	
-	if err := c.BodyParser(&registerReq); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request",
-		})
-	}
-	
-	// Create user
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.CreateUser(registerReq.Email, registerReq.FullName, registerReq.Password)
-	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			return c.Status(409).JSON(fiber.Map{
-				"error": "Email already registered",
-			})
-		}
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to create user",
-		})
-	}
-	
-	return c.JSON(fiber.Map{
-		"status": "success",
-		"message": "Registration successful",
-		"user": fiber.Map{
-			"id": user.ID,
-			"email": user.Email,
-			"fullName": user.FullName,
-		},
 	})
 }
