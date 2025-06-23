@@ -1,7 +1,7 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Fix: Fixed analytics.go - removed unused import and corrected API method calls**
+**Latest Fix: Fixed template rendering - changed from EmbedIndex to EmbedViews for proper view serving**
 
 [![Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange.svg)](https://www.patreon.com/c/aldinokemal)  
 **If you're using this tools to generate income, consider supporting its development by becoming a Patreon member!**  

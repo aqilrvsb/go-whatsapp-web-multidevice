@@ -33,7 +33,7 @@ func init() {
 	rootCmd.AddCommand(restCmd)
 }
 func restServer(_ *cobra.Command, _ []string) {
-	engine := html.NewFileSystem(http.FS(EmbedIndex), ".html")
+	engine := html.NewFileSystem(http.FS(EmbedViews), ".html")
 	engine.AddFunc("isEnableBasicAuth", func(token any) bool {
 		return token != nil
 	})
