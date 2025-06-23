@@ -1,5 +1,6 @@
 ############################
 # STEP 1 build executable binary
+# Updated: 2025-06-23 - PostgreSQL integration
 ############################
 FROM golang:1.23-alpine3.20 AS builder
 RUN apk update && apk add --no-cache gcc musl-dev gcompat
