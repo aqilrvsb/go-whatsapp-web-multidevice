@@ -1,16 +1,25 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Feature: Multi-User System with Auto-Refresh for 200+ Users**
+**Latest Feature: PostgreSQL Database Integration for 200+ Users**
 
-## 🚀 New Features:
+## 🚀 Latest Updates:
+
+### PostgreSQL Database Integration (June 23, 2025)
+- **Full PostgreSQL Support**: Migrated from file-based storage to PostgreSQL
+- **Railway Integration**: Configured for Railway PostgreSQL deployment
+- **Database Schema**: Includes tables for users, devices, sessions, and message analytics
+- **Connection Pooling**: Optimized for 200+ concurrent users
+- **Auto-deployment**: Push to main branch triggers Railway deployment
+
+## 🎯 Key Features:
 
 ### 1. Multi-User System (200+ Users Support)
 - **User Management**: Proper user registration and authentication
 - **Session Management**: Secure token-based sessions
 - **User Isolation**: Each user sees only their own data
-- **Scalable Architecture**: Optimized for 200+ concurrent users
-- **Persistent Storage**: User data saved in JSON files
+- **Scalable Architecture**: PostgreSQL-backed for high concurrency
+- **Persistent Storage**: All data stored in PostgreSQL database
 
 ### 2. Real-Time Dashboard Auto-Refresh
 - **10-Second Auto-Refresh**: Dashboard updates every 10 seconds
@@ -39,6 +48,34 @@
 - Efficient data structure for 200+ users
 - Optimized refresh mechanism
 - Minimal server load with smart caching
+
+## 📊 Database Schema
+
+### PostgreSQL Tables:
+1. **users** - User accounts and authentication
+2. **user_devices** - WhatsApp devices per user
+3. **user_sessions** - Active user sessions
+4. **message_analytics** - Message tracking and analytics
+
+### Connection Details:
+- Database is hosted on Railway PostgreSQL
+- Connection pooling configured for high performance
+- Automatic cleanup of expired sessions
+
+## 🚀 Deployment
+
+### Railway Auto-Deployment:
+1. Push to `main` branch at `https://github.com/aqilrvsb/Was-MCP.git`
+2. Railway automatically builds and deploys
+3. Uses PostgreSQL database from Railway
+4. Environment variables configured in Railway dashboard
+
+### Required Environment Variables:
+```
+DB_URI=postgresql://user:pass@host:port/database?sslmode=require
+APP_PORT=3000
+APP_BASIC_AUTH=admin:changeme123
+```
 
 ## Login Credentials
 - **Admin Account**: 
