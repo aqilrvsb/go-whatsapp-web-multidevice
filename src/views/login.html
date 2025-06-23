@@ -122,36 +122,39 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            // Check if user is registered (from localStorage)
-            const registeredUser = localStorage.getItem('registeredUser');
-            let validLogin = false;
-            
-            if (registeredUser) {
-                const user = JSON.parse(registeredUser);
-                if (user.email === email && user.password === password) {
-                    validLogin = true;
+            // Call login API
+            fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Store token and user info
+                    localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('userEmail', data.user.email);
+                    localStorage.setItem('userFullName', data.user.fullName);
+                    
+                    // Redirect to dashboard
+                    window.location.href = '/dashboard';
+                } else {
+                    // Show error
+                    document.getElementById('errorAlert').classList.remove('d-none');
+                    setTimeout(() => {
+                        document.getElementById('errorAlert').classList.add('d-none');
+                    }, 3000);
                 }
-            }
-            
-            // Also check against basic auth credentials (admin account)
-            // Note: In production, this should be validated server-side
-            if (email === 'admin@whatsapp.com' && password === 'changeme123') {
-                validLogin = true;
-            }
-            
-            if (validLogin) {
-                // Set basic auth header for API calls
-                const authString = btoa(`admin:changeme123`);
-                localStorage.setItem('authToken', authString);
-                localStorage.setItem('userEmail', email);
-                
-                window.location.href = '/dashboard';
-            } else {
+            })
+            .catch(error => {
+                console.error('Login error:', error);
                 document.getElementById('errorAlert').classList.remove('d-none');
                 setTimeout(() => {
                     document.getElementById('errorAlert').classList.add('d-none');
                 }, 3000);
-            }
+            });
         }
     </script>
 </body>

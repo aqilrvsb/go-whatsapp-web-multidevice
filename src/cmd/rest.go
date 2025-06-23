@@ -57,14 +57,17 @@ func restServer(_ *cobra.Command, _ []string) {
 
 	app.Use(middleware.Recovery())
 	app.Use(middleware.BasicAuth())
+	app.Use(middleware.CustomAuth()) // Add custom auth middleware
 	if config.AppDebug {
 		app.Use(logger.New())
 	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Auth-Token",
 	}))
 
+	// Comment out basic auth to use custom login
+	/*
 	if len(config.AppBasicAuthCredential) > 0 {
 		account := make(map[string]string)
 		for _, basicAuth := range config.AppBasicAuthCredential {
@@ -79,6 +82,7 @@ func restServer(_ *cobra.Command, _ []string) {
 			Users: account,
 		}))
 	}
+	*/
 
 	// Rest
 	rest.InitRestApp(app, appUsecase)

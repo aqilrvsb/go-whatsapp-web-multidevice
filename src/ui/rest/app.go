@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
@@ -286,5 +287,85 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status": "healthy",
 		"health": health,
+	})
+}
+
+// HandleLogin processes login requests
+func (handler *App) HandleLogin(c *fiber.Ctx) error {
+	var loginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&loginReq); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	// Validate credentials
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid email or password",
+		})
+	}
+	
+	// Create session
+	session, err := userRepo.CreateSession(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to create session",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"token": session.Token,
+		"user": fiber.Map{
+			"id": user.ID,
+			"email": user.Email,
+			"fullName": user.FullName,
+		},
+	})
+}
+
+// HandleRegister processes registration requests
+func (handler *App) HandleRegister(c *fiber.Ctx) error {
+	var registerReq struct {
+		FullName string `json:"fullname"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&registerReq); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	// Create user
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.CreateUser(registerReq.Email, registerReq.FullName, registerReq.Password)
+	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			return c.Status(409).JSON(fiber.Map{
+				"error": "Email already registered",
+			})
+		}
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to create user",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"message": "Registration successful",
+		"user": fiber.Map{
+			"id": user.ID,
+			"email": user.Email,
+			"fullName": user.FullName,
+		},
 	})
 }
