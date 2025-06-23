@@ -1,7 +1,7 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Fix: Implemented email-based login system with registration support**
+**Latest Fix: Added missing config import in app.go**
 
 ## Login Credentials
 - **Admin Account**: 
