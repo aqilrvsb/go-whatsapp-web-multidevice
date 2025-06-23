@@ -9,6 +9,15 @@ ___
 
 ![release version](https://img.shields.io/github/v/release/aldinokemal/go-whatsapp-web-multidevice)
 
+## 🚀 New Features - Analytics Dashboard with Real Data
+
+### Multi-User Analytics Dashboard
+- **Real WhatsApp Data**: Analytics pulled from actual message history
+- **User Management**: Register and manage multiple users
+- **Device Management**: Each user can manage multiple WhatsApp devices
+- **Live Analytics**: Real-time message statistics from chat storage
+- **Custom Date Ranges**: Analyze any time period with real data
+
 ![Build Image](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/build-docker-image.yaml/badge.svg)
 
 ![release windows](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/release-windows.yml/badge.svg)

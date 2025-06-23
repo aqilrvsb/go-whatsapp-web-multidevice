@@ -23,6 +23,11 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/register", rest.RegisterView)
 	app.Get("/dashboard", rest.DashboardView)
 	
+	// Analytics API endpoints
+	app.Get("/api/analytics/:days", rest.GetAnalyticsData)
+	app.Get("/api/analytics/custom", rest.GetCustomAnalyticsData)
+	app.Get("/api/devices", rest.GetConnectedDevices)
+	
 	// API endpoints
 	app.Get("/app/login", rest.Login)
 	app.Get("/app/login-with-code", rest.LoginWithCode)
@@ -99,17 +104,32 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 }
 // AppLoginView serves the login page
 func (handler *App) AppLoginView(c *fiber.Ctx) error {
-	// Serve login page
-	return c.SendFile("./views/login.html")
+	// Serve login page from embedded filesystem
+	return c.Render("views/login", fiber.Map{
+		"Title": "Login - WhatsApp Analytics",
+	})
 }
 
 // RegisterView serves the register page
 func (handler *App) RegisterView(c *fiber.Ctx) error {
-	// Serve register page
-	return c.SendFile("./views/register.html")
+	// Serve register page from embedded filesystem
+	return c.Render("views/register", fiber.Map{
+		"Title": "Register - WhatsApp Analytics",
+	})
 }
 
 // AppDevicesView serves the devices page (deprecated - redirect to dashboard)
+func (handler *App) AppDevicesView(c *fiber.Ctx) error {
+	return c.Redirect("/dashboard")
+}
+
+// DashboardView serves the main dashboard
+func (handler *App) DashboardView(c *fiber.Ctx) error {
+	// Serve dashboard from embedded filesystem
+	return c.Render("views/dashboard", fiber.Map{
+		"Title": "Dashboard - WhatsApp Analytics",
+	})
+}View serves the devices page (deprecated - redirect to dashboard)
 func (handler *App) AppDevicesView(c *fiber.Ctx) error {
 	return c.Redirect("/dashboard")
 }

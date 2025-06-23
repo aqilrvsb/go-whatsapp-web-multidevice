@@ -434,16 +434,26 @@
 
         // Load Dashboard Data
         function loadDashboardData(days) {
-            // Simulate API call
             showLoading();
             
-            // Generate mock data
-            setTimeout(() => {
-                const mockData = generateMockData(days);
-                updateMetrics(mockData.metrics);
-                updateChart(mockData.daily);
-                hideLoading();
-            }, 500);
+            // Fetch real data from API
+            fetch(`/api/analytics/${days}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        updateMetrics(data.results.metrics);
+                        updateChart(data.results.daily);
+                    }
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error loading analytics:', error);
+                    // Fallback to mock data
+                    const mockData = generateMockData(days);
+                    updateMetrics(mockData.metrics);
+                    updateChart(mockData.daily);
+                    hideLoading();
+                });
         }
 
         // Generate Mock Data
@@ -567,13 +577,24 @@
         function loadDashboardDataCustomRange(startDate, endDate, days) {
             showLoading();
             
-            // Generate mock data for custom range
-            setTimeout(() => {
-                const mockData = generateMockDataForRange(startDate, endDate, days);
-                updateMetrics(mockData.metrics);
-                updateChart(mockData.daily);
-                hideLoading();
-            }, 500);
+            // Fetch real data from API
+            fetch(`/api/analytics/custom?start=${startDate}&end=${endDate}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        updateMetrics(data.results.metrics);
+                        updateChart(data.results.daily);
+                    }
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error loading custom analytics:', error);
+                    // Fallback to mock data
+                    const mockData = generateMockDataForRange(startDate, endDate, days);
+                    updateMetrics(mockData.metrics);
+                    updateChart(mockData.daily);
+                    hideLoading();
+                });
         }
 
         // Generate Mock Data for Date Range
@@ -604,32 +625,40 @@
 
         // Load Devices
         function loadDevices() {
-            // Simulate loading devices
-            devices = [
-                {
-                    id: 1,
-                    name: 'iPhone 12 Pro',
-                    phone: '+62 812-3456-7890',
-                    status: 'online',
-                    lastSeen: 'Active now'
-                },
-                {
-                    id: 2,
-                    name: 'Samsung Galaxy S21',
-                    phone: '+62 813-9876-5432',
-                    status: 'online',
-                    lastSeen: 'Active now'
-                },
-                {
-                    id: 3,
-                    name: 'iPad Air',
-                    phone: '+62 815-1234-5678',
-                    status: 'offline',
-                    lastSeen: 'Last seen 2 hours ago'
-                }
-            ];
-
-            renderDevices();
+            // Fetch real devices from API
+            fetch('/api/devices')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
+                        devices = data.results;
+                    } else {
+                        // Fallback to mock devices
+                        devices = [
+                            {
+                                id: 1,
+                                name: 'Primary Device',
+                                phone: 'Not connected',
+                                status: 'offline',
+                                lastSeen: 'Not connected'
+                            }
+                        ];
+                    }
+                    renderDevices();
+                })
+                .catch(error => {
+                    console.error('Error loading devices:', error);
+                    // Fallback to mock devices
+                    devices = [
+                        {
+                            id: 1,
+                            name: 'Primary Device',
+                            phone: 'Not connected',
+                            status: 'offline',
+                            lastSeen: 'Not connected'
+                        }
+                    ];
+                    renderDevices();
+                });
         }
 
         // Render Devices
