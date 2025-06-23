@@ -20,6 +20,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 		return c.Redirect("/login")
 	})
 	app.Get("/login", rest.AppLoginView)
+	app.Get("/register", rest.RegisterView)
 	app.Get("/dashboard", rest.DashboardView)
 	
 	// API endpoints
@@ -98,15 +99,14 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 }
 // AppLoginView serves the login page
 func (handler *App) AppLoginView(c *fiber.Ctx) error {
-	// Check if already authenticated
-	device, err := handler.Service.GetDevice(c.UserContext())
-	if err == nil && device != nil {
-		// If already logged in, redirect to dashboard
-		return c.Redirect("/dashboard")
-	}
-
 	// Serve login page
 	return c.SendFile("./views/login.html")
+}
+
+// RegisterView serves the register page
+func (handler *App) RegisterView(c *fiber.Ctx) error {
+	// Serve register page
+	return c.SendFile("./views/register.html")
 }
 
 // AppDevicesView serves the devices page (deprecated - redirect to dashboard)

@@ -237,11 +237,43 @@
             <!-- Dashboard Tab -->
             <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
                 <!-- Time Range Toggle -->
-                <div class="d-flex justify-content-end mb-4">
-                    <div class="time-toggle">
-                        <button class="btn active" onclick="changeTimeRange(7)">7 Days</button>
-                        <button class="btn" onclick="changeTimeRange(30)">30 Days</button>
-                        <button class="btn" onclick="changeTimeRange(90)">90 Days</button>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h5 class="mb-0">Analytics Overview</h5>
+                        <small class="text-muted">Today: June 23, 2025</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <div class="time-toggle">
+                            <button class="btn" onclick="changeTimeRange('today')">Today</button>
+                            <button class="btn active" onclick="changeTimeRange(7)">7 Days</button>
+                            <button class="btn" onclick="changeTimeRange(30)">30 Days</button>
+                            <button class="btn" onclick="changeTimeRange(90)">90 Days</button>
+                            <button class="btn" onclick="showCustomDateRange()">Custom</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Date Range (Hidden by default) -->
+                <div id="customDateRange" class="card mb-3 d-none">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate" max="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="endDate" max="">
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-whatsapp" onclick="applyCustomDateRange()">
+                                    <i class="bi bi-check-lg"></i> Apply
+                                </button>
+                                <button class="btn btn-outline-secondary ms-2" onclick="hideCustomDateRange()">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -348,6 +380,17 @@
             initializeChart();
             loadDashboardData(7);
             loadDevices();
+            
+            // Set max date to today for date inputs
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').max = today;
+            document.getElementById('endDate').max = today;
+            document.getElementById('endDate').value = today;
+            
+            // Set start date to 7 days ago
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            document.getElementById('startDate').value = sevenDaysAgo.toISOString().split('T')[0];
         });
 
         // Initialize Chart
@@ -450,7 +493,8 @@
 
         // Change Time Range
         function changeTimeRange(days) {
-            currentTimeRange = days;
+            // Hide custom date range if visible
+            document.getElementById('customDateRange').classList.add('d-none');
             
             // Update button states
             document.querySelectorAll('.time-toggle .btn').forEach(btn => {
@@ -458,8 +502,104 @@
             });
             event.target.classList.add('active');
             
-            // Reload data
-            loadDashboardData(days);
+            if (days === 'today') {
+                currentTimeRange = 1;
+                loadDashboardData(1);
+            } else {
+                currentTimeRange = days;
+                loadDashboardData(days);
+            }
+        }
+
+        // Show Custom Date Range
+        function showCustomDateRange() {
+            document.getElementById('customDateRange').classList.remove('d-none');
+            
+            // Update button states
+            document.querySelectorAll('.time-toggle .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Hide Custom Date Range
+        function hideCustomDateRange() {
+            document.getElementById('customDateRange').classList.add('d-none');
+            
+            // Reset to 7 days
+            document.querySelectorAll('.time-toggle .btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes('7 Days')) {
+                    btn.classList.add('active');
+                }
+            });
+            changeTimeRange(7);
+        }
+
+        // Apply Custom Date Range
+        function applyCustomDateRange() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            if (start > end) {
+                alert('Start date must be before end date');
+                return;
+            }
+            
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Load data for custom range
+            loadDashboardDataCustomRange(startDate, endDate, days);
+            
+            // Update display
+            document.getElementById('customDateRange').classList.add('d-none');
+        }
+
+        // Load Dashboard Data with Custom Range
+        function loadDashboardDataCustomRange(startDate, endDate, days) {
+            showLoading();
+            
+            // Generate mock data for custom range
+            setTimeout(() => {
+                const mockData = generateMockDataForRange(startDate, endDate, days);
+                updateMetrics(mockData.metrics);
+                updateChart(mockData.daily);
+                hideLoading();
+            }, 500);
+        }
+
+        // Generate Mock Data for Date Range
+        function generateMockDataForRange(startDate, endDate, days) {
+            const metrics = {
+                totalSent: Math.floor(Math.random() * 1000 * (days / 30)) + 500,
+                totalReceived: Math.floor(Math.random() * 800 * (days / 30)) + 400,
+                activeChats: Math.floor(Math.random() * 50) + 10,
+                replyRate: Math.floor(Math.random() * 30) + 70
+            };
+
+            const daily = [];
+            const start = new Date(startDate);
+            
+            for (let i = 0; i < days; i++) {
+                const date = new Date(start);
+                date.setDate(start.getDate() + i);
+                
+                daily.push({
+                    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    sent: Math.floor(Math.random() * 100) + 20,
+                    received: Math.floor(Math.random() * 80) + 15
+                });
+            }
+
+            return { metrics, daily };
         }
 
         // Load Devices
