@@ -1,29 +1,44 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Feature: Email-based Real-time Lead Analytics with Device Filtering**
+**Latest Feature: Multi-User System with Auto-Refresh for 200+ Users**
 
-## 🎯 Key Features:
+## 🚀 New Features:
 
-### Lead Analytics Dashboard (NEW!)
-- **Email-based Analytics**: Each user gets their own analytics based on email
-- **Real WhatsApp Data**: Tracks actual message status (sent, delivered, read, replied)
+### 1. Multi-User System (200+ Users Support)
+- **User Management**: Proper user registration and authentication
+- **Session Management**: Secure token-based sessions
+- **User Isolation**: Each user sees only their own data
+- **Scalable Architecture**: Optimized for 200+ concurrent users
+- **Persistent Storage**: User data saved in JSON files
+
+### 2. Real-Time Dashboard Auto-Refresh
+- **10-Second Auto-Refresh**: Dashboard updates every 10 seconds
+- **Toggle Control**: Enable/disable auto-refresh
+- **Manual Refresh**: Button for instant refresh
+- **Smart Updates**: Silent refresh without UI flicker
+- **Visibility API**: Pauses refresh when tab is hidden
+
+### 3. Lead Analytics Dashboard
+- **Email-based Analytics**: Each user gets their own analytics
+- **Real WhatsApp Data**: Tracks actual message status
 - **Lead Metrics**:
   - Active/Inactive Devices per user
   - Leads Sent, Received (with %)
   - Leads Not Received (with %)
   - Leads Read/Not Read (with %)
   - Leads Replied (with %)
-- **Device Filter**: Filter analytics by "All Devices" or specific device
-- **Time Ranges**: Today, 7, 30, 90 days, or custom date range
-- **Real-time Updates**: Message status tracked via WhatsApp receipts
+- **Device Filter**: Filter analytics by device
+- **Time Ranges**: Today, 7, 30, 90 days, or custom
 
-### How It Works:
-1. User logs in with email
-2. Analytics are tracked per user email
-3. Each device's messages are recorded separately
-4. Real-time status updates (delivered, read) via WhatsApp receipts
-5. Interactive charts show trends over time
+### 4. Default Admin Account
+- Email: `admin@whatsapp.com`
+- Password: `changeme123`
+
+### 5. Performance Optimizations
+- Efficient data structure for 200+ users
+- Optimized refresh mechanism
+- Minimal server load with smart caching
 
 ## Login Credentials
 - **Admin Account**: 

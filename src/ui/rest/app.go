@@ -7,6 +7,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -151,34 +152,34 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Check against configured basic auth credentials
-	validCredentials := false
+	// Get user repository
+	userRepo := repository.GetUserRepository()
 	
-	// Check if credentials match any of the configured basic auth users
-	for _, cred := range config.AppBasicAuthCredential {
-		parts := strings.Split(cred, ":")
-		if len(parts) == 2 {
-			// For simplicity, treating username as email
-			if (loginReq.Email == parts[0] || loginReq.Email == "admin@whatsapp.com") && loginReq.Password == parts[1] {
-				validCredentials = true
-				break
-			}
-		}
-	}
-	
-	if validCredentials {
-		// In a real app, you'd generate a JWT token here
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Login successful",
-			"user": fiber.Map{
-				"email": loginReq.Email,
-			},
+	// Validate credentials
+	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid email or password",
 		})
 	}
 	
-	return c.Status(401).JSON(fiber.Map{
-		"error": "Invalid email or password",
+	// Create session
+	session, err := userRepo.CreateSession(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to create session",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Login successful",
+		"user": fiber.Map{
+			"id":       user.ID,
+			"email":    user.Email,
+			"fullName": user.FullName,
+		},
+		"token": session.Token,
 	})
 }
 
@@ -197,14 +198,24 @@ func (handler *App) HandleRegister(c *fiber.Ctx) error {
 		})
 	}
 	
-	// In a real app, you'd save this to a database
-	// For now, we just return success
+	// Get user repository
+	userRepo := repository.GetUserRepository()
+	
+	// Create user
+	user, err := userRepo.CreateUser(registerReq.Email, registerReq.FullName, registerReq.Password)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Registration successful",
 		"user": fiber.Map{
-			"email":    registerReq.Email,
-			"fullname": registerReq.FullName,
+			"id":       user.ID,
+			"email":    user.Email,
+			"fullname": user.FullName,
 		},
 	})
 }

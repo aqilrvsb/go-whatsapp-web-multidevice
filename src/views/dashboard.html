@@ -240,9 +240,22 @@
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h5 class="mb-0">Analytics Overview</h5>
-                        <small class="text-muted">Today: June 23, 2025</small>
+                        <small class="text-muted">Today: June 23, 2025 | <span id="lastRefresh">Last refresh: Never</span></small>
                     </div>
                     <div class="d-flex gap-2 align-items-center">
+                        <!-- Auto Refresh Toggle -->
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                            <label class="form-check-label" for="autoRefreshToggle">
+                                <small>Auto-refresh (10s)</small>
+                            </label>
+                        </div>
+                        
+                        <!-- Manual Refresh Button -->
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshDashboard()" title="Refresh Now">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        
                         <!-- Device Filter -->
                         <select class="form-select form-select-sm" id="deviceFilter" onchange="filterByDevice()" style="width: 200px;">
                             <option value="all">All Devices</option>
@@ -427,6 +440,8 @@
         let currentTimeRange = 7;
         let devices = [];
         let currentDeviceFilter = 'all';
+        let refreshInterval;
+        let isAutoRefreshEnabled = true;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -444,6 +459,9 @@
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             document.getElementById('startDate').value = sevenDaysAgo.toISOString().split('T')[0];
+            
+            // Start auto-refresh
+            startAutoRefresh();
         });
 
         // Initialize Chart
@@ -511,8 +529,10 @@
         }
 
         // Load Dashboard Data
-        function loadDashboardData(days) {
-            showLoading();
+        function loadDashboardData(days, silent = false) {
+            if (!silent) {
+                showLoading();
+            }
             
             // Get user email
             const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
@@ -535,7 +555,9 @@
                         updateMetrics(data.results.metrics);
                         updateChart(data.results.daily);
                     }
-                    hideLoading();
+                    if (!silent) {
+                        hideLoading();
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading analytics:', error);
@@ -543,7 +565,9 @@
                     const mockData = generateMockData(days);
                     updateMetrics(mockData.metrics);
                     updateChart(mockData.daily);
-                    hideLoading();
+                    if (!silent) {
+                        hideLoading();
+                    }
                 });
         }
 
@@ -704,8 +728,10 @@
         }
 
         // Load Dashboard Data with Custom Range
-        function loadDashboardDataCustomRange(startDate, endDate, days) {
-            showLoading();
+        function loadDashboardDataCustomRange(startDate, endDate, days, silent = false) {
+            if (!silent) {
+                showLoading();
+            }
             
             // Get user email
             const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
@@ -728,15 +754,19 @@
                         updateMetrics(data.results.metrics);
                         updateChart(data.results.daily);
                     }
-                    hideLoading();
+                    if (!silent) {
+                        hideLoading();
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading custom analytics:', error);
                     // Fallback to mock data
-                    const mockData = generateMockDataForRange(startDate, endDate, days);
+                    const mockData = generateMockDataForRange(startDate, endDate, days || 30);
                     updateMetrics(mockData.metrics);
                     updateChart(mockData.daily);
-                    hideLoading();
+                    if (!silent) {
+                        hideLoading();
+                    }
                 });
         }
 
@@ -767,7 +797,7 @@
         }
 
         // Load Devices
-        function loadDevices() {
+        function loadDevices(silent = false) {
             // Fetch real devices from API
             fetch('/api/devices')
                 .then(response => response.json())
@@ -789,7 +819,9 @@
                     renderDevices();
                 })
                 .catch(error => {
-                    console.error('Error loading devices:', error);
+                    if (!silent) {
+                        console.error('Error loading devices:', error);
+                    }
                     // Fallback to mock devices
                     devices = [
                         {
@@ -1098,3 +1130,67 @@
             // Restore selected value
             deviceFilter.value = currentDeviceFilter;
         }
+        // Auto-refresh functions
+        function startAutoRefresh() {
+            if (isAutoRefreshEnabled) {
+                // Refresh every 10 seconds
+                refreshInterval = setInterval(() => {
+                    refreshDashboard();
+                }, 10000);
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                console.log('Auto-refresh enabled');
+            } else {
+                stopAutoRefresh();
+                console.log('Auto-refresh disabled');
+            }
+        }
+
+        function refreshDashboard() {
+            // Don't show loading spinner for auto-refresh to avoid UI flicker
+            const isManualRefresh = !refreshInterval;
+            
+            if (isManualRefresh) {
+                showLoading();
+            }
+            
+            // Reload current data
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate, null, !isManualRefresh);
+            } else {
+                loadDashboardData(currentTimeRange, !isManualRefresh);
+            }
+            
+            // Reload devices
+            loadDevices(!isManualRefresh);
+            
+            // Update last refresh time
+            const now = new Date();
+            document.getElementById('lastRefresh').textContent = 
+                `Last refresh: ${now.toLocaleTimeString()}`;
+        }
+
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                refreshDashboard(); // Refresh immediately when page becomes visible
+            }
+        });
