@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"strings"
 
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -22,6 +23,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/login", rest.AppLoginView)
 	app.Get("/register", rest.RegisterView)
 	app.Get("/dashboard", rest.DashboardView)
+	
+	// Auth API endpoints
+	app.Post("/api/login", rest.HandleLogin)
+	app.Post("/api/register", rest.HandleRegister)
 	
 	// Analytics API endpoints
 	app.Get("/api/analytics/:days", rest.GetAnalyticsData)
@@ -128,5 +133,74 @@ func (handler *App) DashboardView(c *fiber.Ctx) error {
 	// Serve dashboard from embedded filesystem
 	return c.Render("views/dashboard", fiber.Map{
 		"Title": "Dashboard - WhatsApp Analytics",
+	})
+}// HandleLogin processes login requests
+func (handler *App) HandleLogin(c *fiber.Ctx) error {
+	var loginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&loginReq); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	// Check against configured basic auth credentials
+	validCredentials := false
+	
+	// Check if credentials match any of the configured basic auth users
+	for _, cred := range config.AppBasicAuthCredential {
+		parts := strings.Split(cred, ":")
+		if len(parts) == 2 {
+			// For simplicity, treating username as email
+			if (loginReq.Email == parts[0] || loginReq.Email == "admin@whatsapp.com") && loginReq.Password == parts[1] {
+				validCredentials = true
+				break
+			}
+		}
+	}
+	
+	if validCredentials {
+		// In a real app, you'd generate a JWT token here
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Login successful",
+			"user": fiber.Map{
+				"email": loginReq.Email,
+			},
+		})
+	}
+	
+	return c.Status(401).JSON(fiber.Map{
+		"error": "Invalid email or password",
+	})
+}
+
+// HandleRegister processes registration requests
+func (handler *App) HandleRegister(c *fiber.Ctx) error {
+	var registerReq struct {
+		FullName string `json:"fullname"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&registerReq); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	// In a real app, you'd save this to a database
+	// For now, we just return success
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Registration successful",
+		"user": fiber.Map{
+			"email":    registerReq.Email,
+			"fullname": registerReq.FullName,
+		},
 	})
 }

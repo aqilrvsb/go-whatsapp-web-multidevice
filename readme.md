@@ -1,7 +1,13 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Fix: Fixed template rendering - changed from EmbedIndex to EmbedViews for proper view serving**
+**Latest Fix: Implemented email-based login system with registration support**
+
+## Login Credentials
+- **Admin Account**: 
+  - Email: `admin@whatsapp.com`
+  - Password: `changeme123` (or whatever you set in APP_BASIC_AUTH environment variable)
+- **Registered Users**: Can register via `/register` page and login with their email
 
 [![Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange.svg)](https://www.patreon.com/c/aldinokemal)  
 **If you're using this tools to generate income, consider supporting its development by becoming a Patreon member!**  

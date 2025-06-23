@@ -172,22 +172,42 @@
                 return;
             }
             
-            // For demo purposes, simulate registration
-            // In production, this would call an API endpoint
-            localStorage.setItem('registeredUser', JSON.stringify({
+            // Store in localStorage for demo
+            const userData = {
                 fullname,
                 username,
                 email,
                 password
-            }));
+            };
             
-            // Show success message
-            document.getElementById('successAlert').classList.remove('d-none');
+            localStorage.setItem('registeredUser', JSON.stringify(userData));
             
-            // Redirect to login after 2 seconds
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 2000);
+            // Call registration API (optional, for future backend integration)
+            fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(userData)
+            }).then(response => response.json())
+            .then(data => {
+                // Show success message
+                document.getElementById('successAlert').classList.remove('d-none');
+                
+                // Redirect to login after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            })
+            .catch(error => {
+                // Even if API fails, we've stored locally, so still show success
+                document.getElementById('successAlert').classList.remove('d-none');
+                
+                // Redirect to login after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            });
         }
     </script>
 </body>

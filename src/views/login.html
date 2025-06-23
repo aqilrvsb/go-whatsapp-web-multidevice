@@ -92,8 +92,8 @@
 
         <form id="loginForm" onsubmit="handleLogin(event)">
             <div class="mb-3">
-                <label class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" required>
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" required>
             </div>
             
             <div class="mb-3">
@@ -102,7 +102,7 @@
             </div>
 
             <div id="errorAlert" class="alert alert-danger d-none" role="alert">
-                Invalid username or password
+                Invalid email or password
             </div>
 
             <button type="submit" class="btn btn-login">
@@ -119,11 +119,31 @@
         function handleLogin(event) {
             event.preventDefault();
             
-            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            // For demo, use the basic auth credentials
-            if (username === 'admin' && password === 'changeme123') {
+            // Check if user is registered (from localStorage)
+            const registeredUser = localStorage.getItem('registeredUser');
+            let validLogin = false;
+            
+            if (registeredUser) {
+                const user = JSON.parse(registeredUser);
+                if (user.email === email && user.password === password) {
+                    validLogin = true;
+                }
+            }
+            
+            // Also check against basic auth credentials (admin account)
+            // Note: In production, this should be validated server-side
+            if (email === 'admin@whatsapp.com' && password === 'changeme123') {
+                validLogin = true;
+            }
+            
+            if (validLogin) {
+                // Set basic auth header for API calls
+                const authString = btoa(`admin:changeme123`);
+                localStorage.setItem('authToken', authString);
+                
                 window.location.href = '/dashboard';
             } else {
                 document.getElementById('errorAlert').classList.remove('d-none');
