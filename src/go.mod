@@ -1,4 +1,4 @@
-module github.com/aqilrvsb/Was-MCP
+module github.com/aldinokemal/go-whatsapp-web-multidevice
 
 go 1.23
 
