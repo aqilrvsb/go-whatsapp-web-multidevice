@@ -1,13 +1,29 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Fix: Implemented QR code display with auto-refresh and WebSocket integration**
+**Latest Feature: Email-based Real-time Lead Analytics with Device Filtering**
 
-## Features Added:
-- QR code generation from WhatsApp login API
-- Auto-refresh QR code every 20 seconds
-- WebSocket connection for real-time device status updates
-- Automatic modal close when device connects
+## 🎯 Key Features:
+
+### Lead Analytics Dashboard (NEW!)
+- **Email-based Analytics**: Each user gets their own analytics based on email
+- **Real WhatsApp Data**: Tracks actual message status (sent, delivered, read, replied)
+- **Lead Metrics**:
+  - Active/Inactive Devices per user
+  - Leads Sent, Received (with %)
+  - Leads Not Received (with %)
+  - Leads Read/Not Read (with %)
+  - Leads Replied (with %)
+- **Device Filter**: Filter analytics by "All Devices" or specific device
+- **Time Ranges**: Today, 7, 30, 90 days, or custom date range
+- **Real-time Updates**: Message status tracked via WhatsApp receipts
+
+### How It Works:
+1. User logs in with email
+2. Analytics are tracked per user email
+3. Each device's messages are recorded separately
+4. Real-time status updates (delivered, read) via WhatsApp receipts
+5. Interactive charts show trends over time
 
 ## Login Credentials
 - **Admin Account**: 

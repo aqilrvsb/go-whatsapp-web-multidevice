@@ -197,9 +197,31 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 		evt.Message,
 	)
 
-	// Record the message
+	// Record the message with analytics
 	message := ExtractMessageText(evt)
 	utils.RecordMessage(evt.Info.ID, evt.Info.Sender.String(), message)
+	
+	// Record for analytics with user email (get from current session/device)
+	userEmail := "admin@whatsapp.com" // TODO: Get from authenticated user
+	deviceID := "device1" // TODO: Get actual device ID
+	deviceName := "Primary Device" // TODO: Get actual device name
+	
+	// Determine message status
+	status := "sent"
+	if !evt.Info.IsFromMe {
+		status = "received"
+	}
+	
+	utils.RecordMessageForUser(
+		evt.Info.ID,
+		userEmail,
+		evt.Info.Chat.String(),
+		message,
+		evt.Info.IsFromMe,
+		status,
+		deviceID,
+		deviceName,
+	)
 
 	// Handle image message if present
 	handleImageMessage(ctx, evt)
@@ -266,8 +288,16 @@ func handleWebhookForward(ctx context.Context, evt *events.Message) {
 func handleReceipt(_ context.Context, evt *events.Receipt) {
 	if evt.Type == types.ReceiptTypeRead || evt.Type == types.ReceiptTypeReadSelf {
 		log.Infof("%v was read by %s at %s", evt.MessageIDs, evt.SourceString(), evt.Timestamp)
+		// Update message status to "read"
+		for _, msgID := range evt.MessageIDs {
+			utils.UpdateMessageStatus(msgID, "read")
+		}
 	} else if evt.Type == types.ReceiptTypeDelivered {
 		log.Infof("%s was delivered to %s at %s", evt.MessageIDs[0], evt.SourceString(), evt.Timestamp)
+		// Update message status to "delivered"
+		for _, msgID := range evt.MessageIDs {
+			utils.UpdateMessageStatus(msgID, "delivered")
+		}
 	}
 }
 

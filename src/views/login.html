@@ -143,6 +143,7 @@
                 // Set basic auth header for API calls
                 const authString = btoa(`admin:changeme123`);
                 localStorage.setItem('authToken', authString);
+                localStorage.setItem('userEmail', email);
                 
                 window.location.href = '/dashboard';
             } else {

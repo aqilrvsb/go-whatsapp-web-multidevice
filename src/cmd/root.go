@@ -201,6 +201,11 @@ func initApp() {
 	ctx := context.Background()
 	whatsappDB = whatsapp.InitWaDB(ctx)
 	whatsappCli = whatsapp.InitWaCLI(ctx, whatsappDB)
+	
+	// Initialize message analytics
+	if err := utils.InitMessageRecords(); err != nil {
+		logrus.Warnf("Failed to initialize message records: %v", err)
+	}
 
 	// Usecase
 	appUsecase = usecase.NewAppService(whatsappCli, whatsappDB)

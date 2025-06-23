@@ -14,8 +14,12 @@ import (
 // GetAnalyticsData returns analytics data for the dashboard
 func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 	days := c.Params("days", "7")
-	daysInt := 7
+	deviceFilter := c.Query("device", "all")
 	
+	// Get user email from session/auth (for now using a placeholder)
+	userEmail := c.Get("X-User-Email", "admin@whatsapp.com")
+	
+	daysInt := 7
 	switch days {
 	case "today":
 		daysInt = 1
@@ -27,17 +31,18 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 		daysInt = 90
 	}
 	
-	// Get metrics from chat storage
-	metrics, dailyData := getMetricsFromStorage(daysInt)
+	// Calculate date range
+	endDate := time.Now()
+	startDate := endDate.AddDate(0, 0, -daysInt)
+	
+	// Get real analytics from message records
+	analytics := utils.GetUserAnalytics(userEmail, startDate, endDate, deviceFilter)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Analytics data retrieved",
-		Results: fiber.Map{
-			"metrics": metrics,
-			"daily":   dailyData,
-		},
+		Results: analytics,
 	})
 }
 
@@ -45,6 +50,10 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 func (handler *App) GetCustomAnalyticsData(c *fiber.Ctx) error {
 	startStr := c.Query("start")
 	endStr := c.Query("end")
+	deviceFilter := c.Query("device", "all")
+	
+	// Get user email from session/auth
+	userEmail := c.Get("X-User-Email", "admin@whatsapp.com")
 	
 	startDate, err := time.Parse("2006-01-02", startStr)
 	if err != nil {
@@ -64,16 +73,14 @@ func (handler *App) GetCustomAnalyticsData(c *fiber.Ctx) error {
 		})
 	}
 	
-	metrics, dailyData := getMetricsFromStorageCustom(startDate, endDate)
+	// Get real analytics from message records
+	analytics := utils.GetUserAnalytics(userEmail, startDate, endDate, deviceFilter)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Custom analytics data retrieved",
-		Results: fiber.Map{
-			"metrics": metrics,
-			"daily":   dailyData,
-		},
+		Results: analytics,
 	})
 }
 
@@ -87,8 +94,11 @@ func getMetricsFromStorage(days int) (fiber.Map, []fiber.Map) {
 
 // getMetricsFromStorageCustom reads chat.csv for custom date range
 func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fiber.Map) {
-	totalSent := 0
-	totalReceived := 0
+	// Lead metrics
+	leadsSent := 0
+	leadsReceived := 0
+	leadsRead := 0
+	leadsReplied := 0
 	uniqueChats := make(map[string]bool)
 	
 	// Initialize daily map
@@ -99,6 +109,8 @@ func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fib
 			"date":     d.Format("Jan 2"),
 			"sent":     0,
 			"received": 0,
+			"read":     0,
+			"replied":  0,
 		}
 	}
 	
@@ -106,12 +118,17 @@ func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fib
 	file, err := os.Open(config.PathChatStorage)
 	if err != nil {
 		// Return empty data if file doesn't exist
-		return fiber.Map{
-			"totalSent":     0,
-			"totalReceived": 0,
-			"activeChats":   0,
-			"replyRate":     0,
-		}, convertDailyMapToSlice(dailyMap, startDate, endDate)
+		metrics := fiber.Map{
+			"activeDevices":     0,
+			"inactiveDevices":   0,
+			"leadsSent":         0,
+			"leadsReceived":     0,
+			"leadsNotReceived":  0,
+			"leadsRead":         0,
+			"leadsNotRead":      0,
+			"leadsReplied":      0,
+		}
+		return metrics, convertDailyMapToSlice(dailyMap, startDate, endDate)
 	}
 	defer file.Close()
 	
@@ -127,35 +144,54 @@ func getMetricsFromStorageCustom(startDate, endDate time.Time) (fiber.Map, []fib
 			// Count unique chats
 			uniqueChats[jid] = true
 			
-			// Determine if sent or received based on JID
-			// Messages to others are "sent", messages from others are "received"
+			// Simulate lead metrics (in real implementation, parse actual message data)
 			if strings.Contains(jid, "@s.whatsapp.net") || strings.Contains(jid, "@g.us") {
-				// For now, count all as received (in real implementation, check against logged-in user)
-				totalReceived++
+				leadsReceived++
 				
-				// Add to daily count (using current date as we don't have timestamps in CSV)
+				// Simulate read status (70% of received are read)
+				if leadsReceived%10 < 7 {
+					leadsRead++
+				}
+				
+				// Simulate reply status (50% of read are replied)
+				if leadsRead%10 < 5 {
+					leadsReplied++
+				}
+				
+				// Add to daily count
 				today := time.Now().Format("2006-01-02")
 				if daily, exists := dailyMap[today]; exists {
 					received := daily["received"].(int)
+					read := daily["read"].(int)
+					replied := daily["replied"].(int)
+					
 					daily["received"] = received + 1
+					if leadsReceived%10 < 7 {
+						daily["read"] = read + 1
+					}
+					if leadsRead%10 < 5 {
+						daily["replied"] = replied + 1
+					}
 					dailyMap[today] = daily
 				}
 			}
 		}
 	}
 	
-	// Calculate reply rate
-	replyRate := 0
-	if totalReceived > 0 {
-		// Assume 80% reply rate for demo
-		replyRate = 80
-	}
+	// Calculate derived metrics
+	leadsSent = len(records) // Assume all records are sent messages for now
+	leadsNotReceived := leadsSent - leadsReceived
+	leadsNotRead := leadsReceived - leadsRead
 	
 	metrics := fiber.Map{
-		"totalSent":     totalSent,
-		"totalReceived": totalReceived,
-		"activeChats":   len(uniqueChats),
-		"replyRate":     replyRate,
+		"activeDevices":     1, // Will be updated from device list
+		"inactiveDevices":   0,
+		"leadsSent":         leadsSent,
+		"leadsReceived":     leadsReceived,
+		"leadsNotReceived":  leadsNotReceived,
+		"leadsRead":         leadsRead,
+		"leadsNotRead":      leadsNotRead,
+		"leadsReplied":      leadsReplied,
 	}
 	
 	return metrics, convertDailyMapToSlice(dailyMap, startDate, endDate)

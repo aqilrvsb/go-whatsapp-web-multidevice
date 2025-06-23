@@ -242,7 +242,13 @@
                         <h5 class="mb-0">Analytics Overview</h5>
                         <small class="text-muted">Today: June 23, 2025</small>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Device Filter -->
+                        <select class="form-select form-select-sm" id="deviceFilter" onchange="filterByDevice()" style="width: 200px;">
+                            <option value="all">All Devices</option>
+                        </select>
+                        
+                        <!-- Time Range -->
                         <div class="time-toggle">
                             <button class="btn" onclick="changeTimeRange('today')">Today</button>
                             <button class="btn active" onclick="changeTimeRange(7)">7 Days</button>
@@ -279,13 +285,32 @@
 
                 <!-- Metrics Cards -->
                 <div class="row g-3 mb-4">
+                    <!-- First Row - Device Metrics -->
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-phone-fill"></i>
+                            </div>
+                            <div class="metric-value" id="activeDevices">0</div>
+                            <div class="metric-label">Active Devices</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-phone-x"></i>
+                            </div>
+                            <div class="metric-value" id="inactiveDevices">0</div>
+                            <div class="metric-label">Inactive Devices</div>
+                        </div>
+                    </div>
                     <div class="col-md-3">
                         <div class="metric-card">
                             <div class="metric-icon bg-primary bg-opacity-10 text-primary">
                                 <i class="bi bi-send"></i>
                             </div>
-                            <div class="metric-value" id="totalSent">0</div>
-                            <div class="metric-label">Messages Sent</div>
+                            <div class="metric-value" id="leadsSent">0</div>
+                            <div class="metric-label">Leads Sent</div>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -293,26 +318,53 @@
                             <div class="metric-icon bg-info bg-opacity-10 text-info">
                                 <i class="bi bi-inbox"></i>
                             </div>
-                            <div class="metric-value" id="totalReceived">0</div>
-                            <div class="metric-label">Messages Received</div>
+                            <div class="metric-value" id="leadsReceived">0</div>
+                            <div class="metric-label">Leads Received</div>
+                            <small class="text-success" id="leadsReceivedPercent">0%</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Row - Lead Status Metrics -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="metric-value" id="leadsNotReceived">0</div>
+                            <div class="metric-label">Leads Not Received</div>
+                            <small class="text-danger" id="leadsNotReceivedPercent">0%</small>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="metric-card">
                             <div class="metric-icon bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-chat-dots"></i>
+                                <i class="bi bi-check-double"></i>
                             </div>
-                            <div class="metric-value" id="activeChats">0</div>
-                            <div class="metric-label">Active Chats</div>
+                            <div class="metric-value" id="leadsRead">0</div>
+                            <div class="metric-label">Leads Read</div>
+                            <small class="text-success" id="leadsReadPercent">0%</small>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="metric-card">
-                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
-                                <i class="bi bi-arrow-repeat"></i>
+                            <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-check"></i>
                             </div>
-                            <div class="metric-value" id="replyRate">0%</div>
-                            <div class="metric-label">Reply Rate</div>
+                            <div class="metric-value" id="leadsNotRead">0</div>
+                            <div class="metric-label">Leads Not Read</div>
+                            <small class="text-secondary" id="leadsNotReadPercent">0%</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-reply"></i>
+                            </div>
+                            <div class="metric-value" id="leadsReplied">0</div>
+                            <div class="metric-label">Leads Replied</div>
+                            <small class="text-primary" id="leadsRepliedPercent">0%</small>
                         </div>
                     </div>
                 </div>
@@ -374,6 +426,7 @@
         let messageChart;
         let currentTimeRange = 7;
         let devices = [];
+        let currentDeviceFilter = 'all';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -401,16 +454,28 @@
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Messages Sent',
+                        label: 'Leads Sent',
                         data: [],
                         borderColor: '#128c7e',
                         backgroundColor: 'rgba(18, 140, 126, 0.1)',
                         tension: 0.4
                     }, {
-                        label: 'Messages Received',
+                        label: 'Leads Received',
                         data: [],
                         borderColor: '#25d366',
                         backgroundColor: 'rgba(37, 211, 102, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Leads Read',
+                        data: [],
+                        borderColor: '#34b7f1',
+                        backgroundColor: 'rgba(52, 183, 241, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Leads Replied',
+                        data: [],
+                        borderColor: '#00a884',
+                        backgroundColor: 'rgba(0, 168, 132, 0.1)',
                         tension: 0.4
                     }]
                 },
@@ -420,12 +485,25 @@
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Lead Activity Trends'
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: 150 // Cap at 150 messages
+                            title: {
+                                display: true,
+                                text: 'Number of Leads'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
                         }
                     }
                 }
@@ -436,8 +514,21 @@
         function loadDashboardData(days) {
             showLoading();
             
+            // Get user email
+            const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
+            
+            // Build URL with device filter
+            let url = `/api/analytics/${days}`;
+            if (currentDeviceFilter && currentDeviceFilter !== 'all') {
+                url += `?device=${currentDeviceFilter}`;
+            }
+            
             // Fetch real data from API
-            fetch(`/api/analytics/${days}`)
+            fetch(url, {
+                headers: {
+                    'X-User-Email': userEmail
+                }
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
@@ -458,11 +549,22 @@
 
         // Generate Mock Data
         function generateMockData(days) {
+            const leadsSent = Math.floor(Math.random() * 1000) + 500;
+            const leadsReceived = Math.floor(leadsSent * 0.8); // 80% received
+            const leadsNotReceived = leadsSent - leadsReceived;
+            const leadsRead = Math.floor(leadsReceived * 0.7); // 70% of received are read
+            const leadsNotRead = leadsReceived - leadsRead;
+            const leadsReplied = Math.floor(leadsRead * 0.5); // 50% of read are replied
+            
             const metrics = {
-                totalSent: Math.floor(Math.random() * 1000) + 500,
-                totalReceived: Math.floor(Math.random() * 800) + 400,
-                activeChats: Math.floor(Math.random() * 50) + 10,
-                replyRate: Math.floor(Math.random() * 30) + 70
+                activeDevices: devices.filter(d => d.status === 'online').length,
+                inactiveDevices: devices.filter(d => d.status === 'offline').length,
+                leadsSent: leadsSent,
+                leadsReceived: leadsReceived,
+                leadsNotReceived: leadsNotReceived,
+                leadsRead: leadsRead,
+                leadsNotRead: leadsNotRead,
+                leadsReplied: leadsReplied
             };
 
             const daily = [];
@@ -475,7 +577,9 @@
                 daily.push({
                     date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                     sent: Math.floor(Math.random() * 100) + 20,
-                    received: Math.floor(Math.random() * 80) + 15
+                    received: Math.floor(Math.random() * 80) + 15,
+                    read: Math.floor(Math.random() * 60) + 10,
+                    replied: Math.floor(Math.random() * 30) + 5
                 });
             }
 
@@ -484,20 +588,46 @@
 
         // Update Metrics
         function updateMetrics(metrics) {
-            document.getElementById('totalSent').textContent = metrics.totalSent.toLocaleString();
-            document.getElementById('totalReceived').textContent = metrics.totalReceived.toLocaleString();
-            document.getElementById('activeChats').textContent = metrics.activeChats;
-            document.getElementById('replyRate').textContent = metrics.replyRate + '%';
+            // Device metrics
+            document.getElementById('activeDevices').textContent = metrics.activeDevices || 0;
+            document.getElementById('inactiveDevices').textContent = metrics.inactiveDevices || 0;
+            
+            // Lead metrics
+            document.getElementById('leadsSent').textContent = metrics.leadsSent || 0;
+            document.getElementById('leadsReceived').textContent = metrics.leadsReceived || 0;
+            document.getElementById('leadsNotReceived').textContent = metrics.leadsNotReceived || 0;
+            document.getElementById('leadsRead').textContent = metrics.leadsRead || 0;
+            document.getElementById('leadsNotRead').textContent = metrics.leadsNotRead || 0;
+            document.getElementById('leadsReplied').textContent = metrics.leadsReplied || 0;
+            
+            // Calculate and update percentages
+            const totalLeads = metrics.leadsSent || 1; // Avoid division by zero
+            
+            const receivedPercent = Math.round((metrics.leadsReceived / totalLeads) * 100);
+            const notReceivedPercent = Math.round((metrics.leadsNotReceived / totalLeads) * 100);
+            const readPercent = Math.round((metrics.leadsRead / totalLeads) * 100);
+            const notReadPercent = Math.round((metrics.leadsNotRead / totalLeads) * 100);
+            const repliedPercent = Math.round((metrics.leadsReplied / totalLeads) * 100);
+            
+            document.getElementById('leadsReceivedPercent').textContent = receivedPercent + '%';
+            document.getElementById('leadsNotReceivedPercent').textContent = notReceivedPercent + '%';
+            document.getElementById('leadsReadPercent').textContent = readPercent + '%';
+            document.getElementById('leadsNotReadPercent').textContent = notReadPercent + '%';
+            document.getElementById('leadsRepliedPercent').textContent = repliedPercent + '%';
         }
         // Update Chart
         function updateChart(dailyData) {
             const labels = dailyData.map(d => d.date);
-            const sentData = dailyData.map(d => d.sent);
-            const receivedData = dailyData.map(d => d.received);
+            const sentData = dailyData.map(d => d.sent || 0);
+            const receivedData = dailyData.map(d => d.received || 0);
+            const readData = dailyData.map(d => d.read || 0);
+            const repliedData = dailyData.map(d => d.replied || 0);
 
             messageChart.data.labels = labels;
             messageChart.data.datasets[0].data = sentData;
             messageChart.data.datasets[1].data = receivedData;
+            messageChart.data.datasets[2].data = readData;
+            messageChart.data.datasets[3].data = repliedData;
             messageChart.update();
         }
 
@@ -577,8 +707,21 @@
         function loadDashboardDataCustomRange(startDate, endDate, days) {
             showLoading();
             
+            // Get user email
+            const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
+            
+            // Build URL with device filter
+            let url = `/api/analytics/custom?start=${startDate}&end=${endDate}`;
+            if (currentDeviceFilter && currentDeviceFilter !== 'all') {
+                url += `&device=${currentDeviceFilter}`;
+            }
+            
             // Fetch real data from API
-            fetch(`/api/analytics/custom?start=${startDate}&end=${endDate}`)
+            fetch(url, {
+                headers: {
+                    'X-User-Email': userEmail
+                }
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
@@ -683,6 +826,9 @@
                     </div>
                 </div>
             `);
+            
+            // Update device filter dropdown
+            updateDeviceFilter();
         }
 
         // Create Device Card
@@ -920,3 +1066,35 @@
     </script>
 </body>
 </html>
+        // Filter by Device
+        function filterByDevice() {
+            currentDeviceFilter = document.getElementById('deviceFilter').value;
+            
+            // Reload data with current time range and device filter
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate);
+            } else {
+                loadDashboardData(currentTimeRange);
+            }
+        }
+
+        // Update Device Filter Dropdown
+        function updateDeviceFilter() {
+            const deviceFilter = document.getElementById('deviceFilter');
+            
+            // Clear existing options (except "All Devices")
+            deviceFilter.innerHTML = '<option value="all">All Devices</option>';
+            
+            // Add device options
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.name} (${device.phone})`;
+                deviceFilter.appendChild(option);
+            });
+            
+            // Restore selected value
+            deviceFilter.value = currentDeviceFilter;
+        }
