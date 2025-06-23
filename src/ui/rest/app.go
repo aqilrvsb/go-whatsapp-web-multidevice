@@ -129,12 +129,4 @@ func (handler *App) DashboardView(c *fiber.Ctx) error {
 	return c.Render("views/dashboard", fiber.Map{
 		"Title": "Dashboard - WhatsApp Analytics",
 	})
-}View serves the devices page (deprecated - redirect to dashboard)
-func (handler *App) AppDevicesView(c *fiber.Ctx) error {
-	return c.Redirect("/dashboard")
-}
-
-// DashboardView serves the main dashboard
-func (handler *App) DashboardView(c *fiber.Ctx) error {
-	return c.SendFile("./views/dashboard.html")
 }
