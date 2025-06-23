@@ -7,7 +7,6 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/gofiber/fiber/v2"
 )
@@ -180,17 +179,32 @@ func convertDailyMapToSlice(dailyMap map[string]fiber.Map, startDate, endDate ti
 func (handler *App) GetConnectedDevices(c *fiber.Ctx) error {
 	devices := []fiber.Map{}
 	
-	// Get device info from the service
-	device, err := handler.Service.GetDeviceInfo(c.UserContext())
-	if err == nil && device != nil {
-		devices = append(devices, fiber.Map{
-			"id":       1,
-			"name":     device.Device.GetPlatform().String(),
-			"phone":    device.Number,
-			"status":   "online",
-			"lastSeen": "Active now",
-			"pushName": device.Device.GetDeviceName(),
-		})
+	// Get devices from the service
+	devicesList, err := handler.Service.FetchDevices(c.UserContext())
+	if err == nil && len(devicesList) > 0 {
+		for i, device := range devicesList {
+			devices = append(devices, fiber.Map{
+				"id":       i + 1,
+				"name":     device.Name,
+				"phone":    device.Device,
+				"status":   "online",
+				"lastSeen": "Active now",
+				"pushName": device.Name,
+			})
+		}
+	} else {
+		// Try to get first device
+		firstDevice, err := handler.Service.FirstDevice(c.UserContext())
+		if err == nil {
+			devices = append(devices, fiber.Map{
+				"id":       1,
+				"name":     firstDevice.Name,
+				"phone":    firstDevice.Device,
+				"status":   "online",
+				"lastSeen": "Active now",
+				"pushName": firstDevice.Name,
+			})
+		}
 	}
 	
 	return c.JSON(utils.ResponseData{
