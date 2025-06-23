@@ -14,6 +14,15 @@ type App struct {
 
 func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	rest := App{Service: service}
+	
+	// Dashboard routes
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.Redirect("/login")
+	})
+	app.Get("/login", rest.AppLoginView)
+	app.Get("/dashboard", rest.DashboardView)
+	
+	// API endpoints
 	app.Get("/app/login", rest.Login)
 	app.Get("/app/login-with-code", rest.LoginWithCode)
 	app.Get("/app/logout", rest.Logout)
@@ -86,4 +95,26 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 		Message: "Fetch device success",
 		Results: devices,
 	})
+}
+// AppLoginView serves the login page
+func (handler *App) AppLoginView(c *fiber.Ctx) error {
+	// Check if already authenticated
+	device, err := handler.Service.GetDevice(c.UserContext())
+	if err == nil && device != nil {
+		// If already logged in, redirect to dashboard
+		return c.Redirect("/dashboard")
+	}
+
+	// Serve login page
+	return c.SendFile("./views/login.html")
+}
+
+// AppDevicesView serves the devices page (deprecated - redirect to dashboard)
+func (handler *App) AppDevicesView(c *fiber.Ctx) error {
+	return c.Redirect("/dashboard")
+}
+
+// DashboardView serves the main dashboard
+func (handler *App) DashboardView(c *fiber.Ctx) error {
+	return c.SendFile("./views/dashboard.html")
 }
