@@ -751,7 +751,7 @@
             const modal = new bootstrap.Modal(document.getElementById('qrModal'));
             modal.show();
             
-            // Simulate QR code generation
+            // Show loading spinner
             const qrContainer = document.getElementById('qrCode');
             qrContainer.innerHTML = `
                 <div class="d-flex align-items-center justify-content-center h-100">
@@ -761,12 +761,53 @@
                 </div>
             `;
             
-            // Simulate QR code loading
-            setTimeout(() => {
-                qrContainer.innerHTML = `
-                    <img src="/app/qr/${deviceId}" alt="QR Code" style="width: 100%; height: 100%;">
-                `;
-            }, 1000);
+            // Get QR code from WhatsApp login endpoint
+            fetch('/app/login')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.qr_link) {
+                        qrContainer.innerHTML = `
+                            <img src="${data.results.qr_link}" alt="QR Code" style="width: 100%; height: 100%;">
+                        `;
+                        
+                        // Set up auto-refresh every 20 seconds
+                        const refreshInterval = setInterval(() => {
+                            fetch('/app/login')
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.results && data.results.qr_link) {
+                                        qrContainer.querySelector('img').src = data.results.qr_link + '?t=' + Date.now();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error refreshing QR code:', error);
+                                });
+                        }, 20000); // Refresh every 20 seconds
+                        
+                        // Clear interval when modal is closed
+                        document.getElementById('qrModal').addEventListener('hidden.bs.modal', function () {
+                            clearInterval(refreshInterval);
+                        }, { once: true });
+                    } else {
+                        qrContainer.innerHTML = `
+                            <div class="text-center">
+                                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 48px;"></i>
+                                <p class="mt-2">Failed to load QR code</p>
+                                <button class="btn btn-sm btn-primary" onclick="scanQR(${deviceId})">Retry</button>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading QR code:', error);
+                    qrContainer.innerHTML = `
+                        <div class="text-center">
+                            <i class="bi bi-wifi-off text-danger" style="font-size: 48px;"></i>
+                            <p class="mt-2">Connection error</p>
+                            <button class="btn btn-sm btn-primary" onclick="scanQR(${deviceId})">Retry</button>
+                        </div>
+                    `;
+                });
         }
 
         // Logout Device
@@ -819,20 +860,48 @@
 
         // WebSocket Connection for Real-time Updates
         function connectWebSocket() {
-            const ws = new WebSocket(`wss://${window.location.host}/ws`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
             
             ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                // Handle different message types
-                switch(data.type) {
-                    case 'device_status':
-                        updateDeviceStatus(data.deviceId, data.status);
-                        break;
-                    case 'new_message':
-                        // Update metrics in real-time
-                        break;
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle different message types
+                    switch(data.code) {
+                        case 'LOGIN_SUCCESS':
+                            // Device connected successfully
+                            console.log('Device connected:', data.message);
+                            // Close QR modal if open
+                            const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
+                            if (qrModal) {
+                                qrModal.hide();
+                            }
+                            // Reload devices
+                            loadDevices();
+                            break;
+                        case 'DEVICE_STATUS':
+                            updateDeviceStatus(data.deviceId, data.status);
+                            break;
+                        case 'NEW_MESSAGE':
+                            // Update metrics in real-time
+                            if (currentTimeRange === 1 || currentTimeRange === 7) {
+                                loadDashboardData(currentTimeRange);
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    console.error('WebSocket message error:', error);
                 }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = function() {
+                // Reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
             };
         }
 
@@ -847,7 +916,7 @@
         }
 
         // Initialize WebSocket on load
-        // connectWebSocket();
+        connectWebSocket();
     </script>
 </body>
 </html>

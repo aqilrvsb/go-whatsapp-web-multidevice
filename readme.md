@@ -1,7 +1,13 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
 **Last Updated: June 23, 2025**  
-**Latest Fix: Added missing config import in app.go**
+**Latest Fix: Implemented QR code display with auto-refresh and WebSocket integration**
+
+## Features Added:
+- QR code generation from WhatsApp login API
+- Auto-refresh QR code every 20 seconds
+- WebSocket connection for real-time device status updates
+- Automatic modal close when device connects
 
 ## Login Credentials
 - **Admin Account**: 

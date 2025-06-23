@@ -34,6 +34,9 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/analytics/custom", rest.GetCustomAnalyticsData)
 	app.Get("/api/devices", rest.GetConnectedDevices)
 	
+	// WhatsApp QR code endpoint
+	app.Get("/app/qr", rest.GetQRCode)
+	
 	// API endpoints
 	app.Get("/app/login", rest.Login)
 	app.Get("/app/login-with-code", rest.LoginWithCode)
@@ -203,5 +206,31 @@ func (handler *App) HandleRegister(c *fiber.Ctx) error {
 			"email":    registerReq.Email,
 			"fullname": registerReq.FullName,
 		},
+	})
+}
+// GetQRCode returns the QR code image directly
+func (handler *App) GetQRCode(c *fiber.Ctx) error {
+	// Get QR code from login service
+	response, err := handler.Service.Login(c.UserContext())
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to generate QR code",
+		})
+	}
+	
+	// Read the QR image file
+	qrImagePath := response.ImagePath
+	if qrImagePath != "" {
+		// Return the image file
+		return c.SendFile(qrImagePath)
+	}
+	
+	// If no QR code available, return error image
+	return c.Status(404).JSON(utils.ResponseData{
+		Status:  404,
+		Code:    "NOT_FOUND",
+		Message: "QR code not available",
 	})
 }
