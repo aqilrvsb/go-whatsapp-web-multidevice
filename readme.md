@@ -73,9 +73,32 @@
 ### Required Environment Variables:
 ```
 DB_URI=postgresql://user:pass@host:port/database?sslmode=require
-APP_PORT=3000
+PORT=3000                    # Railway provides this automatically
+APP_PORT=3000               # Fallback if PORT not set
 APP_BASIC_AUTH=admin:changeme123
+APP_DEBUG=false
+APP_OS=Chrome
+APP_CHAT_FLUSH_INTERVAL=7
+WHATSAPP_AUTO_REPLY=
+WHATSAPP_WEBHOOK=
+WHATSAPP_WEBHOOK_SECRET=
+WHATSAPP_ACCOUNT_VALIDATION=true
+WHATSAPP_CHAT_STORAGE=true
 ```
+
+### Troubleshooting 502 Error:
+If you're seeing a 502 error, check:
+1. **Database Connection**: Ensure DB_URI is correct and PostgreSQL is accessible
+2. **Environment Variables**: All required variables must be set in Railway
+3. **Application Logs**: Check Railway logs for startup errors
+4. **Port Configuration**: Railway automatically sets PORT env variable
+5. **Database Migration**: The app creates tables on first run - check if it has permissions
+
+### Current Status (June 23, 2025):
+- ✅ Code fixed and builds successfully
+- ✅ PostgreSQL integration complete
+- ✅ Auto-deployment configured
+- ⚠️ 502 error indicates runtime issue - check Railway logs
 
 ## Login Credentials
 - **Admin Account**: 

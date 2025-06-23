@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -15,6 +16,10 @@ type App struct {
 
 func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	rest := App{Service: service}
+	
+	// Health check endpoint
+	app.Get("/health", rest.HealthCheck)
+	app.Get("/api/health", rest.HealthCheck)
 	
 	// Dashboard routes
 	app.Get("/", func(c *fiber.Ctx) error {
@@ -241,5 +246,45 @@ func (handler *App) GetQRCode(c *fiber.Ctx) error {
 		Status:  404,
 		Code:    "NOT_FOUND",
 		Message: "QR code not available",
+	})
+}
+
+// HealthCheck endpoint to verify application status
+func (handler *App) HealthCheck(c *fiber.Ctx) error {
+	// Check database connection
+	userRepo := repository.GetUserRepository()
+	dbHealthy := true
+	dbError := ""
+	
+	// Try to get a user to test DB connection
+	_, err := userRepo.GetUserByEmail("test@health.check")
+	if err != nil && err.Error() != "user not found" {
+		dbHealthy = false
+		dbError = err.Error()
+	}
+	
+	health := fiber.Map{
+		"status": "ok",
+		"version": config.AppVersion,
+		"database": fiber.Map{
+			"connected": dbHealthy,
+			"error": dbError,
+		},
+		"environment": fiber.Map{
+			"port": config.AppPort,
+			"debug": config.AppDebug,
+		},
+	}
+	
+	if !dbHealthy {
+		return c.Status(503).JSON(fiber.Map{
+			"status": "error",
+			"health": health,
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "healthy",
+		"health": health,
 	})
 }
