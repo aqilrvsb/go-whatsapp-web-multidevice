@@ -1,338 +1,107 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" type="text/css"
-          href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.8/semantic.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.4/css/dataTables.semanticui.min.css">
-    <link rel="stylesheet" href="assets/app.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Web Multi-Device</title>
+    <meta name="description" content="WhatsApp Web Multi-Device API">
     <style>
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #00A884 0%, #008069 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            transition: opacity 0.5s ease-in-out;
-            color: white;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
         }
-        #splash-screen.fade-out {
-            opacity: 0;
-            pointer-events: none;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .splash-icon {
-            font-size: 5em;
-            color: white;
-            margin-bottom: 20px;
-            animation: bounce 2s infinite;
+        h1 {
+            color: #128c7e;
+            text-align: center;
         }
-        .splash-spinner {
-            margin-top: 20px;
+        .status {
+            text-align: center;
+            padding: 20px;
+            background: #dcf8c6;
+            border-radius: 8px;
+            margin: 20px 0;
         }
-        .splash-title {
-            font-size: 2em;
-            font-weight: bold;
+        .info {
+            margin: 20px 0;
+        }
+        .info h2 {
+            color: #075e54;
+        }
+        .endpoints {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
             margin: 10px 0;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
+        .endpoints ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .endpoints li {
+            padding: 5px 0;
+            color: #495057;
+        }
+        .endpoints code {
+            background: #e9ecef;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 14px;
         }
     </style>
-    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.4/js/dataTables.semanticui.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.8/semantic.min.js"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/axios@1.1.2/dist/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-    <title>WhatsApp API {{ .AppVersion }}</title>
 </head>
 <body>
-<div id="splash-screen">
-    <i class="whatsapp icon splash-icon"></i>
-    <h2 class="splash-title">WhatsApp API</h2>
-    <div class="ui active large inline loader splash-spinner"></div>
-</div>
-
-<div class="ui container" id="app" style="display: none;">
-    <div class="main-header">
-        <h1 class="ui header center aligned">
-            <div class="title-container">
-                <i class="whatsapp icon"></i>
-                WhatsApp API
-
-                <div class="version-label">
-                    {{ .AppVersion }}
-                </div>
-            </div>
-        </h1>
-    </div>
-
-    <div class="ui success message" v-if="connected_devices != null">
-        <div class="header">
-            <i class="check circle icon"></i>
-            Device Connected Successfully
+    <div class="container">
+        <h1>🚀 WhatsApp Web Multi-Device API</h1>
+        
+        <div class="status">
+            <h2>✅ Server Status: Online</h2>
+            <p>WhatsApp Web Multi-Device service is running</p>
         </div>
-        <p>
-            Device ID: <b>[[ connected_devices[0].device ]]</b>
-        </p>
+
+        <div class="info">
+            <h2>📱 Getting Started</h2>
+            <p>To use the WhatsApp Web Multi-Device API:</p>
+            <ol>
+                <li>Access the login page at <code>/app/login</code></li>
+                <li>Scan the QR code with your WhatsApp mobile app</li>
+                <li>Start using the API endpoints</li>
+            </ol>
+        </div>
+
+        <div class="info">
+            <h2>🔌 Main Endpoints</h2>
+            <div class="endpoints">
+                <ul>
+                    <li><strong>GET</strong> <code>/app/login</code> - Login page with QR code</li>
+                    <li><strong>GET</strong> <code>/app/devices</code> - List connected devices</li>
+                    <li><strong>POST</strong> <code>/send/message</code> - Send text message</li>
+                    <li><strong>POST</strong> <code>/send/image</code> - Send image</li>
+                    <li><strong>POST</strong> <code>/send/document</code> - Send document</li>
+                    <li><strong>GET</strong> <code>/user/info</code> - Get user information</li>
+                    <li><strong>GET</strong> <code>/user/avatar</code> - Get user avatar</li>
+                    <li><strong>GET</strong> <code>/group/list</code> - List groups</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info">
+            <h2>📚 Documentation</h2>
+            <p>For complete API documentation, visit <code>/docs</code></p>
+        </div>
+
+        <div class="info" style="text-align: center; margin-top: 40px; color: #666;">
+            <p>Powered by <a href="https://github.com/aldinokemal/go-whatsapp-web-multidevice" target="_blank" style="color: #128c7e;">go-whatsapp-web-multidevice</a></p>
+        </div>
     </div>
-
-    <div class="ui horizontal divider">
-        App
-    </div>
-
-    <div class="ui three column stackable grid cards">
-        <app-login :connected="connected_devices"></app-login>
-        <app-logout @reload-devices="handleReloadDevice"></app-logout>
-        <app-reconnect @reload-devices="handleReloadDevice"></app-reconnect>
-        <app-login-with-code :connected="connected_devices"></app-login-with-code>
-    </div>
-
-    <div class="ui horizontal divider">
-        Send
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <send-message></send-message>
-        <send-image></send-image>
-        <send-file max-file-size="{{ .MaxFileSize }}"></send-file>
-
-        <send-video max-video-size="{{ .MaxVideoSize }}"></send-video>
-        <send-contact></send-contact>
-        <send-location></send-location>
-
-        <send-audio></send-audio>
-        <send-poll></send-poll>
-        <send-presence></send-presence>
-        
-        <send-link></send-link>
-    </div>
-
-    <div class="ui horizontal divider">
-        Message
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <message-delete></message-delete>
-        <message-revoke></message-revoke>
-        <message-react></message-react>
-        <message-update></message-update>
-    </div>
-
-    <div class="ui horizontal divider">
-        Group
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <group-list :connected="connected_devices"></group-list>
-        <group-create></group-create>
-        <group-join-with-link></group-join-with-link>
-        <group-add-participants></group-add-participants>
-    </div>
-
-    <div class="ui horizontal divider">
-        Newsletter
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <newsletter-list></newsletter-list>
-    </div>
-
-    <div class="ui horizontal divider">
-        Account
-    </div>
-
-    <div class="ui three column doubling grid cards">
-        <account-avatar></account-avatar>
-        <account-change-avatar></account-change-avatar>
-        <account-change-push-name></account-change-push-name>
-        <account-user-info></account-user-info>
-        <account-privacy></account-privacy>
-        <account-contact></account-contact>
-        <account-user-check></account-user-check>
-    </div>
-
-</div>
-<script>
-    window.TYPEGROUP = "@g.us";
-    window.TYPEUSER = "@s.whatsapp.net";
-    window.TYPENEWSLETTER = "@newsletter";
-    window.TYPESTATUS = "status@broadcast";
-    window.showErrorInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Error',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'red'
-        });
-    }
-    window.showSuccessInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Success',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'green'
-        });
-    }
-
-    window.http = axios.create({
-        baseURL: `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`
-    });
-    {{ if isEnableBasicAuth .BasicAuthToken }}
-    window.http.defaults.headers.common['Authorization'] = {{ .BasicAuthToken }};
-    {{ end }}
-</script>
-<script type="module">
-    import AppLogin from "./components/AppLogin.js";
-    import AppLoginWithCode from "./components/AppLoginWithCode.js";
-    import AppLogout from "./components/AppLogout.js";
-    import AppReconnect from "./components/AppReconnect.js";
-    import SendMessage from "./components/SendMessage.js";
-    import SendImage from "./components/SendImage.js";
-    import SendFile from "./components/SendFile.js";
-    import SendVideo from "./components/SendVideo.js";
-    import SendLink from "./components/SendLink.js";
-    import SendContact from "./components/SendContact.js";
-    import SendLocation from "./components/SendLocation.js";
-    import SendAudio from "./components/SendAudio.js";
-    import SendPoll from "./components/SendPoll.js";
-    import SendPresence from "./components/SendPresence.js";
-    import MessageDelete from "./components/MessageDelete.js";
-    import MessageUpdate from "./components/MessageUpdate.js";
-    import MessageReact from "./components/MessageReact.js";
-    import MessageRevoke from "./components/MessageRevoke.js";
-    import GroupList from "./components/GroupList.js";
-    import GroupCreate from "./components/GroupCreate.js";
-    import GroupJoinWithLink from "./components/GroupJoinWithLink.js";
-    import GroupAddParticipants from "./components/GroupManageParticipants.js";
-    import NewsletterList from "./components/NewsletterList.js";
-    import AccountAvatar from "./components/AccountAvatar.js";
-    import AccountChangeAvatar from "./components/AccountChangeAvatar.js";
-    import AccountChangePushName from "./components/AccountChangePushName.js";
-    import AccountUserInfo from "./components/AccountUserInfo.js";
-    import AccountPrivacy from "./components/AccountPrivacy.js";
-    import AccountContact from "./components/AccountContact.js";
-    import AccountUserCheck from "./components/AccountUserCheck.js";
-
-    const showErrorInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Error',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'red'
-        });
-    }
-    const showSuccessInfo = (message) => {
-        $('body').toast({
-            position: 'bottom right',
-            title: 'Success',
-            message: message,
-            showProgress: 'bottom',
-            classProgress: 'green'
-        });
-    }
-
-    const constructWebSocketURL = () => {
-        const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const path = location.pathname
-            // Remove trailing slash
-            .replace(/\/+$/, '')
-            // Remove double slashes
-            .replace(/\/+/g, '/');
-        
-        return `${protocol}${location.host}${path}/ws`;
-    };
-
-    Vue.createApp({
-        components: {
-            AppLogin, AppLoginWithCode, AppLogout, AppReconnect,
-            SendMessage, SendImage, SendFile, SendVideo, SendLink, SendContact, SendLocation, SendAudio, SendPoll, SendPresence,
-            MessageDelete, MessageUpdate, MessageReact, MessageRevoke,
-            GroupList, GroupCreate, GroupJoinWithLink, GroupAddParticipants,
-            NewsletterList,
-            AccountAvatar, AccountUserInfo, AccountPrivacy, AccountChangeAvatar, AccountContact, AccountChangePushName, AccountUserCheck
-        },
-        delimiters: ['[[', ']]'],
-        data() {
-            return {
-                app_ws: null,
-                connected_devices: null,
-            }
-        },
-        methods: {
-            handleReloadDevice() {
-                this.app_ws.send(JSON.stringify({"code": "FETCH_DEVICES"}))
-            }
-        },
-        mounted() {
-            // Initialize app container as hidden
-            document.getElementById('app').style.display = 'none';
-            
-            if (window["WebSocket"]) {
-                this.app_ws = new WebSocket(constructWebSocketURL());
-
-                this.app_ws.onopen = (evt) => {
-                    this.app_ws.send(JSON.stringify({
-                        "code": "FETCH_DEVICES",
-                        "message": "List device"
-                    }));
-                    
-                    // Show app container and hide splash screen with a slight delay
-                    setTimeout(() => {
-                        document.getElementById('app').style.display = 'block';
-                        document.getElementById('splash-screen').classList.add('fade-out');
-                    }, 1000);
-                };
-
-                this.app_ws.onerror = (error) => {
-                     console.error('WebSocket error:', error);
-                     showErrorInfo('Connection error occurred. Please refresh the page.');
-                     // Hide splash screen and show error state
-                     setTimeout(() => {
-                         document.getElementById('app').style.display = 'block';
-                         document.getElementById('splash-screen').classList.add('fade-out');
-                     }, 1000);
-                };
-
-                this.app_ws.onmessage = (evt) => {
-                    const message = JSON.parse(evt.data)
-                    switch (message.code) {
-                        case 'LOGIN_SUCCESS':
-                            showSuccessInfo(message.message)
-                            $('#modalLogin').modal('hide');
-
-                            // fetch devices
-                            this.handleReloadDevice()
-                            break;
-                        case 'LIST_DEVICES':
-                            this.connected_devices = message.result
-                            break;
-                        default:
-                            console.log(message)
-                    }
-                };
-            } else {
-                console.error('Your browser does not support WebSockets');
-                // Hide splash screen if WebSocket is not supported
-                document.getElementById('splash-screen').classList.add('fade-out');
-            }
-        },
-    }).mount('#app')
-</script>
 </body>
 </html>
