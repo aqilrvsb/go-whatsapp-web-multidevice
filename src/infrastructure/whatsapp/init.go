@@ -70,11 +70,16 @@ func InitWaDB(ctx context.Context) *sqlstore.Container {
 func initDatabase(ctx context.Context, dbLog waLog.Logger) (*sqlstore.Container, error) {
 	if strings.HasPrefix(config.DBURI, "file:") {
 		return sqlstore.New(ctx, "sqlite3", config.DBURI, dbLog)
-	} else if strings.HasPrefix(config.DBURI, "postgres:") {
-		return sqlstore.New(ctx, "postgres", config.DBURI, dbLog)
+	} else if strings.HasPrefix(config.DBURI, "postgres:") || strings.HasPrefix(config.DBURI, "postgresql:") {
+		// Convert postgresql:// to postgres:// for the driver
+		dbUri := config.DBURI
+		if strings.HasPrefix(dbUri, "postgresql://") {
+			dbUri = strings.Replace(dbUri, "postgresql://", "postgres://", 1)
+		}
+		return sqlstore.New(ctx, "postgres", dbUri, dbLog)
 	}
 
-	return nil, fmt.Errorf("unknown database type: %s. Currently only sqlite3(file:) and postgres are supported", config.DBURI)
+	return nil, fmt.Errorf("unknown database type: %s. Currently only sqlite3(file:) and postgres/postgresql are supported", config.DBURI)
 }
 
 // InitWaCLI initializes the WhatsApp client
