@@ -12,6 +12,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -201,10 +202,9 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 	message := ExtractMessageText(evt)
 	utils.RecordMessage(evt.Info.ID, evt.Info.Sender.String(), message)
 	
-	// Record for analytics with user email (get from current session/device)
-	userEmail := "admin@whatsapp.com" // TODO: Get from authenticated user
-	deviceID := "device1" // TODO: Get actual device ID
-	deviceName := "Primary Device" // TODO: Get actual device name
+	// Record to database for analytics
+	// TODO: Get actual user and device from session context
+	// For now, we'll need to implement a device mapping system
 	
 	// Determine message status
 	status := "sent"
@@ -212,16 +212,33 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 		status = "received"
 	}
 	
-	utils.RecordMessageForUser(
-		evt.Info.ID,
-		userEmail,
-		evt.Info.Chat.String(),
-		message,
-		evt.Info.IsFromMe,
-		status,
-		deviceID,
-		deviceName,
-	)
+	// Try to record in database (if we have user context)
+	if analyticsRepo := ctx.Value("analyticsRepo"); analyticsRepo != nil {
+		if repo, ok := analyticsRepo.(*repository.MessageAnalyticsRepository); ok {
+			// Get user and device info from context
+			userID := ""
+			deviceID := ""
+			
+			if userCtx := ctx.Value("userID"); userCtx != nil {
+				userID = userCtx.(string)
+			}
+			if deviceCtx := ctx.Value("deviceID"); deviceCtx != nil {
+				deviceID = deviceCtx.(string)
+			}
+			
+			if userID != "" && deviceID != "" {
+				repo.RecordMessage(
+					userID,
+					deviceID,
+					evt.Info.ID,
+					evt.Info.Chat.String(),
+					message,
+					evt.Info.IsFromMe,
+					status,
+				)
+			}
+		}
+	}
 
 	// Handle image message if present
 	handleImageMessage(ctx, evt)
@@ -285,18 +302,26 @@ func handleWebhookForward(ctx context.Context, evt *events.Message) {
 	}
 }
 
-func handleReceipt(_ context.Context, evt *events.Receipt) {
+func handleReceipt(ctx context.Context, evt *events.Receipt) {
 	if evt.Type == types.ReceiptTypeRead || evt.Type == types.ReceiptTypeReadSelf {
 		log.Infof("%v was read by %s at %s", evt.MessageIDs, evt.SourceString(), evt.Timestamp)
-		// Update message status to "read"
-		for _, msgID := range evt.MessageIDs {
-			utils.UpdateMessageStatus(msgID, "read")
+		// Update message status to "read" in database
+		if analyticsRepo := ctx.Value("analyticsRepo"); analyticsRepo != nil {
+			if repo, ok := analyticsRepo.(*repository.MessageAnalyticsRepository); ok {
+				for _, msgID := range evt.MessageIDs {
+					repo.UpdateMessageStatus(msgID, "read")
+				}
+			}
 		}
 	} else if evt.Type == types.ReceiptTypeDelivered {
 		log.Infof("%s was delivered to %s at %s", evt.MessageIDs[0], evt.SourceString(), evt.Timestamp)
-		// Update message status to "delivered"
-		for _, msgID := range evt.MessageIDs {
-			utils.UpdateMessageStatus(msgID, "delivered")
+		// Update message status to "delivered" in database
+		if analyticsRepo := ctx.Value("analyticsRepo"); analyticsRepo != nil {
+			if repo, ok := analyticsRepo.(*repository.MessageAnalyticsRepository); ok {
+				for _, msgID := range evt.MessageIDs {
+					repo.UpdateMessageStatus(msgID, "delivered")
+				}
+			}
 		}
 	}
 }

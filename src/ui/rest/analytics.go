@@ -11,13 +11,42 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+package rest
+
+import (
+	"time"
+	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/gofiber/fiber/v2"
+)
+
 // GetAnalyticsData returns analytics data for the dashboard
 func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 	days := c.Params("days", "7")
 	deviceFilter := c.Query("device", "all")
 	
-	// Get user email from session/auth (for now using a placeholder)
-	userEmail := c.Get("X-User-Email", "admin@whatsapp.com")
+	// Get user from session token
+	token := c.Get("Authorization")
+	if token == "" {
+		token = c.Get("X-Auth-Token")
+	}
+	
+	userRepo := repository.NewUserRepository()
+	session, err := userRepo.GetSession(token)
+	if err != nil {
+		// Fallback to header for now
+		userID := c.Get("X-User-ID", "")
+		if userID == "" {
+			return c.Status(401).JSON(utils.ResponseData{
+				Status:  401,
+				Code:    "UNAUTHORIZED",
+				Message: "Invalid session",
+			})
+		}
+		session = &models.UserSession{UserID: userID}
+	}
 	
 	daysInt := 7
 	switch days {
@@ -35,8 +64,16 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -daysInt)
 	
-	// Get real analytics from message records
-	analytics := utils.GetUserAnalytics(userEmail, startDate, endDate, deviceFilter)
+	// Get real analytics from database
+	analyticsRepo := repository.NewMessageAnalyticsRepository()
+	analytics, err := analyticsRepo.GetUserAnalytics(session.UserID, startDate, endDate, deviceFilter)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get analytics",
+		})
+	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
@@ -213,40 +250,49 @@ func convertDailyMapToSlice(dailyMap map[string]fiber.Map, startDate, endDate ti
 
 // GetConnectedDevices returns real connected devices
 func (handler *App) GetConnectedDevices(c *fiber.Ctx) error {
-	devices := []fiber.Map{}
+	// Get user from session
+	token := c.Get("Authorization")
+	if token == "" {
+		token = c.Get("X-Auth-Token")
+	}
 	
-	// Get devices from the service
-	devicesList, err := handler.Service.FetchDevices(c.UserContext())
-	if err == nil && len(devicesList) > 0 {
-		for i, device := range devicesList {
-			devices = append(devices, fiber.Map{
-				"id":       i + 1,
-				"name":     device.Name,
-				"phone":    device.Device,
-				"status":   "online",
-				"lastSeen": "Active now",
-				"pushName": device.Name,
-			})
-		}
-	} else {
-		// Try to get first device
-		firstDevice, err := handler.Service.FirstDevice(c.UserContext())
-		if err == nil {
-			devices = append(devices, fiber.Map{
-				"id":       1,
-				"name":     firstDevice.Name,
-				"phone":    firstDevice.Device,
-				"status":   "online",
-				"lastSeen": "Active now",
-				"pushName": firstDevice.Name,
-			})
-		}
+	userRepo := repository.NewUserRepository()
+	session, err := userRepo.GetSession(token)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user devices from database
+	devices, err := userRepo.GetUserDevices(session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	
+	// Convert to response format
+	deviceList := make([]fiber.Map, 0, len(devices))
+	for _, device := range devices {
+		deviceList = append(deviceList, fiber.Map{
+			"id":       device.ID,
+			"name":     device.DeviceName,
+			"phone":    device.Phone,
+			"status":   device.Status,
+			"lastSeen": device.LastSeen.Format("2006-01-02 15:04:05"),
+			"jid":      device.JID,
+		})
 	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Devices retrieved",
-		Results: devices,
+		Results: deviceList,
 	})
 }
