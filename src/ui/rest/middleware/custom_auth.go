@@ -10,19 +10,17 @@ import (
 
 // PublicRoutes that don't require authentication
 var PublicRoutes = []string{
+	"/",
 	"/login",
 	"/register",
-	"/logout", 
-	"/api/login",
-	"/api/register",
-	"/api/analytics",     // Allow analytics endpoints
-	"/api/devices",       // Allow device management
+	"/logout",
+	"/dashboard",         // Allow dashboard access
+	"/api",              // Allow all API endpoints temporarily
+	"/app",              // Allow all /app endpoints for WhatsApp functionality
 	"/health",
-	"/api/health",
 	"/statics",
 	"/assets",
 	"/components",
-	"/app",              // Allow all /app endpoints for WhatsApp functionality
 	"/favicon.ico",
 	"/robots.txt",
 }
@@ -62,8 +60,9 @@ func CustomAuth() fiber.Handler {
 		}
 		
 		// Debug logging (remove in production)
-		if strings.HasPrefix(path, "/api/") {
-			fmt.Printf("API Auth Debug - Path: %s, Token: %s, Method: %s\n", path, token, c.Method())
+		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/app/") {
+			fmt.Printf("API Auth Debug - Path: %s, Token: %s, Method: %s, Cookie: %s\n", 
+				path, token, c.Method(), c.Cookies("session_token"))
 		}
 		
 		// If no token found
