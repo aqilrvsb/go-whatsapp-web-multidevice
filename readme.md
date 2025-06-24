@@ -1,9 +1,21 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 24, 2025 - 4:00 PM**  
-**Latest Feature: Complete Device Management System**
+**Last Updated: June 24, 2025 - 5:00 PM**  
+**Latest Feature: Authentication Fix & Modern UI Redesign**
 
 ## 🚀 Latest Updates:
+
+### UI Improvements & Auth Fix (June 24, 2025 - 5:00 PM)
+- **Fixed 401 Authentication Errors**: Added /app endpoints to public routes
+- **Redesigned Devices Tab**:
+  - Modern 2-column card layout with better visual hierarchy
+  - Connected devices show green border
+  - Empty state with friendly message when no devices
+  - Improved phone number management with inline editing
+  - Device status icons and connection indicators
+  - Grouped action buttons (QR Code + Phone Code)
+- **Debug Logging**: Added auth middleware debugging for troubleshooting
+- **Better UX**: Clearer device states, last active time, and actions
 
 ### Device Management System (June 24, 2025 - 4:00 PM)
 - **Multi-Device Support**: Each user can manage multiple WhatsApp devices
@@ -109,7 +121,7 @@
 - Sessions persist across browser refreshes
 - Logout endpoint: `/logout`
 
-## 📈 Current Status (June 24, 2025 - 3:00 PM)
+## 📈 Current Status (June 24, 2025 - 5:00 PM)
 
 ### ✅ Working Features:
 - User registration with base64 passwords
@@ -118,39 +130,37 @@
 - PostgreSQL database integration
 - Railway deployment (after forcing rebuild)
 - QR code display for WhatsApp connection
+- Phone code pairing (returns code like `6ZPJ-KFNJ`)
 - Device filter dropdown with "All Devices" option
+- Modern device management UI
+- Phone number linking to devices
+
+### ✅ Fixed Issues:
+- 401 Authentication errors on API endpoints
+- Device management UI completely redesigned
+- Empty state for no devices
+- Better visual feedback for device status
 
 ### ⚠️ In Progress:
-- Linking phone numbers to devices
 - Connecting actual WhatsApp accounts
 - Real-time message analytics
+- Device-specific statistics
 
-### 🔧 Recent Fixes Applied:
-1. **JavaScript Errors Fixed**:
-   - Added proper spacing between functions
-   - Fixed "updateDeviceFilter is not defined" error
-   - Fixed "startAutoRefresh is not defined" error
+### 🎨 UI Improvements:
+1. **Devices Tab Redesign**:
+   - 2-column responsive grid layout
+   - Large, informative device cards
+   - Visual connection status (green border for connected)
+   - Device icons with status colors
+   - Phone number section with edit capability
+   - Grouped action buttons
+   - Empty state with call-to-action
 
-2. **Authentication Fixed**:
-   - Added `credentials: 'include'` to all fetch calls
-   - Cookie-based sessions working properly
-   - No more 401 errors on API calls
-
-3. **Device Filter Fixed**:
-   ```javascript
-   deviceFilter.innerHTML = '<option value="all">All Devices</option>';
-   ```
-
-4. **Railway Deployment Fixed**:
-   - Discovered HTML views are embedded in Go binary
-   - Forced complete rebuild to update embedded files
-   - Deployment now works correctly
-
-### 🔄 Latest Code Changes:
-- Added `/app/link-device` endpoint for linking phone numbers
-- Updated all API calls to include credentials
-- Fixed function definitions in dashboard.html
-- Added console logging for debugging
+2. **Better Visual Hierarchy**:
+   - Clear device names and status
+   - Separated phone number section
+   - Last active time display
+   - Dropdown menu for additional actions
 
 ## 📱 Device Management Guide
 
