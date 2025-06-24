@@ -47,6 +47,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// API endpoints
 	app.Get("/app/login", rest.Login)
 	app.Get("/app/login-with-code", rest.LoginWithCode)
+	app.Post("/app/link-device", rest.LinkDevicePhone)
 	app.Get("/app/logout", rest.Logout)
 	app.Get("/app/reconnect", rest.Reconnect)
 	app.Get("/app/devices", rest.Devices)
@@ -114,6 +115,42 @@ func (handler *App) Devices(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Fetch device success",
 		Results: devices,
+	})
+}
+
+// LinkDevicePhone links a phone number to a device for the current user
+func (handler *App) LinkDevicePhone(c *fiber.Ctx) error {
+	var req struct {
+		DeviceID string `json:"device_id"`
+		Phone    string `json:"phone"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	// Get user from context (set by auth middleware)
+	userID := c.Locals("userID")
+	if userID == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
+	}
+	
+	// Update device with phone number
+	userRepo := repository.GetUserRepository()
+	err := userRepo.UpdateDevicePhone(userID.(string), req.DeviceID, req.Phone)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to update device",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"message": "Phone number linked successfully",
 	})
 }
 

@@ -351,3 +351,27 @@ func (r *UserRepository) CleanupExpiredSessions() error {
 	_, err := r.db.Exec("DELETE FROM user_sessions WHERE expires_at < CURRENT_TIMESTAMP")
 	return err
 }
+
+// UpdateDevicePhone updates the phone number for a user's device
+func (r *UserRepository) UpdateDevicePhone(userID, deviceID, phone string) error {
+	query := `
+		UPDATE user_devices 
+		SET phone = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = $2 AND id = $3
+	`
+	result, err := r.db.Exec(query, phone, userID, deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to update device phone: %w", err)
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	
+	if rowsAffected == 0 {
+		return fmt.Errorf("device not found or not owned by user")
+	}
+	
+	return nil
+}
