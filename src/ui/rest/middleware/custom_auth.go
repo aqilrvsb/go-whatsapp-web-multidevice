@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"fmt"
+	"strings"
+	
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"strings"
 )
 
 // PublicRoutes that don't require authentication
@@ -18,6 +20,7 @@ var PublicRoutes = []string{
 	"/statics",
 	"/assets",
 	"/components",
+	"/app",  // Allow all /app endpoints for WhatsApp functionality
 }
 
 // CustomAuth middleware for session-based authentication
@@ -43,6 +46,9 @@ func CustomAuth() fiber.Handler {
 			}
 		}
 		
+		// Debug logging
+		fmt.Printf("Auth Debug - Path: %s, Token: %s\n", path, token)
+		
 		if token == "" {
 			// No token, redirect to login
 			if strings.HasPrefix(path, "/api/") {
@@ -59,15 +65,19 @@ func CustomAuth() fiber.Handler {
 		userRepo := repository.GetUserRepository()
 		session, err := userRepo.GetSession(strings.TrimPrefix(token, "Bearer "))
 		if err != nil {
+			fmt.Printf("Session validation error: %v\n", err)
 			if strings.HasPrefix(path, "/api/") {
 				return c.Status(401).JSON(fiber.Map{
 					"status": 401,
 					"code": "UNAUTHORIZED", 
-					"message": "Invalid or expired session",
+					"message": "Invalid session",
 				})
 			}
 			return c.Redirect("/login")
 		}
+		
+		// Debug - session found
+		fmt.Printf("Session found for user: %s\n", session.UserID)
 		
 		// Set user context
 		c.Locals("userID", session.UserID)
