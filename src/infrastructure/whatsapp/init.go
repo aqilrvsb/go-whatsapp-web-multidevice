@@ -157,10 +157,23 @@ func handleAppStateSyncComplete(_ context.Context, evt *events.AppStateSyncCompl
 }
 
 func handlePairSuccess(_ context.Context, evt *events.PairSuccess) {
+	log.Infof("Pair success! ID: %s, BusinessName: %s, Platform: %s", 
+		evt.ID.String(), evt.BusinessName, evt.Platform)
+	
+	// Update device status in database
+	if userRepo := repository.GetUserRepository(); userRepo != nil {
+		// TODO: Get current user and device ID from context
+		// For now, just broadcast the success
+		log.Info("Device paired successfully, waiting for full connection...")
+	}
+	
 	websocket.Broadcast <- websocket.BroadcastMessage{
 		Code:    "LOGIN_SUCCESS",
-		Message: fmt.Sprintf("Successfully pair with %s", evt.ID.String()),
+		Message: fmt.Sprintf("Successfully paired with %s", evt.ID.String()),
 	}
+	
+	// The device is paired but not fully connected yet
+	// Wait for Connected event to update status to "online"
 }
 
 func handleLoggedOut(_ context.Context) {
@@ -171,6 +184,32 @@ func handleLoggedOut(_ context.Context) {
 }
 
 func handleConnectionEvents(_ context.Context) {
+	log.Info("WhatsApp connection event received")
+	
+	if !cli.IsConnected() {
+		log.Warn("Connection event received but client not connected")
+		return
+	}
+	
+	if cli.IsLoggedIn() {
+		log.Info("WhatsApp client is logged in and connected!")
+		
+		// Send connection success message
+		websocket.Broadcast <- websocket.BroadcastMessage{
+			Code:    "DEVICE_CONNECTED",
+			Message: "WhatsApp fully connected and logged in",
+		}
+		
+		// Get device info
+		if cli.Store.ID != nil {
+			jid := cli.Store.ID.String()
+			phone := cli.Store.ID.User
+			pushName := cli.Store.PushName
+			
+			log.Infof("Connected as: %s (Phone: %s, Name: %s)", jid, phone, pushName)
+		}
+	}
+	
 	if len(cli.Store.PushName) == 0 {
 		return
 	}

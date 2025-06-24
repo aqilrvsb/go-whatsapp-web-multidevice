@@ -1349,14 +1349,21 @@
                     // Handle different message types
                     switch(data.code) {
                         case 'LOGIN_SUCCESS':
-                            // Device connected successfully
-                            console.log('Device connected:', data.message);
+                            // Device paired successfully (but not fully connected yet)
+                            console.log('Device paired:', data.message);
+                            // Don't close modal yet, wait for full connection
+                            break;
+                        case 'DEVICE_CONNECTED':
+                            // Device fully connected and logged in
+                            console.log('Device fully connected:', data.message);
                             // Close QR modal if open
                             const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
                             if (qrModal) {
                                 qrModal.hide();
                             }
-                            // Reload devices
+                            // Show success message
+                            alert('WhatsApp connected successfully!');
+                            // Reload devices to show updated status
                             loadDevices();
                             break;
                         case 'DEVICE_STATUS':
