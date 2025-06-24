@@ -446,7 +446,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Dashboard Version: 1.1.0 - Device filter fix applied');
-            alert('NEW VERSION LOADED! v1.1.0 - If you see this, the deployment worked!');
+            console.log('This version includes the "All Devices" option fix');
             initializeChart();
             loadDashboardData(7);
             loadDevices();
@@ -1116,21 +1116,24 @@
 
         // Update Device Filter Dropdown
         function updateDeviceFilter() {
+            console.log('updateDeviceFilter v1.1.0 - WITH FIX - Adding "All Devices" option');
             const deviceFilter = document.getElementById('deviceFilter');
             
             // Clear existing options (except "All Devices")
             deviceFilter.innerHTML = '<option value="all">All Devices</option>';
+            console.log('Added "All Devices" option to dropdown');
             
             // Add device options
             devices.forEach(device => {
                 const option = document.createElement('option');
                 option.value = device.id;
-                option.textContent = `${device.name} (${device.phone})`;
+                option.textContent = `${device.name} (${device.phone || 'No phone'})`;
                 deviceFilter.appendChild(option);
             });
             
             // Restore selected value
             deviceFilter.value = currentDeviceFilter;
+            console.log('Device filter updated with', devices.length, 'devices');
         }
         // Auto-refresh functions
         function startAutoRefresh() {
