@@ -40,6 +40,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/analytics/:days", rest.GetAnalyticsData)
 	app.Get("/api/analytics/custom", rest.GetCustomAnalyticsData)
 	app.Get("/api/devices", rest.GetConnectedDevices)
+	app.Post("/api/devices", rest.CreateDevice)
 	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
