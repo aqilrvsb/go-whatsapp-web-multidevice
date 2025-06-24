@@ -474,7 +474,7 @@
         let devices = [];
         let currentDeviceFilter = 'all';
         let refreshInterval;
-        let isAutoRefreshEnabled = true;
+        let isAutoRefreshEnabled = false;  // Default to disabled
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -495,8 +495,13 @@
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             document.getElementById('startDate').value = sevenDaysAgo.toISOString().split('T')[0];
             
-            // Start auto-refresh
-            startAutoRefresh();
+            // Start auto-refresh only if enabled
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+            }
+            
+            // Set the toggle to match the current state
+            document.getElementById('autoRefreshToggle').checked = isAutoRefreshEnabled;
         });
 
         // Initialize Chart

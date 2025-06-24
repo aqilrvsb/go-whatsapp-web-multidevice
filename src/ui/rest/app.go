@@ -61,11 +61,27 @@ func (handler *App) Login(c *fiber.Ctx) error {
 	// Get device ID from query params
 	deviceId := c.Query("deviceId")
 	
-	// Get user from context
+	// Get user from context or cookie
 	userID := c.Locals("userID")
+	if userID == nil {
+		// Try to get from session cookie as fallback
+		token := c.Cookies("session_token")
+		if token != "" {
+			userRepo := repository.GetUserRepository()
+			session, err := userRepo.GetSession(token)
+			if err == nil && session != nil {
+				userID = session.UserID
+			}
+		}
+	}
+	
+	// Log for debugging
+	log.Printf("Login request - UserID: %v, DeviceID: %s", userID, deviceId)
+	
 	if userID != nil && deviceId != "" {
 		// Start tracking this connection session
 		whatsapp.StartConnectionSession(userID.(string), deviceId, "")
+		log.Printf("Started connection session for user %s, device %s", userID, deviceId)
 	}
 	
 	response, err := handler.Service.Login(c.UserContext())

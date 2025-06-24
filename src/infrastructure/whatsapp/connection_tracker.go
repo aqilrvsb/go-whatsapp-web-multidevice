@@ -1,6 +1,7 @@
 package whatsapp
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -32,6 +33,10 @@ func StartConnectionSession(userID, deviceID, deviceName string) {
 		DeviceName: deviceName,
 		StartTime:  time.Now().Unix(),
 	}
+	
+	// Log for debugging
+	fmt.Printf("Started connection session: UserID=%s, DeviceID=%s, Total sessions=%d\n", 
+		userID, deviceID, len(connectionSessions))
 }
 
 // GetConnectionSession retrieves session info for a connected device

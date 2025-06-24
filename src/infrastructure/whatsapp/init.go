@@ -160,6 +160,25 @@ func handlePairSuccess(_ context.Context, evt *events.PairSuccess) {
 	log.Infof("Pair success! ID: %s, BusinessName: %s, Platform: %s", 
 		evt.ID.String(), evt.BusinessName, evt.Platform)
 	
+	// Log the phone number for debugging
+	if evt.ID.User != "" {
+		log.Infof("Phone number from pair success: %s", evt.ID.User)
+		
+		// Try to find and update the device immediately
+		userRepo := repository.GetUserRepository()
+		for userID, session := range connectionSessions {
+			if session != nil && session.DeviceID != "" {
+				log.Infof("Found session for user %s, updating device %s", userID, session.DeviceID)
+				// Update with phone number from pair success
+				err := userRepo.UpdateDeviceStatus(session.DeviceID, "connecting", evt.ID.User, evt.ID.String())
+				if err != nil {
+					log.Errorf("Failed to update device on pair success: %v", err)
+				}
+				break
+			}
+		}
+	}
+	
 	// Update device status in database
 	if userRepo := repository.GetUserRepository(); userRepo != nil {
 		// TODO: Get current user and device ID from context
