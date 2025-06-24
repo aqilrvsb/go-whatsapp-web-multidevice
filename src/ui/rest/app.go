@@ -42,6 +42,23 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/analytics/custom", rest.GetCustomAnalyticsData)
 	app.Get("/api/devices", rest.GetConnectedDevices)
 	app.Post("/api/devices", rest.CreateDevice)
+	app.Get("/api/devices/:id", rest.GetDevice)
+	
+	// Device pages
+	app.Get("/device/:id/actions", rest.DeviceActionsView)
+	app.Get("/device/:id/leads", rest.DeviceLeadsView)
+	
+	// Lead management endpoints
+	app.Get("/api/devices/:deviceId/leads", rest.GetDeviceLeads)
+	app.Post("/api/leads", rest.CreateLead)
+	app.Put("/api/leads/:id", rest.UpdateLead)
+	app.Delete("/api/leads/:id", rest.DeleteLead)
+	
+	// Campaign endpoints
+	app.Get("/api/campaigns", rest.GetCampaigns)
+	app.Post("/api/campaigns", rest.CreateCampaign)
+	app.Put("/api/campaigns/:id", rest.UpdateCampaign)
+	app.Delete("/api/campaigns/:id", rest.DeleteCampaign)
 	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
@@ -390,5 +407,150 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status": "healthy",
 		"health": health,
+	})
+} err)
+		// Return empty array instead of error
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "SUCCESS",
+			Message: "Campaigns retrieved successfully",
+			Results: []interface{}{},
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaigns retrieved successfully",
+		Results: campaigns,
+	})
+}
+
+// CreateCampaign creates a new campaign
+func (handler *App) CreateCampaign(c *fiber.Ctx) error {
+	userEmail := c.Locals("email").(string)
+	
+	var request struct {
+		CampaignDate  string `json:"campaign_date"`
+		Title         string `json:"title"`
+		Message       string `json:"message"`
+		ImageURL      string `json:"image_url"`
+		ScheduledTime string `json:"scheduled_time"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	campaignRepo := repository.GetCampaignRepository()
+	campaign, err := campaignRepo.CreateCampaign(user.ID, request.CampaignDate, request.Title, request.Message, request.ImageURL, request.ScheduledTime)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to create campaign: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  201,
+		Code:    "SUCCESS",
+		Message: "Campaign created successfully",
+		Results: campaign,
+	})
+}
+
+// UpdateCampaign updates an existing campaign
+func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
+	campaignId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	var request struct {
+		Title         string `json:"title"`
+		Message       string `json:"message"`
+		ImageURL      string `json:"image_url"`
+		ScheduledTime string `json:"scheduled_time"`
+		Status        string `json:"status"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	campaignRepo := repository.GetCampaignRepository()
+	campaign, err := campaignRepo.UpdateCampaign(user.ID, campaignId, request.Title, request.Message, request.ImageURL, request.ScheduledTime, request.Status)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to update campaign: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaign updated successfully",
+		Results: campaign,
+	})
+}
+
+// DeleteCampaign deletes a campaign
+func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
+	campaignId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	campaignRepo := repository.GetCampaignRepository()
+	err = campaignRepo.DeleteCampaign(user.ID, campaignId)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to delete campaign: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaign deleted successfully",
 	})
 }

@@ -310,6 +310,41 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	return nil
 }
 
+// GetDevice gets a specific device by ID
+func (r *UserRepository) GetDevice(userID, deviceID string) (*models.Device, error) {
+	query := `
+		SELECT id, user_id, name, phone, jid, status, created_at, updated_at, last_seen
+		FROM user_devices
+		WHERE user_id = $1 AND id = $2
+	`
+	
+	var device models.Device
+	var phone, jid sql.NullString
+	
+	err := r.db.QueryRow(query, userID, deviceID).Scan(
+		&device.ID, &device.UserID, &device.Name,
+		&phone, &jid, &device.Status,
+		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen,
+	)
+	
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found")
+	}
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device: %w", err)
+	}
+	
+	if phone.Valid {
+		device.Phone = phone.String
+	}
+	if jid.Valid {
+		device.Jid = jid.String
+	}
+	
+	return &device, nil
+}
+
 // GetAllUsers returns all users (for admin)
 func (r *UserRepository) GetAllUsers() ([]*models.User, error) {
 	query := `

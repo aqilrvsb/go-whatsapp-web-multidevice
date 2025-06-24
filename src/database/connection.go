@@ -104,12 +104,46 @@ func InitializeSchema() error {
 		UNIQUE(message_id)
 	);
 
+	-- Create leads table
+	CREATE TABLE IF NOT EXISTS leads (
+		id SERIAL PRIMARY KEY,
+		device_id UUID NOT NULL,
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name VARCHAR(255) NOT NULL,
+		phone VARCHAR(50) NOT NULL,
+		niche VARCHAR(255),
+		journey TEXT,
+		status VARCHAR(50) DEFAULT 'new',
+		last_interaction TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Create campaigns table
+	CREATE TABLE IF NOT EXISTS campaigns (
+		id SERIAL PRIMARY KEY,
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		campaign_date DATE NOT NULL,
+		title VARCHAR(255) NOT NULL,
+		message TEXT NOT NULL,
+		image_url TEXT,
+		scheduled_time TIME,
+		status VARCHAR(50) DEFAULT 'scheduled',
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(user_id, campaign_date)
+	);
+
 	-- Create indexes
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
 	CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
 	CREATE INDEX IF NOT EXISTS idx_message_analytics_user_id ON message_analytics(user_id);
 	CREATE INDEX IF NOT EXISTS idx_message_analytics_created_at ON message_analytics(created_at);
+	CREATE INDEX IF NOT EXISTS idx_leads_device_id ON leads(device_id);
+	CREATE INDEX IF NOT EXISTS idx_leads_user_id ON leads(user_id);
+	CREATE INDEX IF NOT EXISTS idx_campaigns_user_id ON campaigns(user_id);
+	CREATE INDEX IF NOT EXISTS idx_campaigns_date ON campaigns(campaign_date);
 	`
 	
 	_, err := db.Exec(schema)
