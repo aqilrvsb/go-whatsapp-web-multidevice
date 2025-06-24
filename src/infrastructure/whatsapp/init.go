@@ -247,22 +247,6 @@ func handleConnectionEvents(_ context.Context) {
 		log.Infof("Marked self as available")
 	}
 }
-			log.Infof("Connected as: %s (Phone: %s, Name: %s)", jid, phone, pushName)
-		}
-	}
-	
-	if len(cli.Store.PushName) == 0 {
-		return
-	}
-
-	// Send presence available when connecting and when the pushname is changed.
-	// This makes sure that outgoing messages always have the right pushname.
-	if err := cli.SendPresence(types.PresenceAvailable); err != nil {
-		log.Warnf("Failed to send available presence: %v", err)
-	} else {
-		log.Infof("Marked self as available")
-	}
-}
 
 func handleStreamReplaced(_ context.Context) {
 	os.Exit(0)
