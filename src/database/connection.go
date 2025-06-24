@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"sync"
@@ -9,7 +10,6 @@ import (
 	
 	_ "github.com/lib/pq"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -125,20 +125,17 @@ func InitializeSchema() error {
 	}
 	
 	if !adminExists {
-		// Generate bcrypt hash for the default password
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("changeme123"), bcrypt.DefaultCost)
-		if err != nil {
-			return fmt.Errorf("failed to hash admin password: %w", err)
-		}
+		// Encode password with base64 for the default admin
+		encodedPassword := base64.StdEncoding.EncodeToString([]byte("changeme123"))
 		
 		_, err = db.Exec(`
 			INSERT INTO users (email, full_name, password_hash, is_active) 
 			VALUES ($1, $2, $3, $4)`,
-			"admin@whatsapp.com", "Administrator", string(hashedPassword), true)
+			"admin@whatsapp.com", "Administrator", encodedPassword, true)
 		if err != nil {
 			return fmt.Errorf("failed to create admin user: %w", err)
 		}
-		log.Println("Created default admin user: admin@whatsapp.com / changeme123")
+		log.Printf("Created default admin user: admin@whatsapp.com / changeme123 (encoded: %s)\n", encodedPassword)
 	}
 	
 	// Run cleanup for expired sessions

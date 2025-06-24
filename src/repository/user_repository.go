@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // UserRepository handles user data persistence in PostgreSQL
@@ -51,18 +51,15 @@ func (r *UserRepository) CreateUser(email, fullName, password string) (*models.U
 		return nil, fmt.Errorf("user with email %s already exists", email)
 	}
 	
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
-	}
+	// Encode password with base64 (for easy viewing)
+	encodedPassword := base64.StdEncoding.EncodeToString([]byte(password))
 	
 	// Create user
 	user := &models.User{
 		ID:           uuid.New().String(),
 		Email:        email,
 		FullName:     fullName,
-		PasswordHash: string(hashedPassword),
+		PasswordHash: encodedPassword,
 		IsActive:     true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -85,6 +82,7 @@ func (r *UserRepository) CreateUser(email, fullName, password string) (*models.U
 
 // GetUserByEmail retrieves a user by email
 func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
+	fmt.Printf("Debug GetUserByEmail: Looking for email: '%s'\n", email)
 	user := &models.User{}
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
@@ -95,9 +93,17 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 		&user.IsActive, &user.CreatedAt, &user.UpdatedAt, &user.LastLogin,
 	)
 	if err == sql.ErrNoRows {
+		fmt.Printf("Debug GetUserByEmail: User not found for email: '%s'\n", email)
 		return nil, fmt.Errorf("user not found")
 	}
 	if err != nil {
+		fmt.Printf("Debug GetUserByEmail: Database error: %v\n", err)
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	
+	fmt.Printf("Debug GetUserByEmail: Found user - Email: '%s', ID: %s\n", user.Email, user.ID)
+	return user, nil
+} != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	
@@ -144,11 +150,18 @@ func (r *UserRepository) ValidatePassword(email, password string) (*models.User,
 	// Debug logging
 	fmt.Printf("Debug: Validating password for email: %s\n", email)
 	fmt.Printf("Debug: Password provided: %s\n", password)
-	fmt.Printf("Debug: Password hash from DB: %s\n", user.PasswordHash)
+	fmt.Printf("Debug: Encoded password from DB: %s\n", user.PasswordHash)
 	
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	// Decode the stored password
+	decodedPassword, err := base64.StdEncoding.DecodeString(user.PasswordHash)
 	if err != nil {
-		fmt.Printf("Debug: Password validation failed: %v\n", err)
+		fmt.Printf("Debug: Failed to decode password: %v\n", err)
+		return nil, fmt.Errorf("invalid password format")
+	}
+	
+	// Compare passwords
+	if string(decodedPassword) != password {
+		fmt.Printf("Debug: Password mismatch - Stored: '%s', Provided: '%s'\n", string(decodedPassword), password)
 		return nil, fmt.Errorf("invalid password")
 	}
 	
