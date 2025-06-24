@@ -1,9 +1,26 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 24, 2025 - 5:00 PM**  
-**Latest Feature: Authentication Fix & Modern UI Redesign**
+**Last Updated: June 24, 2025 - 10:30 PM**  
+**Latest Feature: Critical Bug Fixes for Phone Auth, QR Code & Dashboard**
 
 ## 🚀 Latest Updates:
+
+### Critical Bug Fixes (June 24, 2025 - 10:30 PM)
+- **Fixed Phone Code Authentication**:
+  - Added Malaysian phone number format support (60xxx, 0xxx formats)
+  - Improved UI with loading modal and success display
+  - Better error handling with proper HTTP status checks
+  - Auto-format phone numbers for Malaysian users
+- **Fixed QR Code Display Issues**:
+  - QR code now displays properly with correct styling
+  - Added fallback SVG image on load errors
+  - Auto-refresh with expiration handling (max 10 refreshes)
+  - Clear error messages for connection issues
+- **Fixed Dashboard JavaScript Errors**:
+  - Fixed all `loadDevices()` function calls missing parentheses
+  - Removed mock device creation - now shows empty state properly
+  - Prevented "undefined" errors when no devices exist
+  - Better error handling throughout the dashboard
 
 ### UI Improvements & Auth Fix (June 24, 2025 - 5:00 PM)
 - **Fixed 401 Authentication Errors**: Added /app endpoints to public routes
