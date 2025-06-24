@@ -141,10 +141,18 @@ func (r *UserRepository) ValidatePassword(email, password string) (*models.User,
 		return nil, fmt.Errorf("user account is disabled")
 	}
 	
+	// Debug logging
+	fmt.Printf("Debug: Validating password for email: %s\n", email)
+	fmt.Printf("Debug: Password provided: %s\n", password)
+	fmt.Printf("Debug: Password hash from DB: %s\n", user.PasswordHash)
+	
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
+		fmt.Printf("Debug: Password validation failed: %v\n", err)
 		return nil, fmt.Errorf("invalid password")
 	}
+	
+	fmt.Printf("Debug: Password validation successful\n")
 	
 	// Update last login
 	_, err = r.db.Exec("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1", user.ID)

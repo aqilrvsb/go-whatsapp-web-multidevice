@@ -150,6 +150,33 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 	}
 	
 	if err := c.BodyParser(&loginReq); err != nil {
+		log.Printf("Failed to parse login request: %v", err)
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request",
+		})
+	}
+	
+	log.Printf("Login attempt for email: %s", loginReq.Email)
+	
+	// Get user repository
+	userRepo := repository.GetUserRepository()
+	
+	// Validate credentials
+	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
+	if err != nil {
+		log.Printf("Login failed for %s: %v", loginReq.Email, err)
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid email or password",
+		})
+	}
+	
+	log.Printf("Login successful for user: %s", user.Email) HandleLogin(c *fiber.Ctx) error {
+	var loginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&loginReq); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Invalid request",
 		})
