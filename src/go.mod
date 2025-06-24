@@ -1,5 +1,6 @@
 module github.com/aldinokemal/go-whatsapp-web-multidevice
 
+// Force rebuild: 2025-06-24 v1.1.0
 go 1.23.0
 
 toolchain go1.24.4
