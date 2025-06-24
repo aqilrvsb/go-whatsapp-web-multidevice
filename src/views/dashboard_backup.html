@@ -445,8 +445,6 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Dashboard v1.1.0 FINAL - All fixes applied');
-            console.log('Includes: Device filter fix, auth cookies, proper function definitions');
             initializeChart();
             loadDashboardData(7);
             loadDevices();
@@ -547,7 +545,6 @@
             
             // Fetch real data from API
             fetch(url, {
-                credentials: 'include',
                 headers: {
                     'X-User-Email': userEmail
                 }
@@ -747,7 +744,6 @@
             
             // Fetch real data from API
             fetch(url, {
-                credentials: 'include',
                 headers: {
                     'X-User-Email': userEmail
                 }
@@ -803,7 +799,7 @@
         // Load Devices
         function loadDevices(silent = false) {
             // Fetch real devices from API
-            fetch('/api/devices', { credentials: 'include' })
+            fetch('/api/devices')
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
@@ -1131,7 +1127,6 @@
             // Restore selected value
             deviceFilter.value = currentDeviceFilter;
         }
-        
         // Auto-refresh functions
         function startAutoRefresh() {
             if (isAutoRefreshEnabled) {
@@ -1228,7 +1223,6 @@
             // Restore selected value
             deviceFilter.value = currentDeviceFilter;
         }
-        
         // Auto-refresh functions
         function startAutoRefresh() {
             if (isAutoRefreshEnabled) {
