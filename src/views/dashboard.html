@@ -547,6 +547,7 @@
             
             // Fetch real data from API
             fetch(url, {
+                credentials: 'include',  // Include cookies
                 headers: {
                     'X-User-Email': userEmail
                 }
@@ -746,6 +747,7 @@
             
             // Fetch real data from API
             fetch(url, {
+                credentials: 'include',  // Include cookies
                 headers: {
                     'X-User-Email': userEmail
                 }
@@ -801,7 +803,9 @@
         // Load Devices
         function loadDevices(silent = false) {
             // Fetch real devices from API
-            fetch('/api/devices')
+            fetch('/api/devices', {
+                credentials: 'include'  // Include cookies
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
@@ -942,7 +946,7 @@
             `;
             
             // Get QR code from WhatsApp login endpoint
-            fetch('/app/login')
+            fetch('/app/login', { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.results && data.results.qr_link) {
@@ -952,7 +956,7 @@
                         
                         // Set up auto-refresh every 20 seconds
                         const refreshInterval = setInterval(() => {
-                            fetch('/app/login')
+                            fetch('/app/login', { credentials: 'include' })
                                 .then(response => response.json())
                                 .then(data => {
                                     if (data.results && data.results.qr_link) {
@@ -1135,6 +1139,7 @@
             deviceFilter.value = currentDeviceFilter;
             console.log('Device filter updated with', devices.length, 'devices');
         }
+        
         // Auto-refresh functions
         function startAutoRefresh() {
             if (isAutoRefreshEnabled) {
