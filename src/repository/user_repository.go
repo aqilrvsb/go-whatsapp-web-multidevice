@@ -311,20 +311,21 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 }
 
 // GetDevice gets a specific device by ID
-func (r *UserRepository) GetDevice(userID, deviceID string) (*models.Device, error) {
+func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, name, phone, jid, status, created_at, updated_at, last_seen
+		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at, last_seen
 		FROM user_devices
 		WHERE user_id = $1 AND id = $2
 	`
 	
-	var device models.Device
+	var device models.UserDevice
 	var phone, jid sql.NullString
+	var updatedAt sql.NullTime
 	
 	err := r.db.QueryRow(query, userID, deviceID).Scan(
-		&device.ID, &device.UserID, &device.Name,
+		&device.ID, &device.UserID, &device.DeviceName,
 		&phone, &jid, &device.Status,
-		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen,
+		&device.CreatedAt, &updatedAt, &device.LastSeen,
 	)
 	
 	if err == sql.ErrNoRows {
@@ -339,7 +340,7 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.Device, err
 		device.Phone = phone.String
 	}
 	if jid.Valid {
-		device.Jid = jid.String
+		device.JID = jid.String
 	}
 	
 	return &device, nil

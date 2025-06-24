@@ -408,12 +408,83 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 		"status": "healthy",
 		"health": health,
 	})
-} err)
+}
+
+// GetDevice gets a specific device by ID  
+func (handler *App) GetDevice(c *fiber.Ctx) error {
+	deviceId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	device, err := userRepo.GetDevice(user.ID, deviceId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Convert to expected JSON format
+	deviceData := map[string]interface{}{
+		"id":       device.ID,
+		"name":     device.DeviceName,
+		"phone":    device.Phone,
+		"status":   device.Status,
+		"lastSeen": device.LastSeen,
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device retrieved successfully",
+		Results: deviceData,
+	})
+}
+
+// DeviceActionsView renders the device actions testing page
+func (handler *App) DeviceActionsView(c *fiber.Ctx) error {
+	return c.Render("views/device_actions", fiber.Map{})
+}
+
+// DeviceLeadsView renders the device leads management page
+func (handler *App) DeviceLeadsView(c *fiber.Ctx) error {
+	return c.Render("views/device_leads", fiber.Map{})
+}
+
+// GetDeviceLeads gets all leads for a specific device
+func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
+	deviceId := c.Params("deviceId")
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	leadRepo := repository.GetLeadRepository()
+	leads, err := leadRepo.GetLeadsByDevice(user.ID, deviceId)
+	if err != nil {
+		log.Printf("Error getting leads: %v", err)
 		// Return empty array instead of error
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "SUCCESS",
-			Message: "Campaigns retrieved successfully",
+			Message: "Leads retrieved successfully",
 			Results: []interface{}{},
 		})
 	}
@@ -421,13 +492,159 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Campaigns retrieved successfully",
-		Results: campaigns,
+		Message: "Leads retrieved successfully",
+		Results: leads,
 	})
 }
 
-// CreateCampaign creates a new campaign
-func (handler *App) CreateCampaign(c *fiber.Ctx) error {
+// CreateLead creates a new lead
+func (handler *App) CreateLead(c *fiber.Ctx) error {
+	userEmail := c.Locals("email").(string)
+	
+	var request struct {
+		DeviceID string `json:"device_id"`
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		Niche    string `json:"niche"`
+		Journey  string `json:"journey"`
+		Status   string `json:"status"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	leadRepo := repository.GetLeadRepository()
+	lead, err := leadRepo.CreateLead(user.ID, request.DeviceID, request.Name, request.Phone, request.Niche, request.Journey, request.Status)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to create lead: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  201,
+		Code:    "SUCCESS",
+		Message: "Lead created successfully",
+		Results: lead,
+	})
+}
+
+// UpdateLead updates an existing lead
+func (handler *App) UpdateLead(c *fiber.Ctx) error {
+	leadId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	var request struct {
+		Name    string `json:"name"`
+		Phone   string `json:"phone"`
+		Niche   string `json:"niche"`
+		Journey string `json:"journey"`
+		Status  string `json:"status"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	leadRepo := repository.GetLeadRepository()
+	lead, err := leadRepo.UpdateLead(user.ID, leadId, request.Name, request.Phone, request.Niche, request.Journey, request.Status)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to update lead: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Lead updated successfully",
+		Results: lead,
+	})
+}
+
+// DeleteLead deletes a lead
+func (handler *App) DeleteLead(c *fiber.Ctx) error {
+	leadId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	leadRepo := repository.GetLeadRepository()
+	err = leadRepo.DeleteLead(user.ID, leadId)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to delete lead: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Lead deleted successfully",
+	})
+}
+
+// GetCampaigns gets all campaigns for the user
+func (handler *App) GetCampaigns(c *fiber.Ctx) error {
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	campaignRepo := repository.GetCampaignRepository()
+	campaigns, err := campaignRepo.GetCampaigns(user.ID)
+	if err != nil {
+		log.Printf("Error getting campaigns: %v",
 	userEmail := c.Locals("email").(string)
 	
 	var request struct {
