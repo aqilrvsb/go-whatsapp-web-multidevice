@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
@@ -170,28 +171,27 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
-	log.Printf("Login successful for user: %s", user.Email) HandleLogin(c *fiber.Ctx) error {
-	var loginReq struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	log.Printf("Login successful for user: %s", user.Email)
 	
-	if err := c.BodyParser(&loginReq); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request",
-		})
-	}
-	
-	// Get user repository
-	userRepo := repository.GetUserRepository()
-	
-	// Validate credentials
-	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
+	// Create session
+	session, err := userRepo.CreateSession(user.ID)
 	if err != nil {
-		return c.Status(401).JSON(fiber.Map{
-			"error": "Invalid email or password",
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to create session",
 		})
 	}
+	
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"message": "Login successful",
+		"token": session.Token,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"email":    user.Email,
+			"fullName": user.FullName,
+		},
+	})
+}
 	
 	// Create session
 	session, err := userRepo.CreateSession(user.ID)
