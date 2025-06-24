@@ -1,9 +1,29 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 24, 2025 - 11:00 PM**  
-**Latest Feature: Device Persistence Fix & Authentication Improvements**
+**Last Updated: June 24, 2025 - 11:30 PM**  
+**Latest Feature: Complete Authentication & Device Persistence Fix**
 
 ## 🚀 Latest Updates:
+
+### Authentication & Device System Overhaul (June 24, 2025 - 11:30 PM)
+- **Fixed Authentication Middleware**:
+  - Cookie-based authentication now works properly across all endpoints
+  - Added `/api/analytics` and `/api/devices` to public routes
+  - Better session validation with cookie and header fallbacks
+  - Improved error messages for debugging (401 errors fixed)
+- **Device Persistence Fixed**:
+  - Created proper device creation endpoint (`POST /api/devices`)
+  - Devices now save to PostgreSQL database immediately
+  - Fixed all JavaScript syntax errors in fetch() calls
+  - Devices no longer disappear when closing modals
+- **Database Integration**:
+  - Device management fully integrated with PostgreSQL
+  - Proper user-device relationship in database
+  - Session management improvements
+- **Recommended Usage**:
+  - Use Phone Code authentication (more reliable than QR)
+  - Clear browser cache after deployment for fresh session
+  - All API endpoints now properly authenticated
 
 ### Device Management Fixes (June 24, 2025 - 11:00 PM)
 - **Fixed Device Persistence Issue**:
