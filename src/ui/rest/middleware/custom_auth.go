@@ -9,7 +9,8 @@ import (
 // PublicRoutes that don't require authentication
 var PublicRoutes = []string{
 	"/login",
-	"/register", 
+	"/register",
+	"/logout", 
 	"/api/login",
 	"/api/register",
 	"/health",
@@ -31,9 +32,15 @@ func CustomAuth() fiber.Handler {
 		}
 		
 		// Check session token
-		token := c.Get("Authorization")
+		// Check for session cookie first
+		token := c.Cookies("session_token")
+		
+		// If no cookie, check headers (for API compatibility)
 		if token == "" {
-			token = c.Get("X-Auth-Token")
+			token = c.Get("Authorization")
+			if token == "" {
+				token = c.Get("X-Auth-Token")
+			}
 		}
 		
 		if token == "" {

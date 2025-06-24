@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
@@ -33,6 +34,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Auth API endpoints
 	app.Post("/api/login", rest.HandleLogin)
 	app.Post("/api/register", rest.HandleRegister)
+	app.Get("/logout", rest.HandleLogout)
 	
 	// Analytics API endpoints
 	app.Get("/api/analytics/:days", rest.GetAnalyticsData)
@@ -181,6 +183,16 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Set session cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "session_token",
+		Value:    session.Token,
+		Expires:  session.ExpiresAt,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+	})
+	
 	return c.JSON(fiber.Map{
 		"status": "success",
 		"message": "Login successful",
@@ -232,6 +244,23 @@ func (handler *App) HandleRegister(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// HandleLogout handles user logout
+func (handler *App) HandleLogout(c *fiber.Ctx) error {
+	// Clear session cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+		Secure:   false,
+		SameSite: "Lax",
+	})
+	
+	// Redirect to login page
+	return c.Redirect("/login")
+}
+
 // GetQRCode returns the QR code image directly
 func (handler *App) GetQRCode(c *fiber.Ctx) error {
 	// Get QR code from login service
