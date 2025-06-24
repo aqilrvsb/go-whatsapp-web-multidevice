@@ -84,13 +84,14 @@ func (r *UserRepository) CreateUser(email, fullName, password string) (*models.U
 func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	fmt.Printf("Debug GetUserByEmail: Looking for email: '%s'\n", email)
 	user := &models.User{}
+	var lastLogin sql.NullTime
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
 		FROM users WHERE email = $1
 	`
 	err := r.db.QueryRow(query, email).Scan(
 		&user.ID, &user.Email, &user.FullName, &user.PasswordHash,
-		&user.IsActive, &user.CreatedAt, &user.UpdatedAt, &user.LastLogin,
+		&user.IsActive, &user.CreatedAt, &user.UpdatedAt, &lastLogin,
 	)
 	if err == sql.ErrNoRows {
 		fmt.Printf("Debug GetUserByEmail: User not found for email: '%s'\n", email)
@@ -99,6 +100,10 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	if err != nil {
 		fmt.Printf("Debug GetUserByEmail: Database error: %v\n", err)
 		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	
+	if lastLogin.Valid {
+		user.LastLogin = lastLogin.Time
 	}
 	
 	fmt.Printf("Debug GetUserByEmail: Found user - Email: '%s', ID: %s\n", user.Email, user.ID)
