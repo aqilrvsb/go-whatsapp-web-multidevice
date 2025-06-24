@@ -1,6 +1,7 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "docker/golang.Dockerfile"
+# Force rebuild: 2025-06-24-v1.1.0
 
 [deploy]
 startCommand = "/app/whatsapp rest"

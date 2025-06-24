@@ -1,11 +1,17 @@
 ############################
 # STEP 1 build executable binary
-# Updated: 2025-06-23 - PostgreSQL integration
+# Updated: 2025-06-24 - Force rebuild with auth fixes
+# Cache bust: v1.1.0-fixed
 ############################
 FROM golang:1.23-alpine3.20 AS builder
 RUN apk update && apk add --no-cache gcc musl-dev gcompat
 WORKDIR /whatsapp
+
+# Copy the source code
 COPY ./src .
+
+# Debug: List files to verify dashboard.html is copied
+RUN ls -la views/dashboard.html || echo "dashboard.html not found!"
 
 # Fetch dependencies.
 RUN go mod download
