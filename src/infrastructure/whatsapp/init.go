@@ -164,7 +164,7 @@ func handlePairSuccess(_ context.Context, evt *events.PairSuccess) {
 	if userRepo := repository.GetUserRepository(); userRepo != nil {
 		// TODO: Get current user and device ID from context
 		// For now, just broadcast the success
-		log.Info("Device paired successfully, waiting for full connection...")
+		log.Infof("Device paired successfully, waiting for full connection...")
 	}
 	
 	websocket.Broadcast <- websocket.BroadcastMessage{
@@ -184,15 +184,15 @@ func handleLoggedOut(_ context.Context) {
 }
 
 func handleConnectionEvents(_ context.Context) {
-	log.Info("WhatsApp connection event received")
+	log.Infof("WhatsApp connection event received")
 	
 	if !cli.IsConnected() {
-		log.Warn("Connection event received but client not connected")
+		log.Warnf("Connection event received but client not connected")
 		return
 	}
 	
 	if cli.IsLoggedIn() {
-		log.Info("WhatsApp client is logged in and connected!")
+		log.Infof("WhatsApp client is logged in and connected!")
 		
 		// Send connection success message
 		websocket.Broadcast <- websocket.BroadcastMessage{
