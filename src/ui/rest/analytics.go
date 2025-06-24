@@ -131,25 +131,53 @@ func (handler *App) GetCustomAnalyticsData(c *fiber.Ctx) error {
 
 // GetConnectedDevices returns real connected devices
 func (handler *App) GetConnectedDevices(c *fiber.Ctx) error {
-	// Get user from session
-	token := c.Get("Authorization")
-	if token == "" {
-		token = c.Get("X-Auth-Token")
-	}
-	
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(token)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
+	// Get user from context (set by auth middleware)
+	userID := c.Locals("userID")
+	if userID == nil {
+		// Fallback: try to get from session cookie
+		token := c.Cookies("session_token")
+		if token == "" {
+			// Try headers as last resort
+			token = c.Get("Authorization")
+			if token == "" {
+				token = c.Get("X-Auth-Token")
+			}
+		}
+		
+		if token == "" {
+			return c.Status(401).JSON(utils.ResponseData{
+				Status:  401,
+				Code:    "UNAUTHORIZED",
+				Message: "Authentication required",
+			})
+		}
+		
+		userRepo := repository.GetUserRepository()
+		session, err := userRepo.GetSession(token)
+		if err != nil {
+			return c.Status(401).JSON(utils.ResponseData{
+				Status:  401,
+				Code:    "UNAUTHORIZED",
+				Message: "Invalid session",
+			})
+		}
+		userID = session.UserID
 	}
 	
 	// Get user devices from database
-	devices, err := userRepo.GetUserDevices(session.UserID)
+	userRepo := repository.GetUserRepository()
+	devices, err := userRepo.GetUserDevices(userID.(string))
 	if err != nil {
+		// Return empty array if no devices found
+		if err.Error() == "no devices found" {
+			return c.JSON(utils.ResponseData{
+				Status:  200,
+				Code:    "SUCCESS",
+				Message: "No devices found",
+				Results: []fiber.Map{},
+			})
+		}
+		
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
