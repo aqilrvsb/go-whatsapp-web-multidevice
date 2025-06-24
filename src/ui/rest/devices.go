@@ -5,8 +5,8 @@ import (
 	"time"
 	
 	"github.com/gofiber/fiber/v2"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/utils"
 )
 
 // GetConnectedDevices returns real connected devices
@@ -151,62 +151,5 @@ func (handler *App) CreateDevice(c *fiber.Ctx) error {
 				"lastSeen": device.LastSeen.Format("2006-01-02 15:04:05"),
 			},
 		},
-	})
-}
-
-// UpdateAnalyticsEndpoints updates the analytics endpoints to use context
-func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
-	// Get user from context (set by auth middleware)
-	userID := c.Locals("userID")
-	if userID == nil {
-		// Fallback: try to get from session cookie
-		token := c.Cookies("session_token")
-		if token == "" {
-			return c.Status(401).JSON(utils.ResponseData{
-				Status:  401,
-				Code:    "UNAUTHORIZED",
-				Message: "Authentication required",
-			})
-		}
-		
-		userRepo := repository.GetUserRepository()
-		session, err := userRepo.GetSession(token)
-		if err != nil {
-			return c.Status(401).JSON(utils.ResponseData{
-				Status:  401,
-				Code:    "UNAUTHORIZED",
-				Message: "Invalid session",
-			})
-		}
-		userID = session.UserID
-	}
-	
-	// Rest of the analytics logic...
-	days := c.Params("days", "7")
-	
-	// Mock data for now
-	analytics := fiber.Map{
-		"metrics": fiber.Map{
-			"totalSent":     1250,
-			"totalReceived": 980,
-			"activeChats":   45,
-			"replyRate":     78.4,
-		},
-		"daily": []fiber.Map{
-			{"date": "Jun 18", "sent": 150, "received": 120},
-			{"date": "Jun 19", "sent": 180, "received": 145},
-			{"date": "Jun 20", "sent": 200, "received": 160},
-			{"date": "Jun 21", "sent": 170, "received": 135},
-			{"date": "Jun 22", "sent": 190, "received": 150},
-			{"date": "Jun 23", "sent": 160, "received": 130},
-			{"date": "Jun 24", "sent": 200, "received": 140},
-		},
-	}
-	
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: fmt.Sprintf("Analytics data for %s days", days),
-		Results: analytics,
 	})
 }
