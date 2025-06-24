@@ -9,6 +9,7 @@ import (
 	
 	_ "github.com/lib/pq"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -109,16 +110,35 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
 	CREATE INDEX IF NOT EXISTS idx_message_analytics_user_id ON message_analytics(user_id);
 	CREATE INDEX IF NOT EXISTS idx_message_analytics_created_at ON message_analytics(created_at);
-	
-	-- Create default admin user if not exists
-	INSERT INTO users (email, full_name, password_hash, is_active) 
-	VALUES ('admin@whatsapp.com', 'Administrator', '$2a$10$K.0HwpsoPDGaB/atFBmmXOGTw4ceeg33.WrxJx/sU1l44onhKi9am', true)
-	ON CONFLICT (email) DO NOTHING;
 	`
 	
 	_, err := db.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+	
+	// Create default admin user if not exists
+	var adminExists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = 'admin@whatsapp.com')").Scan(&adminExists)
+	if err != nil {
+		return fmt.Errorf("failed to check admin user: %w", err)
+	}
+	
+	if !adminExists {
+		// Generate bcrypt hash for the default password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("changeme123"), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash admin password: %w", err)
+		}
+		
+		_, err = db.Exec(`
+			INSERT INTO users (email, full_name, password_hash, is_active) 
+			VALUES ($1, $2, $3, $4)`,
+			"admin@whatsapp.com", "Administrator", string(hashedPassword), true)
+		if err != nil {
+			return fmt.Errorf("failed to create admin user: %w", err)
+		}
+		log.Println("Created default admin user: admin@whatsapp.com / changeme123")
 	}
 	
 	// Run cleanup for expired sessions
