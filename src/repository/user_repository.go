@@ -103,11 +103,6 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	
 	fmt.Printf("Debug GetUserByEmail: Found user - Email: '%s', ID: %s\n", user.Email, user.ID)
 	return user, nil
-} != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	
-	return user, nil
 }
 
 // GetUserByID retrieves a user by ID
