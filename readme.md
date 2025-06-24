@@ -1,9 +1,24 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 24, 2025 - 10:30 PM**  
-**Latest Feature: Critical Bug Fixes for Phone Auth, QR Code & Dashboard**
+**Last Updated: June 24, 2025 - 11:00 PM**  
+**Latest Feature: Device Persistence Fix & Authentication Improvements**
 
 ## 🚀 Latest Updates:
+
+### Device Management Fixes (June 24, 2025 - 11:00 PM)
+- **Fixed Device Persistence Issue**:
+  - Device no longer disappears when QR modal is closed
+  - Removed auto-open QR on device creation
+  - User can now choose between QR Code or Phone Code
+  - Device is saved and persists in the UI
+- **Improved Authentication Flow**:
+  - Both QR Code and Phone Code options clearly visible
+  - Added helpful note about using Phone Code if QR fails
+  - Phone Code is recommended as more reliable option
+- **Better User Experience**:
+  - No more confusion with disappearing devices
+  - Clear choice between authentication methods
+  - Persistent device cards for easy management
 
 ### Critical Bug Fixes (June 24, 2025 - 10:30 PM)
 - **Fixed Phone Code Authentication**:

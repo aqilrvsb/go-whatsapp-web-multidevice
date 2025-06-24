@@ -991,18 +991,44 @@
         function addNewDevice() {
             const deviceName = prompt('Enter device name:');
             if (deviceName) {
+                // Create device object
                 const newDevice = {
-                    id: devices.length + 1,
+                    id: 'device_' + Date.now(),
                     name: deviceName,
                     phone: 'Not connected',
                     status: 'offline',
                     lastSeen: 'Never connected'
                 };
+                
+                // Add to devices array
                 devices.push(newDevice);
+                
+                // Save to backend (optional - can be done after successful connection)
+                fetch('/api/devices', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: deviceName })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.device) {
+                        // Update with real ID from backend
+                        const index = devices.findIndex(d => d.id === newDevice.id);
+                        if (index !== -1) {
+                            devices[index].id = data.device.id;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving device:', error);
+                });
+                
+                // Render devices to show the new device card
                 renderDevices();
                 
-                // Automatically open QR scanner
-                setTimeout(() => scanQR(newDevice.id), 100);
+                // Don't auto-open QR - let user choose QR or Phone Code
+                // The device card now shows both options
             }
         }
 
@@ -1038,6 +1064,9 @@
                                     Open WhatsApp on your phone<br>
                                     Settings > Linked Devices > Link a Device
                                 </p>
+                                <div class="alert alert-info mt-3">
+                                    <small><strong>Note:</strong> If QR code doesn't work, close this modal and try the <strong>Phone Code</strong> option instead.</small>
+                                </div>
                             </div>
                         `;
                         
