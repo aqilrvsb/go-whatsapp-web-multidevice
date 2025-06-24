@@ -1,11 +1,23 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 24, 2025 - 3:00 PM**  
-**Latest Feature: Complete Authentication & Dashboard Fix**
+**Last Updated: June 24, 2025 - 4:00 PM**  
+**Latest Feature: Complete Device Management System**
 
 ## 🚀 Latest Updates:
 
-### Complete System Fix (June 24, 2025)
+### Device Management System (June 24, 2025 - 4:00 PM)
+- **Multi-Device Support**: Each user can manage multiple WhatsApp devices
+- **Phone Number Linking**: Link phone numbers to devices with a simple button
+- **Two Connection Methods**:
+  - QR Code scanning (traditional method)
+  - Phone code pairing (new WhatsApp feature)
+- **Device Operations**:
+  - Add/Edit/Delete devices
+  - View device-specific statistics
+  - Link/update phone numbers
+  - Logout individual devices
+
+### Complete System Fix (June 24, 2025 - 3:00 PM)
 - **Fixed Authentication**: Cookie-based sessions with `credentials: 'include'`
 - **Fixed Device Filter**: Dropdown now shows "All Devices" option
 - **Fixed JavaScript Errors**: Proper function spacing and definitions
@@ -28,9 +40,16 @@
 
 ## 🎯 Key Features:
 
-### 1. Multi-User System (200+ Users Support)
-- **User Management**: Proper user registration and authentication
-- **Session Management**: Secure token-based sessions
+### 1. Multi-User Multi-Device System
+- **User Management**: Each user has their own account and devices
+- **Device Management**: 
+  - Add unlimited WhatsApp devices per user
+  - Connect via QR code or phone pairing code
+  - Link phone numbers to devices
+  - View device-specific analytics
+  - Edit device names
+  - Delete devices
+- **Session Management**: Secure cookie-based sessions
 - **User Isolation**: Each user sees only their own data
 - **Scalable Architecture**: PostgreSQL-backed for high concurrency
 - **Persistent Storage**: All data stored in PostgreSQL database
@@ -133,13 +152,39 @@
 - Fixed function definitions in dashboard.html
 - Added console logging for debugging
 
-## 🚀 Deployment
+## 📱 Device Management Guide
 
-### Railway Auto-Deployment:
-1. Push to `main` branch at `https://github.com/aqilrvsb/Was-MCP.git`
-2. Railway automatically builds and deploys
-3. Uses PostgreSQL database from Railway
-4. Environment variables configured in Railway dashboard
+### Adding a New Device:
+1. Go to the **Devices** tab
+2. Click **"Add New Device"**
+3. Enter a device name (e.g., "Work Phone", "Personal Phone")
+4. Choose connection method:
+   - **QR Code**: Scan with WhatsApp mobile app
+   - **Phone Code**: Enter phone number to get pairing code
+
+### Linking Phone Numbers:
+1. In the device card, click the **"Link"** button next to phone
+2. Enter the WhatsApp phone number with country code (e.g., +1234567890)
+3. The phone number will be saved and displayed on the device card
+
+### Device Operations:
+- **Edit**: Click the three-dot menu → Edit to rename device
+- **Delete**: Click the three-dot menu → Delete to remove device
+- **View Stats**: Click "View Stats" to see device-specific analytics
+- **Logout**: Disconnect WhatsApp from this device
+
+### Connection Methods:
+1. **QR Code Method**:
+   - Click "Scan QR Code"
+   - Open WhatsApp → Settings → Linked Devices
+   - Tap "Link a Device" and scan the QR code
+
+2. **Phone Code Method**:
+   - Click "Use Phone Code"
+   - Enter your WhatsApp phone number
+   - Get a pairing code
+   - In WhatsApp → Settings → Linked Devices → Link with phone number
+   - Enter the pairing code
 
 ### Required Environment Variables:
 ```

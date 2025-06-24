@@ -873,16 +873,27 @@
                 <div class="col-md-4">
                     <div class="device-card">
                         <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
+                            <div style="flex: 1;">
                                 <h5 class="mb-1">${device.name}</h5>
-                                <p class="text-muted mb-0">${device.phone}</p>
+                                <p class="text-muted mb-0">
+                                    <i class="bi bi-phone"></i> 
+                                    <span id="phone-${device.id}">${device.phone || 'No phone linked'}</span>
+                                    ${!device.phone || device.phone === 'Not connected' ? 
+                                        `<button class="btn btn-link btn-sm p-0 ms-2" onclick="linkPhoneNumber('${device.id}')">
+                                            <i class="bi bi-link-45deg"></i> Link
+                                        </button>` : ''
+                                    }
+                                </p>
                             </div>
                             <div class="dropdown">
                                 <button class="btn btn-sm" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" onclick="deleteDevice(${device.id})">
+                                    <li><a class="dropdown-item" href="#" onclick="editDevice('${device.id}')">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="deleteDevice('${device.id}')">
                                         <i class="bi bi-trash text-danger"></i> Delete
                                     </a></li>
                                 </ul>
@@ -896,10 +907,16 @@
                         
                         <div class="d-grid gap-2">
                             ${device.status === 'offline' ? 
-                                `<button class="btn btn-whatsapp btn-sm" onclick="scanQR(${device.id})">
+                                `<button class="btn btn-whatsapp btn-sm" onclick="scanQR('${device.id}')">
                                     <i class="bi bi-qr-code"></i> Scan QR Code
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="usePhoneCode('${device.id}')">
+                                    <i class="bi bi-hash"></i> Use Phone Code
                                 </button>` :
-                                `<button class="btn btn-outline-danger btn-sm" onclick="logoutDevice(${device.id})">
+                                `<button class="btn btn-outline-success btn-sm" onclick="viewDeviceStats('${device.id}')">
+                                    <i class="bi bi-graph-up"></i> View Stats
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="logoutDevice('${device.id}')">
                                     <i class="bi bi-box-arrow-right"></i> Logout
                                 </button>`
                             }
@@ -1021,6 +1038,92 @@
                     renderDevices();
                     hideLoading();
                 }, 500);
+            }
+        }
+
+        // Link Phone Number to Device
+        function linkPhoneNumber(deviceId) {
+            const phone = prompt('Enter WhatsApp phone number (with country code, e.g., +1234567890):');
+            if (phone) {
+                fetch('/app/link-device', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        device_id: deviceId,
+                        phone: phone
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update phone display
+                        document.getElementById(`phone-${deviceId}`).textContent = phone;
+                        // Update device in array
+                        const device = devices.find(d => d.id === deviceId);
+                        if (device) {
+                            device.phone = phone;
+                        }
+                        alert('Phone number linked successfully!');
+                    } else {
+                        alert('Failed to link phone number: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error linking phone:', error);
+                    alert('Failed to link phone number');
+                });
+            }
+        }
+
+        // Use Phone Code (for linking without QR)
+        function usePhoneCode(deviceId) {
+            const phone = prompt('Enter your WhatsApp phone number (with country code):');
+            if (phone) {
+                fetch(`/app/login-with-code?phone=${encodeURIComponent(phone)}`, {
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.pair_code) {
+                        alert(`Your pairing code is: ${data.results.pair_code}\n\nOpen WhatsApp on your phone:\n1. Go to Settings > Linked Devices\n2. Tap "Link a Device"\n3. Choose "Link with phone number instead"\n4. Enter this code`);
+                        
+                        // Link phone to device
+                        linkPhoneNumber(deviceId);
+                    } else {
+                        alert('Failed to generate pairing code');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error getting pair code:', error);
+                    alert('Failed to generate pairing code');
+                });
+            }
+        }
+
+        // View Device Statistics
+        function viewDeviceStats(deviceId) {
+            // Switch to dashboard tab and filter by this device
+            currentDeviceFilter = deviceId;
+            document.getElementById('deviceFilter').value = deviceId;
+            
+            // Switch to dashboard tab
+            const dashboardTab = document.getElementById('dashboard-tab');
+            dashboardTab.click();
+            
+            // Reload dashboard data for this device
+            loadDashboardData(currentTimeRange);
+        }
+
+        // Edit Device
+        function editDevice(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+                const newName = prompt('Enter new device name:', device.name);
+                if (newName && newName !== device.name) {
+                    device.name = newName;
+                    renderDevices();
+                }
             }
         }
 
