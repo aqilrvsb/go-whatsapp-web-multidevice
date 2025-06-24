@@ -1,9 +1,16 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 23, 2025**  
-**Latest Feature: PostgreSQL Database Integration for 200+ Users**
+**Last Updated: June 24, 2025**  
+**Latest Feature: Simplified Authentication with Base64 Password Storage**
 
 ## 🚀 Latest Updates:
+
+### Simplified Authentication System (June 24, 2025)
+- **Base64 Password Storage**: Replaced bcrypt with base64 encoding for easy password viewing
+- **Cookie-Based Sessions**: Simple session management using HTTP cookies
+- **No Token Management**: Login once, stay logged in until logout
+- **Fixed Build Errors**: Resolved unused import issues
+- **Working Login System**: Authentication now works properly
 
 ### PostgreSQL Database Integration (June 23, 2025)
 - **Full PostgreSQL Support**: Migrated from file-based storage to PostgreSQL
@@ -52,7 +59,7 @@
 ## 📊 Database Schema
 
 ### PostgreSQL Tables:
-1. **users** - User accounts and authentication
+1. **users** - User accounts and authentication (passwords stored as base64)
 2. **user_devices** - WhatsApp devices per user
 3. **user_sessions** - Active user sessions
 4. **message_analytics** - Message tracking and analytics
@@ -61,6 +68,41 @@
 - Database is hosted on Railway PostgreSQL
 - Connection pooling configured for high performance
 - Automatic cleanup of expired sessions
+
+## 🔐 Authentication System
+
+### Password Storage:
+- Passwords are stored as base64 encoded strings (not hashed)
+- This allows admins to view user passwords if needed
+- Perfect for personal/internal systems where security isn't critical
+- Example: password `aqil@gmail.com` → stored as `YXFpbEBnbWFpbC5jb20=`
+
+### Session Management:
+- Cookie-based authentication (no complex tokens)
+- Login once, stay logged in until logout
+- Sessions persist across browser refreshes
+- Logout endpoint: `/logout`
+
+## 📈 Current Status (June 24, 2025)
+
+### ✅ Working Features:
+- User registration with base64 passwords
+- User login with cookie sessions
+- Dashboard access after login
+- PostgreSQL database integration
+- Railway auto-deployment
+
+### ⚠️ Known Issues:
+- Device filter dropdown needs "All Devices" option fix
+- Analytics data endpoints need implementation
+- WhatsApp device connection needs setup
+
+### 🔄 Recent Fixes:
+- Fixed unused imports error in `cmd/rest.go`
+- Fixed bcrypt login issue by switching to base64
+- Fixed NULL last_login field handling
+- Added cookie-based session management
+- Added logout functionality
 
 ## 🚀 Deployment
 
