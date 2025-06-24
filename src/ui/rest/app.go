@@ -192,26 +192,6 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		},
 	})
 }
-	
-	// Create session
-	session, err := userRepo.CreateSession(user.ID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to create session",
-		})
-	}
-	
-	return c.JSON(fiber.Map{
-		"status": "success",
-		"message": "Login successful",
-		"token": session.Token,
-		"user": fiber.Map{
-			"id":       user.ID,
-			"email":    user.Email,
-			"fullName": user.FullName,
-		},
-	})
-}
 // HandleRegister processes registration requests
 func (handler *App) HandleRegister(c *fiber.Ctx) error {
 	var registerReq struct {
