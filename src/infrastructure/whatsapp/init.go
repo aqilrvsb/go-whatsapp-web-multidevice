@@ -194,18 +194,59 @@ func handleConnectionEvents(_ context.Context) {
 	if cli.IsLoggedIn() {
 		log.Infof("WhatsApp client is logged in and connected!")
 		
+		// Get device info for database update
+		var phoneNumber, jid string
+		if cli.Store.ID != nil {
+			jid = cli.Store.ID.String()
+			phoneNumber = cli.Store.ID.User
+			log.Infof("Connected as: %s (Phone: %s, Name: %s)", jid, phoneNumber, cli.Store.PushName)
+			
+			// Update device status in database
+			userRepo := repository.GetUserRepository()
+			
+			// Look for any active connection session
+			for userID, session := range connectionSessions {
+				if session != nil && session.DeviceID != "" {
+					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
+					
+					// Update device status to online
+					err := userRepo.UpdateDeviceStatus(session.DeviceID, "online", phoneNumber, jid)
+					if err != nil {
+						log.Errorf("Failed to update device status: %v", err)
+					} else {
+						log.Infof("Successfully updated device %s to online status", session.DeviceID)
+					}
+					
+					// Clear the session after successful update
+					ClearConnectionSession(userID)
+					break
+				}
+			}
+		}
+		
 		// Send connection success message
 		websocket.Broadcast <- websocket.BroadcastMessage{
 			Code:    "DEVICE_CONNECTED",
 			Message: "WhatsApp fully connected and logged in",
+			Result: map[string]interface{}{
+				"phone": phoneNumber,
+				"jid":   jid,
+			},
 		}
-		
-		// Get device info
-		if cli.Store.ID != nil {
-			jid := cli.Store.ID.String()
-			phone := cli.Store.ID.User
-			pushName := cli.Store.PushName
-			
+	}
+	
+	if len(cli.Store.PushName) == 0 {
+		return
+	}
+
+	// Send presence available when connecting and when the pushname is changed.
+	// This makes sure that outgoing messages always have the right pushname.
+	if err := cli.SendPresence(types.PresenceAvailable); err != nil {
+		log.Warnf("Failed to send available presence: %v", err)
+	} else {
+		log.Infof("Marked self as available")
+	}
+}
 			log.Infof("Connected as: %s (Phone: %s, Name: %s)", jid, phone, pushName)
 		}
 	}

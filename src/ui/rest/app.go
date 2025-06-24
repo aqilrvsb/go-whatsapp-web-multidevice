@@ -8,6 +8,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
@@ -57,6 +58,16 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 }
 
 func (handler *App) Login(c *fiber.Ctx) error {
+	// Get device ID from query params
+	deviceId := c.Query("deviceId")
+	
+	// Get user from context
+	userID := c.Locals("userID")
+	if userID != nil && deviceId != "" {
+		// Start tracking this connection session
+		whatsapp.StartConnectionSession(userID.(string), deviceId, "")
+	}
+	
 	response, err := handler.Service.Login(c.UserContext())
 	utils.PanicIfNeeded(err)
 

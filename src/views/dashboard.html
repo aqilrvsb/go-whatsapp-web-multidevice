@@ -1048,7 +1048,9 @@
             `;
             
             // Get QR code from WhatsApp login endpoint
-            fetch('/app/login')
+            fetch(`/app/login?deviceId=${deviceId}`, {
+                credentials: 'include'
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.results && data.results.qr_link) {
@@ -1072,7 +1074,9 @@
                         
                         // Set up auto-refresh every 20 seconds
                         const refreshInterval = setInterval(() => {
-                            fetch('/app/login')
+                            fetch(`/app/login?deviceId=${deviceId}`, {
+                                credentials: 'include'
+                            })
                                 .then(response => response.json())
                                 .then(data => {
                                     if (data.results && data.results.qr_link) {
