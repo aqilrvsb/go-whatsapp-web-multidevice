@@ -1,9 +1,27 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 26, 2025 - 8:30 AM**  
-**Latest Fix: WhatsApp Client Registration & Connection Tracking**
+**Last Updated: June 26, 2025 - 9:00 AM**  
+**Latest Fix: Device Management Issues Resolved**
 
 ## 🚀 Latest Updates:
+### Fixed Device Management Issues (June 26, 2025 - 9:00 AM)
+- **🔧 Logout Function Fixed**:
+  - Logout now actually disconnects from WhatsApp (was just simulating)
+  - Properly removes client from ClientManager
+  - Updates device status to offline in database
+  - Frontend calls real API instead of fake timeout
+  
+- **🗑️ Delete Device Enhanced**:
+  - Now cleans up WhatsApp client before deletion
+  - Logs out device if connected
+  - Removes from client manager
+  - Prevents orphaned connections
+  
+- **📱 Known Issues Being Investigated**:
+  - QR code scanning may loop if connection tracking fails
+  - Device may show online after phone logout (needs heartbeat)
+  - Solution: Use diagnostics endpoint to check client status
+
 ### Fixed WhatsApp Client Registration Issue (June 26, 2025 - 8:30 AM)
 - **🔧 Client Manager Fix**:
   - Fixed client not being registered in ClientManager after connection
