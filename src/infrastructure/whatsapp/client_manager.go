@@ -305,3 +305,17 @@ func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 	
 	return allPersonalChats, nil
 }
+
+
+// GetAllClients returns a copy of all clients (for debugging)
+func (cm *ClientManager) GetAllClients() map[string]*whatsmeow.Client {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	
+	// Create a copy to avoid concurrent access issues
+	clientsCopy := make(map[string]*whatsmeow.Client)
+	for k, v := range cm.clients {
+		clientsCopy[k] = v
+	}
+	return clientsCopy
+}

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -54,6 +55,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/devices/:id/messages/:chatId", rest.GetWhatsAppMessages)
 	app.Post("/api/devices/:id/send", rest.SendWhatsAppMessage)
 	app.Post("/api/devices/:id/sync", rest.SyncDeviceChats)
+	app.Get("/api/devices/:id/diagnose", rest.DiagnoseDevice)
 	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
@@ -1022,5 +1024,108 @@ func (handler *App) SyncDeviceChats(c *fiber.Ctx) error {
 			"deviceId": device.ID,
 			"status":   "syncing",
 		},
+	})
+}
+// DiagnoseDevice provides diagnostic information about a device's WhatsApp connection
+func (handler *App) DiagnoseDevice(c *fiber.Ctx) error {
+	deviceId := c.Params("id")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	// Verify device ownership
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Get device info
+	device, err := userRepo.GetDevice(user.ID, deviceId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Check WhatsApp client status
+	cm := whatsapp.GetClientManager()
+	client, clientErr := cm.GetClient(device.ID)
+	
+	diagnostics := map[string]interface{}{
+		"device": map[string]interface{}{
+			"id":     device.ID,
+			"name":   device.DeviceName,
+			"phone":  device.Phone,
+			"status": device.Status,
+			"jid":    device.JID,
+		},
+		"whatsapp_client": map[string]interface{}{
+			"connected": clientErr == nil,
+			"error":     "",
+		},
+		"database": map[string]interface{}{
+			"chats_count":    0,
+			"messages_count": 0,
+		},
+	}
+	
+	if clientErr != nil {
+		diagnostics["whatsapp_client"].(map[string]interface{})["error"] = clientErr.Error()
+	} else {
+		// Check if client is logged in
+		diagnostics["whatsapp_client"].(map[string]interface{})["logged_in"] = client.IsLoggedIn()
+		diagnostics["whatsapp_client"].(map[string]interface{})["is_connected"] = client.IsConnected()
+		
+		// Try to get contacts count
+		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err == nil {
+			diagnostics["whatsapp_client"].(map[string]interface{})["contacts_count"] = len(contacts)
+		}
+	}
+	
+	// Check database
+	whatsappRepo := repository.GetWhatsAppRepository()
+	chats, _ := whatsappRepo.GetChats(device.ID)
+	diagnostics["database"].(map[string]interface{})["chats_count"] = len(chats)
+	
+	// Force a sync attempt
+	go func() {
+		fmt.Printf("Forcing sync for device %s\n", device.ID)
+		chats, err := whatsapp.GetChatsForDevice(device.ID)
+		if err != nil {
+			fmt.Printf("Sync error for device %s: %v\n", device.ID, err)
+		} else {
+			fmt.Printf("Sync complete for device %s: %d chats\n", device.ID, len(chats))
+		}
+	}()
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device diagnostics",
+		Results: diagnostics,
 	})
 }
