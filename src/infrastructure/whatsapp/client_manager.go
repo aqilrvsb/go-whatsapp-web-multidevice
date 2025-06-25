@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 	
@@ -66,89 +67,99 @@ func (cm *ClientManager) RemoveClient(deviceID string) {
 func GetChatsForDevice(deviceID string) ([]repository.WhatsAppChat, error) {
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
+	
+	// Always try to get from database first
+	repo := repository.GetWhatsAppRepository()
+	savedChats, _ := repo.GetChats(deviceID)
+	
 	if err != nil {
 		// If client not connected, return saved chats from database
-		repo := repository.GetWhatsAppRepository()
-		return repo.GetChats(deviceID)
+		return savedChats, nil
 	}
 	
-	// Get chats from WhatsApp client
-	chats, err := client.Store.Chats.GetAll()
+	// Client is connected, try to sync latest data
+	// Get all contacts first to have proper names
+	contacts, err := client.Store.Contacts.GetAllContacts()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get chats: %v", err)
+		fmt.Printf("Failed to get contacts: %v\n", err)
 	}
 	
-	// Convert and save chats to database
-	repo := repository.GetWhatsAppRepository()
-	var savedChats []repository.WhatsAppChat
+	// Get recent conversations from device
+	conversations, err := client.Store.ChatSettings.GetAllChatSettings()
+	if err != nil {
+		fmt.Printf("Failed to get chat settings: %v\n", err)
+		return savedChats, nil
+	}
 	
-	for jid, chat := range chats {
-		// Skip invalid chats
-		if chat == nil {
-			continue
+	// Create a map for quick updates
+	chatMap := make(map[string]*repository.WhatsAppChat)
+	for i := range savedChats {
+		chatMap[savedChats[i].ChatJID] = &savedChats[i]
+	}
+	
+	// Process each conversation
+	for jid, settings := range conversations {
+		chatJID := jid.String()
+		
+		// Get or create chat entry
+		chat, exists := chatMap[chatJID]
+		if !exists {
+			chat = &repository.WhatsAppChat{
+				DeviceID: deviceID,
+				ChatJID:  chatJID,
+			}
+			chatMap[chatJID] = chat
 		}
+		
+		// Update chat info
+		chat.IsGroup = jid.Server == types.GroupServer
+		chat.IsMuted = settings.Muted
 		
 		// Get chat name
-		chatName := ""
-		if chat.Name != "" {
-			chatName = chat.Name
+		if chat.IsGroup {
+			// For groups, get group info
+			groupInfo, err := client.GetGroupInfo(jid)
+			if err == nil && groupInfo != nil {
+				chat.ChatName = groupInfo.Name
+			}
 		} else {
-			// For individual chats, get contact name
-			contact, _ := client.Store.Contacts.GetContact(jid)
-			if contact != nil {
-				if contact.PushName != "" {
-					chatName = contact.PushName
-				} else if contact.BusinessName != "" {
-					chatName = contact.BusinessName
-				} else {
-					chatName = jid.User
-				}
+			// For individual chats, use contact name or push name
+			if contact, ok := contacts[jid]; ok && contact.PushName != "" {
+				chat.ChatName = contact.PushName
+			} else if contact, ok := contacts[jid]; ok && contact.BusinessName != "" {
+				chat.ChatName = contact.BusinessName
 			} else {
-				chatName = jid.User
+				// Fallback to phone number
+				chat.ChatName = jid.User
 			}
 		}
 		
-		// Get last message info
-		lastMessageText := ""
-		lastMessageTime := time.Now()
-		if len(chat.Messages) > 0 {
-			// Get the most recent message
-			for _, msg := range chat.Messages {
-				if msg.Message != nil && msg.Info.Timestamp.After(lastMessageTime) {
-					lastMessageTime = msg.Info.Timestamp
-					if msg.Message.Conversation != nil {
-						lastMessageText = *msg.Message.Conversation
-					} else if msg.Message.ExtendedTextMessage != nil && msg.Message.ExtendedTextMessage.Text != nil {
-						lastMessageText = *msg.Message.ExtendedTextMessage.Text
-					}
-				}
-			}
-		}
-		
-		// Create chat record
-		whatsappChat := repository.WhatsAppChat{
-			DeviceID:        deviceID,
-			ChatJID:         jid.String(),
-			ChatName:        chatName,
-			IsGroup:         jid.Server == types.GroupServer,
-			IsMuted:         chat.Muted,
-			LastMessageText: lastMessageText,
-			LastMessageTime: lastMessageTime,
-			UnreadCount:     int(chat.UnreadCount),
-			AvatarURL:       "", // TODO: Implement avatar fetching
+		// Try to get last message from history sync
+		// Note: This is a simplified approach. In production, you'd handle history sync events
+		if !exists {
+			chat.LastMessageTime = time.Now()
+			chat.LastMessageText = "Chat synced"
+			chat.UnreadCount = 0
 		}
 		
 		// Save to database
-		if err := repo.SaveOrUpdateChat(&whatsappChat); err != nil {
-			// Log error but continue with other chats
-			fmt.Printf("Error saving chat %s: %v\n", jid.String(), err)
-			continue
+		if err := repo.SaveOrUpdateChat(chat); err != nil {
+			fmt.Printf("Error saving chat %s: %v\n", chatJID, err)
 		}
-		
-		savedChats = append(savedChats, whatsappChat)
 	}
 	
-	return savedChats, nil
+	// Convert map back to slice
+	var updatedChats []repository.WhatsAppChat
+	for _, chat := range chatMap {
+		updatedChats = append(updatedChats, *chat)
+	}
+	
+	// Sort by last message time (newest first)
+	sort.Slice(updatedChats, func(i, j int) bool {
+		return updatedChats[i].LastMessageTime.After(updatedChats[j].LastMessageTime)
+	})
+	
+	return updatedChats, nil
 }
 
 // GetMessagesForChat fetches and saves messages for a specific chat

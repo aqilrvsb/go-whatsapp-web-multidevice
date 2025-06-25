@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 )
 
 // WhatsAppChat represents a chat/conversation
@@ -195,7 +196,7 @@ var whatsappRepo *WhatsAppRepository
 // GetWhatsAppRepository returns the WhatsApp repository instance
 func GetWhatsAppRepository() *WhatsAppRepository {
 	if whatsappRepo == nil {
-		whatsappRepo = NewWhatsAppRepository(db)
+		whatsappRepo = NewWhatsAppRepository(database.GetDB())
 	}
 	return whatsappRepo
 }

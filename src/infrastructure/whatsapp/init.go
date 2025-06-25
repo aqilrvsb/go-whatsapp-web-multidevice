@@ -289,6 +289,105 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 	message := ExtractMessageText(evt)
 	utils.RecordMessage(evt.Info.ID, evt.Info.Sender.String(), message)
 	
+	// Save message to WhatsApp storage for all connected devices
+	cm := GetClientManager()
+	for deviceID, client := range cm.clients {
+		// Check if this message belongs to this client
+		if client.Store.ID != nil && evt.Info.MessageSource.Sender.User == client.Store.ID.User {
+			// Get sender name
+			senderName := ""
+			if evt.Info.IsFromMe {
+				senderName = "You"
+			} else {
+				contact, _ := client.Store.Contacts.GetContact(evt.Info.Sender)
+				if contact != nil && contact.PushName != "" {
+					senderName = contact.PushName
+				} else {
+					senderName = evt.Info.Sender.User
+				}
+			}
+			
+			// Determine message type
+			messageType := "text"
+			mediaURL := ""
+			if evt.Message.ImageMessage != nil {
+				messageType = "image"
+			} else if evt.Message.VideoMessage != nil {
+				messageType = "video"
+			} else if evt.Message.AudioMessage != nil {
+				messageType = "audio"
+			} else if evt.Message.DocumentMessage != nil {
+				messageType = "document"
+			}
+			
+			// Save message to database
+			whatsappRepo := repository.GetWhatsAppRepository()
+			whatsappMsg := repository.WhatsAppMessage{
+				DeviceID:    deviceID,
+				ChatJID:     evt.Info.Chat.String(),
+				MessageID:   evt.Info.ID,
+				SenderJID:   evt.Info.Sender.String(),
+				SenderName:  senderName,
+				MessageText: message,
+				MessageType: messageType,
+				MediaURL:    mediaURL,
+				IsSent:      evt.Info.IsFromMe,
+				IsRead:      false,
+				Timestamp:   evt.Info.Timestamp,
+			}
+			
+			if err := whatsappRepo.SaveMessage(&whatsappMsg); err != nil {
+				log.Errorf("Failed to save message: %v", err)
+			}
+			
+			// Update chat's last message
+			chat, err := whatsappRepo.GetChatByJID(deviceID, evt.Info.Chat.String())
+			if err != nil {
+				// Create new chat entry
+				chatName := ""
+				if evt.Info.IsGroup {
+					// Get group info
+					groupInfo, _ := client.GetGroupInfo(evt.Info.Chat)
+					if groupInfo != nil {
+						chatName = groupInfo.Name
+					}
+				} else {
+					// Get contact name
+					contact, _ := client.Store.Contacts.GetContact(evt.Info.Chat)
+					if contact != nil && contact.PushName != "" {
+						chatName = contact.PushName
+					} else {
+						chatName = evt.Info.Chat.User
+					}
+				}
+				
+				chat = &repository.WhatsAppChat{
+					DeviceID:        deviceID,
+					ChatJID:         evt.Info.Chat.String(),
+					ChatName:        chatName,
+					IsGroup:         evt.Info.IsGroup,
+					IsMuted:         false,
+					LastMessageText: message,
+					LastMessageTime: evt.Info.Timestamp,
+					UnreadCount:     0,
+				}
+			} else {
+				// Update existing chat
+				chat.LastMessageText = message
+				chat.LastMessageTime = evt.Info.Timestamp
+				if !evt.Info.IsFromMe {
+					chat.UnreadCount++
+				}
+			}
+			
+			if err := whatsappRepo.SaveOrUpdateChat(chat); err != nil {
+				log.Errorf("Failed to update chat: %v", err)
+			}
+			
+			break
+		}
+	}
+	
 	// Record to database for analytics
 	// TODO: Get actual user and device from session context
 	// For now, we'll need to implement a device mapping system
