@@ -868,7 +868,17 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Delete device
+	// Clean up WhatsApp client if exists
+	cm := whatsapp.GetClientManager()
+	client, err := cm.GetClient(device.ID)
+	if err == nil && client != nil {
+		// Try to logout first
+		client.Logout(c.UserContext())
+		// Remove from client manager
+		cm.RemoveClient(device.ID)
+	}
+	
+	// Delete device from database
 	err = userRepo.DeleteDevice(device.ID)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
