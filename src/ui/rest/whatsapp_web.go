@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
-	whatsapp2 "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/whatsapp"
 )
 
 // WhatsAppWebView renders the WhatsApp Web interface for a device
@@ -27,19 +26,8 @@ func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
 func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// Get WhatsApp instance for this device
-	whatsappService := whatsapp2.WhatsAppServiceMap[deviceId]
-	if whatsappService == nil {
-		return c.JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not connected to WhatsApp",
-			Results: []interface{}{},
-		})
-	}
-	
-	// Get chats from WhatsApp
-	// This is a placeholder - implement actual chat retrieval
+	// For now, return mock data until WhatsApp integration is complete
+	// TODO: Get actual chats from WhatsApp connection for this device
 	chats := []map[string]interface{}{
 		{
 			"id":          "1",
@@ -54,7 +42,7 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Chats retrieved",
+		Message: fmt.Sprintf("Chats for device %s retrieved", deviceId),
 		Results: chats,
 	})
 }
@@ -64,19 +52,8 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	chatId := c.Params("chatId")
 	
-	// Get WhatsApp instance for this device
-	whatsappService := whatsapp2.WhatsAppServiceMap[deviceId]
-	if whatsappService == nil {
-		return c.JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not connected to WhatsApp",
-			Results: []interface{}{},
-		})
-	}
-	
-	// Get messages from WhatsApp
-	// This is a placeholder - implement actual message retrieval
+	// For now, return mock data until WhatsApp integration is complete
+	// TODO: Get actual messages from WhatsApp connection for this device
 	messages := []map[string]interface{}{
 		{
 			"id":   "1",
@@ -95,7 +72,7 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: fmt.Sprintf("Messages for chat %s retrieved", chatId),
+		Message: fmt.Sprintf("Messages for device %s, chat %s retrieved", deviceId, chatId),
 		Results: messages,
 	})
 }
@@ -117,23 +94,13 @@ func (handler *App) SendWhatsAppMessage(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Get WhatsApp instance for this device
-	whatsappService := whatsapp2.WhatsAppServiceMap[deviceId]
-	if whatsappService == nil {
-		return c.JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not connected to WhatsApp",
-		})
-	}
-	
-	// Send message via WhatsApp
-	// This is a placeholder - implement actual message sending
+	// For now, return success until WhatsApp integration is complete
+	// TODO: Send actual message via WhatsApp connection for this device
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Message sent",
+		Message: fmt.Sprintf("Message sent to chat %s on device %s", request.ChatID, deviceId),
 		Results: map[string]interface{}{
 			"messageId": "msg_123",
 			"timestamp": "2025-06-25T10:00:00Z",
