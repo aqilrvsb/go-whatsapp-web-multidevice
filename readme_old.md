@@ -1,9 +1,34 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 25, 2025 - 12:00 PM**  
-**Latest Feature: Critical Fixes - Device Management, Analytics, and WhatsApp Web Integration**
+**Last Updated: June 25, 2025 - 12:15 PM**  
+**Latest Feature: Read-Only WhatsApp Web View with Real Device Data**
 
 ## 🚀 Latest Updates:
+### Read-Only WhatsApp Web View Implementation (June 25, 2025 - 12:15 PM)
+- **Fixed API Error**:
+  - Added missing `GetDevice` handler in `devices.go`
+  - Fixed 500 Internal Server Error on device info loading
+  - Proper error handling for device not found scenarios
+  
+- **Read-Only Features**:
+  - ✅ View list of chats (no message sending)
+  - ✅ Click on any chat to read messages
+  - ✅ Search through chats functionality
+  - ✅ See who sent what message with timestamps
+  - ✅ Clean, minimal interface focused on reading
+  
+- **Status Indicators**:
+  - 🟢 Green bar = Device online (can read chats)
+  - 🔴 Red bar = Device offline (shows error message)
+  - Real-time device status from database
+  
+- **Simplified Interface**:
+  - Left sidebar: Chat list with search
+  - Right side: Message viewer
+  - Bottom: "Read-only mode" notice
+  - No input box, no send button, no complex features
+  - Perfect for just viewing and reading conversations
+
 ### WhatsApp Web Real Data Implementation (June 25, 2025 - 12:00 PM)
 - **Real Device Status**:
   - Shows actual connection status (online/offline)
@@ -92,6 +117,7 @@
   - Updated all campaign CRUD operations
   - Fixed interface conversion errors
 
+
 ### Phase 2 Implementation (June 25, 2025 - 01:00 AM)
 - **Device Actions Tool**:
   - Testing page for each device at `/device/{id}/actions`
@@ -133,118 +159,6 @@
   4. WhatsApp connects → Connected event
   5. Backend updates device status to "online" in database
   6. Frontend shows device as connected
-
-### Emergency Fix Applied (June 25, 2025 - 12:00 AM)
-- **Temporary Auth Changes**:
-  - Made all `/api` and `/app` endpoints public (temporary for debugging)
-  - Added comprehensive debug logging for authentication
-  - This allows us to diagnose the QR code and linking issues
-- **Known Issues Being Investigated**:
-  - QR code displays but WhatsApp doesn't recognize it
-  - Phone linking returning 401 errors
-  - Authentication middleware too restrictive
-- **Recommended Workaround**:
-  - Clear ALL browser data (cookies, cache, storage)
-  - Use Incognito/Private browsing mode
-  - Try Phone Code authentication instead of QR
-  - Check browser console for errors
-
-### Authentication & Device System Overhaul (June 24, 2025 - 11:30 PM)
-- **Fixed Authentication Middleware**:
-  - Cookie-based authentication now works properly across all endpoints
-  - Added `/api/analytics` and `/api/devices` to public routes
-  - Better session validation with cookie and header fallbacks
-  - Improved error messages for debugging (401 errors fixed)
-- **Device Persistence Fixed**:
-  - Created proper device creation endpoint (`POST /api/devices`)
-  - Devices now save to PostgreSQL database immediately
-  - Fixed all JavaScript syntax errors in fetch() calls
-  - Devices no longer disappear when closing modals
-- **Database Integration**:
-  - Device management fully integrated with PostgreSQL
-  - Proper user-device relationship in database
-  - Session management improvements
-- **Recommended Usage**:
-  - Use Phone Code authentication (more reliable than QR)
-  - Clear browser cache after deployment for fresh session
-  - All API endpoints now properly authenticated
-
-### Device Management Fixes (June 24, 2025 - 11:00 PM)
-- **Fixed Device Persistence Issue**:
-  - Device no longer disappears when QR modal is closed
-  - Removed auto-open QR on device creation
-  - User can now choose between QR Code or Phone Code
-  - Device is saved and persists in the UI
-- **Improved Authentication Flow**:
-  - Both QR Code and Phone Code options clearly visible
-  - Added helpful note about using Phone Code if QR fails
-  - Phone Code is recommended as more reliable option
-- **Better User Experience**:
-  - No more confusion with disappearing devices
-  - Clear choice between authentication methods
-  - Persistent device cards for easy management
-
-### Critical Bug Fixes (June 24, 2025 - 10:30 PM)
-- **Fixed Phone Code Authentication**:
-  - Added Malaysian phone number format support (60xxx, 0xxx formats)
-  - Improved UI with loading modal and success display
-  - Better error handling with proper HTTP status checks
-  - Auto-format phone numbers for Malaysian users
-- **Fixed QR Code Display Issues**:
-  - QR code now displays properly with correct styling
-  - Added fallback SVG image on load errors
-  - Auto-refresh with expiration handling (max 10 refreshes)
-  - Clear error messages for connection issues
-- **Fixed Dashboard JavaScript Errors**:
-  - Fixed all `loadDevices()` function calls missing parentheses
-  - Removed mock device creation - now shows empty state properly
-  - Prevented "undefined" errors when no devices exist
-  - Better error handling throughout the dashboard
-
-### UI Improvements & Auth Fix (June 24, 2025 - 5:00 PM)
-- **Fixed 401 Authentication Errors**: Added /app endpoints to public routes
-- **Redesigned Devices Tab**:
-  - Modern 2-column card layout with better visual hierarchy
-  - Connected devices show green border
-  - Empty state with friendly message when no devices
-  - Improved phone number management with inline editing
-  - Device status icons and connection indicators
-  - Grouped action buttons (QR Code + Phone Code)
-- **Debug Logging**: Added auth middleware debugging for troubleshooting
-- **Better UX**: Clearer device states, last active time, and actions
-
-### Device Management System (June 24, 2025 - 4:00 PM)
-- **Multi-Device Support**: Each user can manage multiple WhatsApp devices
-- **Phone Number Linking**: Link phone numbers to devices with a simple button
-- **Two Connection Methods**:
-  - QR Code scanning (traditional method)
-  - Phone code pairing (new WhatsApp feature)
-- **Device Operations**:
-  - Add/Edit/Delete devices
-  - View device-specific statistics
-  - Link/update phone numbers
-  - Logout individual devices
-
-### Complete System Fix (June 24, 2025 - 3:00 PM)
-- **Fixed Authentication**: Cookie-based sessions with `credentials: 'include'`
-- **Fixed Device Filter**: Dropdown now shows "All Devices" option
-- **Fixed JavaScript Errors**: Proper function spacing and definitions
-- **Added Phone Linking**: New endpoint to link phone numbers to devices
-- **Railway Deployment**: Successfully forced rebuild to deploy embedded views
-
-### Authentication System (June 24, 2025)
-- **Base64 Password Storage**: Replaced bcrypt with base64 encoding for easy password viewing
-- **Cookie-Based Sessions**: Simple session management using HTTP cookies
-- **No Token Management**: Login once, stay logged in until logout
-- **Fixed Build Errors**: Resolved unused import issues
-- **Working Login System**: Authentication now works properly
-
-### PostgreSQL Database Integration (June 23, 2025)
-- **Full PostgreSQL Support**: Migrated from file-based storage to PostgreSQL
-- **Railway Integration**: Configured for Railway PostgreSQL deployment
-- **Database Schema**: Includes tables for users, devices, sessions, and message analytics
-- **Connection Pooling**: Optimized for 200+ concurrent users
-- **Auto-deployment**: Push to main branch triggers Railway deployment
 
 ## 🎯 Key Features:
 
@@ -317,7 +231,7 @@
 - Sessions persist across browser refreshes
 - Logout endpoint: `/logout`
 
-## 📈 Current Status (June 24, 2025 - 5:00 PM)
+## 📈 Current Status (June 25, 2025 - 12:15 PM)
 
 ### ✅ Working Features:
 - User registration with base64 passwords
@@ -330,12 +244,15 @@
 - Device filter dropdown with "All Devices" option
 - Modern device management UI
 - Phone number linking to devices
+- **Read-only WhatsApp Web view**
+- **Fixed GetDevice API endpoint**
 
 ### ✅ Fixed Issues:
 - 401 Authentication errors on API endpoints
 - Device management UI completely redesigned
 - Empty state for no devices
 - Better visual feedback for device status
+- **500 Internal Server Error on device info loading**
 
 ### ⚠️ In Progress:
 - Connecting actual WhatsApp accounts
@@ -343,7 +260,14 @@
 - Device-specific statistics
 
 ### 🎨 UI Improvements:
-1. **Devices Tab Redesign**:
+1. **Read-Only WhatsApp Web**:
+   - Simple chat viewer interface
+   - No message sending capability
+   - Search functionality for chats
+   - Clean, minimal design
+   - Perfect for viewing conversations
+
+2. **Devices Tab Redesign**:
    - 2-column responsive grid layout
    - Large, informative device cards
    - Visual connection status (green border for connected)
@@ -352,11 +276,12 @@
    - Grouped action buttons
    - Empty state with call-to-action
 
-2. **Better Visual Hierarchy**:
+3. **Better Visual Hierarchy**:
    - Clear device names and status
    - Separated phone number section
    - Last active time display
    - Dropdown menu for additional actions
+
 
 ## 📱 Device Management Guide
 
@@ -377,6 +302,7 @@
 - **Edit**: Click the three-dot menu → Edit to rename device
 - **Delete**: Click the three-dot menu → Delete to remove device
 - **View Stats**: Click "View Stats" to see device-specific analytics
+- **WhatsApp Web**: Click "Open WhatsApp Web" for read-only chat viewer
 - **Logout**: Disconnect WhatsApp from this device
 
 ### Connection Methods:
@@ -416,112 +342,7 @@ If you're seeing a 502 error, check:
 4. **Port Configuration**: Railway automatically sets PORT env variable
 5. **Database Migration**: The app creates tables on first run - check if it has permissions
 
-### Current Status (June 23, 2025):
-- ✅ Code fixed and builds successfully
-- ✅ PostgreSQL integration complete
-- ✅ Auto-deployment configured
-- ⚠️ 502 error indicates runtime issue - check Railway logs
-
-## Login Credentials
-- **Admin Account**: 
-  - Email: `admin@whatsapp.com`
-  - Password: `changeme123` (or whatever you set in APP_BASIC_AUTH environment variable)
-- **Registered Users**: Can register via `/register` page and login with their email
-
-[![Patreon](https://img.shields.io/badge/Support%20on-Patreon-orange.svg)](https://www.patreon.com/c/aldinokemal)  
-**If you're using this tools to generate income, consider supporting its development by becoming a Patreon member!**  
-Your support helps ensure the library stays maintained and receives regular updates!
-___
-
-![release version](https://img.shields.io/github/v/release/aldinokemal/go-whatsapp-web-multidevice)
-
-## 🚀 New Features - Analytics Dashboard with Real Data
-
-### Multi-User Analytics Dashboard
-- **Real WhatsApp Data**: Analytics pulled from actual message history
-- **User Management**: Register and manage multiple users
-- **Device Management**: Each user can manage multiple WhatsApp devices
-- **Live Analytics**: Real-time message statistics from chat storage
-- **Custom Date Ranges**: Analyze any time period with real data
-
-![Build Image](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/build-docker-image.yaml/badge.svg)
-
-![release windows](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/release-windows.yml/badge.svg)
-![release linux](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/release-linux.yml/badge.svg)
-![release macos](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/release-mac.yml/badge.svg)
-
-## 🚀 New Features - Analytics Dashboard
-
-### Multi-User Analytics Dashboard
-- **User Management**: Register and manage multiple users
-- **Device Management**: Each user can manage multiple WhatsApp devices
-- **Analytics Dashboard**: View message statistics, active chats, and trends
-- **Real-time Updates**: Live device status and message tracking
-
-### Dashboard Features
-- 📊 **Analytics Overview**: Messages sent/received, active chats, reply rate
-- 📱 **Multi-Device Support**: Add, manage, and monitor multiple WhatsApp devices
-- 📈 **Time-based Analytics**: 
-  - Today view
-  - Preset ranges: 7, 30, or 90 days
-  - **Custom date range**: Select any start and end date
-- 📅 **Date Range Selector**: Pick specific date ranges for detailed analysis
-- 🔐 **User Authentication**: Secure login and registration system
-- 👥 **User Registration**: New users can create accounts
-- 🎨 **Modern UI**: Clean, responsive design with WhatsApp's color scheme
-- 📊 **Real-time Updates**: Live statistics and device status monitoring
-
-## Support for `ARM` & `AMD` Architecture along with `MCP` Support
-
-Download:
-
-- [Release](https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/latest)
-- [Docker Image](https://hub.docker.com/r/aldinokemal2104/go-whatsapp-web-multidevice/tags)
-
-## Breaking Changes
-
-- `v6`
-  - For REST mode, you need to run `<binary> rest` instead of `<binary>`
-    - for example: `./whatsapp rest` instead of ~~./whatsapp~~
-  - For MCP mode, you need to run `<binary> mcp`
-    - for example: `./whatsapp mcp`
-
-## Feature
-
-- **NEW: Analytics Dashboard with Multi-User & Multi-Device Support**
-- Send WhatsApp message via http API, [docs/openapi.yml](./docs/openapi.yaml) for more details
-- **MCP (Model Context Protocol) Server Support** - Integrate with AI agents and tools using standardized protocol
-- Mention someone
-  - `@phoneNumber`
-  - example: `Hello @628974812XXXX, @628974812XXXX`
-- Post Whatsapp Status
-- Compress image before send
-- Compress video before send
-- Change OS name become your app (it's the device name when connect via mobile)
-  - `--os=Chrome` or `--os=MyApplication`
-- Basic Auth (able to add multi credentials)
-  - `--basic-auth=kemal:secret,toni:password,userName:secretPassword`, or you can simplify
-  - `-b=kemal:secret,toni:password,userName:secretPassword`
-- Customizable port and debug mode
-  - `--port 8000`
-  - `--debug true`
-- Auto reply message
-  - `--autoreply="Don't reply this message"`_REPLY=
-WHATSAPP_WEBHOOK=
-WHATSAPP_WEBHOOK_SECRET=
-WHATSAPP_ACCOUNT_VALIDATION=true
-WHATSAPP_CHAT_STORAGE=true
-```
-
-### Troubleshooting 502 Error:
-If you're seeing a 502 error, check:
-1. **Database Connection**: Ensure DB_URI is correct and PostgreSQL is accessible
-2. **Environment Variables**: All required variables must be set in Railway
-3. **Application Logs**: Check Railway logs for startup errors
-4. **Port Configuration**: Railway automatically sets PORT env variable
-5. **Database Migration**: The app creates tables on first run - check if it has permissions
-
-### Current Status (June 25, 2025 - 01:00 AM):
+### Current Status (June 25, 2025 - 12:15 PM):
 - ✅ Code fixed and builds successfully
 - ✅ PostgreSQL integration complete
 - ✅ Auto-deployment configured
@@ -529,6 +350,8 @@ If you're seeing a 502 error, check:
 - ✅ Device Actions tool ready
 - ✅ Lead Management System ready
 - ✅ Campaign Dashboard ready
+- ✅ Read-only WhatsApp Web viewer
+- ✅ Fixed GetDevice API endpoint
 
 ## Login Credentials
 - **Admin Account**: 
@@ -598,6 +421,7 @@ ___
 - 📊 **Real-time Updates**: Live statistics and device status monitoring
 - 🔧 **Device Tools**: Test functionality and manage leads
 - 📆 **Campaign Planning**: Visual calendar for broadcast scheduling
+- 👀 **Read-Only Web View**: View WhatsApp chats without sending capabilities
 
 ## Support for `ARM` & `AMD` Architecture along with `MCP` Support
 
@@ -616,6 +440,7 @@ Download:
 
 ## Feature
 
+- **NEW: Read-Only WhatsApp Web View**
 - **NEW: Phase 2 - Device Actions, Lead Management & Campaign Dashboard**
 - **NEW: Analytics Dashboard with Multi-User & Multi-Device Support**
 - Send WhatsApp message via http API, [docs/openapi.yml](./docs/openapi.yaml) for more details
