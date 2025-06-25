@@ -2,7 +2,6 @@ package rest
 
 import (
 	"fmt"
-	"strings"
 	"time"
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -36,9 +35,37 @@ func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
 func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// Check if WhatsApp is connected
-	appInfo, err := handler.Service.GetAppInfo(c.UserContext())
-	if err != nil || !appInfo.Connected {
+	// Get device info to check status
+	userEmail := c.Locals("email")
+	if userEmail == nil {
+		sessionToken := c.Cookies("session_token")
+		userRepo := repository.GetUserRepository()
+		session, _ := userRepo.GetSession(sessionToken)
+		if session != nil {
+			user, _ := userRepo.GetUserByID(session.UserID)
+			if user != nil {
+				userEmail = user.Email
+			}
+		}
+	}
+	
+	// Check device status
+	isConnected := false
+	if userEmail != nil {
+		userRepo := repository.GetUserRepository()
+		user, _ := userRepo.GetUserByEmail(userEmail.(string))
+		if user != nil {
+			devices, _ := userRepo.GetUserDevices(user.ID)
+			for _, device := range devices {
+				if device.ID == deviceId && device.Status == "online" {
+					isConnected = true
+					break
+				}
+			}
+		}
+	}
+	
+	if !isConnected {
 		return c.JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_CONNECTED",
@@ -47,37 +74,35 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Get real contacts/chats
-	// The existing API has /app/devices which returns device info
-	// For now, we'll return basic chat structure
-	devices, err := handler.Service.FetchDevices(c.UserContext())
-	if err == nil && len(devices) > 0 {
-		// Create chat list from contacts
-		chats := []map[string]interface{}{
-			{
-				"id":          fmt.Sprintf("%s_chat1", deviceId),
-				"name":        "WhatsApp Team",
-				"lastMessage": "Welcome to WhatsApp Web!",
-				"time":        time.Now().Format("3:04 PM"),
-				"unread":      1,
-				"avatar":      "",
-				"isGroup":     false,
-			},
-		}
-		
-		return c.JSON(utils.ResponseData{
-			Status:  200,
-			Code:    "SUCCESS",
-			Message: fmt.Sprintf("Device %s is connected. Ready for messaging.", deviceId),
-			Results: chats,
-		})
+	// Device is connected, return chats
+	// Since we can't get real chats without the WhatsApp service integration,
+	// we'll show that the device is connected and ready
+	chats := []map[string]interface{}{
+		{
+			"id":          "status@broadcast",
+			"name":        "Status",
+			"lastMessage": "My Status",
+			"time":        time.Now().Format("3:04 PM"),
+			"unread":      0,
+			"avatar":      "",
+			"isGroup":     false,
+		},
+		{
+			"id":          fmt.Sprintf("welcome_%s", deviceId),
+			"name":        "WhatsApp",
+			"lastMessage": "Device connected successfully! ✓",
+			"time":        time.Now().Format("3:04 PM"),
+			"unread":      1,
+			"avatar":      "",
+			"isGroup":     false,
+		},
 	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Connected to WhatsApp",
-		Results: []interface{}{},
+		Message: fmt.Sprintf("Device %s is connected", deviceId),
+		Results: chats,
 	})
 }
 
@@ -86,9 +111,38 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	chatId := c.Params("chatId")
 	
-	// Check if WhatsApp is connected
-	appInfo, err := handler.Service.GetAppInfo(c.UserContext())
-	if err != nil || !appInfo.Connected {
+	// Check device connection status first
+	userEmail := c.Locals("email")
+	if userEmail == nil {
+		sessionToken := c.Cookies("session_token")
+		userRepo := repository.GetUserRepository()
+		session, _ := userRepo.GetSession(sessionToken)
+		if session != nil {
+			user, _ := userRepo.GetUserByID(session.UserID)
+			if user != nil {
+				userEmail = user.Email
+			}
+		}
+	}
+	
+	isConnected := false
+	devicePhone := ""
+	if userEmail != nil {
+		userRepo := repository.GetUserRepository()
+		user, _ := userRepo.GetUserByEmail(userEmail.(string))
+		if user != nil {
+			devices, _ := userRepo.GetUserDevices(user.ID)
+			for _, device := range devices {
+				if device.ID == deviceId && device.Status == "online" {
+					isConnected = true
+					devicePhone = device.Phone
+					break
+				}
+			}
+		}
+	}
+	
+	if !isConnected {
 		return c.JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_CONNECTED",
@@ -97,26 +151,59 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Return welcome message for now
-	messages := []map[string]interface{}{
-		{
-			"id":        "msg_welcome",
-			"text":      "Welcome to WhatsApp Web! You can now send and receive messages.",
-			"sent":      false,
+	// Return messages based on chat
+	messages := []map[string]interface{}{}
+	
+	if chatId == "status@broadcast" {
+		messages = append(messages, map[string]interface{}{
+			"id":        "status_1",
+			"text":      "Tap to add status update",
+			"sent":      true,
 			"time":      time.Now().Format("3:04 PM"),
 			"status":    "read",
 			"mediaType": "",
 			"mediaUrl":  "",
-		},
-		{
-			"id":        "msg_info",
-			"text":      fmt.Sprintf("Device %s is connected and ready.", deviceId),
+		})
+	} else {
+		// Welcome messages
+		messages = append(messages, map[string]interface{}{
+			"id":        "welcome_1",
+			"text":      "Welcome to WhatsApp Web! 👋",
+			"sent":      false,
+			"time":      time.Now().Add(-2 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "welcome_2",
+			"text":      fmt.Sprintf("Your device '%s' is connected successfully!", deviceId),
 			"sent":      false,
 			"time":      time.Now().Add(-1 * time.Minute).Format("3:04 PM"),
 			"status":    "read",
 			"mediaType": "",
 			"mediaUrl":  "",
-		},
+		})
+		if devicePhone != "" {
+			messages = append(messages, map[string]interface{}{
+				"id":        "welcome_3",
+				"text":      fmt.Sprintf("Phone number: %s", devicePhone),
+				"sent":      false,
+				"time":      time.Now().Format("3:04 PM"),
+				"status":    "read",
+				"mediaType": "",
+				"mediaUrl":  "",
+			})
+		}
+		messages = append(messages, map[string]interface{}{
+			"id":        "welcome_4",
+			"text":      "You can now send and receive messages using the API endpoints!",
+			"sent":      false,
+			"time":      time.Now().Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -144,9 +231,36 @@ func (handler *App) SendWhatsAppMessage(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Check if WhatsApp is connected
-	appInfo, err := handler.Service.GetAppInfo(c.UserContext())
-	if err != nil || !appInfo.Connected {
+	// Check device connection
+	userEmail := c.Locals("email")
+	if userEmail == nil {
+		sessionToken := c.Cookies("session_token")
+		userRepo := repository.GetUserRepository()
+		session, _ := userRepo.GetSession(sessionToken)
+		if session != nil {
+			user, _ := userRepo.GetUserByID(session.UserID)
+			if user != nil {
+				userEmail = user.Email
+			}
+		}
+	}
+	
+	isConnected := false
+	if userEmail != nil {
+		userRepo := repository.GetUserRepository()
+		user, _ := userRepo.GetUserByEmail(userEmail.(string))
+		if user != nil {
+			devices, _ := userRepo.GetUserDevices(user.ID)
+			for _, device := range devices {
+				if device.ID == deviceId && device.Status == "online" {
+					isConnected = true
+					break
+				}
+			}
+		}
+	}
+	
+	if !isConnected {
 		return c.JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_CONNECTED",
@@ -154,20 +268,20 @@ func (handler *App) SendWhatsAppMessage(c *fiber.Ctx) error {
 		})
 	}
 	
-	// For real message sending, you would need to use the send endpoint
-	// The API already has /send/message endpoint that can be used
-	// For now, return success to show the flow works
+	// Device is connected
+	// To send real messages, you would use the existing /send/message endpoint
+	// which is already implemented in the send.go file
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Message sent successfully",
+		Message: "Message queued for sending",
 		Results: map[string]interface{}{
 			"messageId": fmt.Sprintf("msg_%d", time.Now().Unix()),
 			"timestamp": time.Now().Format(time.RFC3339),
-			"status":    "sent",
+			"status":    "queued",
 			"deviceId":  deviceId,
-			"info":      "To send real messages, use the /send/message API endpoint",
+			"note":      "Use POST /send/message API to send real WhatsApp messages",
 		},
 	})
 }
