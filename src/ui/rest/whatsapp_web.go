@@ -78,9 +78,13 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	
 	// Check if device belongs to user and is online
 	isConnected := false
+	devicePhone := ""
 	for _, device := range devices {
-		if device.ID == deviceId && device.Status == "online" {
-			isConnected = true
+		if device.ID == deviceId {
+			if device.Status == "online" {
+				isConnected = true
+				devicePhone = device.Phone
+			}
 			break
 		}
 	}
@@ -94,10 +98,20 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Device is connected, return chats
-	// Since we can't get real chats without the WhatsApp service integration,
-	// we'll show that the device is connected and ready
+	// TODO: Integrate with actual WhatsApp client to get real chats
+	// For now, return a message indicating this needs implementation
+	
+	// Return demo chats with implementation notice
 	chats := []map[string]interface{}{
+		{
+			"id":          "implementation_notice",
+			"name":        "⚠️ Real-Time Integration Needed",
+			"lastMessage": "This feature requires integration with WhatsApp Web client to fetch real chats",
+			"time":        time.Now().Format("3:04 PM"),
+			"unread":      1,
+			"avatar":      "",
+			"isGroup":     false,
+		},
 		{
 			"id":          "status@broadcast",
 			"name":        "Status",
@@ -108,11 +122,11 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 			"isGroup":     false,
 		},
 		{
-			"id":          fmt.Sprintf("welcome_%s", deviceId),
-			"name":        "WhatsApp",
-			"lastMessage": "Device connected successfully! ✓",
+			"id":          fmt.Sprintf("device_%s", deviceId),
+			"name":        fmt.Sprintf("Device: %s", deviceId),
+			"lastMessage": fmt.Sprintf("Phone: %s (Connected)", devicePhone),
 			"time":        time.Now().Format("3:04 PM"),
-			"unread":      1,
+			"unread":      0,
 			"avatar":      "",
 			"isGroup":     false,
 		},
@@ -121,7 +135,7 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: fmt.Sprintf("Device %s is connected", deviceId),
+		Message: "Real-time chat integration pending. Showing demo data.",
 		Results: chats,
 	})
 }
@@ -195,10 +209,66 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 		})
 	}
 	
+	// TODO: Integrate with actual WhatsApp client to get real messages
 	// Return messages based on chat
 	messages := []map[string]interface{}{}
 	
-	if chatId == "status@broadcast" {
+	if chatId == "implementation_notice" {
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_1",
+			"text":      "🔔 Real-Time Chat Integration Required",
+			"sent":      false,
+			"time":      time.Now().Add(-5 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_2",
+			"text":      "To display real WhatsApp chats and messages, we need to:",
+			"sent":      false,
+			"time":      time.Now().Add(-4 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_3",
+			"text":      "1. Create a WhatsApp client manager to handle multiple device connections",
+			"sent":      false,
+			"time":      time.Now().Add(-3 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_4",
+			"text":      "2. Implement methods to fetch chats from the WhatsApp Web client",
+			"sent":      false,
+			"time":      time.Now().Add(-2 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_5",
+			"text":      "3. Create endpoints that connect to the device's WhatsApp instance",
+			"sent":      false,
+			"time":      time.Now().Add(-1 * time.Minute).Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+		messages = append(messages, map[string]interface{}{
+			"id":        "notice_6",
+			"text":      "Currently showing demo data. Device is connected: " + devicePhone,
+			"sent":      false,
+			"time":      time.Now().Format("3:04 PM"),
+			"status":    "read",
+			"mediaType": "",
+			"mediaUrl":  "",
+		})
+	} else if chatId == "status@broadcast" {
 		messages = append(messages, map[string]interface{}{
 			"id":        "status_1",
 			"text":      "Tap to add status update",
@@ -209,10 +279,10 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 			"mediaUrl":  "",
 		})
 	} else {
-		// Welcome messages
+		// Default messages for device info
 		messages = append(messages, map[string]interface{}{
-			"id":        "welcome_1",
-			"text":      "Welcome to WhatsApp Web! 👋",
+			"id":        "device_1",
+			"text":      "Device Information",
 			"sent":      false,
 			"time":      time.Now().Add(-2 * time.Minute).Format("3:04 PM"),
 			"status":    "read",
@@ -220,8 +290,8 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 			"mediaUrl":  "",
 		})
 		messages = append(messages, map[string]interface{}{
-			"id":        "welcome_2",
-			"text":      fmt.Sprintf("Your device '%s' is connected successfully!", deviceId),
+			"id":        "device_2",
+			"text":      fmt.Sprintf("Device ID: %s", deviceId),
 			"sent":      false,
 			"time":      time.Now().Add(-1 * time.Minute).Format("3:04 PM"),
 			"status":    "read",
@@ -230,8 +300,8 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 		})
 		if devicePhone != "" {
 			messages = append(messages, map[string]interface{}{
-				"id":        "welcome_3",
-				"text":      fmt.Sprintf("Phone number: %s", devicePhone),
+				"id":        "device_3",
+				"text":      fmt.Sprintf("Phone: %s", devicePhone),
 				"sent":      false,
 				"time":      time.Now().Format("3:04 PM"),
 				"status":    "read",
@@ -239,15 +309,6 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 				"mediaUrl":  "",
 			})
 		}
-		messages = append(messages, map[string]interface{}{
-			"id":        "welcome_4",
-			"text":      "You can now send and receive messages using the API endpoints!",
-			"sent":      false,
-			"time":      time.Now().Format("3:04 PM"),
-			"status":    "read",
-			"mediaType": "",
-			"mediaUrl":  "",
-		})
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -333,19 +394,18 @@ func (handler *App) SendWhatsAppMessage(c *fiber.Ctx) error {
 	}
 	
 	// Device is connected
-	// To send real messages, you would use the existing /send/message endpoint
-	// which is already implemented in the send.go file
+	// To send real messages, integration with WhatsApp client is needed
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Message queued for sending",
+		Message: "Message sending requires WhatsApp client integration",
 		Results: map[string]interface{}{
 			"messageId": fmt.Sprintf("msg_%d", time.Now().Unix()),
 			"timestamp": time.Now().Format(time.RFC3339),
-			"status":    "queued",
+			"status":    "pending_integration",
 			"deviceId":  deviceId,
-			"note":      "Use POST /send/message API to send real WhatsApp messages",
+			"note":      "Real-time messaging requires WhatsApp Web client integration",
 		},
 	})
 }

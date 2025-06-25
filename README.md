@@ -1,9 +1,34 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 25, 2025 - 12:30 PM**  
-**Latest Feature: Simplified Read-Only WhatsApp Web - No Auth Required for API**
+**Last Updated: June 25, 2025 - 12:45 PM**  
+**Latest Feature: WhatsApp Web Read-Only View (Demo Data - Real Integration Pending)**
 
 ## 🚀 Latest Updates:
+### WhatsApp Web View - Real Data Integration Status (June 25, 2025 - 12:45 PM)
+- **Current Status**:
+  - ✅ WhatsApp Web UI is fully functional
+  - ✅ Authentication and device validation working
+  - ⚠️ Currently showing demo data instead of real WhatsApp chats
+  - ⚠️ Real-time integration with WhatsApp Web client pending
+  
+- **What's Working**:
+  - Device connection status detection
+  - User authentication via cookies
+  - Device ownership validation
+  - Read-only interface with search
+  - Clean UI matching WhatsApp Web design
+  
+- **What Needs Implementation**:
+  - WhatsApp client manager for handling multiple device connections
+  - Methods to fetch real chats from connected WhatsApp instances
+  - Real-time message synchronization
+  - Integration with existing WhatsApp Web API
+  
+- **Demo Data Shown**:
+  - Implementation notice explaining the integration requirements
+  - Device connection status
+  - Sample messages showing what the interface will display
+
 ### Read-Only WhatsApp Web View Implementation (June 25, 2025 - 12:15 PM)
 - **Fixed API Error**:
   - Added missing `GetDevice` handler in `devices.go`
@@ -203,6 +228,45 @@
 - Efficient data structure for 200+ users
 - Optimized refresh mechanism
 - Minimal server load with smart caching
+
+## 🔄 WhatsApp Web Real Data Integration Requirements
+
+### Current Implementation Status:
+The WhatsApp Web read-only view is fully functional with a clean UI, but currently displays demo data. The infrastructure for real WhatsApp data integration exists but needs to be connected.
+
+### Technical Requirements for Real Data:
+1. **WhatsApp Client Manager**:
+   - Create a manager to handle multiple WhatsApp client instances
+   - Map each device ID to its WhatsApp connection
+   - Handle connection lifecycle (connect, disconnect, reconnect)
+
+2. **Chat Data Endpoints**:
+   - Implement `/api/devices/:id/chats` to fetch real chat list
+   - Use WhatsApp Web client's store to get chat data
+   - Return chat metadata (name, last message, unread count)
+
+3. **Message History Endpoints**:
+   - Implement `/api/devices/:id/messages/:chatId` for real messages
+   - Fetch message history from WhatsApp store
+   - Support pagination for large chat histories
+
+4. **Integration Points**:
+   - The WhatsApp client is already initialized in `infrastructure/whatsapp/init.go`
+   - Device connections are tracked in `connection_tracker.go`
+   - Need to expose methods to access chat and message data
+
+### API Documentation Reference:
+Based on the [API documentation](https://bump.sh/aldinokemal/doc/go-whatsapp-web-multidevice/), the system already supports:
+- Device management (`/app/devices`)
+- Message operations (`/message/:message_id/read`)
+- Sending messages (`/send/message`, `/send/image`)
+
+### Next Steps:
+To enable real WhatsApp data in the read-only view:
+1. Extend the existing WhatsApp infrastructure to expose chat fetching methods
+2. Create a client instance manager that maps device IDs to WhatsApp connections
+3. Update the API handlers to use real WhatsApp data instead of demo data
+4. Implement proper error handling for offline devices
 
 ## 📊 Database Schema
 
