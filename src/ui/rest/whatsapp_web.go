@@ -35,33 +35,53 @@ func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
 func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// Get device info to check status
-	userEmail := c.Locals("email")
-	if userEmail == nil {
-		sessionToken := c.Cookies("session_token")
-		userRepo := repository.GetUserRepository()
-		session, _ := userRepo.GetSession(sessionToken)
-		if session != nil {
-			user, _ := userRepo.GetUserByID(session.UserID)
-			if user != nil {
-				userEmail = user.Email
-			}
-		}
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token found",
+		})
 	}
 	
-	// Check device status
+	// Get session from database
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil || session == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user from database
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Get user devices to check if this device belongs to user
+	devices, err := userRepo.GetUserDevices(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	
+	// Check if device belongs to user and is online
 	isConnected := false
-	if userEmail != nil {
-		userRepo := repository.GetUserRepository()
-		user, _ := userRepo.GetUserByEmail(userEmail.(string))
-		if user != nil {
-			devices, _ := userRepo.GetUserDevices(user.ID)
-			for _, device := range devices {
-				if device.ID == deviceId && device.Status == "online" {
-					isConnected = true
-					break
-				}
-			}
+	for _, device := range devices {
+		if device.ID == deviceId && device.Status == "online" {
+			isConnected = true
+			break
 		}
 	}
 	
@@ -106,39 +126,63 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	})
 }
 
+
 // GetWhatsAppMessages gets real messages for a specific chat
 func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	chatId := c.Params("chatId")
 	
-	// Check device connection status first
-	userEmail := c.Locals("email")
-	if userEmail == nil {
-		sessionToken := c.Cookies("session_token")
-		userRepo := repository.GetUserRepository()
-		session, _ := userRepo.GetSession(sessionToken)
-		if session != nil {
-			user, _ := userRepo.GetUserByID(session.UserID)
-			if user != nil {
-				userEmail = user.Email
-			}
-		}
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token found",
+		})
 	}
 	
+	// Get session from database
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil || session == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user from database
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Get user devices to check if this device belongs to user
+	devices, err := userRepo.GetUserDevices(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	
+	// Check if device belongs to user and is online
 	isConnected := false
 	devicePhone := ""
-	if userEmail != nil {
-		userRepo := repository.GetUserRepository()
-		user, _ := userRepo.GetUserByEmail(userEmail.(string))
-		if user != nil {
-			devices, _ := userRepo.GetUserDevices(user.ID)
-			for _, device := range devices {
-				if device.ID == deviceId && device.Status == "online" {
-					isConnected = true
-					devicePhone = device.Phone
-					break
-				}
+	for _, device := range devices {
+		if device.ID == deviceId {
+			if device.Status == "online" {
+				isConnected = true
+				devicePhone = device.Phone
 			}
+			break
 		}
 	}
 	
@@ -231,32 +275,52 @@ func (handler *App) SendWhatsAppMessage(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Check device connection
-	userEmail := c.Locals("email")
-	if userEmail == nil {
-		sessionToken := c.Cookies("session_token")
-		userRepo := repository.GetUserRepository()
-		session, _ := userRepo.GetSession(sessionToken)
-		if session != nil {
-			user, _ := userRepo.GetUserByID(session.UserID)
-			if user != nil {
-				userEmail = user.Email
-			}
-		}
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token found",
+		})
+	}
+	
+	// Get session from database
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil || session == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user from database
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Check if device belongs to user
+	devices, err := userRepo.GetUserDevices(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
 	}
 	
 	isConnected := false
-	if userEmail != nil {
-		userRepo := repository.GetUserRepository()
-		user, _ := userRepo.GetUserByEmail(userEmail.(string))
-		if user != nil {
-			devices, _ := userRepo.GetUserDevices(user.ID)
-			for _, device := range devices {
-				if device.ID == deviceId && device.Status == "online" {
-					isConnected = true
-					break
-				}
-			}
+	for _, device := range devices {
+		if device.ID == deviceId && device.Status == "online" {
+			isConnected = true
+			break
 		}
 	}
 	

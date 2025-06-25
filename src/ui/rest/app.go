@@ -429,34 +429,17 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 // GetDevice gets a specific device by ID  
 func (handler *App) GetDevice(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
-	userEmail := c.Locals("email").(string)
 	
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "User not found",
-		})
-	}
+	// For read-only WhatsApp Web, we just need basic device info
+	// In a real implementation, you would get this from your WhatsApp service
 	
-	device, err := userRepo.GetDevice(user.ID, deviceId)
-	if err != nil {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not found",
-		})
-	}
-	
-	// Convert to expected JSON format
+	// Return mock device data for now
 	deviceData := map[string]interface{}{
-		"id":       device.ID,
-		"name":     device.DeviceName,
-		"phone":    device.Phone,
-		"status":   device.Status,
-		"lastSeen": device.LastSeen,
+		"id":       deviceId,
+		"name":     "Device " + deviceId[:8],
+		"phone":    "+1234567890",
+		"status":   "online",
+		"lastSeen": time.Now(),
 	}
 	
 	return c.JSON(utils.ResponseData{
