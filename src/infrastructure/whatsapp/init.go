@@ -108,6 +108,9 @@ func InitWaCLI(ctx context.Context, storeContainer *sqlstore.Container) *whatsme
 	cli.AddEventHandler(func(rawEvt interface{}) {
 		handler(ctx, rawEvt)
 	})
+	
+	// Set as global client for debugging
+	SetGlobalClient(cli)
 
 	return cli
 }
@@ -224,7 +227,10 @@ func handleConnectionEvents(_ context.Context) {
 			userRepo := repository.GetUserRepository()
 			
 			// Look for any active connection session
-			for userID, session := range connectionSessions {
+			allSessions := GetAllConnectionSessions()
+			log.Infof("Found %d active connection sessions", len(allSessions))
+			
+			for userID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
 					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
 					

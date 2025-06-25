@@ -53,6 +53,19 @@ func GetConnectionSession(jid string) (*ConnectionSession, bool) {
 	return nil, false
 }
 
+// GetAllConnectionSessions returns all active connection sessions (for debugging)
+func GetAllConnectionSessions() map[string]*ConnectionSession {
+	sessionMutex.RLock()
+	defer sessionMutex.RUnlock()
+	
+	// Create a copy to avoid concurrent access issues
+	sessionsCopy := make(map[string]*ConnectionSession)
+	for k, v := range connectionSessions {
+		sessionsCopy[k] = v
+	}
+	return sessionsCopy
+}
+
 // ClearConnectionSession removes a session after successful connection
 func ClearConnectionSession(userID string) {
 	sessionMutex.Lock()

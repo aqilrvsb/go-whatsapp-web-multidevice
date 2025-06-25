@@ -25,7 +25,6 @@ require (
 	github.com/valyala/fasthttp v1.62.0
 	go.mau.fi/libsignal v0.2.0
 	go.mau.fi/whatsmeow v0.0.0-20250617170509-947866bb9f75
-	golang.org/x/crypto v0.39.0
 	golang.org/x/image v0.28.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -63,6 +62,7 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.mau.fi/util v0.8.8 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
