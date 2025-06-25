@@ -178,10 +178,11 @@
                         <div class="mb-3">
                             <label class="form-label">Image</label>
                             <input type="file" class="form-control" id="testImage" accept="image/*" required>
+                            <small class="text-muted">Max 350KB. Will be compressed automatically.</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Caption (Optional)</label>
-                            <input type="text" class="form-control" id="imageCaption" placeholder="Image caption...">
+                            <textarea class="form-control" id="imageCaption" rows="3" placeholder="Add a caption to your image..."></textarea>
                         </div>
                         <button type="submit" class="test-button w-100">
                             <i class="bi bi-upload"></i> Send Image
@@ -221,13 +222,23 @@
                     </h5>
                     <form id="sendBroadcastForm">
                         <div class="mb-3">
-                            <label class="form-label">Phone Numbers (comma separated, without +60)</label>
-                            <textarea class="form-control" id="broadcastPhones" rows="2" placeholder="123456789, 987654321" required></textarea>
-                            <small class="text-muted">+60 will be added automatically</small>
+                            <label class="form-label">Phone Numbers (comma separated, without +)</label>
+                            <textarea class="form-control" id="broadcastPhones" rows="2" placeholder="60123456789, 60987654321" required></textarea>
+                            <small class="text-muted">Include country code (e.g., 60 for Malaysia)</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Message</label>
                             <textarea class="form-control" id="broadcastMessage" rows="3" placeholder="Broadcast message..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Image (Optional)</label>
+                            <input type="file" class="form-control" id="broadcastImage" accept="image/*">
+                            <small class="text-muted">Max 350KB. Will be compressed automatically.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Schedule Time (Optional)</label>
+                            <input type="datetime-local" class="form-control" id="broadcastSchedule">
+                            <small class="text-muted">Leave empty to send immediately</small>
                         </div>
                         <button type="submit" class="test-button w-100">
                             <i class="bi bi-broadcast"></i> Send Broadcast
@@ -273,15 +284,26 @@
         // Load device info
         function loadDeviceInfo() {
             fetch(`/api/devices/${deviceId}`, { credentials: 'include' })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
                         const device = data.results;
-                        document.getElementById('deviceName').textContent = device.name;
+                        document.getElementById('deviceName').textContent = device.name || 'Unknown Device';
                         document.getElementById('devicePhone').textContent = device.phone || 'Not connected';
                         
                         const statusEl = document.getElementById('deviceStatus');
                         statusEl.className = `device-status ${device.status}`;
+                        
+                        // Update the loading section
+                        const loadingSection = document.querySelector('.device-info h4');
+                        if (loadingSection) {
+                            loadingSection.textContent = device.name || 'Device';
+                        }
                         
                         if (device.status !== 'online') {
                             showWarning('This device is not connected. Please connect it first from the Devices tab.');
@@ -290,7 +312,9 @@
                 })
                 .catch(error => {
                     console.error('Error loading device:', error);
-                    showError('Failed to load device information');
+                    document.getElementById('deviceName').textContent = 'Error Loading';
+                    document.getElementById('devicePhone').textContent = 'Error';
+                    showError('Failed to load device information: ' + error.message);
                 });
         }
         
@@ -417,7 +441,7 @@
             });
         }
         
-        // Compress image file
+        // Compress image file to 350KB max
         function compressImageFile(file, callback) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -426,11 +450,13 @@
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    // Calculate new dimensions (max 1200px)
+                    // Start with reasonable dimensions
                     let width = img.width;
                     let height = img.height;
-                    const maxSize = 1200;
+                    let quality = 0.9;
                     
+                    // First resize if too large
+                    const maxSize = 1000;
                     if (width > height) {
                         if (width > maxSize) {
                             height = (height * maxSize) / width;
@@ -447,8 +473,19 @@
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // Convert to blob with 70% quality
-                    canvas.toBlob(callback, 'image/jpeg', 0.7);
+                    // Compress until under 350KB
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                callback(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    
+                    tryCompress();
                 };
                 img.src = e.target.result;
             };

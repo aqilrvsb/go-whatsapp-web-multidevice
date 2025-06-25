@@ -813,9 +813,12 @@
 
         // Update Metrics
         function updateMetrics(metrics) {
-            // Device metrics
-            document.getElementById('activeDevices').textContent = metrics.activeDevices || 0;
-            document.getElementById('inactiveDevices').textContent = metrics.inactiveDevices || 0;
+            // Device metrics - Calculate from loaded devices
+            const activeCount = devices.filter(d => d.status === 'online').length;
+            const inactiveCount = devices.filter(d => d.status !== 'online').length;
+            
+            document.getElementById('activeDevices').textContent = activeCount;
+            document.getElementById('inactiveDevices').textContent = inactiveCount;
             
             // Lead metrics
             document.getElementById('leadsSent').textContent = metrics.leadsSent || 0;
@@ -1961,13 +1964,21 @@
         
         function saveCampaign() {
             const campaignId = document.getElementById('campaignId').value;
+            
+            // Auto-set current time if not provided
+            let scheduledTime = document.getElementById('campaignTime').value;
+            if (!scheduledTime) {
+                const now = new Date();
+                scheduledTime = now.toTimeString().slice(0, 5); // HH:MM format
+            }
+            
             const campaignData = {
                 campaign_date: document.getElementById('campaignDate').value,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
-                scheduled_time: document.getElementById('campaignTime').value || ''
+                scheduled_time: scheduledTime
             };
             
             const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
@@ -1994,7 +2005,7 @@
             .catch(error => showAlert('danger', 'Error: ' + error.message));
         }
         
-        // Image compression function
+        // Image compression function with 350KB limit
         function compressImage(input) {
             const file = input.files[0];
             if (!file) return;
@@ -2006,11 +2017,13 @@
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     
-                    // Calculate new dimensions (max 1200px width/height)
+                    // Start with original dimensions
                     let width = img.width;
                     let height = img.height;
-                    const maxSize = 1200;
+                    let quality = 0.9;
                     
+                    // First resize if image is too large
+                    const maxSize = 1000;
                     if (width > height) {
                         if (width > maxSize) {
                             height = (height * maxSize) / width;
@@ -2027,13 +2040,27 @@
                     canvas.height = height;
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // Convert to compressed base64
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    document.getElementById('campaignImageUrl').value = compressedBase64;
+                    // Compress until under 350KB
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                // Convert to base64
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    document.getElementById('campaignImageUrl').value = e.target.result;
+                                    document.getElementById('imagePreview').innerHTML = 
+                                        `<img src="${e.target.result}" class="img-thumbnail" style="max-height: 200px;">
+                                         <small class="d-block mt-1">Size: ${(blob.size / 1024).toFixed(0)}KB</small>`;
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
                     
-                    // Show preview
-                    document.getElementById('imagePreview').innerHTML = 
-                        `<img src="${compressedBase64}" class="img-thumbnail" style="max-height: 200px;">`;
+                    tryCompress();
                 };
                 img.src = e.target.result;
             };

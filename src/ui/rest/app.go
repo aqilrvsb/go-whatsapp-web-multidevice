@@ -654,11 +654,17 @@ func (handler *App) GetCampaigns(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Group campaigns by date for calendar display
+	campaignsByDate := make(map[string][]repository.Campaign)
+	for _, campaign := range campaigns {
+		campaignsByDate[campaign.CampaignDate] = append(campaignsByDate[campaign.CampaignDate], campaign)
+	}
+	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Campaigns retrieved successfully",
-		Results: campaigns,
+		Results: campaignsByDate,
 	})
 }
 
