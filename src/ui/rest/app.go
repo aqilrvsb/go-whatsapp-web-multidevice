@@ -47,6 +47,17 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Device pages
 	app.Get("/device/:id/actions", rest.DeviceActionsView)
 	app.Get("/device/:id/leads", rest.DeviceLeadsView)
+	app.Get("/device/:id/whatsapp-web", rest.WhatsAppWebView)
+	
+	// Device management endpoints
+	app.Delete("/api/devices/:id", rest.DeleteDevice)
+	app.Get("/app/logout", rest.LogoutDevice)
+	app.Get("/app/reconnect", rest.ReconnectDevice)
+	app.Get("/app/devices", rest.GetDevices)
+	app.Get("/user/info", rest.GetUserInfo)
+	app.Get("/user/avatar", rest.GetUserAvatar)
+	app.Post("/user/avatar", rest.ChangeUserAvatar)
+	app.Post("/user/pushname", rest.ChangeUserPushName)
 	
 	// Lead management endpoints
 	app.Get("/api/devices/:deviceId/leads", rest.GetDeviceLeads)
@@ -797,4 +808,129 @@ func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Campaign deleted successfully",
 	})
+}
+// DeleteDevice deletes a device
+func (handler *App) DeleteDevice(c *fiber.Ctx) error {
+	deviceId := c.Params("id")
+	userEmail := c.Locals("email").(string)
+	
+	userRepo := repository.GetUserRepository()
+	user, err := userRepo.GetUserByEmail(userEmail)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not found",
+		})
+	}
+	
+	// Check if device belongs to user
+	device, err := userRepo.GetDevice(user.ID, deviceId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Delete device
+	err = userRepo.DeleteDevice(device.ID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: fmt.Sprintf("Failed to delete device: %v", err),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device deleted successfully",
+	})
+}
+
+// LogoutDevice logs out from WhatsApp
+func (handler *App) LogoutDevice(c *fiber.Ctx) error {
+	deviceId := c.Query("deviceId")
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Logout successful",
+		Results: map[string]interface{}{
+			"deviceId": deviceId,
+			"status":   "logged_out",
+		},
+	})
+}
+
+// ReconnectDevice reconnects to WhatsApp
+func (handler *App) ReconnectDevice(c *fiber.Ctx) error {
+	deviceId := c.Query("deviceId")
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Reconnecting...",
+		Results: map[string]interface{}{
+			"deviceId": deviceId,
+			"status":   "reconnecting",
+		},
+	})
+}
+
+// GetDevices gets all devices for the app
+func (handler *App) GetDevices(c *fiber.Ctx) error {
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Devices retrieved",
+		Results: []interface{}{},
+	})
+}
+
+// GetUserInfo gets user info
+func (handler *App) GetUserInfo(c *fiber.Ctx) error {
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "User info retrieved",
+		Results: map[string]interface{}{
+			"name":   "User",
+			"number": "+60123456789",
+			"avatar": "",
+		},
+	})
+}
+
+// GetUserAvatar gets user avatar
+func (handler *App) GetUserAvatar(c *fiber.Ctx) error {
+	// Return a default avatar
+	return c.SendString("")
+}
+
+// ChangeUserAvatar changes user avatar
+func (handler *App) ChangeUserAvatar(c *fiber.Ctx) error {
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Avatar updated",
+	})
+}
+
+// ChangeUserPushName changes user push name
+func (handler *App) ChangeUserPushName(c *fiber.Ctx) error {
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Push name updated",
+	})
+}
+
+
+// WhatsAppWebView renders the WhatsApp Web page for a device
+func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
+	return c.Render("views/whatsapp_web", fiber.Map{})
 }

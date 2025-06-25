@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Web - Device</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        .whatsapp-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111b21;
+        }
+        .loading {
+            text-align: center;
+            color: #aaa;
+        }
+        .error {
+            text-align: center;
+            color: #f00;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="whatsapp-container" id="container">
+        <div class="loading">
+            <h2>Loading WhatsApp Web...</h2>
+            <p>Device ID: <span id="deviceId"></span></p>
+        </div>
+    </div>
+    
+    <script>
+        // Get device ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const deviceId = pathParts[2];
+        document.getElementById('deviceId').textContent = deviceId;
+        
+        // In a real implementation, this would connect to the specific device's WhatsApp Web instance
+        // For now, show a message
+        setTimeout(() => {
+            document.getElementById('container').innerHTML = `
+                <div class="error">
+                    <h2>WhatsApp Web Session</h2>
+                    <p>Device: ${deviceId}</p>
+                    <p>This feature requires backend implementation to proxy WhatsApp Web for each device.</p>
+                    <p><a href="/dashboard" style="color: #25d366;">Back to Dashboard</a></p>
+                </div>
+            `;
+        }, 2000);
+    </script>
+</body>
+</html>

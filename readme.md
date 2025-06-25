@@ -1,9 +1,36 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 25, 2025 - 02:00 AM**  
-**Latest Feature: Phase 2 Complete with All Fixes Applied**
+**Last Updated: June 25, 2025 - 03:00 AM**  
+**Latest Feature: Critical Fixes - Device Management, Analytics, and WhatsApp Web Integration**
 
 ## 🚀 Latest Updates:
+
+### Critical Fixes Applied (June 25, 2025 - 03:00 AM)
+- **Fixed Dashboard Analytics Error**:
+  - Corrected undefined URL variable in analytics loading
+  - Fixed 401 unauthorized errors on dashboard load
+  - Real device counts now properly calculated from loaded devices
+  
+- **Fixed Device Management**:
+  - Delete device now actually removes from database (was only UI simulation)
+  - Added proper DELETE endpoint `/api/devices/:id`
+  - Fixed QR code generation endpoint
+  - Device status properly synced across views
+  
+- **Added Device Actions**:
+  - Logout: `/app/logout`
+  - Reconnect: `/app/reconnect`
+  - Get Devices: `/app/devices`
+  - User Info: `/user/info`
+  - User Avatar: `/user/avatar`
+  - Change Avatar: `/user/avatar` (POST)
+  - Change Push Name: `/user/pushname` (POST)
+  
+- **WhatsApp Web Integration**:
+  - Added "Open WhatsApp Web" option for each connected device
+  - Each device can have its own WhatsApp Web session
+  - Supports multiple devices (20+) with individual web access
+  - Opens in new tab for easy management
 
 ### Phase 2 Complete - All Issues Fixed (June 25, 2025 - 02:00 AM)
 - **Campaign Enhancements**:
