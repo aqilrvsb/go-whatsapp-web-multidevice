@@ -669,6 +669,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	var request struct {
 		CampaignDate  string `json:"campaign_date"`
 		Title         string `json:"title"`
+		Niche         string `json:"niche"`
 		Message       string `json:"message"`
 		ImageURL      string `json:"image_url"`
 		ScheduledTime string `json:"scheduled_time"`
@@ -693,7 +694,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
-	campaign, err := campaignRepo.CreateCampaign(user.ID, request.CampaignDate, request.Title, request.Message, request.ImageURL, request.ScheduledTime)
+	campaign, err := campaignRepo.CreateCampaign(user.ID, request.CampaignDate, request.Title, request.Niche, request.Message, request.ImageURL, request.ScheduledTime)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -717,6 +718,7 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	
 	var request struct {
 		Title         string `json:"title"`
+		Niche         string `json:"niche"`
 		Message       string `json:"message"`
 		ImageURL      string `json:"image_url"`
 		ScheduledTime string `json:"scheduled_time"`
@@ -742,7 +744,7 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
-	campaign, err := campaignRepo.UpdateCampaign(user.ID, campaignId, request.Title, request.Message, request.ImageURL, request.ScheduledTime, request.Status)
+	campaign, err := campaignRepo.UpdateCampaign(user.ID, campaignId, request.Title, request.Niche, request.Message, request.ImageURL, request.ScheduledTime, request.Status)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,

@@ -14,6 +14,7 @@ type Campaign struct {
 	UserID        string    `json:"user_id"`
 	CampaignDate  string    `json:"campaign_date"`
 	Title         string    `json:"title"`
+	Niche         string    `json:"niche"`
 	Message       string    `json:"message"`
 	ImageURL      string    `json:"image_url"`
 	ScheduledTime string    `json:"scheduled_time"`
@@ -44,8 +45,8 @@ func GetCampaignRepository() *CampaignRepository {
 // GetCampaigns gets all campaigns for a user
 func (r *CampaignRepository) GetCampaigns(userID string) ([]Campaign, error) {
 	query := `
-		SELECT id, user_id, campaign_date, title, message, image_url, 
-		       scheduled_time, status, created_at, updated_at
+		SELECT id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), 
+		       COALESCE(scheduled_time::text, ''), status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1
 		ORDER BY campaign_date DESC
@@ -62,7 +63,7 @@ func (r *CampaignRepository) GetCampaigns(userID string) ([]Campaign, error) {
 		var campaign Campaign
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-			&campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
+			&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
 			&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
@@ -75,21 +76,21 @@ func (r *CampaignRepository) GetCampaigns(userID string) ([]Campaign, error) {
 }
 
 // CreateCampaign creates a new campaign
-func (r *CampaignRepository) CreateCampaign(userID string, campaignDate, title, message, imageURL, scheduledTime string) (*Campaign, error) {
+func (r *CampaignRepository) CreateCampaign(userID string, campaignDate, title, niche, message, imageURL, scheduledTime string) (*Campaign, error) {
 	query := `
-		INSERT INTO campaigns (user_id, campaign_date, title, message, image_url, scheduled_time, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO campaigns (user_id, campaign_date, title, niche, message, image_url, scheduled_time, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (user_id, campaign_date) 
-		DO UPDATE SET title = $3, message = $4, image_url = $5, scheduled_time = $6, updated_at = $9
-		RETURNING id, user_id, campaign_date, title, message, image_url, scheduled_time, status, created_at, updated_at
+		DO UPDATE SET title = $3, niche = $4, message = $5, image_url = $6, scheduled_time = $7, updated_at = $10
+		RETURNING id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), COALESCE(scheduled_time::text, ''), status, created_at, updated_at
 	`
 	
 	now := time.Now()
 	var campaign Campaign
 	
-	err := r.db.QueryRow(query, userID, campaignDate, title, message, imageURL, scheduledTime, "scheduled", now, now).Scan(
+	err := r.db.QueryRow(query, userID, campaignDate, title, niche, message, imageURL, scheduledTime, "scheduled", now, now).Scan(
 		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
+		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
 		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
 	)
 	
@@ -101,18 +102,18 @@ func (r *CampaignRepository) CreateCampaign(userID string, campaignDate, title, 
 }
 
 // UpdateCampaign updates an existing campaign
-func (r *CampaignRepository) UpdateCampaign(userID string, campaignID, title, message, imageURL, scheduledTime, status string) (*Campaign, error) {
+func (r *CampaignRepository) UpdateCampaign(userID string, campaignID, title, niche, message, imageURL, scheduledTime, status string) (*Campaign, error) {
 	query := `
 		UPDATE campaigns
-		SET title = $3, message = $4, image_url = $5, scheduled_time = $6, status = $7, updated_at = $8
+		SET title = $3, niche = $4, message = $5, image_url = $6, scheduled_time = $7, status = $8, updated_at = $9
 		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, campaign_date, title, message, image_url, scheduled_time, status, created_at, updated_at
+		RETURNING id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), COALESCE(scheduled_time::text, ''), status, created_at, updated_at
 	`
 	
 	var campaign Campaign
-	err := r.db.QueryRow(query, campaignID, userID, title, message, imageURL, scheduledTime, status, time.Now()).Scan(
+	err := r.db.QueryRow(query, campaignID, userID, title, niche, message, imageURL, scheduledTime, status, time.Now()).Scan(
 		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
+		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
 		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
 	)
 	
@@ -147,8 +148,8 @@ func (r *CampaignRepository) DeleteCampaign(userID string, campaignID string) er
 // GetCampaignByDate gets a campaign for a specific date
 func (r *CampaignRepository) GetCampaignByDate(userID string, date string) (*Campaign, error) {
 	query := `
-		SELECT id, user_id, campaign_date, title, message, image_url, 
-		       scheduled_time, status, created_at, updated_at
+		SELECT id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), 
+		       COALESCE(scheduled_time::text, ''), status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1 AND campaign_date = $2
 	`
@@ -156,7 +157,7 @@ func (r *CampaignRepository) GetCampaignByDate(userID string, date string) (*Cam
 	var campaign Campaign
 	err := r.db.QueryRow(query, userID, date).Scan(
 		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
+		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
 		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
 	)
 	

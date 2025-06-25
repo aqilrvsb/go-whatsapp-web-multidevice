@@ -125,6 +125,7 @@ func InitializeSchema() error {
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		campaign_date DATE NOT NULL,
 		title VARCHAR(255) NOT NULL,
+		niche VARCHAR(255),
 		message TEXT NOT NULL,
 		image_url TEXT,
 		scheduled_time TIME,

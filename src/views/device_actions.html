@@ -144,7 +144,10 @@
                     <form id="sendMessageForm">
                         <div class="mb-3">
                             <label class="form-label">Phone Number</label>
-                            <input type="text" class="form-control" id="testPhone" placeholder="+60123456789" required>
+                            <div class="input-group">
+                                <span class="input-group-text">+60</span>
+                                <input type="text" class="form-control" id="testPhone" placeholder="123456789" required>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Message</label>
@@ -167,7 +170,10 @@
                     <form id="sendImageForm">
                         <div class="mb-3">
                             <label class="form-label">Phone Number</label>
-                            <input type="text" class="form-control" id="imagePhone" placeholder="+60123456789" required>
+                            <div class="input-group">
+                                <span class="input-group-text">+60</span>
+                                <input type="text" class="form-control" id="imagePhone" placeholder="123456789" required>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Image</label>
@@ -194,7 +200,10 @@
                     <form id="checkStatusForm">
                         <div class="mb-3">
                             <label class="form-label">Phone Number</label>
-                            <input type="text" class="form-control" id="checkPhone" placeholder="+60123456789" required>
+                            <div class="input-group">
+                                <span class="input-group-text">+60</span>
+                                <input type="text" class="form-control" id="checkPhone" placeholder="123456789" required>
+                            </div>
                         </div>
                         <button type="submit" class="test-button w-100">
                             <i class="bi bi-search"></i> Check Status
@@ -212,8 +221,9 @@
                     </h5>
                     <form id="sendBroadcastForm">
                         <div class="mb-3">
-                            <label class="form-label">Phone Numbers (comma separated)</label>
-                            <textarea class="form-control" id="broadcastPhones" rows="2" placeholder="+60123456789, +60987654321" required></textarea>
+                            <label class="form-label">Phone Numbers (comma separated, without +60)</label>
+                            <textarea class="form-control" id="broadcastPhones" rows="2" placeholder="123456789, 987654321" required></textarea>
+                            <small class="text-muted">+60 will be added automatically</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Message</label>
@@ -290,11 +300,30 @@
             addToLog('Refreshed device status');
         }
         
+        // Format phone number with +60 prefix
+        function formatPhone(phone) {
+            // Remove all non-numeric characters
+            phone = phone.replace(/\D/g, '');
+            
+            // If it starts with 60, return as is
+            if (phone.startsWith('60')) {
+                return '+' + phone;
+            }
+            
+            // If it starts with 0, remove it and add 60
+            if (phone.startsWith('0')) {
+                phone = phone.substring(1);
+            }
+            
+            // Add +60 prefix
+            return '+60' + phone;
+        }
+        
         // Send test message
         function sendMessage(e) {
             e.preventDefault();
             
-            const phone = document.getElementById('testPhone').value;
+            const phone = formatPhone(document.getElementById('testPhone').value);
             const message = document.getElementById('testMessage').value;
             const resultBox = document.getElementById('messageResult');
             
@@ -302,7 +331,7 @@
             resultBox.className = 'result-box';
             resultBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending message...';
             
-            fetch('/api/send/message', {
+            fetch('/send/message', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -334,11 +363,11 @@
             });
         }
         
-        // Send test image
+        // Send test image with compression
         function sendImage(e) {
             e.preventDefault();
             
-            const phone = document.getElementById('imagePhone').value;
+            const phone = formatPhone(document.getElementById('imagePhone').value);
             const caption = document.getElementById('imageCaption').value;
             const imageFile = document.getElementById('testImage').files[0];
             const resultBox = document.getElementById('imageResult');
@@ -352,51 +381,92 @@
             
             resultBox.style.display = 'block';
             resultBox.className = 'result-box';
-            resultBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading and sending image...';
+            resultBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Compressing and sending image...';
             
-            const formData = new FormData();
-            formData.append('device_id', deviceId);
-            formData.append('phone', phone);
-            formData.append('image', imageFile);
-            if (caption) formData.append('caption', caption);
-            
-            fetch('/api/send/image', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 'SUCCESS') {
-                    resultBox.className = 'result-box success-result';
-                    resultBox.innerHTML = '<i class="bi bi-check-circle"></i> Image sent successfully!';
-                    addToLog(`Sent image to ${phone}`);
-                    
-                    // Clear form
-                    document.getElementById('sendImageForm').reset();
-                } else {
+            // Compress image before sending
+            compressImageFile(imageFile, function(compressedBlob) {
+                const formData = new FormData();
+                formData.append('device_id', deviceId);
+                formData.append('phone', phone);
+                formData.append('image', compressedBlob, 'compressed.jpg');
+                if (caption) formData.append('caption', caption);
+                
+                fetch('/send/image', {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        resultBox.className = 'result-box success-result';
+                        resultBox.innerHTML = '<i class="bi bi-check-circle"></i> Image sent successfully!';
+                        addToLog(`Sent image to ${phone}`);
+                        
+                        // Clear form
+                        document.getElementById('sendImageForm').reset();
+                    } else {
+                        resultBox.className = 'result-box error-result';
+                        resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Failed: ${data.message || 'Unknown error'}`;
+                    }
+                })
+                .catch(error => {
                     resultBox.className = 'result-box error-result';
-                    resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Failed: ${data.message || 'Unknown error'}`;
-                }
-            })
-            .catch(error => {
-                resultBox.className = 'result-box error-result';
-                resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Error: ${error.message}`;
+                    resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Error: ${error.message}`;
+                });
             });
+        }
+        
+        // Compress image file
+        function compressImageFile(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Calculate new dimensions (max 1200px)
+                    let width = img.width;
+                    let height = img.height;
+                    const maxSize = 1200;
+                    
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to blob with 70% quality
+                    canvas.toBlob(callback, 'image/jpeg', 0.7);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
         
         // Check number status
         function checkStatus(e) {
             e.preventDefault();
             
-            const phone = document.getElementById('checkPhone').value;
+            const phone = formatPhone(document.getElementById('checkPhone').value);
             const resultBox = document.getElementById('statusResult');
             
             resultBox.style.display = 'block';
             resultBox.className = 'result-box';
             resultBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking status...';
             
-            fetch(`/api/check/${phone}?device_id=${deviceId}`, {
+            fetch(`/user/check/${phone}?device_id=${deviceId}`, {
                 credentials: 'include'
             })
             .then(response => response.json())
@@ -425,7 +495,7 @@
         function sendBroadcast(e) {
             e.preventDefault();
             
-            const phones = document.getElementById('broadcastPhones').value.split(',').map(p => p.trim());
+            const phones = document.getElementById('broadcastPhones').value.split(',').map(p => formatPhone(p.trim()));
             const message = document.getElementById('broadcastMessage').value;
             const resultBox = document.getElementById('broadcastResult');
             
@@ -438,7 +508,7 @@
             let failed = 0;
             
             Promise.all(phones.map(phone => 
-                fetch('/api/send/message', {
+                fetch('/send/message', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

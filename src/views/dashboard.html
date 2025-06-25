@@ -289,6 +289,18 @@
             font-weight: 600;
             color: var(--primary);
         }
+        
+        .campaign-item {
+            font-size: 10px;
+            background: var(--primary);
+            color: white;
+            padding: 2px 4px;
+            margin: 1px 0;
+            border-radius: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -574,15 +586,23 @@
                         </div>
                         
                         <div class="mb-3">
+                            <label class="form-label">Niche/Category <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="campaignNiche" required 
+                                   placeholder="e.g., Promotion, Announcement, Reminder">
+                        </div>
+                        
+                        <div class="mb-3">
                             <label class="form-label">Message <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="campaignMessage" rows="5" required 
                                       placeholder="Enter your broadcast message..."></textarea>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Image URL (Optional)</label>
-                            <input type="url" class="form-control" id="campaignImageUrl" 
-                                   placeholder="https://example.com/image.jpg">
+                            <label class="form-label">Image (Optional)</label>
+                            <input type="file" class="form-control" id="campaignImageFile" accept="image/*" onchange="compressImage(this)">
+                            <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
+                            <input type="hidden" id="campaignImageUrl">
+                            <div id="imagePreview" class="mt-2"></div>
                         </div>
                         
                         <div class="mb-3">
@@ -1847,12 +1867,23 @@
                 const dayElement = document.createElement('div');
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 dayElement.className = 'calendar-day';
-                if (campaigns[dateStr]) {
+                
+                // Get campaigns for this date
+                const dayCampaigns = campaigns[dateStr] || [];
+                if (dayCampaigns.length > 0) {
                     dayElement.className += ' has-campaign';
                 }
+                
+                let campaignHTML = '';
+                if (Array.isArray(dayCampaigns)) {
+                    dayCampaigns.slice(0, 5).forEach(campaign => {
+                        campaignHTML += `<div class="campaign-item" title="${campaign.title}">${campaign.niche || campaign.title}</div>`;
+                    });
+                }
+                
                 dayElement.innerHTML = `
                     <div class="calendar-date">${day}</div>
-                    ${campaigns[dateStr] ? '<div class="calendar-campaign-indicator"></div>' : ''}
+                    ${campaignHTML}
                 `;
                 dayElement.onclick = () => openCampaignModal(dateStr);
                 calendar.appendChild(dayElement);
@@ -1932,10 +1963,11 @@
             const campaignId = document.getElementById('campaignId').value;
             const campaignData = {
                 campaign_date: document.getElementById('campaignDate').value,
-                title: document.getElementById('campaignTitle').value,
-                message: document.getElementById('campaignMessage').value,
-                image_url: document.getElementById('campaignImageUrl').value,
-                scheduled_time: document.getElementById('campaignTime').value
+                title: document.getElementById('campaignTitle').value || '',
+                niche: document.getElementById('campaignNiche').value || '',
+                message: document.getElementById('campaignMessage').value || '',
+                image_url: document.getElementById('campaignImageUrl').value || '',
+                scheduled_time: document.getElementById('campaignTime').value || ''
             };
             
             const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
@@ -1960,6 +1992,52 @@
                 }
             })
             .catch(error => showAlert('danger', 'Error: ' + error.message));
+        }
+        
+        // Image compression function
+        function compressImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Calculate new dimensions (max 1200px width/height)
+                    let width = img.width;
+                    let height = img.height;
+                    const maxSize = 1200;
+                    
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to compressed base64
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    document.getElementById('campaignImageUrl').value = compressedBase64;
+                    
+                    // Show preview
+                    document.getElementById('imagePreview').innerHTML = 
+                        `<img src="${compressedBase64}" class="img-thumbnail" style="max-height: 200px;">`;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
         
         function showAlert(type, message) {
