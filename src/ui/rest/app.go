@@ -1074,6 +1074,9 @@ func (handler *App) DiagnoseDevice(c *fiber.Ctx) error {
 	cm := whatsapp.GetClientManager()
 	client, clientErr := cm.GetClient(device.ID)
 	
+	// Get full client diagnostics
+	allDiagnostics := whatsapp.DiagnoseClients()
+	
 	diagnostics := map[string]interface{}{
 		"device": map[string]interface{}{
 			"id":     device.ID,
@@ -1090,10 +1093,27 @@ func (handler *App) DiagnoseDevice(c *fiber.Ctx) error {
 			"chats_count":    0,
 			"messages_count": 0,
 		},
+		"client_manager": allDiagnostics,
 	}
 	
 	if clientErr != nil {
 		diagnostics["whatsapp_client"].(map[string]interface{})["error"] = clientErr.Error()
+		
+		// Try to register from database if device is online
+		if device.Status == "online" {
+			log.Printf("Attempting to auto-register device %s from database", device.ID)
+			if err := whatsapp.TryRegisterDeviceFromDatabase(device.ID); err == nil {
+				diagnostics["whatsapp_client"].(map[string]interface{})["auto_registered"] = true
+				// Retry getting client
+				client, clientErr = cm.GetClient(device.ID)
+				if clientErr == nil {
+					diagnostics["whatsapp_client"].(map[string]interface{})["connected"] = true
+					diagnostics["whatsapp_client"].(map[string]interface{})["error"] = ""
+				}
+			} else {
+				log.Printf("Auto-registration failed: %v", err)
+			}
+		}
 	} else {
 		// Check if client is logged in
 		diagnostics["whatsapp_client"].(map[string]interface{})["logged_in"] = client.IsLoggedIn()
