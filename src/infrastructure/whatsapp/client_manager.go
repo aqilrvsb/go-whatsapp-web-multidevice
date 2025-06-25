@@ -181,25 +181,12 @@ func formatPhoneNumber(phone string) string {
 
 // GetMessagesForChat fetches and saves messages for a specific chat
 func GetMessagesForChat(deviceID, chatJID string, limit int) ([]repository.WhatsAppMessage, error) {
-	cm := GetClientManager()
-	client, err := cm.GetClient(deviceID)
-	
+	// Get the repository
 	repo := repository.GetWhatsAppRepository()
 	
-	if err != nil {
-		// If client not connected, return saved messages from database
-		return repo.GetMessages(deviceID, chatJID, limit)
-	}
-	
-	// Parse JID
-	jid, err := types.ParseJID(chatJID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid chat JID: %v", err)
-	}
-	
-	// Get messages from WhatsApp client
-	// Note: whatsmeow doesn't provide direct access to message history
-	// Messages are received through events. For now, return from database
+	// For now, we only return messages from database
+	// whatsmeow doesn't provide direct access to message history
+	// Messages are captured through real-time events
 	return repo.GetMessages(deviceID, chatJID, limit)
 }
 
@@ -257,11 +244,7 @@ func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 				chatName = contact.FullName
 			} else if contact.FirstName != "" {
 				firstName := contact.FirstName
-				familyName := ""
-				if contact.FamilyName != "" {
-					familyName = contact.FamilyName
-				}
-				chatName = strings.TrimSpace(firstName + " " + familyName)
+				chatName = strings.TrimSpace(firstName)
 			}
 			
 			if chatName == "" {
