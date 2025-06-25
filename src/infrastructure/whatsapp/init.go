@@ -234,6 +234,10 @@ func handleConnectionEvents(_ context.Context) {
 						log.Errorf("Failed to update device status: %v", err)
 					} else {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
+						
+						// Register device with client manager for real-time chat access
+						RegisterDeviceClient(session.DeviceID, cli)
+						log.Infof("Registered device %s with client manager", session.DeviceID)
 					}
 					
 					// Clear the session after successful update
