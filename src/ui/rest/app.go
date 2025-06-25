@@ -49,6 +49,11 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/device/:id/leads", rest.DeviceLeadsView)
 	app.Get("/device/:id/whatsapp-web", rest.WhatsAppWebView)
 	
+	// WhatsApp Web API endpoints
+	app.Get("/api/devices/:id/chats", rest.GetWhatsAppChats)
+	app.Get("/api/devices/:id/messages/:chatId", rest.GetWhatsAppMessages)
+	app.Post("/api/devices/:id/send", rest.SendWhatsAppMessage)
+	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
 	app.Get("/app/logout", rest.LogoutDevice)
@@ -927,10 +932,4 @@ func (handler *App) ChangeUserPushName(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Push name updated",
 	})
-}
-
-
-// WhatsAppWebView renders the WhatsApp Web page for a device
-func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
-	return c.Render("views/whatsapp_web", fiber.Map{})
 }
