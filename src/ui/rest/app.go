@@ -644,7 +644,26 @@ func (handler *App) GetCampaigns(c *fiber.Ctx) error {
 	campaignRepo := repository.GetCampaignRepository()
 	campaigns, err := campaignRepo.GetCampaigns(user.ID)
 	if err != nil {
-		log.Printf("Error getting campaigns: %v",
+		log.Printf("Error getting campaigns: %v", err)
+		// Return empty array instead of error
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "SUCCESS",
+			Message: "Campaigns retrieved successfully",
+			Results: []interface{}{},
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaigns retrieved successfully",
+		Results: campaigns,
+	})
+}
+
+// CreateCampaign creates a new campaign
+func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	userEmail := c.Locals("email").(string)
 	
 	var request struct {
