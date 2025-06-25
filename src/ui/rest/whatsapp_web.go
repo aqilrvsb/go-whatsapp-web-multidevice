@@ -4,19 +4,29 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 )
 
 // WhatsAppWebView renders the WhatsApp Web interface for a device
 func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// Check if user is authenticated
-	userEmail := c.Locals("email")
-	if userEmail == nil {
+	// Check if user has valid session cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		// No session, redirect to login
 		return c.Redirect("/login")
 	}
 	
-	// Render the WhatsApp Web view
+	// Verify session is valid
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil || session == nil {
+		// Invalid session, redirect to login
+		return c.Redirect("/login")
+	}
+	
+	// Session is valid, render WhatsApp Web
 	return c.Render("views/whatsapp_web", fiber.Map{
 		"DeviceID": deviceId,
 	})

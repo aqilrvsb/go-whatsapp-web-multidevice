@@ -1,9 +1,25 @@
 # WhatsApp Analytics Multi-Device Dashboard
 
-**Last Updated: June 25, 2025 - 03:00 AM**  
+**Last Updated: June 25, 2025 - 11:40 AM**  
 **Latest Feature: Critical Fixes - Device Management, Analytics, and WhatsApp Web Integration**
 
 ## 🚀 Latest Updates:
+### WhatsApp Web Button and Authentication Fix (June 25, 2025 - 11:40 AM)
+- **Moved WhatsApp Web to Main Button**:
+  - Removed from dropdown menu
+  - Added as prominent green button for connected devices
+  - Shows with WhatsApp icon for better visibility
+  
+- **Fixed Authentication Issue**:
+  - WhatsApp Web now properly checks session cookies
+  - No more redirect to login page
+  - Uses same cookie-based auth as dashboard
+  
+- **Improved User Experience**:
+  - One-click access to WhatsApp Web
+  - Each device has its own WhatsApp Web session
+  - Opens in new tab for better multitasking
+
 
 ### Critical Fixes Applied (June 25, 2025 - 03:00 AM)
 - **Fixed Dashboard Analytics Error**:
