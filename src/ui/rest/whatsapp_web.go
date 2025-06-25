@@ -102,7 +102,6 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	
 	// Get chats (from WhatsApp if online, from database if offline)
 	var chats []repository.WhatsAppChat
-	var err error
 	
 	if fetchAll && isOnline {
 		// Try to get ALL personal chats including contacts without messages
