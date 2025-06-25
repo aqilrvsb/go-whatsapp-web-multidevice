@@ -313,8 +313,8 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 			if evt.Info.IsFromMe {
 				senderName = "You"
 			} else {
-				contact, _ := client.Store.Contacts.GetContact(evt.Info.Sender)
-				if contact != nil && contact.PushName != "" {
+				contact, _ := client.Store.Contacts.GetContact(context.Background(), evt.Info.Sender)
+				if contact.Found && contact.PushName != "" {
 					senderName = contact.PushName
 				} else {
 					senderName = evt.Info.Sender.User
@@ -367,8 +367,8 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 					}
 				} else {
 					// Get contact name
-					contact, _ := client.Store.Contacts.GetContact(evt.Info.Chat)
-					if contact != nil && contact.PushName != "" {
+					contact, _ := client.Store.Contacts.GetContact(context.Background(), evt.Info.Chat)
+					if contact.Found && contact.PushName != "" {
 						chatName = contact.PushName
 					} else {
 						chatName = evt.Info.Chat.User
