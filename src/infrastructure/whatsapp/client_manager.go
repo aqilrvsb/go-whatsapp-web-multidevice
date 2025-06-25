@@ -202,86 +202,6 @@ func GetMessagesForChat(deviceID, chatJID string, limit int) ([]repository.Whats
 	// Messages are received through events. For now, return from database
 	return repo.GetMessages(deviceID, chatJID, limit)
 }
-	
-	var savedMessages []repository.WhatsAppMessage
-	messageCount := 0
-	
-	for _, msg := range chat.Messages {
-		if messageCount >= limit {
-			break
-		}
-		
-		if msg.Message == nil {
-			continue
-		}
-		
-		// Extract message text
-		messageText := ""
-		messageType := "text"
-		
-		if msg.Message.Conversation != nil {
-			messageText = *msg.Message.Conversation
-		} else if msg.Message.ExtendedTextMessage != nil && msg.Message.ExtendedTextMessage.Text != nil {
-			messageText = *msg.Message.ExtendedTextMessage.Text
-		} else if msg.Message.ImageMessage != nil {
-			messageType = "image"
-			if msg.Message.ImageMessage.Caption != nil {
-				messageText = *msg.Message.ImageMessage.Caption
-			}
-		} else if msg.Message.VideoMessage != nil {
-			messageType = "video"
-			if msg.Message.VideoMessage.Caption != nil {
-				messageText = *msg.Message.VideoMessage.Caption
-			}
-		}
-		
-		// Get sender info
-		senderJID := msg.Info.Sender.String()
-		senderName := ""
-		if msg.Info.IsFromMe {
-			senderName = "You"
-		} else {
-			contact, _ := client.Store.Contacts.GetContact(msg.Info.Sender)
-			if contact != nil {
-				senderName = contact.PushName
-			} else {
-				senderName = msg.Info.Sender.User
-			}
-		}
-		
-		// Create message record
-		whatsappMsg := repository.WhatsAppMessage{
-			DeviceID:    deviceID,
-			ChatJID:     chatJID,
-			MessageID:   msg.Info.ID,
-			SenderJID:   senderJID,
-			SenderName:  senderName,
-			MessageText: messageText,
-			MessageType: messageType,
-			MediaURL:    "", // TODO: Implement media handling
-			IsSent:      msg.Info.IsFromMe,
-			IsRead:      msg.Receipt != nil && msg.Receipt.Type == types.ReceiptTypeRead,
-			Timestamp:   msg.Info.Timestamp,
-		}
-		
-		// Save to database
-		if err := repo.SaveMessage(&whatsappMsg); err != nil {
-			fmt.Printf("Error saving message %s: %v\n", msg.Info.ID, err)
-			continue
-		}
-		
-		savedMessages = append(savedMessages, whatsappMsg)
-		messageCount++
-	}
-	
-	// If we didn't get enough messages from memory, fetch from database
-	if len(savedMessages) < limit {
-		dbMessages, _ := repo.GetMessages(deviceID, chatJID, limit)
-		return dbMessages, nil
-	}
-	
-	return savedMessages, nil
-}
 
 // RegisterDeviceClient registers a WhatsApp client when a device connects
 func RegisterDeviceClient(deviceID string, client *whatsmeow.Client) {
@@ -303,6 +223,7 @@ func UnregisterDeviceClient(deviceID string) {
 	cm := GetClientManager()
 	cm.RemoveClient(deviceID)
 }
+
 // GetAllPersonalChats attempts to get ALL personal chats, including those without recent messages
 func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 	cm := GetClientManager()
