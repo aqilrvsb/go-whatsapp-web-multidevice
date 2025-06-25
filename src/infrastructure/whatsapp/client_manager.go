@@ -67,12 +67,15 @@ func (cm *ClientManager) RemoveClient(deviceID string) {
 
 // GetChatsForDevice fetches and saves chats for a specific device (personal chats only)
 func GetChatsForDevice(deviceID string) ([]repository.WhatsAppChat, error) {
+	fmt.Printf("GetChatsForDevice called for device: %s\n", deviceID)
+	
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
 	
 	// Always try to get from database first
 	repo := repository.GetWhatsAppRepository()
 	savedChats, _ := repo.GetChats(deviceID)
+	fmt.Printf("Found %d saved chats in database for device %s\n", len(savedChats), deviceID)
 	
 	// Filter out groups - only keep personal chats
 	var personalChats []repository.WhatsAppChat
@@ -81,11 +84,15 @@ func GetChatsForDevice(deviceID string) ([]repository.WhatsAppChat, error) {
 			personalChats = append(personalChats, chat)
 		}
 	}
+	fmt.Printf("Filtered to %d personal chats for device %s\n", len(personalChats), deviceID)
 	
 	if err != nil {
 		// If client not connected, return saved personal chats from database
+		fmt.Printf("Client not connected for device %s: %v\n", deviceID, err)
 		return personalChats, nil
 	}
+	
+	fmt.Printf("Client connected for device %s, syncing contacts...\n", deviceID)
 	
 	// Client is connected, try to sync latest data
 	// Get all contacts first to have proper names

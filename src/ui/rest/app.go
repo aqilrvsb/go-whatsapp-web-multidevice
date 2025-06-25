@@ -53,6 +53,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/devices/:id/chats", rest.GetWhatsAppChats)
 	app.Get("/api/devices/:id/messages/:chatId", rest.GetWhatsAppMessages)
 	app.Post("/api/devices/:id/send", rest.SendWhatsAppMessage)
+	app.Post("/api/devices/:id/sync", rest.SyncDeviceChats)
 	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
@@ -430,16 +431,59 @@ func (handler *App) HealthCheck(c *fiber.Ctx) error {
 func (handler *App) GetDevice(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// For read-only WhatsApp Web, we just need basic device info
-	// In a real implementation, you would get this from your WhatsApp service
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
 	
-	// Return mock device data for now
+	// Get user from session
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Get the actual device from database
+	device, err := userRepo.GetDevice(user.ID, deviceId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Format phone for display
+	phoneDisplay := device.Phone
+	if phoneDisplay == "" {
+		phoneDisplay = "Not connected"
+	}
+	
+	// Convert to response format
 	deviceData := map[string]interface{}{
-		"id":       deviceId,
-		"name":     "Device " + deviceId[:8],
-		"phone":    "+1234567890",
-		"status":   "online",
-		"lastSeen": time.Now(),
+		"id":       device.ID,
+		"name":     device.DeviceName,
+		"phone":    phoneDisplay,
+		"status":   device.Status,
+		"lastSeen": device.LastSeen,
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -914,5 +958,69 @@ func (handler *App) ChangeUserPushName(c *fiber.Ctx) error {
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Push name updated",
+	})
+}
+// SyncDeviceChats manually triggers chat synchronization for a device
+func (handler *App) SyncDeviceChats(c *fiber.Ctx) error {
+	deviceId := c.Params("id")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	// Verify device ownership
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Check if device belongs to user
+	device, err := userRepo.GetDevice(user.ID, deviceId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Trigger chat sync
+	go func() {
+		chats, err := whatsapp.GetChatsForDevice(device.ID)
+		if err != nil {
+			fmt.Printf("Failed to sync chats for device %s: %v\n", device.ID, err)
+		} else {
+			fmt.Printf("Successfully synced %d chats for device %s\n", len(chats), device.ID)
+		}
+	}()
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Chat sync initiated",
+		Results: map[string]interface{}{
+			"deviceId": device.ID,
+			"status":   "syncing",
+		},
 	})
 }

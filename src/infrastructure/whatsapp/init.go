@@ -238,6 +238,17 @@ func handleConnectionEvents(_ context.Context) {
 						// Register device with client manager for real-time chat access
 						RegisterDeviceClient(session.DeviceID, cli)
 						log.Infof("Registered device %s with client manager", session.DeviceID)
+						
+						// Trigger initial chat sync
+						go func() {
+							time.Sleep(3 * time.Second) // Wait for connection to stabilize
+							chats, err := GetChatsForDevice(session.DeviceID)
+							if err != nil {
+								log.Errorf("Failed to sync chats for device %s: %v", session.DeviceID, err)
+							} else {
+								log.Infof("Successfully synced %d chats for device %s", len(chats), session.DeviceID)
+							}
+						}()
 					}
 					
 					// Clear the session after successful update
