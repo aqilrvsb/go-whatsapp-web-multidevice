@@ -97,8 +97,24 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get query parameter for fetching all contacts
+	fetchAll := c.Query("all") == "true"
+	
 	// Get chats (from WhatsApp if online, from database if offline)
-	chats, err := whatsapp.GetChatsForDevice(deviceId)
+	var chats []repository.WhatsAppChat
+	var err error
+	
+	if fetchAll && isOnline {
+		// Try to get ALL personal chats including contacts without messages
+		chats, err = whatsapp.GetAllPersonalChats(deviceId)
+		if err != nil {
+			// Fallback to regular method
+			chats, err = whatsapp.GetChatsForDevice(deviceId)
+		}
+	} else {
+		// Regular method - get chats with recent activity
+		chats, err = whatsapp.GetChatsForDevice(deviceId)
+	}
 	if err != nil && isOnline {
 		// If online but failed to get chats, return error
 		return c.Status(500).JSON(utils.ResponseData{

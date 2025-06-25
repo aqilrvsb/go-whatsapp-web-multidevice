@@ -292,6 +292,20 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 	// Save message to WhatsApp storage for all connected devices
 	cm := GetClientManager()
 	for deviceID, client := range cm.clients {
+		// Skip group messages - we only want personal chats
+		if evt.Info.IsGroup || evt.Info.Chat.Server == types.GroupServer {
+			continue
+		}
+		
+		// Skip broadcast and status messages
+		if evt.Info.Chat.Server == types.BroadcastServer || evt.Info.Chat.User == "status" {
+			continue
+		}
+		
+		// Only process personal chats
+		if evt.Info.Chat.Server != types.DefaultUserServer {
+			continue
+		}
 		// Check if this message belongs to this client
 		if client.Store.ID != nil && evt.Info.MessageSource.Sender.User == client.Store.ID.User {
 			// Get sender name
