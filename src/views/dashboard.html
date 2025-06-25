@@ -529,6 +529,7 @@
                 <!-- Calendar Container -->
                 <div class="card">
                     <div class="card-body">
+                        <!-- Calendar controls will be added here by JavaScript -->
                         <div id="campaignCalendar"></div>
                     </div>
                 </div>
@@ -549,6 +550,50 @@
                         <div id="qrCode" style="width: 256px; height: 256px; margin: 0 auto; background: #f0f0f0;"></div>
                         <p class="mt-3 text-muted">Scan this QR code with WhatsApp on your phone</p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Campaign Modal -->
+    <div class="modal fade" id="campaignModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="campaignModalTitle">Create Campaign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="campaignForm">
+                        <input type="hidden" id="campaignId">
+                        <input type="hidden" id="campaignDate">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Campaign Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="campaignTitle" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="campaignMessage" rows="5" required 
+                                      placeholder="Enter your broadcast message..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Image URL (Optional)</label>
+                            <input type="url" class="form-control" id="campaignImageUrl" 
+                                   placeholder="https://example.com/image.jpg">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Scheduled Time (Optional)</label>
+                            <input type="time" class="form-control" id="campaignTime">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCampaign()">Save Campaign</button>
                 </div>
             </div>
         </div>
@@ -1737,31 +1782,43 @@
         let campaigns = {};
         
         function initializeCampaignCalendar() {
+            const calendarContainer = document.getElementById('campaignCalendar');
+            if (!calendarContainer) return;
+            
+            // Clear any existing content
+            calendarContainer.innerHTML = '';
+            
+            // Create controls container
+            const controlsContainer = document.createElement('div');
+            controlsContainer.id = 'calendarControls';
+            calendarContainer.parentElement.insertBefore(controlsContainer, calendarContainer);
+            
             renderCalendar();
             loadCampaigns();
         }
         
         function renderCalendar() {
             const calendar = document.getElementById('campaignCalendar');
-            if (!calendar) return;
+            const controls = document.getElementById('calendarControls');
+            if (!calendar || !controls) return;
             
+            // Clear calendar
             calendar.innerHTML = '';
             
-            // Add controls
-            const controls = document.createElement('div');
-            controls.className = 'calendar-controls mb-3';
+            // Update controls
             controls.innerHTML = `
-                <button class="btn btn-sm btn-outline-primary" onclick="previousMonth()">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
-                <div class="calendar-month-year">
-                    ${new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                <div class="calendar-controls mb-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="previousMonth()">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <div class="calendar-month-year">
+                        ${new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="nextMonth()">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
                 </div>
-                <button class="btn btn-sm btn-outline-primary" onclick="nextMonth()">
-                    <i class="bi bi-chevron-right"></i>
-                </button>
             `;
-            calendar.parentElement.insertBefore(controls, calendar);
             
             // Add day headers
             const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1847,14 +1904,85 @@
         }
         
         function openCampaignModal(date) {
-            // This would open a modal to create/edit campaign for the selected date
-            console.log('Open campaign modal for date:', date);
-            // TODO: Implement campaign creation modal
+            const existingCampaign = campaigns[date];
+            const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
+            
+            // Set modal data
+            document.getElementById('campaignDate').value = date;
+            document.getElementById('campaignModalTitle').textContent = existingCampaign 
+                ? `Edit Campaign - ${new Date(date).toLocaleDateString()}` 
+                : `Create Campaign - ${new Date(date).toLocaleDateString()}`;
+            
+            if (existingCampaign) {
+                document.getElementById('campaignId').value = existingCampaign.id;
+                document.getElementById('campaignTitle').value = existingCampaign.title;
+                document.getElementById('campaignMessage').value = existingCampaign.message;
+                document.getElementById('campaignImageUrl').value = existingCampaign.image_url || '';
+                document.getElementById('campaignTime').value = existingCampaign.scheduled_time || '';
+            } else {
+                document.getElementById('campaignForm').reset();
+                document.getElementById('campaignId').value = '';
+                document.getElementById('campaignDate').value = date;
+            }
+            
+            modal.show();
+        }
+        
+        function saveCampaign() {
+            const campaignId = document.getElementById('campaignId').value;
+            const campaignData = {
+                campaign_date: document.getElementById('campaignDate').value,
+                title: document.getElementById('campaignTitle').value,
+                message: document.getElementById('campaignMessage').value,
+                image_url: document.getElementById('campaignImageUrl').value,
+                scheduled_time: document.getElementById('campaignTime').value
+            };
+            
+            const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
+            const method = campaignId ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(campaignData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    bootstrap.Modal.getInstance(document.getElementById('campaignModal')).hide();
+                    loadCampaigns();
+                    showAlert('success', campaignId ? 'Campaign updated!' : 'Campaign created!');
+                } else {
+                    showAlert('danger', data.message || 'Failed to save campaign');
+                }
+            })
+            .catch(error => showAlert('danger', 'Error: ' + error.message));
+        }
+        
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+            alert.style.zIndex = '9999';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => alert.remove(), 5000);
         }
         
         // Initialize campaign calendar when switching to campaign tab
-        document.getElementById('campaign-tab').addEventListener('shown.bs.tab', function() {
-            initializeCampaignCalendar();
+        document.addEventListener('DOMContentLoaded', function() {
+            const campaignTab = document.getElementById('campaign-tab');
+            if (campaignTab) {
+                campaignTab.addEventListener('shown.bs.tab', function() {
+                    initializeCampaignCalendar();
+                });
+            }
         });
     </script>
 </body>
