@@ -331,11 +331,16 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 		// Either sent by this client OR sent to this client
 		if client.Store.ID != nil {
 			// For personal chats, check if the message is part of this client's conversations
-			isMyMessage := evt.Info.MessageSource.Sender.User == client.Store.ID.User
-			isToMe := evt.Info.Chat.User == client.Store.ID.User
+			clientPhone := client.Store.ID.User
+			isMyMessage := evt.Info.MessageSource.Sender.User == clientPhone
 			
-			// Save if it's my message OR if it's a message in a chat with me
-			if isMyMessage || isToMe || !evt.Info.IsGroup {
+			// In personal chats, if I didn't send it, then it was sent to me
+			isPersonalChat := evt.Info.Chat.Server == types.DefaultUserServer && !evt.Info.IsGroup
+			
+			// Save all messages in personal chats
+			if isPersonalChat {
+				log.Infof("Saving message for device %s: sender=%s, chat=%s, isFromMe=%v",
+					deviceID, evt.Info.Sender.String(), evt.Info.Chat.String(), evt.Info.IsFromMe)
 			// Get sender name
 			senderName := ""
 			if evt.Info.IsFromMe {
