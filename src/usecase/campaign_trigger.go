@@ -77,25 +77,46 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	logrus.Infof("Found %d leads matching niche: %s", len(leads), campaign.Niche)
 	
-	// Get device for campaign
+	// Get ALL connected devices for the user
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByID(campaign.DeviceID)
+	devices, err := userRepo.GetUserDevices(campaign.UserID)
 	if err != nil {
-		logrus.Errorf("Failed to get device for campaign %s: %v", campaign.ID, err)
+		logrus.Errorf("Failed to get devices for user %s: %v", campaign.UserID, err)
 		return
 	}
+	
+	// Filter only connected devices
+	connectedDevices := make([]models.UserDevice, 0)
+	for _, device := range devices {
+		if device.Status == "connected" {
+			connectedDevices = append(connectedDevices, device)
+		}
+	}
+	
+	if len(connectedDevices) == 0 {
+		logrus.Errorf("No connected devices found for user %s", campaign.UserID)
+		return
+	}
+	
+	logrus.Infof("Using %d connected devices for campaign distribution", len(connectedDevices))
 	
 	// Get broadcast repository
 	broadcastRepo := repository.GetBroadcastRepository()
 	
-	// Queue messages for each lead
+	// Queue messages for each lead, distributing across devices
 	successful := 0
 	failed := 0
+	deviceIndex := 0
 	
 	for _, lead := range leads {
+		// Round-robin device selection
+		device := connectedDevices[deviceIndex%len(connectedDevices)]
+		deviceIndex++
+		
 		msg := domainBroadcast.BroadcastMessage{
+			UserID:         campaign.UserID,
 			DeviceID:       device.ID,
-			CampaignID:     campaign.ID,
+			CampaignID:     &campaign.ID,
 			RecipientPhone: lead.Phone,
 			Type:           "text",
 			Content:        campaign.Message,
@@ -117,7 +138,8 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	campaign.Status = "sent"
 	campaignRepo.UpdateCampaign(campaign)
 	
-	logrus.Infof("Campaign %s completed: %d messages queued, %d failed", campaign.Title, successful, failed)
+	logrus.Infof("Campaign %s completed: %d messages queued across %d devices, %d failed", 
+		campaign.Title, successful, len(connectedDevices), failed)
 }
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {

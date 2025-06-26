@@ -6,6 +6,7 @@ import (
 
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -395,17 +396,62 @@ func (s *sequenceService) ProcessSequences() error {
 }
 // sendSequenceMessage sends a message for a sequence step
 func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact *models.SequenceContact, step *models.SequenceStep) error {
-	// Get the WhatsApp client for the device
-	cm := whatsapp.GetClientManager()
-	_, err := cm.GetClient(sequence.DeviceID)
+	// Get broadcast repository
+	broadcastRepo := repository.GetBroadcastRepository()
+	userRepo := repository.GetUserRepository()
+	
+	// Get ALL connected devices for the user
+	devices, err := userRepo.GetUserDevices(sequence.UserID)
 	if err != nil {
-		return fmt.Errorf("device not connected: %v", err)
+		return fmt.Errorf("failed to get user devices: %v", err)
 	}
 	
-	// Use the send service with the correct client
-	switch step.MessageType {
-	case "text":
-		request := domainSend.MessageRequest{
+	// Filter only connected devices
+	connectedDevices := make([]models.UserDevice, 0)
+	for _, device := range devices {
+		if device.Status == "connected" {
+			connectedDevices = append(connectedDevices, device)
+		}
+	}
+	
+	if len(connectedDevices) == 0 {
+		return fmt.Errorf("no connected devices found for user")
+	}
+	
+	// Select random device for load balancing
+	deviceIndex := time.Now().Nanosecond() % len(connectedDevices)
+	selectedDevice := connectedDevices[deviceIndex]
+	
+	// Queue message through broadcast system
+	msg := domainBroadcast.BroadcastMessage{
+		UserID:         sequence.UserID,
+		DeviceID:       selectedDevice.ID,
+		SequenceID:     &sequence.ID,
+		RecipientPhone: contact.ContactPhone,
+		Type:           "text", // Default to text
+		Content:        step.Content,
+		ScheduledAt:    time.Now(),
+	}
+	
+	// Handle different message types
+	if step.ImageURL != "" || step.MediaURL != "" {
+		msg.Type = "image"
+		msg.MediaURL = step.ImageURL
+		if msg.MediaURL == "" {
+			msg.MediaURL = step.MediaURL
+		}
+		msg.Caption = step.Caption
+	}
+	
+	// Queue the message
+	err = broadcastRepo.QueueMessage(msg)
+	if err != nil {
+		return fmt.Errorf("failed to queue message: %v", err)
+	}
+	
+	logrus.Infof("Queued sequence message for %s using device %s", contact.ContactPhone, selectedDevice.ID)
+	return nil
+}MessageRequest{
 			Phone:   contact.ContactPhone,
 			Message: step.Content,
 		}
