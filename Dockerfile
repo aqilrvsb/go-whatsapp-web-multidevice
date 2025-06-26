@@ -34,11 +34,15 @@ COPY --from=builder /app/whatsapp .
 COPY --from=builder /app/src/views ./views
 COPY --from=builder /app/src/statics ./statics
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Create directories for storage
 RUN mkdir -p /app/storages /app/sessions
 
 # Expose port
 EXPOSE 3000
 
-# Run the binary
-CMD ["./whatsapp"]
+# Set entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

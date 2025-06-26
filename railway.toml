@@ -12,6 +12,9 @@ name = "web"
 port = 3000
 
 [variables]
+# Database Configuration - Railway provides DATABASE_URL
+DB_URI = "${{DATABASE_URL}}"
+
 # Application Configuration
 APP_PORT = "3000"
 APP_DEBUG = "false"
@@ -27,6 +30,3 @@ WHATSAPP_AUTO_REPLY = "Thank you for contacting us. We will respond shortly."
 # Performance Settings
 NODE_ENV = "production"
 NODE_TLS_REJECT_UNAUTHORIZED = "0"
-
-# Note: DB_URI will be automatically set from DATABASE_URL
-# Webhook settings can be added later through Railway dashboard
