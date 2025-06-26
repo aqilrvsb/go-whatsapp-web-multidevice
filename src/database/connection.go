@@ -237,7 +237,9 @@ func InitializeSchema() error {
 		error_message TEXT,
 		scheduled_at TIMESTAMP,
 		sent_at TIMESTAMP,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		group_id VARCHAR(255),
+		group_order INTEGER
 	);
 
 	-- Create indexes
@@ -306,6 +308,10 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_sequence_logs_sequence_id ON sequence_logs(sequence_id);
 	CREATE INDEX IF NOT EXISTS idx_sequence_logs_contact_id ON sequence_logs(contact_id);
 	CREATE INDEX IF NOT EXISTS idx_sequence_logs_sent_at ON sequence_logs(sent_at);
+	
+	-- Add group columns to broadcast_messages
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS group_id VARCHAR(255);
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS group_order INTEGER;
 	`
 	
 	_, err = db.Exec(alterSchema)

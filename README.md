@@ -491,10 +491,10 @@ Both campaigns run simultaneously without interference!
 ## Deployment Trigger - Fri 27/06/2025  1:53:49.15 
 
 
-## Latest Update - June 27, 2025 (3:30 AM)
+## Latest Update - June 27, 2025 (3:50 AM)
 
 ### ✅ Campaign & Sequence Triggers WORKING!
-Both campaign and sequence triggers are fully operational:
+Both campaign and sequence triggers are fully operational with proper multi-device distribution:
 
 #### Campaign Triggers:
 - **Auto-execution**: Campaigns run automatically at scheduled date/time
@@ -502,13 +502,44 @@ Both campaign and sequence triggers are fully operational:
 - **User isolation**: Each user's campaigns only use their own devices
 - **Load balancing**: Round-robin distribution across devices
 - **Status tracking**: Automatic update to "sent" when complete
+- **Message types**: Supports text and image messages
 
 #### Sequence Triggers:
 - **Auto-enrollment**: New leads automatically added based on niche
 - **Daily processing**: Messages sent at scheduled times
 - **Progress tracking**: Each contact maintains individual timeline
 - **Multi-device support**: Distributes across all user devices
-- **Broadcast integration**: Uses queue system with rate limiting
+- **Message logic**:
+  - If has image → Send image first (no caption)
+  - If has text → Send text after image (3 second gap)
+  - Only image → Send just image
+  - Only text → Send just text
+- **Delay logic**:
+  - Between image/text for same lead: Fixed 3 seconds
+  - Between different leads: Random delay (device min/max settings)
+
+#### Example Message Flow:
+```
+User A (15 connected devices) creates "Promo Merdeka" sequence:
+
+Lead 1 (Image + Text):
+→ Device A3 sends image to +60123456789
+→ Wait 3 seconds
+→ Device A3 sends text to +60123456789
+→ Wait 10-20 seconds (random based on device settings)
+
+Lead 2 (Text only):
+→ Device A7 sends text to +60987654321
+→ Wait 10-20 seconds
+
+Lead 3 (Image + Text):
+→ Device A11 sends image to +60111222333
+→ Wait 3 seconds
+→ Device A11 sends text to +60111222333
+→ Wait 10-20 seconds
+
+... continues distributing across all 15 devices
+```
 
 ### Sequence System Compilation Fixes ✅
 Successfully fixed all compilation errors in the sequence system:

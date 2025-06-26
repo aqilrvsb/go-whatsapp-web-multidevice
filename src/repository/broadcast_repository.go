@@ -35,33 +35,53 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	query := `
 		INSERT INTO broadcast_messages 
 		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
-		 message_type, content, media_url, status, scheduled_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	
-	// Get user_id from device
+	// Get user_id - use from message if provided, otherwise get from device
 	var userID string
-	err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = $1", msg.DeviceID).Scan(&userID)
-	if err != nil {
-		return err
+	if msg.UserID != "" {
+		userID = msg.UserID
+	} else {
+		err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = $1", msg.DeviceID).Scan(&userID)
+		if err != nil {
+			return err
+		}
 	}
 	
-	// Convert campaign_id if needed
+	// Handle nullable fields
 	var campaignID interface{}
-	if msg.CampaignID != "" {
-		// Try to convert to int for the database
-		if id, err := strconv.Atoi(msg.CampaignID); err == nil {
-			campaignID = id
-		} else {
-			campaignID = nil
-		}
+	if msg.CampaignID != nil {
+		campaignID = *msg.CampaignID
 	} else {
 		campaignID = nil
 	}
 	
-	_, err = r.db.Exec(query, msg.ID, userID, msg.DeviceID, campaignID,
-		msg.SequenceID, msg.RecipientPhone, msg.Type, msg.Content, 
-		msg.MediaURL, "pending", msg.ScheduledAt, time.Now())
+	var sequenceID interface{}
+	if msg.SequenceID != nil {
+		sequenceID = *msg.SequenceID
+	} else {
+		sequenceID = nil
+	}
+	
+	var groupID interface{}
+	if msg.GroupID != nil {
+		groupID = *msg.GroupID
+	} else {
+		groupID = nil
+	}
+	
+	var groupOrder interface{}
+	if msg.GroupOrder != nil {
+		groupOrder = *msg.GroupOrder
+	} else {
+		groupOrder = nil
+	}
+	
+	_, err = r.db.Exec(query, msg.ID, msg.UserID, msg.DeviceID, campaignID,
+		sequenceID, msg.RecipientPhone, msg.Type, msg.Content, 
+		msg.MediaURL, "pending", msg.ScheduledAt, time.Now(), groupID, groupOrder)
 		
 	return err
 }
@@ -69,12 +89,12 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 // GetPendingMessages gets pending messages for a device
 func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
-		SELECT id, device_id, campaign_id, sequence_id, recipient_phone, 
-		       message_type, content, media_url, scheduled_at
+		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
+		       message_type, content, media_url, scheduled_at, group_id, group_order
 		FROM broadcast_messages
 		WHERE device_id = $1 AND status = 'pending'
 		AND (scheduled_at IS NULL OR scheduled_at <= $2)
-		ORDER BY created_at ASC
+		ORDER BY group_id NULLS LAST, group_order NULLS LAST, created_at ASC
 		LIMIT $3
 	`
 	
@@ -87,20 +107,35 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 	var messages []domainBroadcast.BroadcastMessage
 	for rows.Next() {
 		var msg domainBroadcast.BroadcastMessage
-		var campaignID, sequenceID sql.NullString
+		var userID sql.NullString
+		var campaignID sql.NullInt64
+		var sequenceID, groupID sql.NullString
+		var groupOrder sql.NullInt64
 		var scheduledAt sql.NullTime
 		
-		err := rows.Scan(&msg.ID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt)
+		err := rows.Scan(&msg.ID, &userID, &msg.DeviceID, &campaignID, &sequenceID,
+			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
+			&groupID, &groupOrder)
 		if err != nil {
 			continue
 		}
 		
+		if userID.Valid {
+			msg.UserID = userID.String
+		}
 		if campaignID.Valid {
-			msg.CampaignID = campaignID.String
+			campaignIDInt := int(campaignID.Int64)
+			msg.CampaignID = &campaignIDInt
 		}
 		if sequenceID.Valid {
-			msg.SequenceID = sequenceID.String
+			msg.SequenceID = &sequenceID.String
+		}
+		if groupID.Valid {
+			msg.GroupID = &groupID.String
+		}
+		if groupOrder.Valid {
+			groupOrderInt := int(groupOrder.Int64)
+			msg.GroupOrder = &groupOrderInt
 		}
 		if scheduledAt.Valid {
 			msg.ScheduledAt = scheduledAt.Time
