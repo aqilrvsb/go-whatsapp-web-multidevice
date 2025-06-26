@@ -80,8 +80,6 @@ func (r *CampaignRepository) CreateCampaign(userID string, campaignDate, title, 
 	query := `
 		INSERT INTO campaigns (user_id, campaign_date, title, niche, message, image_url, scheduled_time, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (user_id, campaign_date) 
-		DO UPDATE SET title = $3, niche = $4, message = $5, image_url = $6, scheduled_time = $7, updated_at = $10
 		RETURNING id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), COALESCE(scheduled_time::text, ''), status, created_at, updated_at
 	`
 	

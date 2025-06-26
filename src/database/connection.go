@@ -131,9 +131,11 @@ func InitializeSchema() error {
 		scheduled_time TIME,
 		status VARCHAR(50) DEFAULT 'scheduled',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(user_id, campaign_date)
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+	
+	-- Remove old unique constraint if it exists
+	ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_user_id_campaign_date_key;
 
 	-- Create whatsapp_chats table to store chat list
 	CREATE TABLE IF NOT EXISTS whatsapp_chats (

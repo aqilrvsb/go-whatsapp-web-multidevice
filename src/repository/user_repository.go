@@ -313,18 +313,17 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 // GetDevice gets a specific device by ID
 func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at, last_seen
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, updated_at, last_seen
 		FROM user_devices
 		WHERE user_id = $1 AND id = $2
 	`
 	
 	var device models.UserDevice
-	var phone, jid sql.NullString
 	var updatedAt sql.NullTime
 	
 	err := r.db.QueryRow(query, userID, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName,
-		&phone, &jid, &device.Status,
+		&device.Phone, &device.JID, &device.Status,
 		&device.CreatedAt, &updatedAt, &device.LastSeen,
 	)
 	
@@ -336,11 +335,40 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 		return nil, fmt.Errorf("failed to get device: %w", err)
 	}
 	
-	if phone.Valid {
-		device.Phone = phone.String
+	if updatedAt.Valid {
+		device.UpdatedAt = updatedAt.Time
 	}
-	if jid.Valid {
-		device.JID = jid.String
+	
+	return &device, nil
+}
+
+// GetDeviceByID gets a device by ID only (used for deletion)
+func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
+	query := `
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, updated_at, last_seen
+		FROM user_devices
+		WHERE id = $1
+	`
+	
+	var device models.UserDevice
+	var updatedAt sql.NullTime
+	
+	err := r.db.QueryRow(query, deviceID).Scan(
+		&device.ID, &device.UserID, &device.DeviceName,
+		&device.Phone, &device.JID, &device.Status,
+		&device.CreatedAt, &updatedAt, &device.LastSeen,
+	)
+	
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found")
+	}
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device: %w", err)
+	}
+	
+	if updatedAt.Valid {
+		device.UpdatedAt = updatedAt.Time
 	}
 	
 	return &device, nil

@@ -277,6 +277,21 @@
             right: 8px;
         }
         
+        .campaign-item {
+            font-size: 11px;
+            margin: 2px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .campaign-item .badge {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
         .calendar-controls {
             display: flex;
             justify-content: space-between;
@@ -1658,8 +1673,21 @@
                 deviceFilter.appendChild(option);
             });
             
-            // Restore selected value
-            deviceFilter.value = currentDeviceFilter;
+            // If no device is selected and we have devices, select the latest one
+            if (currentDeviceFilter === 'all' && devices.length > 0) {
+                // Find the latest device by created_at or just use the first one
+                const latestDevice = devices.reduce((latest, device) => {
+                    const latestTime = new Date(latest.created_at || 0).getTime();
+                    const deviceTime = new Date(device.created_at || 0).getTime();
+                    return deviceTime > latestTime ? device : latest;
+                }, devices[0]);
+                
+                currentDeviceFilter = latestDevice.id;
+                deviceFilter.value = currentDeviceFilter;
+            } else {
+                // Restore selected value
+                deviceFilter.value = currentDeviceFilter;
+            }
         }
         
         // Auto-refresh functions
@@ -1755,8 +1783,21 @@
                 deviceFilter.appendChild(option);
             });
             
-            // Restore selected value
-            deviceFilter.value = currentDeviceFilter;
+            // If no device is selected and we have devices, select the latest one
+            if (currentDeviceFilter === 'all' && devices.length > 0) {
+                // Find the latest device by created_at or just use the first one
+                const latestDevice = devices.reduce((latest, device) => {
+                    const latestTime = new Date(latest.created_at || 0).getTime();
+                    const deviceTime = new Date(device.created_at || 0).getTime();
+                    return deviceTime > latestTime ? device : latest;
+                }, devices[0]);
+                
+                currentDeviceFilter = latestDevice.id;
+                deviceFilter.value = currentDeviceFilter;
+            } else {
+                // Restore selected value
+                deviceFilter.value = currentDeviceFilter;
+            }
         }
         
         // Auto-refresh functions
@@ -1920,8 +1961,41 @@
                 let campaignHTML = '';
                 if (Array.isArray(dayCampaigns)) {
                     dayCampaigns.slice(0, 5).forEach(campaign => {
-                        campaignHTML += `<div class="campaign-item" title="${campaign.title}">${campaign.niche || campaign.title}</div>`;
+                        // Determine status color and icon based on campaign status
+                        let statusClass = '';
+                        let statusIcon = '';
+                        let bgColor = '';
+                        
+                        if (campaign.status === 'completed' || campaign.status === 'delivered') {
+                            statusClass = 'text-success';
+                            statusIcon = '<i class="bi bi-check-circle-fill"></i>';
+                            bgColor = 'bg-success';
+                        } else if (campaign.status === 'failed' || campaign.status === 'cancelled') {
+                            statusClass = 'text-danger';
+                            statusIcon = '<i class="bi bi-x-circle-fill"></i>';
+                            bgColor = 'bg-danger';
+                        } else if (campaign.status === 'ongoing' || campaign.status === 'sending' || campaign.status === 'processing') {
+                            statusClass = 'text-warning';
+                            statusIcon = '<i class="bi bi-arrow-repeat"></i>';
+                            bgColor = 'bg-warning';
+                        } else {
+                            statusClass = 'text-primary';
+                            statusIcon = '<i class="bi bi-clock"></i>';
+                            bgColor = 'bg-primary';
+                        }
+                        
+                        campaignHTML += `
+                            <div class="campaign-item ${statusClass}" title="${campaign.title} - ${campaign.status}">
+                                <span class="badge ${bgColor} bg-opacity-75 text-white" style="font-size: 10px; padding: 2px 4px;">
+                                    ${campaign.niche || campaign.title}
+                                </span>
+                            </div>
+                        `;
                     });
+                    
+                    if (dayCampaigns.length > 5) {
+                        campaignHTML += `<div class="campaign-item text-muted" style="font-size: 10px;">+${dayCampaigns.length - 5} more</div>`;
+                    }
                 }
                 
                 dayElement.innerHTML = `
@@ -1966,11 +2040,20 @@
             fetch('/api/campaigns', { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Campaign API response:', data);
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
                         campaigns = {};
+                        console.log('Processing campaigns:', data.results.length);
+                        // Group campaigns by date
                         data.results.forEach(campaign => {
-                            campaigns[campaign.campaign_date] = campaign;
+                            // Ensure date is in YYYY-MM-DD format
+                            const date = campaign.campaign_date.split('T')[0];
+                            if (!campaigns[date]) {
+                                campaigns[date] = [];
+                            }
+                            campaigns[date].push(campaign);
                         });
+                        console.log('Grouped campaigns:', campaigns);
                         renderCalendar();
                     }
                 })
@@ -1978,26 +2061,21 @@
         }
         
         function openCampaignModal(date) {
-            const existingCampaign = campaigns[date];
+            const existingCampaigns = campaigns[date] || [];
             const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
             
-            // Set modal data
+            // Set modal data for new campaign
             document.getElementById('campaignDate').value = date;
-            document.getElementById('campaignModalTitle').textContent = existingCampaign 
-                ? `Edit Campaign - ${new Date(date).toLocaleDateString()}` 
-                : `Create Campaign - ${new Date(date).toLocaleDateString()}`;
+            document.getElementById('campaignModalTitle').textContent = `Create Campaign - ${new Date(date).toLocaleDateString()}`;
+            document.getElementById('campaignForm').reset();
+            document.getElementById('campaignId').value = '';
+            document.getElementById('campaignDate').value = date;
             
-            if (existingCampaign) {
-                document.getElementById('campaignId').value = existingCampaign.id;
-                document.getElementById('campaignTitle').value = existingCampaign.title;
-                document.getElementById('campaignMessage').value = existingCampaign.message;
-                document.getElementById('campaignImageUrl').value = existingCampaign.image_url || '';
-                document.getElementById('campaignTime').value = existingCampaign.scheduled_time || '';
-            } else {
-                document.getElementById('campaignForm').reset();
-                document.getElementById('campaignId').value = '';
-                document.getElementById('campaignDate').value = date;
-            }
+            // TODO: If you want to edit existing campaigns, you could show a list to select from
+            // For now, we just create new campaigns
+            
+            modal.show();
+        }
             
             modal.show();
         }

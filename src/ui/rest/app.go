@@ -846,25 +846,52 @@ func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 // DeleteDevice deletes a device
 func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
-	userEmail := c.Locals("email").(string)
+	
+	// Get session from cookie instead of relying on Locals
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
 	
 	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
 			Message: "User not found",
 		})
 	}
 	
-	// Check if device belongs to user
-	device, err := userRepo.GetDevice(user.ID, deviceId)
+	// Check if device exists and get its details
+	device, err := userRepo.GetDeviceByID(deviceId)
 	if err != nil {
 		return c.Status(404).JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_FOUND",
 			Message: "Device not found",
+		})
+	}
+	
+	// Verify device belongs to user
+	if device.UserID != user.ID {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "FORBIDDEN",
+			Message: "You don't have permission to delete this device",
 		})
 	}
 	
