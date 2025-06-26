@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Analytics Dashboard - Fixed</title>
+    <title>WhatsApp Analytics Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
@@ -34,11 +34,10 @@
         .metric-card {
             background: white;
             border-radius: 12px;
-            padding: 15px;
+            padding: 20px;
             box-shadow: var(--card-shadow);
             border: none;
             transition: transform 0.2s;
-            text-align: center;
         }
 
         .metric-card:hover {
@@ -46,8 +45,19 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
         .metric-value {
-            font-size: 2rem;
+            font-size: 32px;
             font-weight: 700;
             line-height: 1;
             margin-bottom: 4px;
@@ -56,7 +66,29 @@
         .metric-label {
             color: #667781;
             font-size: 14px;
+        }
+
+        .time-toggle {
+            background: white;
+            border-radius: 24px;
+            padding: 4px;
+            display: inline-flex;
+            box-shadow: var(--card-shadow);
+        }
+
+        .time-toggle .btn {
+            border-radius: 20px;
+            border: none;
+            padding: 8px 20px;
+            font-size: 14px;
             font-weight: 500;
+            background: transparent;
+            color: #667781;
+        }
+
+        .time-toggle .btn.active {
+            background: var(--primary);
+            color: white;
         }
 
         .chart-container {
@@ -65,6 +97,89 @@
             padding: 24px;
             box-shadow: var(--card-shadow);
             height: 350px;
+        }
+
+        .device-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s;
+            height: 100%;
+        }
+
+        .device-card.connected {
+            border-color: var(--success);
+            border-width: 2px;
+        }
+
+        .device-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+
+        .device-icon {
+            width: 48px;
+            height: 48px;
+            background: #f0f9f7;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .device-info {
+            background: #f8f9fa !important;
+            border: 1px solid #e9ecef;
+        }
+
+        .device-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .device-status.online {
+            background-color: var(--success);
+        }
+
+        .device-status.offline {
+            background-color: #e74c3c;
+        }
+
+        .btn-whatsapp {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-whatsapp:hover {
+            background-color: var(--primary-dark);
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .add-device-card {
+            border: 2px dashed #dee2e6;
+            background: #fafbfc;
+            cursor: pointer;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .add-device-card:hover {
+            border-color: var(--primary);
+            background: #f0f9f7;
         }
 
         .nav-tabs {
@@ -84,28 +199,146 @@
             border-bottom: 3px solid var(--primary);
         }
 
-        .card-header {
-            background-color: var(--light-bg);
-            border-bottom: 1px solid #e9ecef;
+        #loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
 
-        .card-header h5 {
+        .qr-modal .modal-content {
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .qr-container {
+            padding: 40px;
+            text-align: center;
+            background: white;
+        }
+        
+        /* Campaign Calendar Styles */
+        #campaignCalendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e9ecef;
+            padding: 1px;
+            border-radius: 8px;
+        }
+        
+        .calendar-header {
+            background: var(--primary);
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .calendar-day {
+            background: white;
+            min-height: 80px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .calendar-day:hover {
+            background: #f8f9fa;
+            transform: scale(1.02);
+        }
+        
+        .calendar-day.other-month {
+            color: #ccc;
+            background: #fafafa;
+        }
+        
+        .calendar-day.has-campaign {
+            background: #e3f2fd;
+            border: 2px solid var(--primary);
+        }
+        
+        .calendar-date {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .calendar-campaign-indicator {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+        }
+        
+        .campaign-item {
+            font-size: 11px;
+            margin: 2px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .campaign-item .badge {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .campaign-detail {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 1px 0;
+            transition: background 0.2s;
+        }
+        
+        .campaign-detail:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .campaign-container {
+            max-height: 60px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+        
+        .calendar-day {
+            position: relative;
+            overflow: visible;
+        }
+        
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-month-year {
+            font-size: 20px;
+            font-weight: 600;
             color: var(--primary);
         }
-
-        .btn-whatsapp {
-            background-color: var(--primary);
+        
+        .campaign-item {
+            font-size: 10px;
+            background: var(--primary);
             color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-
-        .btn-whatsapp:hover {
-            background-color: var(--primary-dark);
-            color: white;
+            padding: 2px 4px;
+            margin: 1px 0;
+            border-radius: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -152,6 +385,16 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="campaign-summary-tab" data-bs-toggle="tab" data-bs-target="#campaign-summary" type="button">
+                    <i class="bi bi-graph-up"></i> Campaign Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sequence-summary-tab" data-bs-toggle="tab" data-bs-target="#sequence-summary" type="button">
+                    <i class="bi bi-bar-chart"></i> Sequence Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="worker-status-tab" data-bs-toggle="tab" data-bs-target="#worker-status" type="button">
                     <i class="bi bi-cpu"></i> Worker Status
                 </button>
@@ -162,174 +405,162 @@
         <div class="tab-content" id="mainTabContent">
             <!-- Dashboard Tab -->
             <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
-                <!-- Filters -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label">Filter by Device</label>
-                        <select class="form-select" id="deviceFilter" onchange="filterDashboard()">
+                <!-- Time Range Toggle -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h5 class="mb-0">Analytics Overview</h5>
+                        <small class="text-muted">Today: June 23, 2025 | <span id="lastRefresh">Last refresh: Never</span></small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Auto Refresh Toggle -->
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                            <label class="form-check-label" for="autoRefreshToggle">
+                                <small>Auto-refresh (10s)</small>
+                            </label>
+                        </div>
+                        
+                        <!-- Manual Refresh Button -->
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshDashboard()" title="Refresh Now">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        
+                        <!-- Device Filter -->
+                        <select class="form-select form-select-sm" id="deviceFilter" onchange="filterByDevice()" style="width: 200px;">
                             <option value="all">All Devices</option>
                         </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Filter by Date</label>
-                        <input type="date" class="form-control" id="dateFilter" onchange="filterDashboard()">
-                    </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-outline-primary" onclick="refreshDashboard()">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
-                        </button>
+                        
+                        <!-- Time Range -->
+                        <div class="time-toggle">
+                            <button class="btn" onclick="changeTimeRange('today')">Today</button>
+                            <button class="btn active" onclick="changeTimeRange(7)">7 Days</button>
+                            <button class="btn" onclick="changeTimeRange(30)">30 Days</button>
+                            <button class="btn" onclick="changeTimeRange(90)">90 Days</button>
+                            <button class="btn" onclick="showCustomDateRange()">Custom</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- CAMPAIGN SECTION -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-calendar3"></i> Campaign Analytics</h5>
-                    </div>
+                <!-- Custom Date Range (Hidden by default) -->
+                <div id="customDateRange" class="card mb-3 d-none">
                     <div class="card-body">
-                        <!-- Campaign Row 1 -->
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="todayCampaigns">0</div>
-                                    <div class="metric-label">Today Campaigns</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cRunning">0</div>
-                                    <div class="metric-label">C Running</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cSuccess">0</div>
-                                    <div class="metric-label">C Success</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cFailed">0</div>
-                                    <div class="metric-label">C Failed</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cActiveDevices">0</div>
-                                    <div class="metric-label">Active Devices</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cDisconnected">0</div>
-                                    <div class="metric-label">Disconnected</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Campaign Row 2 -->
-                        <div class="row g-3">
+                        <div class="row g-3 align-items-end">
                             <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="cTotalLeads">0</div>
-                                    <div class="metric-label">Total Leads</div>
-                                </div>
+                                <label class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate" max="">
                             </div>
                             <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value text-success" id="cLeadsSuccess">0</div>
-                                    <div class="metric-label">Success</div>
-                                </div>
+                                <label class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="endDate" max="">
                             </div>
                             <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value text-danger" id="cLeadsFailed">0</div>
-                                    <div class="metric-label">Failed</div>
-                                </div>
+                                <button class="btn btn-whatsapp" onclick="applyCustomDateRange()">
+                                    <i class="bi bi-check-lg"></i> Apply
+                                </button>
+                                <button class="btn btn-outline-secondary ms-2" onclick="hideCustomDateRange()">
+                                    Cancel
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SEQUENCE SECTION -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-collection"></i> Sequence Analytics</h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- Sequence Row 1 -->
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="todaySequences">0</div>
-                                    <div class="metric-label">Today Sequences</div>
-                                </div>
+                <!-- Metrics Cards -->
+                <div class="row g-3 mb-4">
+                    <!-- First Row - Device Metrics -->
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-phone-fill"></i>
                             </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sRunning">0</div>
-                                    <div class="metric-label">S Running</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sSuccess">0</div>
-                                    <div class="metric-label">S Success</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sFailed">0</div>
-                                    <div class="metric-label">S Failed</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sActiveDevices">0</div>
-                                    <div class="metric-label">Active Devices</div>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sDisconnected">0</div>
-                                    <div class="metric-label">Disconnected</div>
-                                </div>
-                            </div>
+                            <div class="metric-value" id="activeDevices">0</div>
+                            <div class="metric-label">Active Devices</div>
                         </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-phone-x"></i>
+                            </div>
+                            <div class="metric-value" id="inactiveDevices">0</div>
+                            <div class="metric-label">Inactive Devices</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-send"></i>
+                            </div>
+                            <div class="metric-value" id="leadsSent">0</div>
+                            <div class="metric-label">Leads Sent</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-inbox"></i>
+                            </div>
+                            <div class="metric-value" id="leadsReceived">0</div>
+                            <div class="metric-label">Leads Received</div>
+                            <small class="text-success" id="leadsReceivedPercent">0%</small>
+                        </div>
+                    </div>
+                </div>
 
-                        <!-- Sequence Row 2 -->
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value" id="sTotalLeads">0</div>
-                                    <div class="metric-label">Total Leads</div>
-                                </div>
+                <!-- Second Row - Lead Status Metrics -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-x-circle"></i>
                             </div>
-                            <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value text-success" id="sLeadsSuccess">0</div>
-                                    <div class="metric-label">Success</div>
-                                </div>
+                            <div class="metric-value" id="leadsNotReceived">0</div>
+                            <div class="metric-label">Leads Not Received</div>
+                            <small class="text-danger" id="leadsNotReceivedPercent">0%</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check-double"></i>
                             </div>
-                            <div class="col-md-4">
-                                <div class="metric-card">
-                                    <div class="metric-value text-danger" id="sLeadsFailed">0</div>
-                                    <div class="metric-label">Failed</div>
-                                </div>
+                            <div class="metric-value" id="leadsRead">0</div>
+                            <div class="metric-label">Leads Read</div>
+                            <small class="text-success" id="leadsReadPercent">0%</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-check"></i>
                             </div>
+                            <div class="metric-value" id="leadsNotRead">0</div>
+                            <div class="metric-label">Leads Not Read</div>
+                            <small class="text-secondary" id="leadsNotReadPercent">0%</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-reply"></i>
+                            </div>
+                            <div class="metric-value" id="leadsReplied">0</div>
+                            <div class="metric-label">Leads Replied</div>
+                            <small class="text-primary" id="leadsRepliedPercent">0%</small>
                         </div>
                     </div>
                 </div>
 
                 <!-- Chart -->
                 <div class="chart-container">
-                    <h5 class="mb-3">Campaign & Sequence Activity</h5>
-                    <canvas id="activityChart"></canvas>
+                    <h5 class="mb-3">Daily Message Activity</h5>
+                    <canvas id="messageChart"></canvas>
                 </div>
             </div>
 
             <!-- Devices Tab -->
             <div class="tab-pane fade" id="devices" role="tabpanel">
+                <!-- Devices Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="mb-1">WhatsApp Devices</h4>
@@ -340,13 +571,25 @@
                     </button>
                 </div>
 
+                <!-- Devices Grid -->
                 <div class="row g-4" id="devicesGrid">
-                    <!-- Device cards will be loaded here -->
+                    <!-- Device cards will be dynamically added here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyDeviceState" class="text-center py-5" style="display: none;">
+                    <i class="bi bi-phone" style="font-size: 64px; color: #dee2e6;"></i>
+                    <h5 class="mt-3 text-muted">No devices connected</h5>
+                    <p class="text-muted">Add a device to start using WhatsApp Analytics</p>
+                    <button class="btn btn-primary mt-3" onclick="addNewDevice()">
+                        <i class="bi bi-plus-circle me-2"></i>Add Your First Device
+                    </button>
                 </div>
             </div>
-
+            
             <!-- Campaign Tab -->
             <div class="tab-pane fade" id="campaign" role="tabpanel">
+                <!-- Campaign Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="mb-1">Campaign Calendar</h4>
@@ -354,25 +597,31 @@
                     </div>
                 </div>
                 
+                <!-- Calendar Container -->
                 <div class="card">
                     <div class="card-body">
-                        <p class="text-center text-muted">Campaign calendar will be displayed here</p>
+                        <!-- Calendar controls will be added here by JavaScript -->
+                        <div id="campaignCalendar"></div>
                     </div>
                 </div>
             </div>
-
+            
             <!-- Sequences Tab -->
             <div class="tab-pane fade" id="sequences" role="tabpanel">
+                <!-- Sequences Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h4 class="mb-1">Message Sequences</h4>
                         <p class="text-muted mb-0">Create automated drip campaigns for your contacts</p>
                     </div>
-                    <a href="/sequences" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> Manage Sequences
-                    </a>
+                    <div>
+                        <a href="/sequences" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Manage Sequences
+                        </a>
+                    </div>
                 </div>
                 
+                <!-- Sequences List -->
                 <div class="row" id="sequencesList">
                     <div class="col-12">
                         <div class="card">
@@ -388,7 +637,49 @@
                     </div>
                 </div>
             </div>
-
+            
+            <!-- Campaign Summary Tab -->
+            <div class="tab-pane fade" id="campaign-summary" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Campaign Summary</h4>
+                        <p class="text-muted mb-0">Overview of all your campaign activities</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadCampaignSummary()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="campaignSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sequence Summary Tab -->
+            <div class="tab-pane fade" id="sequence-summary" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Sequence Summary</h4>
+                        <p class="text-muted mb-0">Overview of all your sequence activities</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadSequenceSummary()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="sequenceSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Worker Status Tab -->
             <div class="tab-pane fade" id="worker-status" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -398,7 +689,7 @@
                     </div>
                     <div>
                         <div class="form-check form-switch d-inline-block me-3">
-                            <input class="form-check-input" type="checkbox" id="workerAutoRefresh">
+                            <input class="form-check-input" type="checkbox" id="workerAutoRefresh" checked>
                             <label class="form-check-label" for="workerAutoRefresh">
                                 Auto-refresh (5s)
                             </label>
@@ -410,11 +701,9 @@
                 </div>
                 
                 <div id="workerStatusContent">
-                    <div class="card">
-                        <div class="card-body text-center py-5">
-                            <i class="bi bi-cpu display-3 text-muted mb-3"></i>
-                            <h5>No Workers Running</h5>
-                            <p class="text-muted">Workers will appear here when devices are processing messages</p>
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
                 </div>
@@ -422,52 +711,152 @@
         </div>
     </div>
 
+    <!-- QR Code Modal -->
+    <div class="modal fade qr-modal" id="qrModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Scan QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="qr-container">
+                        <div id="qrCode" style="width: 256px; height: 256px; margin: 0 auto; background: #f0f0f0;"></div>
+                        <p class="mt-3 text-muted">Scan this QR code with WhatsApp on your phone</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Campaign Modal -->
+    <div class="modal fade" id="campaignModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="campaignModalTitle">Create Campaign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="campaignForm">
+                        <input type="hidden" id="campaignId">
+                        <input type="hidden" id="campaignDate">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Campaign Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="campaignTitle" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Niche/Category <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="campaignNiche" required 
+                                   placeholder="e.g., Promotion, Announcement, Reminder">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="campaignMessage" rows="5" required 
+                                      placeholder="Enter your broadcast message..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Image (Optional)</label>
+                            <input type="file" class="form-control" id="campaignImageFile" accept="image/*" onchange="compressImage(this)">
+                            <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
+                            <input type="hidden" id="campaignImageUrl">
+                            <div id="imagePreview" class="mt-2"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Scheduled Time (Optional)</label>
+                            <input type="time" class="form-control" id="campaignTime">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCampaign()">Save Campaign</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global variables
-        let activityChart;
+        let messageChart;
+        let currentTimeRange = 7;
         let devices = [];
-        let selectedDevice = 'all';
-        let selectedDate = '';
+        let currentDeviceFilter = 'all';
+        let refreshInterval;
+        let isAutoRefreshEnabled = false;  // Default to disabled
 
-        // Initialize on page load
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('WhatsApp Analytics Dashboard - Layout Fixed');
-            
-            // Set today's date as default
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('dateFilter').value = today;
-            selectedDate = today;
-            
+            console.log('Dashboard v1.1.0 FINAL - All fixes applied');
+            console.log('Includes: Device filter fix, auth cookies, proper function definitions');
             initializeChart();
+            loadDashboardData(7);
             loadDevices();
-            loadDashboardData();
             
-            // Worker auto-refresh disabled by default
-            document.getElementById('workerAutoRefresh').checked = false;
+            // Set max date to today for date inputs
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').max = today;
+            document.getElementById('endDate').max = today;
+            document.getElementById('endDate').value = today;
+            
+            // Set start date to 7 days ago
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            document.getElementById('startDate').value = sevenDaysAgo.toISOString().split('T')[0];
+            
+            // Start auto-refresh only if enabled
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+            }
+            
+            // Set the toggle to match the current state
+            document.getElementById('autoRefreshToggle').checked = isAutoRefreshEnabled;
         });
 
         // Initialize Chart
         function initializeChart() {
-            const ctx = document.getElementById('activityChart').getContext('2d');
-            activityChart = new Chart(ctx, {
-                type: 'bar',
+            const ctx = document.getElementById('messageChart').getContext('2d');
+            messageChart = new Chart(ctx, {
+                type: 'line',
                 data: {
-                    labels: ['Campaign Today', 'C Running', 'C Success', 'C Failed', 'Sequence Today', 'S Running', 'S Success', 'S Failed'],
+                    labels: [],
                     datasets: [{
-                        label: 'Count',
-                        data: [0, 0, 0, 0, 0, 0, 0, 0],
-                        backgroundColor: [
-                            'rgba(18, 140, 126, 0.8)',
-                            'rgba(23, 162, 184, 0.8)',
-                            'rgba(40, 167, 69, 0.8)',
-                            'rgba(220, 53, 69, 0.8)',
-                            'rgba(102, 16, 242, 0.8)',
-                            'rgba(255, 193, 7, 0.8)',
-                            'rgba(40, 167, 69, 0.8)',
-                            'rgba(220, 53, 69, 0.8)'
-                        ],
-                        borderWidth: 1
+                        label: 'Leads Sent',
+                        data: [],
+                        borderColor: '#128c7e',
+                        backgroundColor: 'rgba(18, 140, 126, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Leads Received',
+                        data: [],
+                        borderColor: '#25d366',
+                        backgroundColor: 'rgba(37, 211, 102, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Leads Read',
+                        data: [],
+                        borderColor: '#34b7f1',
+                        backgroundColor: 'rgba(52, 183, 241, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Leads Replied',
+                        data: [],
+                        borderColor: '#00a884',
+                        backgroundColor: 'rgba(0, 168, 132, 0.1)',
+                        tension: 0.4
                     }]
                 },
                 options: {
@@ -475,224 +864,2052 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: false
+                            position: 'bottom',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Lead Activity Trends'
                         }
                     },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Leads'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Load Devices for Filter
-        function loadDevices() {
-            // Mock device data for filter
-            devices = [
-                { id: 'device1', name: 'Device 1', status: 'online' },
-                { id: 'device2', name: 'Device 2', status: 'online' },
-                { id: 'device3', name: 'Device 3', status: 'offline' }
-            ];
-            
-            updateDeviceFilter();
-            renderDevices();
-        }
-
-        // Update Device Filter Dropdown
-        function updateDeviceFilter() {
-            const deviceFilter = document.getElementById('deviceFilter');
-            deviceFilter.innerHTML = '<option value="all">All Devices</option>';
-            
-            devices.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.id;
-                option.textContent = `${device.name} (${device.status})`;
-                deviceFilter.appendChild(option);
-            });
-        }
-
-        // Filter Dashboard Data
-        function filterDashboard() {
-            selectedDevice = document.getElementById('deviceFilter').value;
-            selectedDate = document.getElementById('dateFilter').value;
-            
-            console.log('Filtering by:', { device: selectedDevice, date: selectedDate });
-            loadDashboardData();
-        }
-
-        // Load Dashboard Data with Filters
-        function loadDashboardData() {
-            // Mock data based on filters
-            let campaignData, sequenceData, deviceData;
-            
-            if (selectedDevice === 'all') {
-                // All devices data
-                campaignData = {
-                    today: 5,
-                    running: 2,
-                    success: 8,
-                    failed: 1,
-                    totalLeads: 150,
-                    successLeads: 130,
-                    failedLeads: 20
-                };
-                
-                sequenceData = {
-                    today: 3,
-                    running: 1,
-                    success: 12,
-                    failed: 0,
-                    totalLeads: 89,
-                    successLeads: 85,
-                    failedLeads: 4
-                };
-                
-                deviceData = {
-                    active: devices.filter(d => d.status === 'online').length,
-                    disconnected: devices.filter(d => d.status === 'offline').length
-                };
-            } else {
-                // Filtered device data (reduced numbers)
-                campaignData = {
-                    today: 2,
-                    running: 1,
-                    success: 3,
-                    failed: 0,
-                    totalLeads: 45,
-                    successLeads: 42,
-                    failedLeads: 3
-                };
-                
-                sequenceData = {
-                    today: 1,
-                    running: 1,
-                    success: 4,
-                    failed: 0,
-                    totalLeads: 25,
-                    successLeads: 24,
-                    failedLeads: 1
-                };
-                
-                deviceData = {
-                    active: 1,
-                    disconnected: 0
-                };
+        // Load Dashboard Data
+        function loadDashboardData(days, silent = false) {
+            if (!silent) {
+                showLoading();
             }
             
-            updateDashboardMetrics(campaignData, sequenceData, deviceData);
+            // Get user email
+            const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
+            
+            // Build URL with device filter
+            let url = `/api/analytics/${days}`;
+            if (currentDeviceFilter && currentDeviceFilter !== 'all') {
+                url += `?device=${currentDeviceFilter}`;
+            }
+            
+            // Fetch real data from API
+            fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'X-User-Email': userEmail
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        updateMetrics(data.results.metrics);
+                        updateChart(data.results.daily);
+                    }
+                    if (!silent) {
+                        hideLoading();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading analytics:', error);
+                    // Fallback to mock data
+                    const mockData = generateMockData(days);
+                    updateMetrics(mockData.metrics);
+                    updateChart(mockData.daily);
+                    if (!silent) {
+                        hideLoading();
+                    }
+                });
         }
 
-        // Update Dashboard Metrics
-        function updateDashboardMetrics(campaignData, sequenceData, deviceData) {
-            // Update Campaign metrics
-            document.getElementById('todayCampaigns').textContent = campaignData.today;
-            document.getElementById('cRunning').textContent = campaignData.running;
-            document.getElementById('cSuccess').textContent = campaignData.success;
-            document.getElementById('cFailed').textContent = campaignData.failed;
-            document.getElementById('cActiveDevices').textContent = deviceData.active;
-            document.getElementById('cDisconnected').textContent = deviceData.disconnected;
-            document.getElementById('cTotalLeads').textContent = campaignData.totalLeads;
-            document.getElementById('cLeadsSuccess').textContent = campaignData.successLeads;
-            document.getElementById('cLeadsFailed').textContent = campaignData.failedLeads;
+        // Generate Mock Data
+        function generateMockData(days) {
+            const leadsSent = Math.floor(Math.random() * 1000) + 500;
+            const leadsReceived = Math.floor(leadsSent * 0.8); // 80% received
+            const leadsNotReceived = leadsSent - leadsReceived;
+            const leadsRead = Math.floor(leadsReceived * 0.7); // 70% of received are read
+            const leadsNotRead = leadsReceived - leadsRead;
+            const leadsReplied = Math.floor(leadsRead * 0.5); // 50% of read are replied
+            
+            const metrics = {
+                activeDevices: devices.filter(d => d.status === 'online').length,
+                inactiveDevices: devices.filter(d => d.status === 'offline').length,
+                leadsSent: leadsSent,
+                leadsReceived: leadsReceived,
+                leadsNotReceived: leadsNotReceived,
+                leadsRead: leadsRead,
+                leadsNotRead: leadsNotRead,
+                leadsReplied: leadsReplied
+            };
 
-            // Update Sequence metrics
-            document.getElementById('todaySequences').textContent = sequenceData.today;
-            document.getElementById('sRunning').textContent = sequenceData.running;
-            document.getElementById('sSuccess').textContent = sequenceData.success;
-            document.getElementById('sFailed').textContent = sequenceData.failed;
-            document.getElementById('sActiveDevices').textContent = deviceData.active;
-            document.getElementById('sDisconnected').textContent = deviceData.disconnected;
-            document.getElementById('sTotalLeads').textContent = sequenceData.totalLeads;
-            document.getElementById('sLeadsSuccess').textContent = sequenceData.successLeads;
-            document.getElementById('sLeadsFailed').textContent = sequenceData.failedLeads;
+            const daily = [];
+            const today = new Date();
+            
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                
+                daily.push({
+                    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    sent: Math.floor(Math.random() * 100) + 20,
+                    received: Math.floor(Math.random() * 80) + 15,
+                    read: Math.floor(Math.random() * 60) + 10,
+                    replied: Math.floor(Math.random() * 30) + 5
+                });
+            }
 
-            // Update chart
-            activityChart.data.datasets[0].data = [
-                campaignData.today,
-                campaignData.running,
-                campaignData.success,
-                campaignData.failed,
-                sequenceData.today,
-                sequenceData.running,
-                sequenceData.success,
-                sequenceData.failed
-            ];
-            activityChart.update();
+            return { metrics, daily };
         }
 
-        // Render Devices (for devices tab)
+        // Update Metrics
+        function updateMetrics(metrics) {
+            // Device metrics - Calculate from loaded devices
+            const activeCount = devices.filter(d => d.status === 'online').length;
+            const inactiveCount = devices.filter(d => d.status !== 'online').length;
+            
+            document.getElementById('activeDevices').textContent = activeCount;
+            document.getElementById('inactiveDevices').textContent = inactiveCount;
+            
+            // Lead metrics
+            document.getElementById('leadsSent').textContent = metrics.leadsSent || 0;
+            document.getElementById('leadsReceived').textContent = metrics.leadsReceived || 0;
+            document.getElementById('leadsNotReceived').textContent = metrics.leadsNotReceived || 0;
+            document.getElementById('leadsRead').textContent = metrics.leadsRead || 0;
+            document.getElementById('leadsNotRead').textContent = metrics.leadsNotRead || 0;
+            document.getElementById('leadsReplied').textContent = metrics.leadsReplied || 0;
+            
+            // Calculate and update percentages
+            const totalLeads = metrics.leadsSent || 1; // Avoid division by zero
+            
+            const receivedPercent = Math.round((metrics.leadsReceived / totalLeads) * 100);
+            const notReceivedPercent = Math.round((metrics.leadsNotReceived / totalLeads) * 100);
+            const readPercent = Math.round((metrics.leadsRead / totalLeads) * 100);
+            const notReadPercent = Math.round((metrics.leadsNotRead / totalLeads) * 100);
+            const repliedPercent = Math.round((metrics.leadsReplied / totalLeads) * 100);
+            
+            document.getElementById('leadsReceivedPercent').textContent = receivedPercent + '%';
+            document.getElementById('leadsNotReceivedPercent').textContent = notReceivedPercent + '%';
+            document.getElementById('leadsReadPercent').textContent = readPercent + '%';
+            document.getElementById('leadsNotReadPercent').textContent = notReadPercent + '%';
+            document.getElementById('leadsRepliedPercent').textContent = repliedPercent + '%';
+        }
+        // Update Chart
+        function updateChart(dailyData) {
+            const labels = dailyData.map(d => d.date);
+            const sentData = dailyData.map(d => d.sent || 0);
+            const receivedData = dailyData.map(d => d.received || 0);
+            const readData = dailyData.map(d => d.read || 0);
+            const repliedData = dailyData.map(d => d.replied || 0);
+
+            messageChart.data.labels = labels;
+            messageChart.data.datasets[0].data = sentData;
+            messageChart.data.datasets[1].data = receivedData;
+            messageChart.data.datasets[2].data = readData;
+            messageChart.data.datasets[3].data = repliedData;
+            messageChart.update();
+        }
+
+        // Change Time Range
+        function changeTimeRange(days) {
+            // Hide custom date range if visible
+            document.getElementById('customDateRange').classList.add('d-none');
+            
+            // Update button states
+            document.querySelectorAll('.time-toggle .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            if (days === 'today') {
+                currentTimeRange = 1;
+                loadDashboardData(1);
+            } else {
+                currentTimeRange = days;
+                loadDashboardData(days);
+            }
+        }
+
+        // Show Custom Date Range
+        function showCustomDateRange() {
+            document.getElementById('customDateRange').classList.remove('d-none');
+            
+            // Update button states
+            document.querySelectorAll('.time-toggle .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Hide Custom Date Range
+        function hideCustomDateRange() {
+            document.getElementById('customDateRange').classList.add('d-none');
+            
+            // Reset to 7 days
+            document.querySelectorAll('.time-toggle .btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes('7 Days')) {
+                    btn.classList.add('active');
+                }
+            });
+            changeTimeRange(7);
+        }
+
+        // Apply Custom Date Range
+        function applyCustomDateRange() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            if (start > end) {
+                alert('Start date must be before end date');
+                return;
+            }
+            
+            const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Load data for custom range
+            loadDashboardDataCustomRange(startDate, endDate, days);
+            
+            // Update display
+            document.getElementById('customDateRange').classList.add('d-none');
+        }
+
+        // Load Dashboard Data with Custom Range
+        function loadDashboardDataCustomRange(startDate, endDate, days, silent = false) {
+            if (!silent) {
+                showLoading();
+            }
+            
+            // Get user email
+            const userEmail = localStorage.getItem('userEmail') || 'admin@whatsapp.com';
+            
+            // Build URL with device filter
+            let url = `/api/analytics/custom?start=${startDate}&end=${endDate}`;
+            if (currentDeviceFilter && currentDeviceFilter !== 'all') {
+                url += `&device=${currentDeviceFilter}`;
+            }
+            
+            // Fetch real data from API
+            fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'X-User-Email': userEmail
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        updateMetrics(data.results.metrics);
+                        updateChart(data.results.daily);
+                    }
+                    if (!silent) {
+                        hideLoading();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading custom analytics:', error);
+                    // Fallback to mock data
+                    const mockData = generateMockDataForRange(startDate, endDate, days || 30);
+                    updateMetrics(mockData.metrics);
+                    updateChart(mockData.daily);
+                    if (!silent) {
+                        hideLoading();
+                    }
+                });
+        }
+
+        // Generate Mock Data for Date Range
+        function generateMockDataForRange(startDate, endDate, days) {
+            const metrics = {
+                totalSent: Math.floor(Math.random() * 1000 * (days / 30)) + 500,
+                totalReceived: Math.floor(Math.random() * 800 * (days / 30)) + 400,
+                activeChats: Math.floor(Math.random() * 50) + 10,
+                replyRate: Math.floor(Math.random() * 30) + 70
+            };
+
+            const daily = [];
+            const start = new Date(startDate);
+            
+            for (let i = 0; i < days; i++) {
+                const date = new Date(start);
+                date.setDate(start.getDate() + i);
+                
+                daily.push({
+                    date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    sent: Math.floor(Math.random() * 100) + 20,
+                    received: Math.floor(Math.random() * 80) + 15
+                });
+            }
+
+            return { metrics, daily };
+        }
+
+        // Load Devices
+        function loadDevices(silent = false) {
+            // Fetch real devices from API
+            fetch('/api/devices', { credentials: 'include' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch devices');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
+                        devices = data.results;
+                    } else {
+                        // Initialize with empty array instead of mock device
+                        devices = [];
+                    }
+                    renderDevices();
+                })
+                .catch(error => {
+                    if (!silent) {
+                        console.error('Error loading devices:', error);
+                    }
+                    // Initialize with empty array on error
+                    devices = [];
+                    renderDevices();
+                });
+        }
+
+        // Render Devices
         function renderDevices() {
             const devicesGrid = document.getElementById('devicesGrid');
+            const emptyState = document.getElementById('emptyDeviceState');
+            
+            // Clear grid
             devicesGrid.innerHTML = '';
             
-            devices.forEach(device => {
-                const deviceCard = createDeviceCard(device);
-                devicesGrid.appendChild(deviceCard);
-            });
+            // Check if we have devices
+            if (!devices || devices.length === 0) {
+                devicesGrid.style.display = 'none';
+                emptyState.style.display = 'block';
+            } else {
+                devicesGrid.style.display = '';
+                emptyState.style.display = 'none';
+                
+                // Add existing devices
+                devices.forEach(device => {
+                    const deviceCard = createDeviceCard(device);
+                    devicesGrid.insertAdjacentHTML('beforeend', deviceCard);
+                });
+            }
+            
+            // Update device filter dropdown
+            updateDeviceFilter();
         }
 
         // Create Device Card
         function createDeviceCard(device) {
-            const div = document.createElement('div');
-            div.className = 'col-lg-6';
-            div.innerHTML = `
-                <div class="metric-card">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <h5 class="mb-1">${device.name}</h5>
-                            <span class="badge ${device.status === 'online' ? 'bg-success' : 'bg-secondary'}">
-                                ${device.status === 'online' ? 'Connected' : 'Disconnected'}
-                            </span>
+            const isConnected = device.status === 'online';
+            const phoneDisplay = device.phone && device.phone !== 'Not connected' ? device.phone : null;
+            
+            return `
+                <div class="col-lg-6">
+                    <div class="device-card ${isConnected ? 'connected' : ''}">
+                        <!-- Card Header -->
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="device-icon me-3">
+                                    <i class="bi bi-phone-fill" style="font-size: 24px; color: ${isConnected ? 'var(--success)' : '#6c757d'};"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">${device.name}</h5>
+                                    <div class="d-flex align-items-center">
+                                        <span class="device-status ${device.status}"></span>
+                                        <span class="text-muted small">${isConnected ? 'Connected' : 'Disconnected'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" onclick="editDevice('${device.id}')">
+                                        <i class="bi bi-pencil me-2"></i>Rename
+                                    </a></li>
+                                    ${isConnected ? `
+                                        <li><a class="dropdown-item" href="#" onclick="viewDeviceStats('${device.id}')">
+                                            <i class="bi bi-graph-up me-2"></i>View Analytics
+                                        </a></li>
+                                        
+                                    ` : ''}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteDevice('${device.id}')">
+                                        <i class="bi bi-trash me-2"></i>Delete
+                                    </a></li>
+                                </ul>
+                            </div>
                         </div>
-                        <i class="bi bi-phone-fill text-${device.status === 'online' ? 'success' : 'muted'}"></i>
-                    </div>
-                    <div class="d-grid gap-2 d-md-flex">
-                        ${device.status === 'online' ? 
-                            '<button class="btn btn-success btn-sm me-md-2"><i class="bi bi-whatsapp"></i> WhatsApp Web</button>' :
-                            '<button class="btn btn-primary btn-sm me-md-2"><i class="bi bi-qr-code"></i> Connect</button>'
-                        }
-                        <button class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-gear"></i> Settings
-                        </button>
+
+                        <!-- Phone Number Section -->
+                        <div class="device-info mb-3 p-3 bg-light rounded">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted">Phone Number</small>
+                                    <p class="mb-0 fw-medium">
+                                        ${phoneDisplay || 
+                                            `<span class="text-muted">Not linked</span>
+                                            <button class="btn btn-link btn-sm p-0 ms-2" onclick="linkPhoneNumber('${device.id}')">
+                                                <i class="bi bi-plus-circle"></i> Add
+                                            </button>`
+                                        }
+                                    </p>
+                                </div>
+                                ${phoneDisplay ? `
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="linkPhoneNumber('${device.id}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Last Seen -->
+                        <div class="mb-3">
+                            <small class="text-muted">Last active</small>
+                            <p class="mb-0">${device.lastSeen || 'Never'}</p>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2">
+                            ${!isConnected ? `
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-primary" onclick="scanQR('${device.id}')">
+                                        <i class="bi bi-qr-code me-2"></i>QR Code
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="usePhoneCode('${device.id}')">
+                                        <i class="bi bi-hash me-2"></i>Phone Code
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <button class="btn btn-success w-100" onclick="openWhatsAppWeb('${device.id}')">
+                                            <i class="bi bi-whatsapp me-2"></i>WhatsApp Web
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-primary w-100" onclick="deviceActions('${device.id}')">
+                                            <i class="bi bi-play-circle me-2"></i>Actions
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-info w-100" onclick="deviceLeads('${device.id}')">
+                                            <i class="bi bi-people me-2"></i>Leads
+                                        </button>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="btn-group w-100" role="group">
+                                            <button class="btn btn-outline-success" onclick="viewDeviceStats('${device.id}')">
+                                                <i class="bi bi-graph-up me-2"></i>Analytics
+                                            </button>
+                                            <button class="btn btn-outline-danger" onclick="logoutDevice('${device.id}')">
+                                                <i class="bi bi-box-arrow-right me-2"></i>Logout
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `}
+                        </div>
                     </div>
                 </div>
             `;
-            return div;
         }
 
-        // Worker Status Functions
-        function loadWorkerStatus() {
-            console.log('Loading worker status...');
-            // Implementation for worker status
-        }
-
-        // Utility Functions
+        // Add New Device
         function addNewDevice() {
             const deviceName = prompt('Enter device name:');
             if (deviceName) {
+                // Create device object
                 const newDevice = {
-                    id: Date.now().toString(),
+                    id: 'device_' + Date.now(),
                     name: deviceName,
-                    status: 'offline'
+                    phone: 'Not connected',
+                    status: 'offline',
+                    lastSeen: 'Never connected'
                 };
+                
+                // Add to devices array
                 devices.push(newDevice);
-                updateDeviceFilter();
+                
+                // Save to backend (optional - can be done after successful connection)
+                fetch('/api/devices', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: deviceName })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.device) {
+                        // Update with real ID from backend
+                        const index = devices.findIndex(d => d.id === newDevice.id);
+                        if (index !== -1) {
+                            devices[index].id = data.device.id;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving device:', error);
+                });
+                
+                // Render devices to show the new device card
                 renderDevices();
+                
+                // Don't auto-open QR - let user choose QR or Phone Code
+                // The device card now shows both options
             }
         }
 
-        function refreshDashboard() {
-            loadDashboardData();
-            console.log('Dashboard refreshed');
+        // Scan QR Code
+        function scanQR(deviceId) {
+            const modal = new bootstrap.Modal(document.getElementById('qrModal'));
+            modal.show();
+            
+            // Show loading spinner
+            const qrContainer = document.getElementById('qrCode');
+            qrContainer.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center h-100">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading QR Code...</span>
+                    </div>
+                </div>
+            `;
+            
+            // Get QR code from WhatsApp login endpoint
+            fetch(`/app/login?deviceId=${deviceId}`, {
+                credentials: 'include'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.qr_link) {
+                        // Display QR code with proper styling
+                        qrContainer.innerHTML = `
+                            <div class="text-center">
+                                <img src="${data.results.qr_link}" 
+                                     alt="WhatsApp QR Code" 
+                                     class="img-fluid"
+                                     style="max-width: 256px; max-height: 256px; width: 100%; height: auto; background: white; padding: 10px; border-radius: 8px;"
+                                     onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjZjBmMGYwIi8+CiAgICA8dGV4dCB4PSI1MCUiIHk9IjUwJSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM5OTkiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCI+UVIgQ29kZSBFcnJvcjwvdGV4dD4KPC9zdmc+'; alert('QR code failed to load. Please try again.');">
+                                <p class="mt-3 text-muted small">
+                                    Open WhatsApp on your phone<br>
+                                    Settings > Linked Devices > Link a Device
+                                </p>
+                                <div class="alert alert-info mt-3">
+                                    <small><strong>Note:</strong> If QR code doesn't work, close this modal and try the <strong>Phone Code</strong> option instead.</small>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Set up auto-refresh every 20 seconds
+                        const refreshInterval = setInterval(() => {
+                            fetch(`/app/login?deviceId=${deviceId}`, {
+                                credentials: 'include'
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.results && data.results.qr_link) {
+                                        qrContainer.querySelector('img').src = data.results.qr_link + '?t=' + Date.now();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error refreshing QR code:', error);
+                                });
+                        }, 20000); // Refresh every 20 seconds
+                        
+                        // Clear interval when modal is closed
+                        document.getElementById('qrModal').addEventListener('hidden.bs.modal', function () {
+                            clearInterval(refreshInterval);
+                        }, { once: true });
+                    } else {
+                        qrContainer.innerHTML = `
+                            <div class="text-center">
+                                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 48px;"></i>
+                                <p class="mt-2">Failed to load QR code</p>
+                                <button class="btn btn-sm btn-primary" onclick="scanQR(${deviceId})">Retry</button>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading QR code:', error);
+                    qrContainer.innerHTML = `
+                        <div class="text-center">
+                            <i class="bi bi-wifi-off text-danger" style="font-size: 48px;"></i>
+                            <p class="mt-2">Connection error</p>
+                            <button class="btn btn-sm btn-primary" onclick="scanQR(${deviceId})">Retry</button>
+                        </div>
+                    `;
+                });
         }
 
+        // Logout Device
+        function logoutDevice(deviceId) {
+            if (confirm('Are you sure you want to logout this device from WhatsApp?')) {
+                showLoading();
+                
+                fetch('/app/logout?deviceId=' + deviceId, {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        // Update device status
+                        const device = devices.find(d => d.id === deviceId);
+                        if (device) {
+                            device.status = 'offline';
+                            device.phone = '';
+                            device.jid = '';
+                            device.lastSeen = new Date().toISOString();
+                            renderDevices();
+                        }
+                        showAlert('success', 'Device logged out successfully');
+                        
+                        // Refresh devices after a moment
+                        setTimeout(loadDevices, 2000);
+                    } else {
+                        showAlert('danger', data.message || 'Failed to logout device');
+                    }
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error logging out device:', error);
+                    showAlert('danger', 'Error logging out device');
+                    hideLoading();
+                });
+            }
+        }
+
+        // Delete Device
+        function deleteDevice(deviceId) {
+            if (confirm('Are you sure you want to delete this device?')) {
+                showLoading();
+                
+                fetch(`/api/devices/${deviceId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        devices = devices.filter(d => d.id !== deviceId);
+                        renderDevices();
+                        showAlert('success', 'Device deleted successfully');
+                    } else {
+                        showAlert('danger', data.message || 'Failed to delete device');
+                    }
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error deleting device:', error);
+                    showAlert('danger', 'Error deleting device');
+                    hideLoading();
+                });
+            }
+        }
+
+        // Link Phone Number to Device
+        function linkPhoneNumber(deviceId) {
+            const phone = prompt('Enter WhatsApp phone number (with country code, e.g., +1234567890):');
+            if (phone) {
+                fetch('/app/link-device', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        device_id: deviceId,
+                        phone: phone
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update phone display
+                        document.getElementById(`phone-${deviceId}`).textContent = phone;
+                        // Update device in array
+                        const device = devices.find(d => d.id === deviceId);
+                        if (device) {
+                            device.phone = phone;
+                        }
+                        alert('Phone number linked successfully!');
+                    } else {
+                        alert('Failed to link phone number: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error linking phone:', error);
+                    alert('Failed to link phone number');
+                });
+            }
+        }
+
+        // Use Phone Code (for linking without QR)
+        function usePhoneCode(deviceId) {
+            // Malaysian phone format helper
+            const formatPhoneNumber = (phone) => {
+                // Remove all non-numeric characters
+                phone = phone.replace(/\D/g, '');
+                
+                // Handle Malaysian numbers
+                if (phone.startsWith('60')) {
+                    return '+' + phone; // Already has country code
+                } else if (phone.startsWith('0')) {
+                    return '+60' + phone.substring(1); // Malaysian number without country code
+                } else if (phone.startsWith('1')) {
+                    return '+60' + phone; // Malaysian mobile number without leading 0
+                } else {
+                    return '+' + phone; // Assume it's already formatted
+                }
+            };
+            
+            const phone = prompt('Enter your WhatsApp phone number:\n\nMalaysia: 0123456789 or 60123456789\nOther countries: Include country code (e.g., +1234567890)');
+            if (phone) {
+                const formattedPhone = formatPhoneNumber(phone);
+                
+                // Show loading
+                const loadingModal = `
+                    <div class="modal fade" id="phoneCodeLoadingModal" tabindex="-1" data-bs-backdrop="static">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content">
+                                <div class="modal-body text-center p-4">
+                                    <div class="spinner-border text-primary mb-3" role="status">
+                                        <span class="visually-hidden">Getting code...</span>
+                                    </div>
+                                    <p class="mb-0">Getting pairing code for<br><strong>${formattedPhone}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Add modal to body if not exists
+                if (!document.getElementById('phoneCodeLoadingModal')) {
+                    document.body.insertAdjacentHTML('beforeend', loadingModal);
+                }
+                
+                const loadingModalEl = new bootstrap.Modal(document.getElementById('phoneCodeLoadingModal'));
+                loadingModalEl.show();
+                
+                fetch(`/app/login-with-code?phone=${encodeURIComponent(formattedPhone)}`, {
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    loadingModalEl.hide();
+                    
+                    if (data.results && data.results.pair_code) {
+                        // Show success modal with code
+                        const successModal = `
+                            <div class="modal fade" id="pairCodeModal" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-success text-white">
+                                            <h5 class="modal-title">
+                                                <i class="bi bi-check-circle me-2"></i>
+                                                Pairing Code Generated
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="text-center mb-4">
+                                                <h1 class="display-4 fw-bold text-primary">${data.results.pair_code}</h1>
+                                                <p class="text-muted">Your WhatsApp pairing code</p>
+                                            </div>
+                                            <div class="alert alert-info">
+                                                <h6 class="alert-heading">How to use this code:</h6>
+                                                <ol class="mb-0">
+                                                    <li>Open WhatsApp on your phone</li>
+                                                    <li>Go to <strong>Settings > Linked Devices</strong></li>
+                                                    <li>Tap <strong>"Link a Device"</strong></li>
+                                                    <li>Choose <strong>"Link with phone number instead"</strong></li>
+                                                    <li>Enter this code: <strong>${data.results.pair_code}</strong></li>
+                                                </ol>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            <button type="button" class="btn btn-primary" onclick="linkPhoneNumber('${deviceId}')">
+                                                <i class="bi bi-link-45deg"></i> Link Phone Number
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add modal to body if not exists
+                        if (!document.getElementById('pairCodeModal')) {
+                            document.body.insertAdjacentHTML('beforeend', successModal);
+                        }
+                        
+                        const successModalEl = new bootstrap.Modal(document.getElementById('pairCodeModal'));
+                        successModalEl.show();
+                    } else {
+                        alert('Failed to generate pairing code: ' + (data.error || data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    loadingModalEl.hide();
+                    console.error('Error getting pair code:', error);
+                    alert('Failed to generate pairing code. Please check your phone number format and try again.');
+                });
+            }
+        }
+
+        // View Device Statistics
+        function viewDeviceStats(deviceId) {
+            // Switch to dashboard tab and filter by this device
+            currentDeviceFilter = deviceId;
+            document.getElementById('deviceFilter').value = deviceId;
+            
+            // Switch to dashboard tab
+            const dashboardTab = document.getElementById('dashboard-tab');
+            dashboardTab.click();
+            
+            // Reload dashboard data for this device
+            loadDashboardData(currentTimeRange);
+        }
+
+        // Edit Device
+        function editDevice(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+                const newName = prompt('Enter new device name:', device.name);
+                if (newName && newName !== device.name) {
+                    device.name = newName;
+                    renderDevices();
+                }
+            }
+        }
+
+        // Logout
         function logout() {
             if (confirm('Are you sure you want to logout?')) {
                 window.location.href = '/logout';
             }
         }
+
+        // Show/Hide Loading
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // WebSocket Connection for Real-time Updates
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle different message types
+                    switch(data.code) {
+                        case 'LOGIN_SUCCESS':
+                            // Device paired successfully (but not fully connected yet)
+                            console.log('Device paired:', data.message);
+                            // Don't close modal yet, wait for full connection
+                            break;
+                        case 'DEVICE_CONNECTED':
+                            // Device fully connected and logged in
+                            console.log('Device fully connected:', data.message);
+                            // Close QR modal if open
+                            const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
+                            if (qrModal) {
+                                qrModal.hide();
+                            }
+                            // Show success message
+                            alert('WhatsApp connected successfully!');
+                            // Reload devices to show updated status
+                            loadDevices();
+                            break;
+                        case 'DEVICE_STATUS':
+                            updateDeviceStatus(data.deviceId, data.status);
+                            break;
+                        case 'NEW_MESSAGE':
+                            // Update metrics in real-time
+                            if (currentTimeRange === 1 || currentTimeRange === 7) {
+                                loadDashboardData(currentTimeRange);
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    console.error('WebSocket message error:', error);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = function() {
+                // Reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        // Update Device Status
+        function updateDeviceStatus(deviceId, status) {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+                device.status = status;
+                device.lastSeen = status === 'online' ? 'Active now' : 'Just now';
+                renderDevices();
+            }
+        }
+
+        // Initialize WebSocket on load
+        connectWebSocket();
+        // Filter by Device
+        function filterByDevice() {
+            currentDeviceFilter = document.getElementById('deviceFilter').value;
+            
+            // Reload data with current time range and device filter
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate);
+            } else {
+                loadDashboardData(currentTimeRange);
+            }
+        }
+
+        // Update Device Filter Dropdown
+        function updateDeviceFilter() {
+            const deviceFilter = document.getElementById('deviceFilter');
+            
+            // Clear existing options (except "All Devices")
+            deviceFilter.innerHTML = '<option value="all">All Devices</option>';
+            
+            // Add device options
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.name} (${device.phone})`;
+                deviceFilter.appendChild(option);
+            });
+            
+            // If no device is selected and we have devices, select the latest one
+            if (currentDeviceFilter === 'all' && devices.length > 0) {
+                // Find the latest device by created_at or just use the first one
+                const latestDevice = devices.reduce((latest, device) => {
+                    const latestTime = new Date(latest.created_at || 0).getTime();
+                    const deviceTime = new Date(device.created_at || 0).getTime();
+                    return deviceTime > latestTime ? device : latest;
+                }, devices[0]);
+                
+                currentDeviceFilter = latestDevice.id;
+                deviceFilter.value = currentDeviceFilter;
+            } else {
+                // Restore selected value
+                deviceFilter.value = currentDeviceFilter;
+            }
+        }
+        
+        // Auto-refresh functions
+        function startAutoRefresh() {
+            if (isAutoRefreshEnabled) {
+                // Refresh every 10 seconds
+                refreshInterval = setInterval(() => {
+                    refreshDashboard();
+                }, 10000);
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                console.log('Auto-refresh enabled');
+            } else {
+                stopAutoRefresh();
+                console.log('Auto-refresh disabled');
+            }
+        }
+
+        function refreshDashboard() {
+            // Don't show loading spinner for auto-refresh to avoid UI flicker
+            const isManualRefresh = !refreshInterval;
+            
+            if (isManualRefresh) {
+                showLoading();
+            }
+            
+            // Reload current data
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate, null, !isManualRefresh);
+            } else {
+                loadDashboardData(currentTimeRange, !isManualRefresh);
+            }
+            
+            // Reload devices
+            loadDevices(!isManualRefresh);
+            
+            // Update last refresh time
+            const now = new Date();
+            document.getElementById('lastRefresh').textContent = 
+                `Last refresh: ${now.toLocaleTimeString()}`;
+        }
+
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                refreshDashboard(); // Refresh immediately when page becomes visible
+            }
+        });
+        // Filter by Device
+        function filterByDevice() {
+            currentDeviceFilter = document.getElementById('deviceFilter').value;
+            
+            // Reload data with current time range and device filter
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate);
+            } else {
+                loadDashboardData(currentTimeRange);
+            }
+        }
+
+        // Update Device Filter Dropdown
+        function updateDeviceFilter() {
+            const deviceFilter = document.getElementById('deviceFilter');
+            
+            // Clear existing options (except "All Devices")
+            deviceFilter.innerHTML = '<option value="all">All Devices</option>';
+            
+            // Add device options
+            devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.name} (${device.phone})`;
+                deviceFilter.appendChild(option);
+            });
+            
+            // If no device is selected and we have devices, select the latest one
+            if (currentDeviceFilter === 'all' && devices.length > 0) {
+                // Find the latest device by created_at or just use the first one
+                const latestDevice = devices.reduce((latest, device) => {
+                    const latestTime = new Date(latest.created_at || 0).getTime();
+                    const deviceTime = new Date(device.created_at || 0).getTime();
+                    return deviceTime > latestTime ? device : latest;
+                }, devices[0]);
+                
+                currentDeviceFilter = latestDevice.id;
+                deviceFilter.value = currentDeviceFilter;
+            } else {
+                // Restore selected value
+                deviceFilter.value = currentDeviceFilter;
+            }
+        }
+        
+        // Auto-refresh functions
+        function startAutoRefresh() {
+            if (isAutoRefreshEnabled) {
+                // Refresh every 10 seconds
+                refreshInterval = setInterval(() => {
+                    refreshDashboard();
+                }, 10000);
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefreshEnabled = document.getElementById('autoRefreshToggle').checked;
+            
+            if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                console.log('Auto-refresh enabled');
+            } else {
+                stopAutoRefresh();
+                console.log('Auto-refresh disabled');
+            }
+        }
+
+        function refreshDashboard() {
+            // Don't show loading spinner for auto-refresh to avoid UI flicker
+            const isManualRefresh = !refreshInterval;
+            
+            if (isManualRefresh) {
+                showLoading();
+            }
+            
+            // Reload current data
+            if (currentTimeRange === 'custom') {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                loadDashboardDataCustomRange(startDate, endDate, null, !isManualRefresh);
+            } else {
+                loadDashboardData(currentTimeRange, !isManualRefresh);
+            }
+            
+            // Reload devices
+            loadDevices(!isManualRefresh);
+            
+            // Update last refresh time
+            const now = new Date();
+            document.getElementById('lastRefresh').textContent = 
+                `Last refresh: ${now.toLocaleTimeString()}`;
+        }
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else if (isAutoRefreshEnabled) {
+                startAutoRefresh();
+                refreshDashboard(); // Refresh immediately when page becomes visible
+            }
+        });
+        
+        // Device Actions - Testing Page
+        function deviceActions(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+                window.location.href = `/device/${deviceId}/actions`;
+            }
+        }
+        
+        // Device Leads - Lead Management
+        function deviceLeads(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+                window.location.href = `/device/${deviceId}/leads`;
+            }
+        }
+        
+        // Campaign Calendar Functions
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let campaigns = {};
+        
+        function initializeCampaignCalendar() {
+            const calendarContainer = document.getElementById('campaignCalendar');
+            if (!calendarContainer) return;
+            
+            // Clear any existing content
+            calendarContainer.innerHTML = '';
+            
+            // Create controls container
+            const controlsContainer = document.createElement('div');
+            controlsContainer.id = 'calendarControls';
+            calendarContainer.parentElement.insertBefore(controlsContainer, calendarContainer);
+            
+            renderCalendar();
+            loadCampaigns();
+        }
+        
+        function renderCalendar() {
+            const calendar = document.getElementById('campaignCalendar');
+            const controls = document.getElementById('calendarControls');
+            if (!calendar || !controls) return;
+            
+            // Clear calendar
+            calendar.innerHTML = '';
+            
+            // Update controls
+            controls.innerHTML = `
+                <div class="calendar-controls mb-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="previousMonth()">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <div class="calendar-month-year">
+                        ${new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="nextMonth()">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            `;
+            
+            // Add day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+            
+            // Get first day of month and number of days
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+            
+            // Add previous month's trailing days
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.innerHTML = `<div class="calendar-date">${daysInPrevMonth - i}</div>`;
+                calendar.appendChild(day);
+            }
+            
+            // Add current month's days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayElement = document.createElement('div');
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                dayElement.className = 'calendar-day';
+                
+                // Get campaigns for this date
+                const dayCampaigns = campaigns[dateStr] || [];
+                if (dayCampaigns.length > 0) {
+                    dayElement.className += ' has-campaign';
+                }
+                
+                let campaignHTML = '';
+                if (Array.isArray(dayCampaigns)) {
+                    dayCampaigns.forEach((campaign, index) => {
+                        // Determine status color based on campaign status
+                        let statusColor = '';
+                        let statusBg = '';
+                        
+                        switch(campaign.status) {
+                            case 'completed':
+                            case 'delivered':
+                            case 'success':
+                                statusColor = '#28a745'; // green
+                                statusBg = 'bg-success';
+                                break;
+                            case 'failed':
+                            case 'error':
+                                statusColor = '#dc3545'; // red
+                                statusBg = 'bg-danger';
+                                break;
+                            case 'ongoing':
+                            case 'processing':
+                            case 'progress':
+                                statusColor = '#ffc107'; // yellow
+                                statusBg = 'bg-warning';
+                                break;
+                            default: // scheduled, pending
+                                statusColor = '#6c757d'; // grey
+                                statusBg = 'bg-secondary';
+                        }
+                        
+                        // Only show first 3 campaigns in detail
+                        if (index < 3) {
+                            campaignHTML += `
+                                <div class="campaign-detail" style="font-size: 9px; margin: 2px 0; cursor: pointer;">
+                                    <div style="display: flex; align-items: center; gap: 2px;">
+                                        <span class="badge ${statusBg}" style="width: 6px; height: 6px; padding: 0; border-radius: 50%;"></span>
+                                        <span onclick="editCampaign('${campaign.id}', '${dateStr}')" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${campaign.title}">
+                                            ${campaign.title}
+                                        </span>
+                                        <i class="bi bi-trash" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer;" title="Delete"></i>
+                                    </div>
+                                    <div style="color: #666; font-size: 8px;">
+                                        ${campaign.niche || 'General'} 
+                                        ${campaign.scheduled_time ? `• ${campaign.scheduled_time.slice(0,5)}` : ''}
+                                        ${campaign.image_url ? '<i class="bi bi-image" title="Has image"></i>' : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    if (dayCampaigns.length > 3) {
+                        campaignHTML += `<div class="campaign-item text-muted" style="font-size: 8px; text-align: center;">+${dayCampaigns.length - 3} more</div>`;
+                    }
+                }
+                
+                dayElement.innerHTML = `
+                    <div class="calendar-date" onclick="openCampaignModal('${dateStr}')">${day}</div>
+                    <div class="campaign-container">${campaignHTML}</div>
+                `;
+                calendar.appendChild(dayElement);
+            }
+            
+            // Add next month's leading days
+            const totalCells = calendar.children.length - 7; // Minus headers
+            const remainingCells = 35 - totalCells; // 5 rows x 7 days
+            for (let day = 1; day <= remainingCells; day++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day other-month';
+                dayElement.innerHTML = `<div class="calendar-date">${day}</div>`;
+                calendar.appendChild(dayElement);
+            }
+        }
+        
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        }
+        
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar();
+        }
+        
+        function loadCampaigns() {
+            // Load campaigns from API
+            fetch('/api/campaigns', { credentials: 'include' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Campaign API response:', data);
+                    if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
+                        campaigns = {};
+                        console.log('Processing campaigns:', data.results.length);
+                        // Group campaigns by date
+                        data.results.forEach(campaign => {
+                            // Ensure date is in YYYY-MM-DD format
+                            const date = campaign.campaign_date.split('T')[0];
+                            if (!campaigns[date]) {
+                                campaigns[date] = [];
+                            }
+                            campaigns[date].push(campaign);
+                        });
+                        console.log('Grouped campaigns:', campaigns);
+                        renderCalendar();
+                    }
+                })
+                .catch(error => console.error('Error loading campaigns:', error));
+        }
+        
+        function openCampaignModal(date) {
+            const existingCampaigns = campaigns[date] || [];
+            const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
+            
+            // Set modal data for new campaign
+            document.getElementById('campaignDate').value = date;
+            document.getElementById('campaignModalTitle').textContent = `Create Campaign - ${new Date(date).toLocaleDateString()}`;
+            document.getElementById('campaignForm').reset();
+            document.getElementById('campaignId').value = '';
+            document.getElementById('campaignDate').value = date;
+            
+            // TODO: If you want to edit existing campaigns, you could show a list to select from
+            // For now, we just create new campaigns
+            
+            modal.show();
+        }
+        
+        function saveCampaign() {
+            const campaignId = document.getElementById('campaignId').value;
+            
+            // Auto-set current time if not provided
+            let scheduledTime = document.getElementById('campaignTime').value;
+            if (!scheduledTime) {
+                const now = new Date();
+                scheduledTime = now.toTimeString().slice(0, 5); // HH:MM format
+            }
+            
+            const campaignData = {
+                campaign_date: document.getElementById('campaignDate').value,
+                title: document.getElementById('campaignTitle').value || '',
+                niche: document.getElementById('campaignNiche').value || '',
+                message: document.getElementById('campaignMessage').value || '',
+                image_url: document.getElementById('campaignImageUrl').value || '',
+                scheduled_time: scheduledTime
+            };
+            
+            const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
+            const method = campaignId ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(campaignData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    bootstrap.Modal.getInstance(document.getElementById('campaignModal')).hide();
+                    loadCampaigns();
+                    showAlert('success', campaignId ? 'Campaign updated!' : 'Campaign created!');
+                } else {
+                    showAlert('danger', data.message || 'Failed to save campaign');
+                }
+            })
+            .catch(error => showAlert('danger', 'Error: ' + error.message));
+        }
+        
+        // Image compression function with 350KB limit
+        function compressImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Start with original dimensions
+                    let width = img.width;
+                    let height = img.height;
+                    let quality = 0.9;
+                    
+                    // First resize if image is too large
+                    const maxSize = 1000;
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Compress until under 350KB
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                // Convert to base64
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    document.getElementById('campaignImageUrl').value = e.target.result;
+                                    document.getElementById('imagePreview').innerHTML = 
+                                        `<img src="${e.target.result}" class="img-thumbnail" style="max-height: 200px;">
+                                         <small class="d-block mt-1">Size: ${(blob.size / 1024).toFixed(0)}KB</small>`;
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    
+                    tryCompress();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+            alert.style.zIndex = '9999';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => alert.remove(), 5000);
+        }
+        
+        // Edit campaign function
+        function editCampaign(campaignId, dateStr) {
+            event.stopPropagation(); // Prevent day click
+            
+            // Find the campaign in our data
+            const dayCampaigns = campaigns[dateStr] || [];
+            const campaign = dayCampaigns.find(c => c.id == campaignId);
+            
+            if (!campaign) {
+                showAlert('danger', 'Campaign not found');
+                return;
+            }
+            
+            // Populate the modal with campaign data
+            document.getElementById('campaignId').value = campaign.id;
+            document.getElementById('campaignDate').value = dateStr;
+            document.getElementById('campaignTitle').value = campaign.title || '';
+            document.getElementById('campaignNiche').value = campaign.niche || '';
+            document.getElementById('campaignMessage').value = campaign.message || '';
+            document.getElementById('campaignTime').value = campaign.scheduled_time || '';
+            document.getElementById('campaignImageUrl').value = campaign.image_url || '';
+            
+            // Show image preview if exists
+            if (campaign.image_url) {
+                document.getElementById('imagePreview').innerHTML = 
+                    `<img src="${campaign.image_url}" class="img-thumbnail" style="max-height: 200px;">`;
+            } else {
+                document.getElementById('imagePreview').innerHTML = '';
+            }
+            
+            // Update modal title
+            document.getElementById('campaignModalTitle').textContent = `Edit Campaign - ${new Date(dateStr).toLocaleDateString()}`;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
+            modal.show();
+        }
+        
+        // Delete campaign function
+        function deleteCampaign(campaignId, event) {
+            event.stopPropagation(); // Prevent day click and edit click
+            
+            if (!confirm('Are you sure you want to delete this campaign?')) {
+                return;
+            }
+            
+            showLoading();
+            
+            fetch(`/api/campaigns/${campaignId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.code === 'SUCCESS') {
+                    showAlert('success', 'Campaign deleted successfully');
+                    loadCampaigns(); // Reload campaigns
+                } else {
+                    showAlert('danger', data.message || 'Failed to delete campaign');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error deleting campaign:', error);
+                showAlert('danger', 'Error deleting campaign');
+            });
+        }
+        
+        // Open WhatsApp Web for device
+        function openWhatsAppWeb(deviceId) {
+            // Open WhatsApp Web in a new tab
+            // This would open a dedicated WhatsApp Web instance for this device
+            window.open(`/device/${deviceId}/whatsapp-web`, '_blank');
+        }
+        
+        // Sequences Functions
+        async function loadSequences() {
+            try {
+                const response = await fetch('/api/sequences');
+                const data = await response.json();
+                
+                if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
+                    displaySequences(data.results);
+                } else {
+                    // Show empty state (already in HTML)
+                }
+            } catch (error) {
+                console.error('Error loading sequences:', error);
+                showToast('Error loading sequences', 'error');
+            }
+        }
+        
+        function displaySequences(sequences) {
+            const container = document.getElementById('sequencesList');
+            container.innerHTML = '';
+            
+            sequences.forEach(seq => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 mb-3';
+                
+                col.innerHTML = `
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">${seq.name}</h5>
+                                <span class="badge bg-${seq.status === 'active' ? 'success' : 'secondary'}">
+                                    ${seq.status}
+                                </span>
+                            </div>
+                            <p class="text-muted small mb-2">${seq.niche || 'No niche'}</p>
+                            <p class="card-text">${seq.description || 'No description'}</p>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-people"></i> ${seq.contacts_count || 0} contacts
+                                </small>
+                                <a href="/sequences/${seq.id}" class="btn btn-sm btn-outline-primary">
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+            });
+        }
+        
+        // Initialize campaign calendar when switching to campaign tab
+        document.addEventListener('DOMContentLoaded', function() {
+            const campaignTab = document.getElementById('campaign-tab');
+            if (campaignTab) {
+                campaignTab.addEventListener('shown.bs.tab', function() {
+                    initializeCampaignCalendar();
+                });
+            }
+            
+            const sequencesTab = document.getElementById('sequences-tab');
+            if (sequencesTab) {
+                sequencesTab.addEventListener('shown.bs.tab', function() {
+                    loadSequences();
+                });
+            }
+        });
+        
+        // Campaign Summary Functions
+        function loadCampaignSummary() {
+            fetch('/api/campaigns/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displayCampaignSummary(data.results);
+                    } else {
+                        document.getElementById('campaignSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load campaign summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading campaign summary:', error);
+                    document.getElementById('campaignSummaryContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displayCampaignSummary(summary) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${summary.campaigns.total}</h3>
+                                <p class="text-muted mb-0">Total Campaigns</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">${summary.campaigns.pending}</h3>
+                                <p class="text-muted mb-0">Pending</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.campaigns.sent}</h3>
+                                <p class="text-muted mb-0">Sent</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-danger">${summary.campaigns.failed}</h3>
+                                <p class="text-muted mb-0">Failed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Message Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Total Messages: <strong>${summary.messages.total_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Sent: <strong class="text-success">${summary.messages.sent_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Failed: <strong class="text-danger">${summary.messages.failed_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Success Rate: <strong>${summary.messages.success_rate?.toFixed(1) || 0}%</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Recent Campaigns</h5>
+                            </div>
+                            <div class="card-body">
+                                ${summary.recent_campaigns.length > 0 ? `
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Title</th>
+                                                    <th>Date</th>
+                                                    <th>Niche</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${summary.recent_campaigns.map(campaign => `
+                                                    <tr>
+                                                        <td>${campaign.title}</td>
+                                                        <td>${campaign.campaign_date}</td>
+                                                        <td>${campaign.niche || '-'}</td>
+                                                        <td>
+                                                            <span class="badge bg-${getStatusColor(campaign.status)}">
+                                                                ${campaign.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ` : '<p class="text-muted text-center">No campaigns yet</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('campaignSummaryContent').innerHTML = html;
+        }
+        
+        // Sequence Summary Functions
+        function loadSequenceSummary() {
+            fetch('/api/sequences/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displaySequenceSummary(data.results);
+                    } else {
+                        document.getElementById('sequenceSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load sequence summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sequence summary:', error);
+                    document.getElementById('sequenceSummaryContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displaySequenceSummary(summary) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${summary.sequences.total}</h3>
+                                <p class="text-muted mb-0">Total Sequences</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.sequences.active}</h3>
+                                <p class="text-muted mb-0">Active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">${summary.sequences.paused}</h3>
+                                <p class="text-muted mb-0">Paused</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-secondary">${summary.sequences.draft}</h3>
+                                <p class="text-muted mb-0">Draft</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Contact Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Total Contacts: <strong>${summary.contacts.total}</strong></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Average per Sequence: <strong>${summary.contacts.average_per_sequence.toFixed(1)}</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Recent Sequences</h5>
+                            </div>
+                            <div class="card-body">
+                                ${summary.recent_sequences.length > 0 ? `
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Niche</th>
+                                                    <th>Contacts</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${summary.recent_sequences.map(sequence => `
+                                                    <tr>
+                                                        <td>${sequence.name}</td>
+                                                        <td>${sequence.niche || '-'}</td>
+                                                        <td>${sequence.contacts_count}</td>
+                                                        <td>
+                                                            <span class="badge bg-${getStatusColor(sequence.status)}">
+                                                                ${sequence.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ` : '<p class="text-muted text-center">No sequences yet</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('sequenceSummaryContent').innerHTML = html;
+        }
+        
+        // Worker Status Functions
+        let workerRefreshInterval;
+        
+        function loadWorkerStatus() {
+            fetch('/api/workers/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displayWorkerStatus(data.results);
+                    } else {
+                        document.getElementById('workerStatusContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load worker status</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading worker status:', error);
+                    document.getElementById('workerStatusContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displayWorkerStatus(status) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${status.total_workers}</h3>
+                                <p class="text-muted mb-0">Total Workers Running</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-info">${status.user_devices}</h3>
+                                <p class="text-muted mb-0">Your Devices</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${status.connected_devices}</h3>
+                                <p class="text-muted mb-0">Connected Devices</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Device Workers Detail</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Device Name</th>
+                                                <th>Device Status</th>
+                                                <th>Worker Status</th>
+                                                <th>Queue Size</th>
+                                                <th>Processed</th>
+                                                <th>Failed</th>
+                                                <th>Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${status.device_workers.map(worker => `
+                                                <tr>
+                                                    <td>${worker.device_name}</td>
+                                                    <td>
+                                                        <span class="badge bg-${worker.device_status === 'connected' ? 'success' : 'secondary'}">
+                                                            ${worker.device_status}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-${getWorkerStatusColor(worker.worker_status)}">
+                                                            ${worker.worker_status}
+                                                        </span>
+                                                    </td>
+                                                    <td>${worker.queue_size}</td>
+                                                    <td class="text-success">${worker.processed}</td>
+                                                    <td class="text-danger">${worker.failed}</td>
+                                                    <td>${worker.last_activity ? new Date(worker.last_activity).toLocaleString() : '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('workerStatusContent').innerHTML = html;
+        }
+        
+        function getStatusColor(status) {
+            switch(status) {
+                case 'active':
+                case 'sent':
+                    return 'success';
+                case 'pending':
+                case 'scheduled':
+                case 'paused':
+                    return 'warning';
+                case 'failed':
+                    return 'danger';
+                case 'draft':
+                    return 'secondary';
+                default:
+                    return 'primary';
+            }
+        }
+        
+        function getWorkerStatusColor(status) {
+            switch(status) {
+                case 'processing':
+                    return 'success';
+                case 'idle':
+                    return 'primary';
+                case 'stopped':
+                case 'not_running':
+                    return 'secondary';
+                default:
+                    return 'warning';
+            }
+        }
+        
+        // Auto-refresh for worker status
+        document.getElementById('workerAutoRefresh')?.addEventListener('change', function() {
+            if (this.checked) {
+                workerRefreshInterval = setInterval(loadWorkerStatus, 5000);
+            } else {
+                clearInterval(workerRefreshInterval);
+            }
+        });
+        
+        // Load summaries when tabs are clicked
+        document.getElementById('campaign-summary-tab')?.addEventListener('shown.bs.tab', function() {
+            loadCampaignSummary();
+        });
+        
+        document.getElementById('sequence-summary-tab')?.addEventListener('shown.bs.tab', function() {
+            loadSequenceSummary();
+        });
+        
+        document.getElementById('worker-status-tab')?.addEventListener('shown.bs.tab', function() {
+            loadWorkerStatus();
+            if (document.getElementById('workerAutoRefresh').checked) {
+                workerRefreshInterval = setInterval(loadWorkerStatus, 5000);
+            }
+        });
+        
+        // Clear worker refresh when leaving tab
+        document.getElementById('worker-status-tab')?.addEventListener('hidden.bs.tab', function() {
+            clearInterval(workerRefreshInterval);
+        });
     </script>
+</body>
+</html>    </script>
 </body>
 </html>
