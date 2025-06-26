@@ -33,7 +33,7 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 
 	query := `
 		INSERT INTO sequences (id, user_id, device_id, name, description, niche, total_days, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	
 	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, sequence.DeviceID, 
@@ -48,7 +48,7 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	query := `
 		SELECT id, user_id, device_id, name, description, total_days, is_active, created_at, updated_at
 		FROM sequences
-		WHERE user_id = ?
+		WHERE user_id = $1
 		ORDER BY created_at DESC
 	`
 	
@@ -76,7 +76,7 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 	query := `
 		SELECT id, user_id, device_id, name, description, total_days, is_active, created_at, updated_at
 		FROM sequences
-		WHERE id = ?
+		WHERE id = $1
 	`
 	
 	var seq models.Sequence
@@ -96,8 +96,8 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	
 	query := `
 		UPDATE sequences 
-		SET name = ?, description = ?, total_days = ?, is_active = ?, updated_at = ?
-		WHERE id = ?
+		SET name = $1, description = $2, total_days = $3, is_active = $4, updated_at = $5
+		WHERE id = $6
 	`
 	
 	_, err := r.db.Exec(query, sequence.Name, sequence.Description, 
@@ -108,7 +108,7 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 
 // DeleteSequence deletes a sequence
 func (r *sequenceRepository) DeleteSequence(sequenceID string) error {
-	_, err := r.db.Exec("DELETE FROM sequences WHERE id = ?", sequenceID)
+	_, err := r.db.Exec("DELETE FROM sequences WHERE id = $1", sequenceID)
 	return err
 }
 
@@ -120,7 +120,7 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 
 	query := `
 		INSERT INTO sequence_steps (id, sequence_id, day, message_type, content, media_url, caption, send_time, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	
 	_, err := r.db.Exec(query, step.ID, step.SequenceID, step.Day, step.MessageType,
@@ -133,7 +133,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	query := `
 		SELECT id, sequence_id, day, message_type, content, media_url, caption, send_time, created_at, updated_at
 		FROM sequence_steps
-		WHERE sequence_id = ?
+		WHERE sequence_id = $1
 		ORDER BY day ASC
 	`
 	
@@ -167,7 +167,7 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 
 	query := `
 		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_day, status, added_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
 	
@@ -182,7 +182,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 		SELECT id, sequence_id, contact_phone, contact_name, current_day, status, 
 			   added_at, last_message_at, completed_at
 		FROM sequence_contacts
-		WHERE sequence_id = ?
+		WHERE sequence_id = $1
 		ORDER BY added_at DESC
 	`
 	
@@ -217,7 +217,7 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 		WHERE sc.status = 'active' 
 		AND s.is_active = true
 		AND (sc.last_message_at IS NULL 
-			 OR sc.last_message_at < DATE_SUB(?, INTERVAL 24 HOUR))
+			 OR sc.last_message_at < DATE_SUB($1, INTERVAL 24 HOUR))
 	`
 	
 	rows, err := r.db.Query(query, currentTime)
@@ -245,8 +245,8 @@ func (r *sequenceRepository) UpdateContactProgress(contactID string, currentDay 
 	now := time.Now()
 	query := `
 		UPDATE sequence_contacts 
-		SET current_day = ?, status = ?, last_message_at = ?
-		WHERE id = ?
+		SET current_day = $1, status = $2, last_message_at = $3
+		WHERE id = $4
 	`
 	
 	_, err := r.db.Exec(query, currentDay, status, now, contactID)
@@ -258,8 +258,8 @@ func (r *sequenceRepository) MarkContactCompleted(contactID string) error {
 	now := time.Now()
 	query := `
 		UPDATE sequence_contacts 
-		SET status = 'completed', completed_at = ?
-		WHERE id = ?
+		SET status = 'completed', completed_at = $1
+		WHERE id = $2
 	`
 	
 	_, err := r.db.Exec(query, now, contactID)
@@ -273,7 +273,7 @@ func (r *sequenceRepository) CreateSequenceLog(log *models.SequenceLog) error {
 
 	query := `
 		INSERT INTO sequence_logs (id, sequence_id, contact_id, step_id, day, status, message_id, error_message, sent_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	
 	_, err := r.db.Exec(query, log.ID, log.SequenceID, log.ContactID, log.StepID,
@@ -290,7 +290,7 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	query := `
 		SELECT status, COUNT(*) as count
 		FROM sequence_contacts
-		WHERE sequence_id = ?
+		WHERE sequence_id = $1
 		GROUP BY status
 	`
 	
@@ -311,7 +311,7 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	// Get total messages sent
 	var messageCount int
 	err = r.db.QueryRow(`
-		SELECT COUNT(*) FROM sequence_logs WHERE sequence_id = ?
+		SELECT COUNT(*) FROM sequence_logs WHERE sequence_id = $1
 	`, sequenceID).Scan(&messageCount)
 	
 	if err == nil {

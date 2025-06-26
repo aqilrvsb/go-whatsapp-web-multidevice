@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
@@ -574,7 +575,17 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 	}
 	
 	leadRepo := repository.GetLeadRepository()
-	lead, err := leadRepo.CreateLead(user.ID, request.DeviceID, request.Name, request.Phone, request.Niche, request.Journey, request.Status)
+	lead := &models.Lead{
+		UserID: user.ID,
+		Name:   request.Name,
+		Phone:  request.Phone,
+		Email:  "",
+		Niche:  request.Niche,
+		Source: request.Journey,
+		Status: request.Status,
+		Notes:  "",
+	}
+	err = leadRepo.CreateLead(lead)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -623,7 +634,17 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 	}
 	
 	leadRepo := repository.GetLeadRepository()
-	lead, err := leadRepo.UpdateLead(user.ID, leadId, request.Name, request.Phone, request.Niche, request.Journey, request.Status)
+	lead := &models.Lead{
+		UserID: user.ID,  // Use the user ID
+		Name:   request.Name,
+		Phone:  request.Phone,
+		Email:  "",
+		Niche:  request.Niche,
+		Source: request.Journey,
+		Status: request.Status,
+		Notes:  "",
+	}
+	err = leadRepo.UpdateLead(leadId, lead)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -636,7 +657,7 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Lead updated successfully",
-		Results: lead,
+		Results: map[string]string{"id": leadId},
 	})
 }
 
@@ -646,7 +667,7 @@ func (handler *App) DeleteLead(c *fiber.Ctx) error {
 	userEmail := c.Locals("email").(string)
 	
 	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
+	_, err := userRepo.GetUserByEmail(userEmail)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
@@ -656,7 +677,7 @@ func (handler *App) DeleteLead(c *fiber.Ctx) error {
 	}
 	
 	leadRepo := repository.GetLeadRepository()
-	err = leadRepo.DeleteLead(user.ID, leadId)
+	err = leadRepo.DeleteLead(leadId)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -774,7 +795,18 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
-	campaign, err := campaignRepo.CreateCampaign(user.ID, request.CampaignDate, request.Title, request.Niche, request.Message, request.ImageURL, request.ScheduledTime)
+	campaign := &models.Campaign{
+		UserID:        user.ID,
+		Title:         request.Title,
+		Message:       request.Message,
+		DeviceID:      "", // Will be set later
+		Niche:         request.Niche,
+		ImageURL:      request.ImageURL,
+		ScheduledDate: request.CampaignDate,
+		ScheduledTime: request.ScheduledTime,
+		Status:        "pending",
+	}
+	err = campaignRepo.CreateCampaign(campaign)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -842,7 +874,17 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
-	campaign, err := campaignRepo.UpdateCampaign(user.ID, campaignId, request.Title, request.Niche, request.Message, request.ImageURL, request.ScheduledTime, request.Status)
+	campaign := &models.Campaign{
+		ID:            campaignId,
+		UserID:        user.ID,
+		Title:         request.Title,
+		Message:       request.Message,
+		Niche:         request.Niche,
+		ImageURL:      request.ImageURL,
+		ScheduledTime: request.ScheduledTime,
+		Status:        request.Status,
+	}
+	err = campaignRepo.UpdateCampaign(campaign)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -883,7 +925,7 @@ func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 		})
 	}
 	
-	user, err := userRepo.GetUserByID(session.UserID)
+	_, err = userRepo.GetUserByID(session.UserID)
 	if err != nil {
 		return c.Status(404).JSON(utils.ResponseData{
 			Status:  404,
@@ -893,7 +935,7 @@ func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
-	err = campaignRepo.DeleteCampaign(user.ID, campaignId)
+	err = campaignRepo.DeleteCampaign(campaignId)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,

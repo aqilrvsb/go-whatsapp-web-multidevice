@@ -2,8 +2,6 @@ package broadcast
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 

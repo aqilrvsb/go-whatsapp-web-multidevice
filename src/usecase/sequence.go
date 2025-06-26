@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -397,7 +396,7 @@ func (s *sequenceService) ProcessSequences() error {
 func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact *models.SequenceContact, step *models.SequenceStep) error {
 	// Get the WhatsApp client for the device
 	cm := whatsapp.GetClientManager()
-	client, err := cm.GetClient(sequence.DeviceID)
+	_, err := cm.GetClient(sequence.DeviceID)
 	if err != nil {
 		return fmt.Errorf("device not connected: %v", err)
 	}
@@ -413,10 +412,11 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 		
 	case "image":
 		// For image messages, we need to handle URL
+		mediaURL := step.MediaURL
 		request := domainSend.ImageRequest{
 			Phone:    contact.ContactPhone,
 			Caption:  step.Caption,
-			ImageURL: step.MediaURL,
+			ImageURL: &mediaURL,
 		}
 		// TODO: Implement SendImageURL in send service
 		_, err = s.sendService.SendImage(nil, request)

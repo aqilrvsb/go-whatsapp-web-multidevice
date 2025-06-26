@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -33,7 +34,7 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 
 	query := `
 		INSERT INTO leads (id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	
 	_, err := r.db.Exec(query, lead.ID, lead.UserID, lead.Name, lead.Phone, 
@@ -48,7 +49,7 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	query := `
 		SELECT id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at
 		FROM leads
-		WHERE niche = ?
+		WHERE niche = $1
 		ORDER BY created_at DESC
 	`
 	
@@ -79,10 +80,10 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 		SELECT l.id, l.user_id, l.name, l.phone, l.email, l.niche, 
 		       l.source, l.status, l.notes, l.created_at, l.updated_at
 		FROM leads l
-		WHERE l.niche = ?
+		WHERE l.niche = $1
 		AND NOT EXISTS (
 			SELECT 1 FROM sequence_contacts sc 
-			WHERE sc.sequence_id = ? 
+			WHERE sc.sequence_id = $2 
 			AND sc.contact_phone = l.phone
 		)
 		ORDER BY l.created_at DESC
@@ -107,4 +108,76 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 	}
 	
 	return leads, nil
+}
+
+// GetLeadsByDevice gets all leads for a specific user's device
+func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lead, error) {
+	query := `
+		SELECT id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at
+		FROM leads
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var leads []models.Lead
+	for rows.Next() {
+		var lead models.Lead
+		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.Notes,
+			&lead.CreatedAt, &lead.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		leads = append(leads, lead)
+	}
+	
+	return leads, nil
+}
+
+// UpdateLead updates an existing lead
+func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
+	lead.UpdatedAt = time.Now()
+	
+	query := `
+		UPDATE leads 
+		SET name = $2, phone = $3, email = $4, niche = $5, 
+		    source = $6, status = $7, notes = $8, updated_at = $9
+		WHERE id = $1
+	`
+	
+	result, err := r.db.Exec(query, id, lead.Name, lead.Phone, lead.Email,
+		lead.Niche, lead.Source, lead.Status, lead.Notes, lead.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("lead not found")
+	}
+	
+	return nil
+}
+
+// DeleteLead deletes a lead
+func (r *leadRepository) DeleteLead(id string) error {
+	query := `DELETE FROM leads WHERE id = $1`
+	
+	result, err := r.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("lead not found")
+	}
+	
+	return nil
 }

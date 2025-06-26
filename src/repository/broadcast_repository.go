@@ -35,7 +35,7 @@ func (r *broadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		INSERT INTO message_queue 
 		(id, device_id, message_type, reference_id, contact_phone, content, 
 		 media_url, caption, priority, status, scheduled_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	
 	_, err := r.db.Exec(query, msg.ID, msg.DeviceID, msg.Type, msg.ReferenceID,
@@ -52,9 +52,9 @@ func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.B
 		       content, media_url, caption, priority, scheduled_at, retry_count
 		FROM message_queue
 		WHERE status = 'pending'
-		AND (scheduled_at IS NULL OR scheduled_at <= ?)
+		AND (scheduled_at IS NULL OR scheduled_at <= $1)
 		ORDER BY priority DESC, created_at ASC
-		LIMIT ?
+		LIMIT $2
 	`
 	
 	rows, err := r.db.Query(query, time.Now(), limit)
@@ -87,8 +87,8 @@ func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.B
 func (r *broadcastRepository) UpdateMessageStatus(messageID, status string) error {
 	query := `
 		UPDATE message_queue 
-		SET status = ?, processed_at = ?
-		WHERE id = ?
+		SET status = $1, processed_at = $2
+		WHERE id = $3
 	`
 	
 	_, err := r.db.Exec(query, status, time.Now(), messageID)
@@ -99,8 +99,8 @@ func (r *broadcastRepository) UpdateMessageStatus(messageID, status string) erro
 func (r *broadcastRepository) SetMessageError(messageID, errorMsg string) error {
 	query := `
 		UPDATE message_queue 
-		SET error_message = ?
-		WHERE id = ?
+		SET error_message = $1
+		WHERE id = $2
 	`
 	
 	_, err := r.db.Exec(query, errorMsg, messageID)
@@ -114,7 +114,7 @@ func (r *broadcastRepository) CreateBroadcastJob(jobType, referenceID, deviceID 
 	query := `
 		INSERT INTO broadcast_jobs 
 		(id, job_type, reference_id, device_id, total_contacts, status, started_at)
-		VALUES (?, ?, ?, ?, ?, 'running', ?)
+		VALUES ($1, $2, $3, $4, $5, 'running', $6)
 	`
 	
 	_, err := r.db.Exec(query, jobID, jobType, referenceID, deviceID, totalContacts, time.Now())
@@ -125,8 +125,8 @@ func (r *broadcastRepository) CreateBroadcastJob(jobType, referenceID, deviceID 
 func (r *broadcastRepository) UpdateBroadcastJob(jobID string, processed, successful, failed int) error {
 	query := `
 		UPDATE broadcast_jobs 
-		SET processed_contacts = ?, successful_contacts = ?, failed_contacts = ?
-		WHERE id = ?
+		SET processed_contacts = $1, successful_contacts = $2, failed_contacts = $3
+		WHERE id = $4
 	`
 	
 	_, err := r.db.Exec(query, processed, successful, failed, jobID)
@@ -137,8 +137,8 @@ func (r *broadcastRepository) UpdateBroadcastJob(jobID string, processed, succes
 func (r *broadcastRepository) CompleteBroadcastJob(jobID string) error {
 	query := `
 		UPDATE broadcast_jobs 
-		SET status = 'completed', completed_at = ?
-		WHERE id = ?
+		SET status = 'completed', completed_at = $1
+		WHERE id = $2
 	`
 	
 	_, err := r.db.Exec(query, time.Now(), jobID)

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -30,13 +31,12 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	campaign.ID = uuid.New().String()
 	campaign.CreatedAt = time.Now()
 	campaign.UpdatedAt = time.Now()
-	campaign.Status = "pending"
-
+	
 	query := `
 		INSERT INTO campaigns 
 		(id, user_id, device_id, title, niche, message, image_url, 
 		 scheduled_date, scheduled_time, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	
 	_, err := r.db.Exec(query, campaign.ID, campaign.UserID, campaign.DeviceID,
@@ -47,18 +47,16 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	return err
 }
 
-// GetCampaignsByDate gets campaigns scheduled for a specific date
-func (r *campaignRepository) GetCampaignsByDate(date string) ([]models.Campaign, error) {
+// GetCampaignByDateAndNiche gets campaigns by date and niche
+func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, device_id, title, niche, message, image_url,
+		SELECT id, user_id, device_id, title, niche, message, image_url, 
 		       scheduled_date, scheduled_time, status, created_at, updated_at
 		FROM campaigns
-		WHERE scheduled_date = ?
-		AND status = 'pending'
-		ORDER BY scheduled_time ASC
+		WHERE scheduled_date = $1 AND niche = $2 AND status = 'pending'
 	`
 	
-	rows, err := r.db.Query(query, date)
+	rows, err := r.db.Query(query, scheduledDate, niche)
 	if err != nil {
 		return nil, err
 	}
@@ -86,9 +84,9 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 	
 	query := `
 		UPDATE campaigns 
-		SET title = ?, niche = ?, message = ?, image_url = ?,
-		    scheduled_date = ?, scheduled_time = ?, status = ?, updated_at = ?
-		WHERE id = ?
+		SET title = $1, niche = $2, message = $3, image_url = $4,
+		    scheduled_date = $5, scheduled_time = $6, status = $7, updated_at = $8
+		WHERE id = $9
 	`
 	
 	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, campaign.Message,
@@ -96,4 +94,105 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 		campaign.Status, campaign.UpdatedAt, campaign.ID)
 		
 	return err
+}
+
+// GetCampaigns gets all campaigns for a user
+func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
+	query := `
+		SELECT id, user_id, title, message, device_id, niche, image_url, 
+		       scheduled_date, scheduled_time, status, created_at, updated_at
+		FROM campaigns
+		WHERE user_id = $1
+		ORDER BY scheduled_date DESC, scheduled_time DESC
+	`
+	
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var campaign models.Campaign
+		var scheduledTime sql.NullString
+		
+		err := rows.Scan(
+			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
+			&campaign.DeviceID, &campaign.Niche, &campaign.ImageURL,
+			&campaign.ScheduledDate, &scheduledTime, &campaign.Status,
+			&campaign.CreatedAt, &campaign.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		
+		if scheduledTime.Valid {
+			campaign.ScheduledTime = scheduledTime.String
+		}
+		
+		campaigns = append(campaigns, campaign)
+	}
+	
+	return campaigns, nil
+}
+
+
+// DeleteCampaign deletes a campaign
+func (r *campaignRepository) DeleteCampaign(campaignID string) error {
+	query := `DELETE FROM campaigns WHERE id = $1`
+	
+	result, err := r.db.Exec(query, campaignID)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("campaign not found")
+	}
+	
+	return nil
+}
+
+
+// GetCampaignsByDate gets all campaigns scheduled for a specific date
+func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
+	query := `
+		SELECT id, user_id, title, message, device_id, niche, image_url, 
+		       scheduled_date, scheduled_time, status, created_at, updated_at
+		FROM campaigns
+		WHERE scheduled_date = $1 AND status = 'pending'
+		ORDER BY scheduled_time ASC
+	`
+	
+	rows, err := r.db.Query(query, scheduledDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var campaign models.Campaign
+		var scheduledTime sql.NullString
+		
+		err := rows.Scan(
+			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
+			&campaign.DeviceID, &campaign.Niche, &campaign.ImageURL,
+			&campaign.ScheduledDate, &scheduledTime, &campaign.Status,
+			&campaign.CreatedAt, &campaign.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		
+		if scheduledTime.Valid {
+			campaign.ScheduledTime = scheduledTime.String
+		}
+		
+		campaigns = append(campaigns, campaign)
+	}
+	
+	return campaigns, nil
 }

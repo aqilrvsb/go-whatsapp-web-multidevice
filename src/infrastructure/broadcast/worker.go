@@ -7,11 +7,11 @@ import (
 	"time"
 
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
-	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
 )
 
 // Run starts the device worker
@@ -107,9 +107,9 @@ func (dw *DeviceWorker) sendMessage(msg domainBroadcast.BroadcastMessage) error 
 }
 
 // sendTextMessage sends text message
-func (dw *DeviceWorker) sendTextMessage(recipient whatsmeow.JID, msg domainBroadcast.BroadcastMessage) error {
-	message := &whatsmeow.Message{
-		ExtendedTextMessage: &whatsmeow.ExtendedTextMessage{
+func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast.BroadcastMessage) error {
+	message := &waProto.Message{
+		ExtendedTextMessage: &waProto.ExtendedTextMessage{
 			Text: &msg.Content,
 		},
 	}
@@ -119,7 +119,7 @@ func (dw *DeviceWorker) sendTextMessage(recipient whatsmeow.JID, msg domainBroad
 }
 
 // sendImageMessage sends image message
-func (dw *DeviceWorker) sendImageMessage(recipient whatsmeow.JID, msg domainBroadcast.BroadcastMessage) error {
+func (dw *DeviceWorker) sendImageMessage(recipient types.JID, msg domainBroadcast.BroadcastMessage) error {
 	// TODO: Download image from URL and send
 	// For now, return not implemented
 	return fmt.Errorf("image sending not yet implemented")

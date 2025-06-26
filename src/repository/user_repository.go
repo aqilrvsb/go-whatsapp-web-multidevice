@@ -289,21 +289,25 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
 	var device models.UserDevice
 	query := `
-		SELECT id, user_id, device_name, phone, jid, status, 
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, 
 		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
-		       created_at, updated_at
+		       created_at, COALESCE(updated_at, created_at), last_seen
 		FROM user_devices
-		WHERE id = ?
+		WHERE id = $1
 	`
 	
 	err := r.db.QueryRow(query, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName, &device.Phone,
 		&device.JID, &device.Status, &device.MinDelaySeconds, &device.MaxDelaySeconds,
-		&device.CreatedAt, &device.UpdatedAt,
+		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen,
 	)
 	
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found")
+	}
+	
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get device: %w", err)
 	}
 	
 	return &device, nil
@@ -345,33 +349,6 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 	var device models.UserDevice
 	
 	err := r.db.QueryRow(query, userID, deviceID).Scan(
-		&device.ID, &device.UserID, &device.DeviceName,
-		&device.Phone, &device.JID, &device.Status,
-		&device.CreatedAt, &device.LastSeen,
-	)
-	
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("device not found")
-	}
-	
-	if err != nil {
-		return nil, fmt.Errorf("failed to get device: %w", err)
-	}
-	
-	return &device, nil
-}
-
-// GetDeviceByID gets a device by ID only (used for deletion)
-func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
-	query := `
-		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, last_seen
-		FROM user_devices
-		WHERE id = $1
-	`
-	
-	var device models.UserDevice
-	
-	err := r.db.QueryRow(query, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName,
 		&device.Phone, &device.JID, &device.Status,
 		&device.CreatedAt, &device.LastSeen,
