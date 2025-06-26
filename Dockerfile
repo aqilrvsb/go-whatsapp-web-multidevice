@@ -34,9 +34,15 @@ COPY --from=builder /app/whatsapp .
 COPY --from=builder /app/src/views ./views
 COPY --from=builder /app/src/statics ./statics
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /app/
-RUN chmod +x /app/docker-entrypoint.sh
+# Create entrypoint script directly
+RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
+    echo 'if [ -n "$DATABASE_URL" ]; then' >> /app/entrypoint.sh && \
+    echo '    export DB_URI="$DATABASE_URL"' >> /app/entrypoint.sh && \
+    echo '    echo "DB_URI set from DATABASE_URL"' >> /app/entrypoint.sh && \
+    echo 'fi' >> /app/entrypoint.sh && \
+    echo 'echo "Starting WhatsApp Multi-Device..."' >> /app/entrypoint.sh && \
+    echo 'exec /app/whatsapp' >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
 
 # Create directories for storage
 RUN mkdir -p /app/storages /app/sessions
@@ -45,4 +51,4 @@ RUN mkdir -p /app/storages /app/sessions
 EXPOSE 3000
 
 # Set entrypoint
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
