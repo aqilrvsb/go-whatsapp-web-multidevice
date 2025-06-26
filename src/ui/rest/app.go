@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -825,7 +826,15 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 
 // UpdateCampaign updates an existing campaign
 func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
-	campaignId := c.Params("id")
+	campaignIdStr := c.Params("id")
+	campaignId, err := strconv.Atoi(campaignIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
 	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
@@ -903,7 +912,15 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 
 // DeleteCampaign deletes a campaign
 func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
-	campaignId := c.Params("id")
+	campaignIdStr := c.Params("id")
+	campaignId, err := strconv.Atoi(campaignIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
 	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
