@@ -232,7 +232,7 @@ func InitializeSchema() error {
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
-		campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+		campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL,
 		sequence_id UUID REFERENCES sequences(id) ON DELETE SET NULL,
 		recipient_phone VARCHAR(50) NOT NULL,
 		message_type VARCHAR(50) NOT NULL,

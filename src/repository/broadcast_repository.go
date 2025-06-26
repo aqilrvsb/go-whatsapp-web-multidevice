@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -45,7 +46,20 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		return err
 	}
 	
-	_, err = r.db.Exec(query, msg.ID, userID, msg.DeviceID, msg.CampaignID,
+	// Convert campaign_id if needed
+	var campaignID interface{}
+	if msg.CampaignID != "" {
+		// Try to convert to int for the database
+		if id, err := strconv.Atoi(msg.CampaignID); err == nil {
+			campaignID = id
+		} else {
+			campaignID = nil
+		}
+	} else {
+		campaignID = nil
+	}
+	
+	_, err = r.db.Exec(query, msg.ID, userID, msg.DeviceID, campaignID,
 		msg.SequenceID, msg.RecipientPhone, msg.Type, msg.Content, 
 		msg.MediaURL, "pending", msg.ScheduledAt, time.Now())
 		
