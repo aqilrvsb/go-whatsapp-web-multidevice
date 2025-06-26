@@ -2,72 +2,76 @@ package repository
 
 import (
 	"database/sql"
-	"fmt"
-	"sync"
 	"time"
-	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
+
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/google/uuid"
 )
 
-type Campaign struct {
-	ID            string    `json:"id"`
-	UserID        string    `json:"user_id"`
-	CampaignDate  string    `json:"campaign_date"`
-	Title         string    `json:"title"`
-	Niche         string    `json:"niche"`
-	Message       string    `json:"message"`
-	ImageURL      string    `json:"image_url"`
-	ScheduledTime string    `json:"scheduled_time"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-}
-
-type CampaignRepository struct {
+type campaignRepository struct {
 	db *sql.DB
 }
 
-var (
-	campaignRepo     *CampaignRepository
-	campaignRepoOnce sync.Once
-)
+var campaignRepo *campaignRepository
 
-// GetCampaignRepository returns singleton instance of CampaignRepository
-func GetCampaignRepository() *CampaignRepository {
-	campaignRepoOnce.Do(func() {
-		campaignRepo = &CampaignRepository{
-			db: database.GetDB(),
+// GetCampaignRepository returns campaign repository instance
+func GetCampaignRepository() *campaignRepository {
+	if campaignRepo == nil {
+		campaignRepo = &campaignRepository{
+			db: db,
 		}
-	})
+	}
 	return campaignRepo
 }
 
-// GetCampaigns gets all campaigns for a user
-func (r *CampaignRepository) GetCampaigns(userID string) ([]Campaign, error) {
+// CreateCampaign creates a new campaign
+func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
+	campaign.ID = uuid.New().String()
+	campaign.CreatedAt = time.Now()
+	campaign.UpdatedAt = time.Now()
+	campaign.Status = "pending"
+
 	query := `
-		SELECT id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), 
-		       COALESCE(scheduled_time::text, ''), status, created_at, updated_at
-		FROM campaigns
-		WHERE user_id = $1
-		ORDER BY campaign_date DESC
+		INSERT INTO campaigns 
+		(id, user_id, device_id, title, niche, message, image_url, 
+		 scheduled_date, scheduled_time, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
-	rows, err := r.db.Query(query, userID)
+	_, err := r.db.Exec(query, campaign.ID, campaign.UserID, campaign.DeviceID,
+		campaign.Title, campaign.Niche, campaign.Message, campaign.ImageURL,
+		campaign.ScheduledDate, campaign.ScheduledTime, campaign.Status,
+		campaign.CreatedAt, campaign.UpdatedAt)
+		
+	return err
+}
+
+// GetCampaignsByDate gets campaigns scheduled for a specific date
+func (r *campaignRepository) GetCampaignsByDate(date string) ([]models.Campaign, error) {
+	query := `
+		SELECT id, user_id, device_id, title, niche, message, image_url,
+		       scheduled_date, scheduled_time, status, created_at, updated_at
+		FROM campaigns
+		WHERE scheduled_date = ?
+		AND status = 'pending'
+		ORDER BY scheduled_time ASC
+	`
+	
+	rows, err := r.db.Query(query, date)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	
-	var campaigns []Campaign
+	var campaigns []models.Campaign
 	for rows.Next() {
-		var campaign Campaign
-		err := rows.Scan(
-			&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-			&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
-			&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
-		)
+		var campaign models.Campaign
+		err := rows.Scan(&campaign.ID, &campaign.UserID, &campaign.DeviceID,
+			&campaign.Title, &campaign.Niche, &campaign.Message, &campaign.ImageURL,
+			&campaign.ScheduledDate, &campaign.ScheduledTime, &campaign.Status,
+			&campaign.CreatedAt, &campaign.UpdatedAt)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		campaigns = append(campaigns, campaign)
 	}
@@ -75,97 +79,20 @@ func (r *CampaignRepository) GetCampaigns(userID string) ([]Campaign, error) {
 	return campaigns, nil
 }
 
-// CreateCampaign creates a new campaign
-func (r *CampaignRepository) CreateCampaign(userID string, campaignDate, title, niche, message, imageURL, scheduledTime string) (*Campaign, error) {
+// UpdateCampaign updates a campaign
+func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
+	campaign.UpdatedAt = time.Now()
+	
 	query := `
-		INSERT INTO campaigns (user_id, campaign_date, title, niche, message, image_url, scheduled_time, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), COALESCE(scheduled_time::text, ''), status, created_at, updated_at
+		UPDATE campaigns 
+		SET title = ?, niche = ?, message = ?, image_url = ?,
+		    scheduled_date = ?, scheduled_time = ?, status = ?, updated_at = ?
+		WHERE id = ?
 	`
 	
-	now := time.Now()
-	var campaign Campaign
-	
-	err := r.db.QueryRow(query, userID, campaignDate, title, niche, message, imageURL, scheduledTime, "scheduled", now, now).Scan(
-		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
-		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
-	)
-	
-	if err != nil {
-		return nil, err
-	}
-	
-	return &campaign, nil
-}
-
-// UpdateCampaign updates an existing campaign
-func (r *CampaignRepository) UpdateCampaign(userID string, campaignID, title, niche, message, imageURL, scheduledTime, status string) (*Campaign, error) {
-	query := `
-		UPDATE campaigns
-		SET title = $3, niche = $4, message = $5, image_url = $6, scheduled_time = $7, status = $8, updated_at = $9
-		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), COALESCE(scheduled_time::text, ''), status, created_at, updated_at
-	`
-	
-	var campaign Campaign
-	err := r.db.QueryRow(query, campaignID, userID, title, niche, message, imageURL, scheduledTime, status, time.Now()).Scan(
-		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
-		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
-	)
-	
-	if err != nil {
-		return nil, err
-	}
-	
-	return &campaign, nil
-}
-
-// DeleteCampaign deletes a campaign
-func (r *CampaignRepository) DeleteCampaign(userID string, campaignID string) error {
-	query := `DELETE FROM campaigns WHERE id = $1 AND user_id = $2`
-	
-	result, err := r.db.Exec(query, campaignID, userID)
-	if err != nil {
-		return err
-	}
-	
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	
-	if rowsAffected == 0 {
-		return fmt.Errorf("campaign not found")
-	}
-	
-	return nil
-}
-
-// GetCampaignByDate gets a campaign for a specific date
-func (r *CampaignRepository) GetCampaignByDate(userID string, date string) (*Campaign, error) {
-	query := `
-		SELECT id, user_id, campaign_date, title, COALESCE(niche, ''), message, COALESCE(image_url, ''), 
-		       COALESCE(scheduled_time::text, ''), status, created_at, updated_at
-		FROM campaigns
-		WHERE user_id = $1 AND campaign_date = $2
-	`
-	
-	var campaign Campaign
-	err := r.db.QueryRow(query, userID, date).Scan(
-		&campaign.ID, &campaign.UserID, &campaign.CampaignDate, &campaign.Title,
-		&campaign.Niche, &campaign.Message, &campaign.ImageURL, &campaign.ScheduledTime,
-		&campaign.Status, &campaign.CreatedAt, &campaign.UpdatedAt,
-	)
-	
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	
-	if err != nil {
-		return nil, err
-	}
-	
-	return &campaign, nil
+	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, campaign.Message,
+		campaign.ImageURL, campaign.ScheduledDate, campaign.ScheduledTime,
+		campaign.Status, campaign.UpdatedAt, campaign.ID)
+		
+	return err
 }

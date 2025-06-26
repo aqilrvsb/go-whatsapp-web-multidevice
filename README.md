@@ -27,6 +27,13 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ **Auto-reply** - Automatic responses
 - ✅ **Webhooks** - Real-time notifications
 
+### New Features (June 2025)
+- ✅ **Message Sequences** - Automated drip campaigns with niche targeting
+- ✅ **Broadcast Manager** - Optimized for 3,000+ devices
+- ✅ **Device Rate Limiting** - Custom min/max delay per device
+- ✅ **Campaign Triggers** - Auto-send based on date and niche matching
+- ✅ **Worker Pool System** - Simultaneous message processing
+
 ### Fixed Issues (June 27, 2025)
 - ✅ Build errors - Go 1.23, correct paths
 - ✅ 502 errors - REST mode enabled
@@ -208,6 +215,57 @@ When `WHATSAPP_WEBHOOK` is set, you'll receive:
 - `GET /api/campaigns` - List campaigns
 - `POST /api/campaigns` - Create campaign
 
+### Sequences (NEW!)
+- `GET /api/sequences` - List sequences
+- `POST /api/sequences` - Create sequence
+- `GET /api/sequences/:id` - Get sequence details
+- `PUT /api/sequences/:id` - Update sequence
+- `DELETE /api/sequences/:id` - Delete sequence
+- `POST /api/sequences/:id/contacts` - Add contacts
+- `POST /api/sequences/:id/start` - Start sequence
+- `POST /api/sequences/:id/pause` - Pause sequence
+
+## 📧 Message Sequences Feature
+
+### What are Sequences?
+Automated drip campaigns that send messages over multiple days. Each contact progresses through their own timeline.
+
+### How it Works
+1. **Create Sequence**: Define messages for Day 1, Day 2, etc.
+2. **Set Send Times**: Each day can have specific send time
+3. **Niche Targeting**: Auto-enroll leads based on their niche
+4. **Individual Progress**: New contacts always start from Day 1
+
+### Example Sequence
+```
+Day 1 (10:00 AM): Welcome message + introduction
+Day 2 (2:00 PM): Product features + benefits  
+Day 3 (11:00 AM): Customer testimonials
+Day 4 (3:00 PM): Special offer
+Day 5 (10:00 AM): Final reminder
+```
+
+## 🚀 Broadcast Optimization
+
+### Device Workers
+- Each device runs its own worker thread
+- Custom delay settings (min/max seconds)
+- Queue-based message processing
+- Automatic retry on failure
+
+### Performance Features
+- **Worker Pool**: Up to 100 concurrent workers
+- **Message Queue**: 1000 messages buffer per device
+- **Rate Limiting**: Random delay between min/max
+- **Health Monitoring**: Auto-restart unhealthy workers
+
+### Configuration
+```env
+# Device delay settings (per device)
+MIN_DELAY_SECONDS=5
+MAX_DELAY_SECONDS=15
+```
+
 ## 🎉 Summary
 
 This WhatsApp Multi-Device system is production-ready with:
@@ -217,5 +275,8 @@ This WhatsApp Multi-Device system is production-ready with:
 - ✅ Broadcast capabilities
 - ✅ Analytics dashboard
 - ✅ Campaign management
+- ✅ Message sequences with niche targeting
+- ✅ Optimized broadcasting with device workers
+- ✅ Automatic triggers for campaigns and sequences
 
 **Support**: Create an issue on GitHub for help!

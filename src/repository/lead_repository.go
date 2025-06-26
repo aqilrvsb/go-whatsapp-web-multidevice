@@ -2,72 +2,69 @@ package repository
 
 import (
 	"database/sql"
-	"fmt"
-	"sync"
 	"time"
-	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
+
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/google/uuid"
 )
 
-type Lead struct {
-	ID              string    `json:"id"`
-	DeviceID        string    `json:"device_id"`
-	UserID          string    `json:"user_id"`
-	Name            string    `json:"name"`
-	Phone           string    `json:"phone"`
-	Niche           string    `json:"niche"`
-	Journey         string    `json:"journey"`
-	Status          string    `json:"status"`
-	LastInteraction *time.Time `json:"last_interaction"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-}
-
-type LeadRepository struct {
+type leadRepository struct {
 	db *sql.DB
 }
 
-var (
-	leadRepo     *LeadRepository
-	leadRepoOnce sync.Once
-)
+var leadRepo *leadRepository
 
-// GetLeadRepository returns singleton instance of LeadRepository
-func GetLeadRepository() *LeadRepository {
-	leadRepoOnce.Do(func() {
-		leadRepo = &LeadRepository{
-			db: database.GetDB(),
+// GetLeadRepository returns lead repository instance
+func GetLeadRepository() *leadRepository {
+	if leadRepo == nil {
+		leadRepo = &leadRepository{
+			db: db,
 		}
-	})
+	}
 	return leadRepo
 }
 
-// GetLeadsByDevice gets all leads for a specific device
-func (r *LeadRepository) GetLeadsByDevice(userID string, deviceID string) ([]Lead, error) {
+// CreateLead creates a new lead
+func (r *leadRepository) CreateLead(lead *models.Lead) error {
+	lead.ID = uuid.New().String()
+	lead.CreatedAt = time.Now()
+	lead.UpdatedAt = time.Now()
+
 	query := `
-		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
-		       last_interaction, created_at, updated_at
+		INSERT INTO leads (id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	
+	_, err := r.db.Exec(query, lead.ID, lead.UserID, lead.Name, lead.Phone, 
+		lead.Email, lead.Niche, lead.Source, lead.Status, lead.Notes,
+		lead.CreatedAt, lead.UpdatedAt)
+		
+	return err
+}
+
+// GetLeadsByNiche gets all leads matching a niche
+func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
+	query := `
+		SELECT id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at
 		FROM leads
-		WHERE user_id = $1 AND device_id = $2
+		WHERE niche = ?
 		ORDER BY created_at DESC
 	`
 	
-	rows, err := r.db.Query(query, userID, deviceID)
+	rows, err := r.db.Query(query, niche)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	
-	var leads []Lead
+	var leads []models.Lead
 	for rows.Next() {
-		var lead Lead
-		err := rows.Scan(
-			&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Niche, &lead.Journey, &lead.Status, &lead.LastInteraction,
-			&lead.CreatedAt, &lead.UpdatedAt,
-		)
+		var lead models.Lead
+		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.Notes,
+			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		leads = append(leads, lead)
 	}
@@ -75,82 +72,38 @@ func (r *LeadRepository) GetLeadsByDevice(userID string, deviceID string) ([]Lea
 	return leads, nil
 }
 
-// CreateLead creates a new lead
-func (r *LeadRepository) CreateLead(userID string, deviceID, name, phone, niche, journey, status string) (*Lead, error) {
-	if status == "" {
-		status = "new"
-	}
-	
+// GetNewLeadsForSequence gets new leads matching niche that aren't in sequence
+func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]models.Lead, error) {
 	query := `
-		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, device_id, user_id, name, phone, niche, journey, status, last_interaction, created_at, updated_at
+		SELECT l.id, l.user_id, l.name, l.phone, l.email, l.niche, 
+		       l.source, l.status, l.notes, l.created_at, l.updated_at
+		FROM leads l
+		WHERE l.niche = ?
+		AND NOT EXISTS (
+			SELECT 1 FROM sequence_contacts sc 
+			WHERE sc.sequence_id = ? 
+			AND sc.contact_phone = l.phone
+		)
+		ORDER BY l.created_at DESC
 	`
 	
-	now := time.Now()
-	var lead Lead
-	
-	err := r.db.QueryRow(query, deviceID, userID, name, phone, niche, journey, status, now, now).Scan(
-		&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-		&lead.Niche, &lead.Journey, &lead.Status, &lead.LastInteraction,
-		&lead.CreatedAt, &lead.UpdatedAt,
-	)
-	
+	rows, err := r.db.Query(query, niche, sequenceID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	
-	return &lead, nil
-}
-
-// UpdateLead updates an existing lead
-func (r *LeadRepository) UpdateLead(userID string, leadID, name, phone, niche, journey, status string) (*Lead, error) {
-	query := `
-		UPDATE leads
-		SET name = $3, phone = $4, niche = $5, journey = $6, status = $7, updated_at = $8
-		WHERE id = $1 AND user_id = $2
-		RETURNING id, device_id, user_id, name, phone, niche, journey, status, last_interaction, created_at, updated_at
-	`
-	
-	var lead Lead
-	err := r.db.QueryRow(query, leadID, userID, name, phone, niche, journey, status, time.Now()).Scan(
-		&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-		&lead.Niche, &lead.Journey, &lead.Status, &lead.LastInteraction,
-		&lead.CreatedAt, &lead.UpdatedAt,
-	)
-	
-	if err != nil {
-		return nil, err
+	var leads []models.Lead
+	for rows.Next() {
+		var lead models.Lead
+		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.Notes,
+			&lead.CreatedAt, &lead.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		leads = append(leads, lead)
 	}
 	
-	return &lead, nil
-}
-
-// DeleteLead deletes a lead
-func (r *LeadRepository) DeleteLead(userID string, leadID string) error {
-	query := `DELETE FROM leads WHERE id = $1 AND user_id = $2`
-	
-	result, err := r.db.Exec(query, leadID, userID)
-	if err != nil {
-		return err
-	}
-	
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	
-	if rowsAffected == 0 {
-		return fmt.Errorf("lead not found")
-	}
-	
-	return nil
-}
-
-// UpdateLastInteraction updates the last interaction time for a lead
-func (r *LeadRepository) UpdateLastInteraction(leadID string) error {
-	query := `UPDATE leads SET last_interaction = $1 WHERE id = $2`
-	
-	_, err := r.db.Exec(query, time.Now(), leadID)
-	return err
+	return leads, nil
 }

@@ -285,6 +285,30 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 	return devices, nil
 }
 
+// GetDeviceByID gets a device by ID
+func (r *userRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
+	var device models.UserDevice
+	query := `
+		SELECT id, user_id, device_name, phone, jid, status, 
+		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
+		       created_at, updated_at
+		FROM user_devices
+		WHERE id = ?
+	`
+	
+	err := r.db.QueryRow(query, deviceID).Scan(
+		&device.ID, &device.UserID, &device.DeviceName, &device.Phone,
+		&device.JID, &device.Status, &device.MinDelaySeconds, &device.MaxDelaySeconds,
+		&device.CreatedAt, &device.UpdatedAt,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &device, nil
+}
+
 // UpdateDeviceStatus updates device status
 func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
 	query := `

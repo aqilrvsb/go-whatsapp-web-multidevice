@@ -6,16 +6,19 @@ import (
 	"net/http"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/dustin/go-humanize"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/template/html/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -89,6 +92,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestMessage(app, messageUsecase)
 	rest.InitRestGroup(app, groupUsecase)
 	rest.InitRestNewsletter(app, newsletterUsecase)
+	rest.InitRestSequence(app, sequenceUsecase)
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
@@ -111,6 +115,14 @@ func restServer(_ *cobra.Command, _ []string) {
 	if config.WhatsappChatStorage {
 		go helpers.StartAutoFlushChatStorage()
 	}
+	
+	// Start broadcast manager
+	broadcastManager := broadcast.GetBroadcastManager()
+	logrus.Info("Broadcast manager started")
+	
+	// Start campaign/sequence trigger processor
+	go usecase.StartTriggerProcessor()
+	logrus.Info("Campaign trigger processor started")
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		log.Fatalln("Failed to start: ", err.Error())

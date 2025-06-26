@@ -18,14 +18,16 @@ type User struct {
 
 // UserDevice represents a WhatsApp device belonging to a user
 type UserDevice struct {
-	ID         string    `json:"id"`
-	UserID     string    `json:"userId"`
-	DeviceName string    `json:"deviceName"`
-	Phone      string    `json:"phone"`
-	Status     string    `json:"status"` // online, offline, connecting
-	LastSeen   time.Time `json:"lastSeen"`
-	CreatedAt  time.Time `json:"createdAt"`
-	JID        string    `json:"jid,omitempty"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"userId"`
+	DeviceName      string    `json:"deviceName"`
+	Phone           string    `json:"phone"`
+	Status          string    `json:"status"` // online, offline, connecting
+	LastSeen        time.Time `json:"lastSeen"`
+	CreatedAt       time.Time `json:"createdAt"`
+	JID             string    `json:"jid,omitempty"`
+	MinDelaySeconds int       `json:"minDelaySeconds"`
+	MaxDelaySeconds int       `json:"maxDelaySeconds"`
 }
 
 // UserSession represents an active user session
