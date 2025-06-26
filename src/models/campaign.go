@@ -6,13 +6,14 @@ import (
 
 // Campaign represents a marketing campaign
 type Campaign struct {
-	ID            string    `json:"id" db:"id"`
+	ID            int       `json:"id" db:"id"`
 	UserID        string    `json:"user_id" db:"user_id"`
 	DeviceID      string    `json:"device_id" db:"device_id"`
 	Title         string    `json:"title" db:"title"`
 	Niche         string    `json:"niche" db:"niche"`
 	Message       string    `json:"message" db:"message"`
 	ImageURL      string    `json:"image_url" db:"image_url"`
+	CampaignDate  string    `json:"campaign_date" db:"campaign_date"`
 	ScheduledDate string    `json:"scheduled_date" db:"scheduled_date"`
 	ScheduledTime string    `json:"scheduled_time" db:"scheduled_time"`
 	Status        string    `json:"status" db:"status"` // pending, sent, failed

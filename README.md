@@ -319,10 +319,16 @@ Day 7: Express delivery still available! [15-30 sec delay]
   - Each contact progresses individually through sequence
 
 ### Device Workers
-- **Individual Workers**: Each device runs its own message worker
+- **Individual Workers**: Each device has its own dedicated worker thread
+- **Simultaneous Operation**: All device workers run in parallel
+- **Example**: User A with 15 devices = 15 workers running simultaneously
+- **Independent Processing**: Each worker:
+  - Has its own message queue (1000 buffer)
+  - Processes messages independently
+  - Uses device-specific min/max delays
+  - No waiting for other devices
 - **Parallel Processing**: Up to 100 concurrent workers system-wide
 - **Custom Rate Limiting**: Each device has min/max delay settings
-- **Queue Management**: 1000 message buffer per device
 - **Health Monitoring**: Auto-restart stuck workers
 
 ### Message Flow

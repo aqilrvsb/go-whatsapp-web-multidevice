@@ -86,7 +86,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	}
 	
 	// Filter only connected devices
-	connectedDevices := make([]models.UserDevice, 0)
+	connectedDevices := make([]*models.UserDevice, 0)
 	for _, device := range devices {
 		if device.Status == "connected" {
 			connectedDevices = append(connectedDevices, device)

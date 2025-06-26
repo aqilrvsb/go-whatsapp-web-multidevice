@@ -407,7 +407,7 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 	}
 	
 	// Filter only connected devices
-	connectedDevices := make([]models.UserDevice, 0)
+	connectedDevices := make([]*models.UserDevice, 0)
 	for _, device := range devices {
 		if device.Status == "connected" {
 			connectedDevices = append(connectedDevices, device)
