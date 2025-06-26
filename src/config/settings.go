@@ -36,10 +36,4 @@ var (
 	WhatsappTypeGroup                    = "@g.us"
 	WhatsappAccountValidation            = true
 	WhatsappChatStorage                  = true
-	
-	// Proxy settings
-	ProxyEnabled               = true  // Enable proxy support
-	ProxyAutoFetch            = true  // Auto-fetch free proxies
-	ProxyCountry              = "MY"  // Target country (Malaysia)
-	ProxyUpdateInterval       = 30    // Minutes between proxy updates
 )
