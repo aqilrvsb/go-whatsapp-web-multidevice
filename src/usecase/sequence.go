@@ -422,63 +422,73 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 	deviceIndex := time.Now().Nanosecond() % len(connectedDevices)
 	selectedDevice := connectedDevices[deviceIndex]
 	
-	// Queue message through broadcast system
-	msg := domainBroadcast.BroadcastMessage{
-		UserID:         sequence.UserID,
-		DeviceID:       selectedDevice.ID,
-		SequenceID:     &sequence.ID,
-		RecipientPhone: contact.ContactPhone,
-		Type:           "text", // Default to text
-		Content:        step.Content,
-		ScheduledAt:    time.Now(),
+	// Generate a group ID for this lead's messages (to handle 3-second gap between image and text)
+	groupID := fmt.Sprintf("%s_%s_%d", sequence.ID, contact.ID, time.Now().Unix())
+	
+	messagesQueued := 0
+	messageOrder := 0
+	
+	// 1. First, send image if exists (without caption)
+	imageURL := step.ImageURL
+	if imageURL == "" && step.MediaURL != "" {
+		imageURL = step.MediaURL
 	}
 	
-	// Handle different message types
-	if step.ImageURL != "" || step.MediaURL != "" {
-		msg.Type = "image"
-		msg.MediaURL = step.ImageURL
-		if msg.MediaURL == "" {
-			msg.MediaURL = step.MediaURL
+	if imageURL != "" {
+		messageOrder++
+		imgMsg := domainBroadcast.BroadcastMessage{
+			UserID:         sequence.UserID,
+			DeviceID:       selectedDevice.ID,
+			SequenceID:     &sequence.ID,
+			RecipientPhone: contact.ContactPhone,
+			Type:           "image",
+			MediaURL:       imageURL,
+			Content:        "", // No caption as per requirement
+			ScheduledAt:    time.Now(),
+			GroupID:        &groupID,
+			GroupOrder:     &messageOrder,
 		}
-		msg.Caption = step.Caption
+		
+		err = broadcastRepo.QueueMessage(imgMsg)
+		if err != nil {
+			return fmt.Errorf("failed to queue image message: %v", err)
+		}
+		messagesQueued++
+		logrus.Infof("Queued image message for %s using device %s (group: %s, order: %d)", 
+			contact.ContactPhone, selectedDevice.ID, groupID, messageOrder)
 	}
 	
-	// Queue the message
-	err = broadcastRepo.QueueMessage(msg)
-	if err != nil {
-		return fmt.Errorf("failed to queue message: %v", err)
+	// 2. Then, send text if exists (will have 3-second gap from image)
+	if step.Content != "" {
+		messageOrder++
+		textMsg := domainBroadcast.BroadcastMessage{
+			UserID:         sequence.UserID,
+			DeviceID:       selectedDevice.ID,
+			SequenceID:     &sequence.ID,
+			RecipientPhone: contact.ContactPhone,
+			Type:           "text",
+			Content:        step.Content,
+			ScheduledAt:    time.Now(),
+			GroupID:        &groupID,
+			GroupOrder:     &messageOrder,
+		}
+		
+		err = broadcastRepo.QueueMessage(textMsg)
+		if err != nil {
+			return fmt.Errorf("failed to queue text message: %v", err)
+		}
+		messagesQueued++
+		logrus.Infof("Queued text message for %s using device %s (group: %s, order: %d)", 
+			contact.ContactPhone, selectedDevice.ID, groupID, messageOrder)
 	}
 	
-	logrus.Infof("Queued sequence message for %s using device %s", contact.ContactPhone, selectedDevice.ID)
+	if messagesQueued == 0 {
+		return fmt.Errorf("no content to send (neither image nor text)")
+	}
+	
+	// Note: The device worker will handle:
+	// - 3 second gap between messages in the same group (image → text)
+	// - Random delay (min/max) between different groups (different leads)
+	
 	return nil
-}MessageRequest{
-			Phone:   contact.ContactPhone,
-			Message: step.Content,
-		}
-		_, err = s.sendService.SendText(nil, request)
-		
-	case "image":
-		// For image messages, we need to handle URL
-		mediaURL := step.MediaURL
-		request := domainSend.ImageRequest{
-			Phone:    contact.ContactPhone,
-			Caption:  step.Caption,
-			ImageURL: &mediaURL,
-		}
-		// TODO: Implement SendImageURL in send service
-		_, err = s.sendService.SendImage(nil, request)
-		
-	case "video":
-		// TODO: Implement video sending
-		err = fmt.Errorf("video messages not yet implemented")
-		
-	case "document":
-		// TODO: Implement document sending
-		err = fmt.Errorf("document messages not yet implemented")
-		
-	default:
-		err = fmt.Errorf("unknown message type: %s", step.MessageType)
-	}
-	
-	return err
 }
