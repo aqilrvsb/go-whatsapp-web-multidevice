@@ -497,7 +497,35 @@ Both campaigns run simultaneously without interference!
 ## Deployment Trigger - Fri 27/06/2025  1:53:49.15 
 
 
-## Latest Update - June 27, 2025 (4:15 AM)
+## Latest Update - June 27, 2025 (4:30 AM)
+
+### ✅ New Dashboard Tabs Added!
+Three new tabs have been added to the dashboard for easy monitoring:
+
+#### 1. Campaign Summary Tab
+- **Location**: Dashboard → Campaign Summary tab
+- **Features**:
+  - Total campaigns count (pending, sent, failed)
+  - Message statistics with success rate
+  - Recent campaigns table
+  - One-click refresh button
+
+#### 2. Sequence Summary Tab
+- **Location**: Dashboard → Sequence Summary tab
+- **Features**:
+  - Total sequences count (active, paused, draft)
+  - Contact statistics and averages
+  - Recent sequences table
+  - One-click refresh button
+
+#### 3. Worker Status Tab
+- **Location**: Dashboard → Worker Status tab
+- **Features**:
+  - Real-time worker monitoring
+  - Device-by-device status
+  - Queue size, processed, and failed counts
+  - Last activity tracking
+  - Auto-refresh every 5 seconds (toggleable)
 
 ### ✅ All Compilation Errors Fixed!
 The system is now fully compiled and ready for deployment:

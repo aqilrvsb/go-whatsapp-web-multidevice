@@ -384,6 +384,21 @@
                     <i class="bi bi-collection"></i> Sequences
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="campaign-summary-tab" data-bs-toggle="tab" data-bs-target="#campaign-summary" type="button">
+                    <i class="bi bi-graph-up"></i> Campaign Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sequence-summary-tab" data-bs-toggle="tab" data-bs-target="#sequence-summary" type="button">
+                    <i class="bi bi-bar-chart"></i> Sequence Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="worker-status-tab" data-bs-toggle="tab" data-bs-target="#worker-status" type="button">
+                    <i class="bi bi-cpu"></i> Worker Status
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -618,6 +633,77 @@
                                     <i class="bi bi-plus-circle"></i> Create Sequence
                                 </a>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campaign Summary Tab -->
+            <div class="tab-pane fade" id="campaign-summary" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Campaign Summary</h4>
+                        <p class="text-muted mb-0">Overview of all your campaign activities</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadCampaignSummary()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="campaignSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sequence Summary Tab -->
+            <div class="tab-pane fade" id="sequence-summary" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Sequence Summary</h4>
+                        <p class="text-muted mb-0">Overview of all your sequence activities</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadSequenceSummary()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="sequenceSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Worker Status Tab -->
+            <div class="tab-pane fade" id="worker-status" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Worker Status</h4>
+                        <p class="text-muted mb-0">Monitor your device workers in real-time</p>
+                    </div>
+                    <div>
+                        <div class="form-check form-switch d-inline-block me-3">
+                            <input class="form-check-input" type="checkbox" id="workerAutoRefresh" checked>
+                            <label class="form-check-label" for="workerAutoRefresh">
+                                Auto-refresh (5s)
+                            </label>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="loadWorkerStatus()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="workerStatusContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
                 </div>
@@ -2414,6 +2500,413 @@
                     loadSequences();
                 });
             }
+        });
+        
+        // Campaign Summary Functions
+        function loadCampaignSummary() {
+            fetch('/api/campaigns/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displayCampaignSummary(data.results);
+                    } else {
+                        document.getElementById('campaignSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load campaign summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading campaign summary:', error);
+                    document.getElementById('campaignSummaryContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displayCampaignSummary(summary) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${summary.campaigns.total}</h3>
+                                <p class="text-muted mb-0">Total Campaigns</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">${summary.campaigns.pending}</h3>
+                                <p class="text-muted mb-0">Pending</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.campaigns.sent}</h3>
+                                <p class="text-muted mb-0">Sent</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-danger">${summary.campaigns.failed}</h3>
+                                <p class="text-muted mb-0">Failed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Message Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Total Messages: <strong>${summary.messages.total_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Sent: <strong class="text-success">${summary.messages.sent_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Failed: <strong class="text-danger">${summary.messages.failed_messages}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Success Rate: <strong>${summary.messages.success_rate?.toFixed(1) || 0}%</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Recent Campaigns</h5>
+                            </div>
+                            <div class="card-body">
+                                ${summary.recent_campaigns.length > 0 ? `
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Title</th>
+                                                    <th>Date</th>
+                                                    <th>Niche</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${summary.recent_campaigns.map(campaign => `
+                                                    <tr>
+                                                        <td>${campaign.title}</td>
+                                                        <td>${campaign.campaign_date}</td>
+                                                        <td>${campaign.niche || '-'}</td>
+                                                        <td>
+                                                            <span class="badge bg-${getStatusColor(campaign.status)}">
+                                                                ${campaign.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ` : '<p class="text-muted text-center">No campaigns yet</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('campaignSummaryContent').innerHTML = html;
+        }
+        
+        // Sequence Summary Functions
+        function loadSequenceSummary() {
+            fetch('/api/sequences/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displaySequenceSummary(data.results);
+                    } else {
+                        document.getElementById('sequenceSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load sequence summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sequence summary:', error);
+                    document.getElementById('sequenceSummaryContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displaySequenceSummary(summary) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${summary.sequences.total}</h3>
+                                <p class="text-muted mb-0">Total Sequences</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.sequences.active}</h3>
+                                <p class="text-muted mb-0">Active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">${summary.sequences.paused}</h3>
+                                <p class="text-muted mb-0">Paused</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-secondary">${summary.sequences.draft}</h3>
+                                <p class="text-muted mb-0">Draft</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Contact Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Total Contacts: <strong>${summary.contacts.total}</strong></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Average per Sequence: <strong>${summary.contacts.average_per_sequence.toFixed(1)}</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Recent Sequences</h5>
+                            </div>
+                            <div class="card-body">
+                                ${summary.recent_sequences.length > 0 ? `
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Niche</th>
+                                                    <th>Contacts</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${summary.recent_sequences.map(sequence => `
+                                                    <tr>
+                                                        <td>${sequence.name}</td>
+                                                        <td>${sequence.niche || '-'}</td>
+                                                        <td>${sequence.contacts_count}</td>
+                                                        <td>
+                                                            <span class="badge bg-${getStatusColor(sequence.status)}">
+                                                                ${sequence.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ` : '<p class="text-muted text-center">No sequences yet</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('sequenceSummaryContent').innerHTML = html;
+        }
+        
+        // Worker Status Functions
+        let workerRefreshInterval;
+        
+        function loadWorkerStatus() {
+            fetch('/api/workers/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displayWorkerStatus(data.results);
+                    } else {
+                        document.getElementById('workerStatusContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load worker status</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading worker status:', error);
+                    document.getElementById('workerStatusContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
+        
+        function displayWorkerStatus(status) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${status.total_workers}</h3>
+                                <p class="text-muted mb-0">Total Workers Running</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-info">${status.user_devices}</h3>
+                                <p class="text-muted mb-0">Your Devices</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${status.connected_devices}</h3>
+                                <p class="text-muted mb-0">Connected Devices</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Device Workers Detail</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Device Name</th>
+                                                <th>Device Status</th>
+                                                <th>Worker Status</th>
+                                                <th>Queue Size</th>
+                                                <th>Processed</th>
+                                                <th>Failed</th>
+                                                <th>Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${status.device_workers.map(worker => `
+                                                <tr>
+                                                    <td>${worker.device_name}</td>
+                                                    <td>
+                                                        <span class="badge bg-${worker.device_status === 'connected' ? 'success' : 'secondary'}">
+                                                            ${worker.device_status}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-${getWorkerStatusColor(worker.worker_status)}">
+                                                            ${worker.worker_status}
+                                                        </span>
+                                                    </td>
+                                                    <td>${worker.queue_size}</td>
+                                                    <td class="text-success">${worker.processed}</td>
+                                                    <td class="text-danger">${worker.failed}</td>
+                                                    <td>${worker.last_activity ? new Date(worker.last_activity).toLocaleString() : '-'}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('workerStatusContent').innerHTML = html;
+        }
+        
+        function getStatusColor(status) {
+            switch(status) {
+                case 'active':
+                case 'sent':
+                    return 'success';
+                case 'pending':
+                case 'scheduled':
+                case 'paused':
+                    return 'warning';
+                case 'failed':
+                    return 'danger';
+                case 'draft':
+                    return 'secondary';
+                default:
+                    return 'primary';
+            }
+        }
+        
+        function getWorkerStatusColor(status) {
+            switch(status) {
+                case 'processing':
+                    return 'success';
+                case 'idle':
+                    return 'primary';
+                case 'stopped':
+                case 'not_running':
+                    return 'secondary';
+                default:
+                    return 'warning';
+            }
+        }
+        
+        // Auto-refresh for worker status
+        document.getElementById('workerAutoRefresh')?.addEventListener('change', function() {
+            if (this.checked) {
+                workerRefreshInterval = setInterval(loadWorkerStatus, 5000);
+            } else {
+                clearInterval(workerRefreshInterval);
+            }
+        });
+        
+        // Load summaries when tabs are clicked
+        document.getElementById('campaign-summary-tab')?.addEventListener('shown.bs.tab', function() {
+            loadCampaignSummary();
+        });
+        
+        document.getElementById('sequence-summary-tab')?.addEventListener('shown.bs.tab', function() {
+            loadSequenceSummary();
+        });
+        
+        document.getElementById('worker-status-tab')?.addEventListener('shown.bs.tab', function() {
+            loadWorkerStatus();
+            if (document.getElementById('workerAutoRefresh').checked) {
+                workerRefreshInterval = setInterval(loadWorkerStatus, 5000);
+            }
+        });
+        
+        // Clear worker refresh when leaving tab
+        document.getElementById('worker-status-tab')?.addEventListener('hidden.bs.tab', function() {
+            clearInterval(workerRefreshInterval);
         });
     </script>
 </body>
