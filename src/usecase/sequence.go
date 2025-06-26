@@ -275,7 +275,7 @@ func (s *sequenceService) GetSequenceContacts(sequenceID string) ([]domainSequen
 		}
 		
 		if contact.LastMessageAt != nil {
-			response.LastMessageAt = *contact.LastMessageAt
+			response.LastMessageAt = contact.LastMessageAt
 		}
 		if contact.CompletedAt != nil {
 			response.CompletedAt = contact.CompletedAt

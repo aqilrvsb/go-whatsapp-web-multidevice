@@ -50,6 +50,7 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ Foreign key constraint - Fixed campaign_id type mismatch
 - ✅ Sequence initialization - Added missing usecase initialization
 - ✅ Simplified sequences - Removed device requirement, simplified to match campaigns
+- ✅ **Sequence compilation errors** - Fixed all model and domain type mismatches
 
 ## 📋 Environment Variables (Railway)
 
@@ -144,6 +145,10 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
 - `whatsapp_chats` - Chat metadata
 - `whatsapp_messages` - Message history
 - `message_analytics` - Tracking data
+- `sequences` - Message sequence projects
+- `sequence_steps` - Daily messages in sequences
+- `sequence_contacts` - Contact progress tracking
+- `sequence_logs` - Message send history
 
 ## 🔍 Troubleshooting
 
@@ -234,47 +239,58 @@ When `WHATSAPP_WEBHOOK` is set, you'll receive:
 ## 📧 Message Sequences Feature (Updated June 27, 2025)
 
 ### What are Sequences?
-Simplified multi-day campaigns similar to regular campaigns but with automatic progression. Each contact maintains their own timeline - perfect for onboarding and follow-up sequences.
+Multi-project marketing campaigns with automated message delivery. Each sequence is a project (e.g., "Promo Merdeka", "Promosi Hari Raya") with multi-day templates where each contact maintains their own progress timeline.
 
-### Simplified Features
-1. **Multi-Day Messages**: Create sequences with unlimited days
-2. **Individual Progress**: Each contact starts from Day 1 regardless of when added
-3. **Simple Content**: Text message + optional image URL (just like campaigns)
-4. **Per-Message Delays**: Min/max delay in seconds between messages
-5. **Niche Matching**: Auto-enroll contacts based on niche
-6. **Status Control**: Active, Paused, or Draft states
+### Key Features
+1. **Project-Based Campaigns**: Create named marketing projects
+2. **Multi-Day Templates**: Define 5+ day message sequences
+3. **Individual Progress**: Each lead starts from Day 1 when enrolled
+4. **Niche-Based Auto-Enrollment**: Automatically add matching leads
+5. **Multiple Active Projects**: Leads can be in multiple sequences
+6. **Cross-Device Support**: Works across all user devices
+7. **Rate Limiting**: Per-device min/max delays prevent bans
+8. **Analytics**: Track success/failure rates per project
 
 ### How it Works
-1. **Create Sequence**: 
-   - Name and description
-   - Set niche for auto-enrollment
-   - Add days with messages and delays
+1. **Create Project Sequence**: 
+   - Name your campaign (e.g., "Promo Merdeka")
+   - Set target niche
+   - Define daily messages with delays
 
-2. **Add Contacts**:
-   - Manual: Add phone numbers
-   - Automatic: Contacts with matching niche
+2. **Lead Enrollment**:
+   - Manual: Add specific phone numbers
+   - Automatic: All leads matching niche
 
-3. **Message Delivery**:
-   - Each message sent with random delay (min/max seconds)
-   - Next day message sent 24 hours after previous
-   - Respects per-device rate limits
+3. **Progress Tracking**:
+   - Each lead maintains individual timeline
+   - Ali: Day 3 of "Promo Merdeka", Day 1 of "Hari Raya"
+   - New leads always start at Day 1
 
-### Example Sequences
+4. **Message Delivery**:
+   - Daily processing at scheduled times
+   - Random delays between messages
+   - Next day = 24 hours after previous
 
-**Sales Sequence** (5 days):
+### Example Projects
+
+**Promo Merdeka Sequence** (5 days):
 ```
-Day 1: Welcome! Check out our special offer... [5-15 sec delay]
-Day 2: Did you see our products? Here's 10% off... [5-15 sec delay]
-Day 3: Customer success story + testimonial... [5-15 sec delay]
-Day 4: Limited time - 20% discount code... [5-15 sec delay]
-Day 5: Final reminder - offer expires tonight! [5-15 sec delay]
+Day 1: Selamat Hari Merdeka! Special 17% discount... [10-20 sec delay]
+Day 2: Flash sale continues! Check our products... [10-20 sec delay]
+Day 3: Customer testimonials from last year... [10-20 sec delay]
+Day 4: Only 2 days left for Merdeka promo... [10-20 sec delay]
+Day 5: Last day! Promo ends at midnight... [10-20 sec delay]
 ```
 
-**Onboarding Sequence** (3 days):
+**Promosi Hari Raya Sequence** (7 days):
 ```
-Day 1: Thanks for joining! Here's how to start... [10-20 sec delay]
-Day 2: Pro tip: Try this feature... [10-20 sec delay]
-Day 3: Need help? Contact our support... [10-20 sec delay]
+Day 1: Ramadan Kareem! Early bird Raya collection... [15-30 sec delay]
+Day 2: New arrivals for your Raya celebration... [15-30 sec delay]
+Day 3: Exclusive designs now available... [15-30 sec delay]
+Day 4: Free delivery for orders above RM100... [15-30 sec delay]
+Day 5: Limited stock warning - popular items... [15-30 sec delay]
+Day 6: Final week before Raya - order now... [15-30 sec delay]
+Day 7: Express delivery still available! [15-30 sec delay]
 ```
 
 ## 🚀 Broadcast System Architecture
@@ -333,7 +349,7 @@ This WhatsApp Multi-Device system is production-ready with:
 - ✅ Broadcast capabilities
 - ✅ Analytics dashboard
 - ✅ Campaign management
-- ✅ Message sequences with niche targeting
+- ✅ Message sequences with project-based marketing
 - ✅ Optimized broadcasting with device workers
 - ✅ Automatic triggers for campaigns and sequences
 
@@ -341,22 +357,23 @@ This WhatsApp Multi-Device system is production-ready with:
 
 ### Setting Up Sequences
 
-1. **Create a Sequence**
+1. **Create a Project Sequence**
    - Navigate to Sequences tab
    - Click "Create New Sequence"
-   - Define messages for each day with specific send times
-   - Set niche for auto-enrollment
+   - Name your project (e.g., "Promo Merdeka")
+   - Set target niche
+   - Add daily messages with delays
 
 2. **Add Contacts**
    ```bash
    POST /api/sequences/{id}/contacts
    {
-     "contacts": ["+1234567890", "+0987654321"]
+     "contacts": ["+60123456789", "+60987654321"]
    }
    ```
 
-3. **Auto-Enrollment by Niche**
-   - Leads with matching niche are automatically enrolled
+3. **Auto-Enrollment**
+   - All leads with matching niche auto-enrolled
    - Processed every minute by background worker
 
 ### Broadcast Optimization
@@ -412,27 +429,35 @@ This WhatsApp Multi-Device system is production-ready with:
 ## Deployment Trigger - Fri 27/06/2025  1:53:49.15 
 
 
-## Latest Update - June 27, 2025
+## Latest Update - June 27, 2025 (3:20 AM)
 
-### Sequence System Simplified
-The sequence system has been simplified to match the campaign structure:
-- **No device selection required** - System automatically selects available devices
-- **Simple message format** - Text + optional image URL only
-- **Per-message delays** - Min/max seconds delay between messages
-- **Auto-enrollment** - Based on niche matching
-- **No complex scheduling** - Messages sent with delays, next day = 24 hours later
+### Sequence System Compilation Fixes ✅
+Successfully fixed all compilation errors in the sequence system:
 
-### Key Improvements
-1. **Fixed nil pointer error** - Added missing sequence usecase initialization
-2. **Fixed foreign key constraint** - Changed campaign_id to INTEGER type
-3. **Simplified UI** - Removed unnecessary options
-4. **Better performance** - Streamlined message processing
+#### Model Updates (`src/models/sequence.go`):
+- Added `DeviceID`, `TotalDays`, `IsActive` to Sequence model
+- Added `Day`, `MessageType`, `SendTime`, `MediaURL`, `Caption`, `UpdatedAt` to SequenceStep
+- Added `CurrentDay`, `AddedAt`, `LastMessageAt` to SequenceContact
+- Created complete SequenceLog model with all required fields
 
-### Usage
-1. Go to Dashboard → Sequences tab
-2. Create sequence with name, description, and niche
-3. Add days with messages and delay settings
-4. Contacts are auto-enrolled based on niche
-5. Each contact progresses individually through the sequence
+#### Domain Type Updates (`src/domains/sequence/sequence.go`):
+- Updated CreateSequenceRequest with `DeviceID`, `IsActive`
+- Enhanced CreateSequenceStepRequest with all message fields
+- Added missing fields to SequenceResponse including `UserID`, `DeviceID`, `TotalSteps`, etc.
+- Created SequenceStats type for analytics
+- Updated SequenceContactResponse with `CurrentDay`, `AddedAt`, `LastMessageAt`
+- Fixed UpdateSequenceRequest with `IsActive` field
+
+#### Database Schema Updates (`src/database/connection.go`):
+- Added missing columns to sequences table: `device_id`, `total_days`, `is_active`
+- Enhanced sequence_steps table with: `day`, `send_time`, `message_type`, `media_url`, `caption`, `updated_at`
+- Updated sequence_contacts with: `current_day`, `added_at`, `last_message_at`
+- Created sequence_logs table for message history tracking
+
+#### Code Fixes (`src/usecase/sequence.go`):
+- Fixed type mismatch for `LastMessageAt` pointer assignment
+
+### Ready for Production
+The sequence system is now fully compiled and ready for deployment on Railway. All type mismatches and missing fields have been resolved.
 
 ---
