@@ -55,6 +55,7 @@ type UpdateSequenceRequest struct {
 	Description string                   `json:"description"`
 	Niche       string                   `json:"niche"`
 	Status      string                   `json:"status"`
+	IsActive    bool                     `json:"is_active"`
 	Steps       []CreateSequenceStepRequest `json:"steps"`
 }
 
@@ -81,17 +82,34 @@ type SequenceResponse struct {
 // SequenceStepResponse for each step
 type SequenceStepResponse struct {
 	ID              string `json:"id"`
+	SequenceID      string `json:"sequence_id"`
+	Day             int    `json:"day"`
 	DayNumber       int    `json:"day_number"`
+	MessageType     string `json:"message_type"`
+	SendTime        string `json:"send_time"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
+	MediaURL        string `json:"media_url"`
+	Caption         string `json:"caption"`
 	MinDelaySeconds int    `json:"min_delay_seconds"`
 	MaxDelaySeconds int    `json:"max_delay_seconds"`
+}
+
+// SequenceStats statistics for a sequence
+type SequenceStats struct {
+	TotalContacts    int `json:"total_contacts"`
+	ActiveContacts   int `json:"active_contacts"`
+	CompletedContacts int `json:"completed_contacts"`
+	PausedContacts   int `json:"paused_contacts"`
+	TotalMessagesSent int `json:"total_messages_sent"`
+	SuccessRate      float64 `json:"success_rate"`
 }
 
 // SequenceDetailResponse includes full details
 type SequenceDetailResponse struct {
 	SequenceResponse
 	Contacts []SequenceContactResponse `json:"contacts"`
+	Stats    SequenceStats            `json:"stats"`
 }
 
 // SequenceContactResponse contact info
@@ -100,6 +118,7 @@ type SequenceContactResponse struct {
 	ContactPhone string     `json:"contact_phone"`
 	ContactName  string     `json:"contact_name"`
 	CurrentStep  int        `json:"current_step"`
+	CurrentDay   int        `json:"current_day"`
 	Status       string     `json:"status"`
 	EnrolledAt   time.Time  `json:"enrolled_at"`
 	LastSentAt   *time.Time `json:"last_sent_at,omitempty"`
