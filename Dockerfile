@@ -40,8 +40,8 @@ RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
     echo '    export DB_URI="$DATABASE_URL"' >> /app/entrypoint.sh && \
     echo '    echo "DB_URI set from DATABASE_URL"' >> /app/entrypoint.sh && \
     echo 'fi' >> /app/entrypoint.sh && \
-    echo 'echo "Starting WhatsApp Multi-Device..."' >> /app/entrypoint.sh && \
-    echo 'exec /app/whatsapp' >> /app/entrypoint.sh && \
+    echo 'echo "Starting WhatsApp Multi-Device in REST mode..."' >> /app/entrypoint.sh && \
+    echo 'exec /app/whatsapp rest' >> /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Create directories for storage
