@@ -316,8 +316,9 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	
 	if err == nil {
 		stats["messages_sent"] = messageCount
-	}
-	
+	return stats, nil
+}
+
 // GetActiveSequencesWithNiche gets all active sequences that have a niche
 func (r *sequenceRepository) GetActiveSequencesWithNiche() ([]models.Sequence, error) {
 	query := `

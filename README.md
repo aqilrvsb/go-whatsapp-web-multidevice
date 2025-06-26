@@ -279,4 +279,74 @@ This WhatsApp Multi-Device system is production-ready with:
 - ✅ Optimized broadcasting with device workers
 - ✅ Automatic triggers for campaigns and sequences
 
+## 🛠️ Implementation Guide
+
+### Setting Up Sequences
+
+1. **Create a Sequence**
+   - Navigate to Sequences tab
+   - Click "Create New Sequence"
+   - Define messages for each day with specific send times
+   - Set niche for auto-enrollment
+
+2. **Add Contacts**
+   ```bash
+   POST /api/sequences/{id}/contacts
+   {
+     "contacts": ["+1234567890", "+0987654321"]
+   }
+   ```
+
+3. **Auto-Enrollment by Niche**
+   - Leads with matching niche are automatically enrolled
+   - Processed every minute by background worker
+
+### Broadcast Optimization
+
+1. **Device Configuration**
+   ```sql
+   UPDATE user_devices 
+   SET min_delay_seconds = 10, max_delay_seconds = 30 
+   WHERE id = 'device-id';
+   ```
+
+2. **Monitor Workers**
+   - Check `/api/broadcast/stats` for worker status
+   - Auto-restart on failure
+   - Health checks every 30 seconds
+
+### Campaign Automation
+
+1. **Schedule Campaign**
+   - Set date and time in campaign calendar
+   - Assign device and niche
+   - System auto-sends at scheduled time
+
+2. **Track Progress**
+   - Real-time status updates
+   - Message delivery tracking
+   - Failed message retry
+
+## 📈 Scaling Guidelines
+
+### For 3,000+ Devices:
+1. **Database**: Use PostgreSQL with connection pooling
+2. **Memory**: Minimum 4GB RAM for worker pool
+3. **CPU**: 4+ cores recommended
+4. **Network**: Stable connection for concurrent messaging
+
+### Performance Tuning:
+- Adjust `maxWorkers` in broadcast manager (default: 100)
+- Configure message queue buffer size (default: 1000)
+- Set appropriate delay ranges per device type
+- Monitor and adjust based on WhatsApp response
+
+## 🐛 Troubleshooting
+
+### Common Issues:
+1. **Import Cycle Error**: Fixed by moving types to domain layer
+2. **Worker Stuck**: Auto-restart after 10 minutes of inactivity
+3. **Queue Full**: Increase buffer size or add more workers
+4. **High Ban Rate**: Increase delay settings, reduce concurrent messages
+
 **Support**: Create an issue on GitHub for help!
