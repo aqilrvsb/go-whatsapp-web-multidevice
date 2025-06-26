@@ -330,10 +330,7 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 		// Check if this message belongs to this client's conversation
 		// Either sent by this client OR sent to this client
 		if client.Store.ID != nil {
-			// For personal chats, check if the message is part of this client's conversations
-			clientPhone := client.Store.ID.User
-			isMyMessage := evt.Info.MessageSource.Sender.User == clientPhone
-			
+			// For personal chats, we save all messages
 			// In personal chats, if I didn't send it, then it was sent to me
 			isPersonalChat := evt.Info.Chat.Server == types.DefaultUserServer && !evt.Info.IsGroup
 			

@@ -35,6 +35,8 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ Campaign creation - Schema updated
 - ✅ Device deletion - NULL handling
 - ✅ JavaScript errors - Syntax fixes
+- ✅ WhatsApp message storage - Fixed to capture both sent and received messages
+- ✅ Chat sync functionality - Added manual and auto-sync features
 
 ## 📋 Environment Variables (Railway)
 
@@ -136,7 +138,10 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
 1. Ensure `WHATSAPP_CHAT_STORAGE=true` is set
 2. Check if device is online
 3. Send a test message to trigger sync
-4. Refresh the WhatsApp Web view
+4. Click the "Sync" button in WhatsApp Web view
+5. Check Railway logs for any errors
+
+**Note**: Messages are now properly saved for both sent and received messages in personal chats.
 
 ### Campaign Creation Error?
 The database schema is automatically updated on startup. If you still get errors:
