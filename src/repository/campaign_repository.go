@@ -145,7 +145,7 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 
 
 // DeleteCampaign deletes a campaign
-func (r *campaignRepository) DeleteCampaign(campaignID string) error {
+func (r *campaignRepository) DeleteCampaign(campaignID int) error {
 	query := `DELETE FROM campaigns WHERE id = $1`
 	
 	result, err := r.db.Exec(query, campaignID)
