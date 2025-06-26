@@ -26,6 +26,7 @@ require (
 	go.mau.fi/libsignal v0.2.0
 	go.mau.fi/whatsmeow v0.0.0-20250617170509-947866bb9f75
 	golang.org/x/image v0.28.0
+	golang.org/x/net v0.41.0
 	google.golang.org/protobuf v1.36.6
 )
 
@@ -64,7 +65,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

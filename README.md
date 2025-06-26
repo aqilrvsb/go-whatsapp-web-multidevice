@@ -14,6 +14,7 @@ A powerful WhatsApp Multi-Device system designed for:
 - **Real-time analytics** and tracking
 - **Chat history storage**
 - **Campaign management**
+- **Proxy support** for ban prevention (NEW!)
 
 ## ✅ Current Status (All Working)
 
@@ -26,6 +27,7 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ **Chat storage** - Save all messages
 - ✅ **Auto-reply** - Automatic responses
 - ✅ **Webhooks** - Real-time notifications
+- ✅ **Proxy support** - Malaysian proxies for ban prevention
 
 ### Fixed Issues (June 27, 2025)
 - ✅ Build errors - Go 1.23, correct paths
@@ -37,6 +39,7 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ JavaScript errors - Syntax fixes
 - ✅ WhatsApp message storage - Fixed to capture both sent and received messages
 - ✅ Chat sync functionality - Added manual and auto-sync features
+- ✅ Proxy implementation - Auto-fetch Malaysian proxies
 
 ## 📋 Environment Variables (Railway)
 
@@ -58,6 +61,12 @@ WHATSAPP_AUTO_REPLY=Thank you for contacting us!
 # Optional Webhooks
 WHATSAPP_WEBHOOK=https://your-webhook.com
 WHATSAPP_WEBHOOK_SECRET=your-secret
+
+# Proxy Settings (NEW!)
+PROXY_ENABLED=true
+PROXY_AUTO_FETCH=true
+PROXY_COUNTRY=MY
+PROXY_UPDATE_INTERVAL=30
 ```
 
 ## 🔧 Installation & Deployment
@@ -208,6 +217,42 @@ When `WHATSAPP_WEBHOOK` is set, you'll receive:
 - `GET /api/campaigns` - List campaigns
 - `POST /api/campaigns` - Create campaign
 
+### Proxy Management (NEW!)
+- `GET /api/proxy/stats` - Proxy statistics
+- `GET /api/proxy/device/:device_id` - Get device proxy
+- `POST /api/proxy/refresh` - Refresh proxy list
+- `POST /api/proxy/assign` - Manually assign proxy
+
+## 🛡️ Proxy System
+
+### Automatic Malaysian Proxy Support
+The system now includes automatic proxy support to reduce ban risks:
+
+- **Auto-fetch**: Automatically fetches free Malaysian proxies from multiple sources
+- **Auto-assign**: Each device gets its own unique proxy IP
+- **Auto-rotate**: Failed proxies are automatically replaced
+- **Zero config**: Works out of the box with no manual setup
+
+### How It Works
+1. On startup, the system fetches Malaysian proxies from:
+   - Public proxy APIs
+   - GitHub proxy lists
+   - ProxyScrape API
+2. Validates proxies by testing WhatsApp connectivity
+3. Assigns a working proxy to each device
+4. Monitors proxy health and replaces failed ones
+
+### Proxy Sources
+- Free public APIs (filtered for Malaysia)
+- Community-maintained proxy lists
+- Malaysian IP ranges: 103.x, 175.x, 202.x, 203.x, 210.x, 218.x, 219.x
+
+### Benefits
+- Reduces ban risk by distributing traffic
+- Each device appears from a different IP
+- Automatic failover for reliability
+- No additional cost (uses free proxies)
+
 ## 🎉 Summary
 
 This WhatsApp Multi-Device system is production-ready with:
@@ -217,5 +262,6 @@ This WhatsApp Multi-Device system is production-ready with:
 - ✅ Broadcast capabilities
 - ✅ Analytics dashboard
 - ✅ Campaign management
+- ✅ Malaysian proxy support for ban prevention
 
 **Support**: Create an issue on GitHub for help!

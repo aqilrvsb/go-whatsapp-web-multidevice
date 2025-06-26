@@ -89,6 +89,13 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestMessage(app, messageUsecase)
 	rest.InitRestGroup(app, groupUsecase)
 	rest.InitRestNewsletter(app, newsletterUsecase)
+	
+	// Initialize proxy routes
+	proxyController := &rest.Proxy{}
+	app.Get("/api/proxy/stats", proxyController.GetProxyStats)
+	app.Get("/api/proxy/device/:device_id", proxyController.GetDeviceProxy)
+	app.Post("/api/proxy/refresh", proxyController.RefreshProxies)
+	app.Post("/api/proxy/assign", proxyController.AssignProxy)
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
