@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "golang.Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "/app/whatsapp"

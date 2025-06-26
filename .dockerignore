@@ -1,10 +1,50 @@
-.idea
-.vscode
+# Git files
 .git
 .gitignore
-.env
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Development files
+.env.example
 .env.local
-.env.development
-.env.test
-.env.production
-docker
+*.bat
+*.sh
+
+# Test files
+*_test.go
+test/
+
+# Build artifacts
+whatsapp
+whatsapp.exe
+main
+main.exe
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Local storage (will be created at runtime)
+storages/
+sessions/
+
+# Node modules (if any)
+node_modules/
+
+# Go workspace
+go.work
+go.work.sum
