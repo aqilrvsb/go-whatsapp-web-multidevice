@@ -216,7 +216,7 @@ func initApp() {
 	messageUsecase = usecase.NewMessageService(whatsappCli)
 	groupUsecase = usecase.NewGroupService(whatsappCli)
 	newsletterUsecase = usecase.NewNewsletterService(whatsappCli)
-	sequenceUsecase = usecase.NewSequenceService(whatsappCli, sendUsecase)
+	sequenceUsecase = usecase.NewSequenceUsecase(whatsappCli, sendUsecase)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
