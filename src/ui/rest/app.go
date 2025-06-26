@@ -1701,106 +1701,10 @@ func (handler *App) ResumeFailedWorkers(c *fiber.Ctx) error {
 }
 
 
-// GetWorkerStatus gets the status of all device workers
-func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
-	// Get session from cookie
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-
-	// Get user devices
-	devices, err := userRepo.GetUserDevices(session.UserID)
-	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "ERROR",
-			Message: "Failed to get devices",
-		})
-	}
-
-	// Get broadcast manager stats
-	broadcastManager := broadcast.GetBroadcastManager()
-	workerStats := broadcastManager.GetWorkerStats()
-
-	// Build device worker info
-	deviceWorkers := []map[string]interface{}{}
-	for _, device := range devices {
-		workerInfo := map[string]interface{}{
-			"device_id":     device.ID,
-			"device_name":   device.DeviceName,
-			"device_status": device.Status,
-			"worker_status": "not_running",
-			"queue_size":    0,
-			"processed":     0,
-			"failed":        0,
-		}
-
-		// Try to find worker info for this device
-		if workers, ok := workerStats["workers"].([]map[string]interface{}); ok {
-			for _, worker := range workers {
-				if worker["device_id"] == device.ID {
-					workerInfo["worker_status"] = worker["status"]
-					workerInfo["queue_size"] = worker["queue_size"]
-					workerInfo["processed"] = worker["processed"]
-					workerInfo["failed"] = worker["failed"]
-					workerInfo["last_activity"] = worker["last_activity"]
-					break
-				}
-			}
-		}
-
-		deviceWorkers = append(deviceWorkers, workerInfo)
-	}
-
-	response := map[string]interface{}{
-		"total_workers":      workerStats["total_workers"],
-		"user_devices":       len(devices),
-		"connected_devices":  countConnectedDevices(devices),
-		"device_workers":     deviceWorkers,
-	}
-
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: "Worker status",
-		Results: response,
-	})
-}
 
 // Helper functions
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 
-func countConnectedDevices(devices []*models.UserDevice) int {
-	count := 0
-	for _, device := range devices {
-		if device.Status == "connected" {
-			count++
-		}
-		}
-	}
-	return count
-}
 
 // StopAllWorkers stops all running device workers
 func (handler *App) StopAllWorkers(c *fiber.Ctx) error {
