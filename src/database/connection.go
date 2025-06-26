@@ -186,13 +186,10 @@ func InitializeSchema() error {
 	CREATE TABLE IF NOT EXISTS sequences (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
 		name VARCHAR(255) NOT NULL,
 		description TEXT,
 		niche VARCHAR(255),
 		status VARCHAR(50) DEFAULT 'draft',
-		auto_enroll BOOLEAN DEFAULT false,
-		skip_weekends BOOLEAN DEFAULT false,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
@@ -202,12 +199,10 @@ func InitializeSchema() error {
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
 		day_number INTEGER NOT NULL,
-		message_type VARCHAR(50) NOT NULL,
 		content TEXT,
-		media_url TEXT,
-		caption TEXT,
-		send_time TIME DEFAULT '10:00:00',
-		delay_days INTEGER DEFAULT 1,
+		image_url TEXT,
+		min_delay_seconds INTEGER DEFAULT 5,
+		max_delay_seconds INTEGER DEFAULT 15,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(sequence_id, day_number)
 	);

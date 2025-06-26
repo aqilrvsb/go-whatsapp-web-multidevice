@@ -47,6 +47,9 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ JavaScript errors - Syntax fixes
 - ✅ WhatsApp message storage - Fixed to capture both sent and received messages
 - ✅ Chat sync functionality - Added manual and auto-sync features
+- ✅ Foreign key constraint - Fixed campaign_id type mismatch
+- ✅ Sequence initialization - Added missing usecase initialization
+- ✅ Simplified sequences - Removed device requirement, simplified to match campaigns
 
 ## 📋 Environment Variables (Railway)
 
@@ -228,57 +231,50 @@ When `WHATSAPP_WEBHOOK` is set, you'll receive:
 - `POST /api/sequences/:id/start` - Start sequence
 - `POST /api/sequences/:id/pause` - Pause sequence
 
-## 📧 Message Sequences Feature
+## 📧 Message Sequences Feature (Updated June 27, 2025)
 
 ### What are Sequences?
-Automated drip campaigns that send messages over multiple days. Unlike campaigns which broadcast to all at once, sequences maintain individual progress for each contact - perfect for onboarding, follow-ups, and nurture campaigns.
+Simplified multi-day campaigns similar to regular campaigns but with automatic progression. Each contact maintains their own timeline - perfect for onboarding and follow-up sequences.
 
-### Key Features
-1. **Individual Timeline**: Each contact starts from Day 1 when added, regardless of when others started
-2. **Multi-Step Messages**: Create sequences with unlimited days/steps
-3. **Message Types**: Support for text, images, videos, and documents
-4. **Smart Scheduling**: Set specific send times for each day
-5. **Auto-Enrollment**: Automatically add new leads matching the sequence niche
-6. **Weekend Skipping**: Optional pause on weekends
-7. **Progress Tracking**: Monitor where each contact is in their journey
+### Simplified Features
+1. **Multi-Day Messages**: Create sequences with unlimited days
+2. **Individual Progress**: Each contact starts from Day 1 regardless of when added
+3. **Simple Content**: Text message + optional image URL (just like campaigns)
+4. **Per-Message Delays**: Min/max delay in seconds between messages
+5. **Niche Matching**: Auto-enroll contacts based on niche
+6. **Status Control**: Active, Paused, or Draft states
 
 ### How it Works
 1. **Create Sequence**: 
-   - Name your sequence (e.g., "5-Day Sales Funnel")
-   - Select device to send from
-   - Set niche/category for auto-enrollment
-   - Define messages for each day with send times
+   - Name and description
+   - Set niche for auto-enrollment
+   - Add days with messages and delays
 
 2. **Add Contacts**:
-   - Manual: Add specific phone numbers
-   - Automatic: New leads with matching niche are enrolled
+   - Manual: Add phone numbers
+   - Automatic: Contacts with matching niche
 
-3. **Individual Progress**:
-   - Day 1 contact gets Day 1 message today
-   - If new contact added tomorrow, they still start with Day 1
-   - Each contact maintains their own timeline
+3. **Message Delivery**:
+   - Each message sent with random delay (min/max seconds)
+   - Next day message sent 24 hours after previous
+   - Respects per-device rate limits
 
-4. **Message Delivery**:
-   - Background worker checks every minute
-   - Sends messages at scheduled times
-   - Respects device rate limits (min/max delay)
+### Example Sequences
 
-### Example Use Cases
-
-**Onboarding Sequence** (5 days):
+**Sales Sequence** (5 days):
 ```
-Day 1 (10:00 AM): Welcome! Here's how to get started...
-Day 2 (2:00 PM): Quick tip: Did you know you can...
-Day 3 (11:00 AM): Case study: How John increased sales by 50%
-Day 4 (3:00 PM): Exclusive offer - 20% off for new users
-Day 5 (10:00 AM): Last chance! Offer expires tonight
+Day 1: Welcome! Check out our special offer... [5-15 sec delay]
+Day 2: Did you see our products? Here's 10% off... [5-15 sec delay]
+Day 3: Customer success story + testimonial... [5-15 sec delay]
+Day 4: Limited time - 20% discount code... [5-15 sec delay]
+Day 5: Final reminder - offer expires tonight! [5-15 sec delay]
 ```
 
-**Follow-up Sequence** (3 days):
+**Onboarding Sequence** (3 days):
 ```
-Day 1 (9:00 AM): Thanks for your interest! Here's the info...
-Day 2 (2:00 PM): Any questions? We're here to help
-Day 3 (10:00 AM): Special bonus just for you
+Day 1: Thanks for joining! Here's how to start... [10-20 sec delay]
+Day 2: Pro tip: Try this feature... [10-20 sec delay]
+Day 3: Need help? Contact our support... [10-20 sec delay]
 ```
 
 ## 🚀 Broadcast System Architecture
@@ -414,3 +410,29 @@ This WhatsApp Multi-Device system is production-ready with:
 **Support**: Create an issue on GitHub for help!
  
 ## Deployment Trigger - Fri 27/06/2025  1:53:49.15 
+
+
+## Latest Update - June 27, 2025
+
+### Sequence System Simplified
+The sequence system has been simplified to match the campaign structure:
+- **No device selection required** - System automatically selects available devices
+- **Simple message format** - Text + optional image URL only
+- **Per-message delays** - Min/max seconds delay between messages
+- **Auto-enrollment** - Based on niche matching
+- **No complex scheduling** - Messages sent with delays, next day = 24 hours later
+
+### Key Improvements
+1. **Fixed nil pointer error** - Added missing sequence usecase initialization
+2. **Fixed foreign key constraint** - Changed campaign_id to INTEGER type
+3. **Simplified UI** - Removed unnecessary options
+4. **Better performance** - Streamlined message processing
+
+### Usage
+1. Go to Dashboard → Sequences tab
+2. Create sequence with name, description, and niche
+3. Add days with messages and delay settings
+4. Contacts are auto-enrolled based on niche
+5. Each contact progresses individually through the sequence
+
+---

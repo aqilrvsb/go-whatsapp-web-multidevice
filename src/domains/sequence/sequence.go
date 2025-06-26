@@ -23,89 +23,77 @@ type ISequenceUsecase interface {
 	ProcessSequences() error // Called by cron job
 }
 
-// CreateSequenceRequest for creating new sequence
+// CreateSequenceRequest for creating new sequence - simplified
 type CreateSequenceRequest struct {
 	Name        string                   `json:"name" validate:"required"`
 	Description string                   `json:"description"`
 	UserID      string                   `json:"user_id"`
-	DeviceID    string                   `json:"device_id" validate:"required"`
-	Niche       string                   `json:"niche"` // Auto-trigger based on lead niche
-	Steps       []SequenceStepRequest    `json:"steps" validate:"required,min=1"`
-	IsActive    bool                     `json:"is_active"`
+	Niche       string                   `json:"niche"`
+	Status      string                   `json:"status"`
+	Steps       []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
 }
 
-// SequenceStepRequest for each step in sequence
-type SequenceStepRequest struct {
-	Day         int    `json:"day" validate:"required,min=1"`
-	MessageType string `json:"message_type" validate:"required,oneof=text image video document"`
-	Content     string `json:"content" validate:"required"`
-	MediaURL    string `json:"media_url"`
-	Caption     string `json:"caption"`
-	SendTime    string `json:"send_time" validate:"required"` // HH:MM format
+// CreateSequenceStepRequest for each step
+type CreateSequenceStepRequest struct {
+	DayNumber       int    `json:"day_number" validate:"required,min=1"`
+	Content         string `json:"content"`
+	ImageURL        string `json:"image_url"`
+	MinDelaySeconds int    `json:"min_delay_seconds"`
+	MaxDelaySeconds int    `json:"max_delay_seconds"`
 }
 
 // UpdateSequenceRequest for updating sequence
 type UpdateSequenceRequest struct {
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Steps       []SequenceStepRequest `json:"steps"`
-	IsActive    bool                  `json:"is_active"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	Niche       string                   `json:"niche"`
+	Status      string                   `json:"status"`
+	Steps       []CreateSequenceStepRequest `json:"steps"`
 }
 
 // SequenceResponse basic sequence info
 type SequenceResponse struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	UserID       string    `json:"user_id"`
-	DeviceID     string    `json:"device_id"`
-	Niche        string    `json:"niche"`
-	TotalSteps   int       `json:"total_steps"`
-	TotalDays    int       `json:"total_days"`
-	IsActive     bool      `json:"is_active"`
-	ContactCount int       `json:"contact_count"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-// SequenceDetailResponse with full details
-type SequenceDetailResponse struct {
-	SequenceResponse
-	Steps []SequenceStepResponse `json:"steps"`
-	Stats SequenceStats         `json:"stats"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	Niche         string    `json:"niche"`
+	Status        string    `json:"status"`
+	ContactsCount int       `json:"contacts_count"`
+	StepCount     int       `json:"step_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Steps         []SequenceStepResponse `json:"steps,omitempty"`
 }
 
 // SequenceStepResponse for each step
 type SequenceStepResponse struct {
-	ID          string `json:"id"`
-	SequenceID  string `json:"sequence_id"`
-	Day         int    `json:"day"`
-	MessageType string `json:"message_type"`
-	Content     string `json:"content"`
-	MediaURL    string `json:"media_url"`
-	Caption     string `json:"caption"`
-	SendTime    string `json:"send_time"`
+	ID              string `json:"id"`
+	DayNumber       int    `json:"day_number"`
+	Content         string `json:"content"`
+	ImageURL        string `json:"image_url"`
+	MinDelaySeconds int    `json:"min_delay_seconds"`
+	MaxDelaySeconds int    `json:"max_delay_seconds"`
 }
 
-// SequenceContactResponse for contacts in sequence
+// SequenceDetailResponse includes full details
+type SequenceDetailResponse struct {
+	SequenceResponse
+	Contacts []SequenceContactResponse `json:"contacts"`
+}
+
+// SequenceContactResponse contact info
 type SequenceContactResponse struct {
-	ID            string    `json:"id"`
-	ContactPhone  string    `json:"contact_phone"`
-	ContactName   string    `json:"contact_name"`
-	CurrentDay    int       `json:"current_day"`
-	Status        string    `json:"status"` // active, completed, paused
-	AddedAt       time.Time `json:"added_at"`
-	LastMessageAt time.Time `json:"last_message_at"`
-	CompletedAt   *time.Time `json:"completed_at"`
+	ID           string     `json:"id"`
+	ContactPhone string     `json:"contact_phone"`
+	ContactName  string     `json:"contact_name"`
+	CurrentStep  int        `json:"current_step"`
+	Status       string     `json:"status"`
+	EnrolledAt   time.Time  `json:"enrolled_at"`
+	LastSentAt   *time.Time `json:"last_sent_at,omitempty"`
+	CompletedAt  *time.Time `json:"completed_at,omitempty"`
 }
 
-// SequenceStats statistics
-type SequenceStats struct {
-	TotalContacts    int `json:"total_contacts"`
-	ActiveContacts   int `json:"active_contacts"`
-	CompletedContacts int `json:"completed_contacts"`
-	PausedContacts   int `json:"paused_contacts"`
-	MessagesSent     int `json:"messages_sent"`
-	MessagesDelivered int `json:"messages_delivered"`
-	MessagesRead     int `json:"messages_read"`
+// AddContactsRequest for adding contacts
+type AddContactsRequest struct {
+	Contacts []string `json:"contacts" validate:"required,min=1"`
 }

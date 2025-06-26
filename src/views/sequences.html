@@ -185,7 +185,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="mb-0">Message Sequences</h2>
-                    <p class="text-muted mb-0">Create automated drip campaigns for your contacts</p>
+                    <p class="text-muted mb-0">Create multi-day automated campaigns</p>
                 </div>
                 <div class="col-auto">
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createSequenceModal">
@@ -258,21 +258,10 @@
                                 <label class="form-label">Description</label>
                                 <textarea class="form-control" id="sequenceDescription" rows="2"></textarea>
                             </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label class="form-label">Device <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="sequenceDevice" required>
-                                        <option value="">Select device</option>
-                                        {{ range .Devices }}
-                                        <option value="{{ .ID }}">{{ .DeviceName }} - {{ .Phone }}</option>
-                                        {{ end }}
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Niche/Category</label>
-                                    <input type="text" class="form-control" id="sequenceNiche" 
-                                           placeholder="e.g., Sales, Onboarding, Follow-up">
-                                </div>
+                            <div class="mb-3">
+                                <label class="form-label">Niche/Category</label>
+                                <input type="text" class="form-control" id="sequenceNiche" 
+                                       placeholder="e.g., Sales, Onboarding, Follow-up">
                             </div>
                         </div>
 
@@ -288,32 +277,23 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Send Time</label>
-                                            <input type="time" class="form-control step-time" value="10:00">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label">Message Type</label>
-                                            <select class="form-select step-type">
-                                                <option value="text">Text</option>
-                                                <option value="image">Image</option>
-                                                <option value="video">Video</option>
-                                                <option value="document">Document</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label">Delay (days after previous)</label>
-                                            <input type="number" class="form-control step-delay" value="0" min="0" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="mt-2">
-                                        <label class="form-label">Message Content</label>
+                                    <div class="mb-3">
+                                        <label class="form-label">Message</label>
                                         <textarea class="form-control step-content" rows="3" placeholder="Enter your message..."></textarea>
                                     </div>
-                                    <div class="mt-2 media-fields" style="display:none;">
-                                        <label class="form-label">Media URL</label>
-                                        <input type="url" class="form-control step-media-url" placeholder="https://example.com/image.jpg">
+                                    <div class="mb-3">
+                                        <label class="form-label">Image URL (Optional)</label>
+                                        <input type="url" class="form-control step-image-url" placeholder="https://example.com/image.jpg">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Min Delay (seconds)</label>
+                                            <input type="number" class="form-control step-min-delay" value="5" min="1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Max Delay (seconds)</label>
+                                            <input type="number" class="form-control step-max-delay" value="15" min="1">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -321,23 +301,6 @@
                             <button type="button" class="add-step-btn" id="addStepBtn">
                                 <i class="bi bi-plus-circle"></i> Add Next Day
                             </button>
-                        </div>
-
-                        <!-- Settings -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold mb-3">Settings</h6>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="autoEnroll" checked>
-                                <label class="form-check-label" for="autoEnroll">
-                                    Auto-enroll new leads matching the niche
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="skipWeekends">
-                                <label class="form-check-label" for="skipWeekends">
-                                    Skip weekends (pause on Saturday/Sunday)
-                                </label>
-                            </div>
                         </div>
                     </form>
                 </div>
@@ -378,7 +341,6 @@
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="/sequences/{id}">View Details</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="editSequence('{id}')">Edit</a></li>
                             <li><a class="dropdown-item" href="#" onclick="toggleSequence('{id}', '{status}')">{toggleText}</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="#" onclick="deleteSequence('{id}')">Delete</a></li>
@@ -386,7 +348,7 @@
                     </div>
                 </div>
                 
-                <p class="text-muted small mb-3">{niche}</p>
+                <p class="text-muted small mb-3">Niche: {niche}</p>
                 <p class="mb-3">{description}</p>
                 
                 <div class="step-timeline">
@@ -422,18 +384,6 @@
             // Add step button
             document.getElementById('addStepBtn').addEventListener('click', addStep);
             
-            // Message type change
-            document.addEventListener('change', function(e) {
-                if (e.target.classList.contains('step-type')) {
-                    const mediaFields = e.target.closest('.step-input').querySelector('.media-fields');
-                    if (e.target.value !== 'text') {
-                        mediaFields.style.display = 'block';
-                    } else {
-                        mediaFields.style.display = 'none';
-                    }
-                }
-            });
-            
             // Remove step
             document.addEventListener('click', function(e) {
                 if (e.target.closest('.remove-step')) {
@@ -448,7 +398,7 @@
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS' && data.results) {
-                    sequences = data.results;
+                    sequences = data.results || [];
                     displaySequences();
                 } else {
                     displayEmptyState();
@@ -458,7 +408,6 @@
                 Swal.fire('Error', 'Failed to load sequences', 'error');
             }
         }
-
         
         function displaySequences() {
             const active = sequences.filter(s => s.status === 'active');
@@ -475,6 +424,7 @@
             displaySequenceList('pausedSequencesList', paused);
             displaySequenceList('draftSequencesList', draft);
         }
+
         
         function displaySequenceList(containerId, sequences) {
             const container = document.getElementById(containerId);
@@ -493,7 +443,7 @@
                     .replace(/{id}/g, seq.id)
                     .replace(/{name}/g, seq.name || 'Untitled')
                     .replace(/{status}/g, seq.status)
-                    .replace(/{niche}/g, seq.niche || 'No category')
+                    .replace(/{niche}/g, seq.niche || 'General')
                     .replace(/{description}/g, seq.description || 'No description')
                     .replace(/{contacts_count}/g, seq.contacts_count || 0)
                     .replace(/{step_count}/g, seq.steps ? seq.steps.length : 0)
@@ -509,8 +459,8 @@
             
             return steps.slice(0, 3).map((step, index) => `
                 <div class="step-item">
-                    <strong>Day ${step.day_number}</strong> - ${step.send_time || '10:00 AM'}<br>
-                    <small class="text-muted">${step.message_type}: ${truncateText(step.content, 50)}</small>
+                    <strong>Day ${step.day_number}</strong><br>
+                    <small class="text-muted">${truncateText(step.content, 50)}</small>
                 </div>
             `).join('') + (steps.length > 3 ? '<p class="text-muted small">...and ' + (steps.length - 3) + ' more days</p>' : '');
         }
@@ -519,7 +469,6 @@
             if (!text) return '';
             return text.length > length ? text.substring(0, length) + '...' : text;
         }
-
         
         function displayEmptyState() {
             ['activeSequencesList', 'pausedSequencesList', 'draftSequencesList'].forEach(id => {
@@ -542,32 +491,23 @@
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <label class="form-label">Send Time</label>
-                            <input type="time" class="form-control step-time" value="10:00">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Message Type</label>
-                            <select class="form-select step-type">
-                                <option value="text">Text</option>
-                                <option value="image">Image</option>
-                                <option value="video">Video</option>
-                                <option value="document">Document</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Delay (days after previous)</label>
-                            <input type="number" class="form-control step-delay" value="1" min="0">
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <label class="form-label">Message Content</label>
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
                         <textarea class="form-control step-content" rows="3" placeholder="Enter your message..."></textarea>
                     </div>
-                    <div class="mt-2 media-fields" style="display:none;">
-                        <label class="form-label">Media URL</label>
-                        <input type="url" class="form-control step-media-url" placeholder="https://example.com/image.jpg">
+                    <div class="mb-3">
+                        <label class="form-label">Image URL (Optional)</label>
+                        <input type="url" class="form-control step-image-url" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Min Delay (seconds)</label>
+                            <input type="number" class="form-control step-min-delay" value="5" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Max Delay (seconds)</label>
+                            <input type="number" class="form-control step-max-delay" value="15" min="1">
+                        </div>
                     </div>
                 </div>
             `;
@@ -587,15 +527,6 @@
             steps.forEach((step, index) => {
                 step.dataset.step = index + 1;
                 step.querySelector('h6').textContent = `Day ${index + 1}`;
-                
-                // Update delay field
-                const delayInput = step.querySelector('.step-delay');
-                if (index === 0) {
-                    delayInput.value = 0;
-                    delayInput.readOnly = true;
-                } else {
-                    delayInput.readOnly = false;
-                }
             });
         }
 
@@ -612,25 +543,27 @@
             document.querySelectorAll('.step-input').forEach((stepEl, index) => {
                 const step = {
                     day_number: index + 1,
-                    message_type: stepEl.querySelector('.step-type').value,
                     content: stepEl.querySelector('.step-content').value,
-                    media_url: stepEl.querySelector('.step-media-url')?.value || '',
-                    send_time: stepEl.querySelector('.step-time').value,
-                    delay_days: parseInt(stepEl.querySelector('.step-delay').value) || 0
+                    image_url: stepEl.querySelector('.step-image-url').value || '',
+                    min_delay_seconds: parseInt(stepEl.querySelector('.step-min-delay').value) || 5,
+                    max_delay_seconds: parseInt(stepEl.querySelector('.step-max-delay').value) || 15
                 };
-                steps.push(step);
+                if (step.content || step.image_url) {
+                    steps.push(step);
+                }
             });
+            
+            if (steps.length === 0) {
+                Swal.fire('Error', 'Please add at least one message', 'error');
+                return;
+            }
             
             const sequenceData = {
                 name: document.getElementById('sequenceName').value,
                 description: document.getElementById('sequenceDescription').value,
-                device_id: document.getElementById('sequenceDevice').value,
                 niche: document.getElementById('sequenceNiche').value,
                 steps: steps,
-                settings: {
-                    auto_enroll: document.getElementById('autoEnroll').checked,
-                    skip_weekends: document.getElementById('skipWeekends').checked
-                }
+                status: 'draft'
             };
             
             try {
@@ -644,9 +577,13 @@
                 
                 const data = await response.json();
                 
-                if (data.code === 'CREATED' || data.code === 'SUCCESS') {
+                if (response.ok && (data.code === 'CREATED' || data.code === 'SUCCESS')) {
                     Swal.fire('Success', 'Sequence created successfully!', 'success');
                     bootstrap.Modal.getInstance(document.getElementById('createSequenceModal')).hide();
+                    // Reset form
+                    form.reset();
+                    document.getElementById('sequenceSteps').innerHTML = document.querySelector('.step-input').outerHTML;
+                    currentStep = 1;
                     loadSequences();
                 } else {
                     Swal.fire('Error', data.message || 'Failed to create sequence', 'error');
@@ -703,11 +640,6 @@
                     Swal.fire('Error', 'Failed to delete sequence', 'error');
                 }
             }
-        }
-        
-        function editSequence(id) {
-            // TODO: Implement edit functionality
-            window.location.href = `/sequences/${id}`;
         }
     </script>
 </body>
