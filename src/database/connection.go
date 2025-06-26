@@ -276,6 +276,9 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 0;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+	
+	-- Make device_id nullable since sequences use all user devices
+	ALTER TABLE sequences ALTER COLUMN device_id DROP NOT NULL;
 
 	-- Add missing columns to sequence_steps table
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS day INTEGER;

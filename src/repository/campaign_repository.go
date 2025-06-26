@@ -202,3 +202,43 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 	
 	return campaigns, nil
 }
+// GetCampaignsByUser gets all campaigns for a user
+func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
+	query := `
+		SELECT id, user_id, title, message, niche, image_url, 
+		       campaign_date, scheduled_time, status, created_at, updated_at
+		FROM campaigns
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var campaign models.Campaign
+		var scheduledTime sql.NullString
+		
+		err := rows.Scan(
+			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
+			&campaign.Niche, &campaign.ImageURL,
+			&campaign.CampaignDate, &scheduledTime, &campaign.Status,
+			&campaign.CreatedAt, &campaign.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		
+		if scheduledTime.Valid {
+			campaign.ScheduledTime = scheduledTime.String
+		}
+		
+		campaigns = append(campaigns, campaign)
+	}
+	
+	return campaigns, nil
+}

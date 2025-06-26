@@ -10,6 +10,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -80,6 +81,13 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/campaigns", rest.CreateCampaign)
 	app.Put("/api/campaigns/:id", rest.UpdateCampaign)
 	app.Delete("/api/campaigns/:id", rest.DeleteCampaign)
+	app.Get("/api/campaigns/summary", rest.GetCampaignSummary)
+	
+	// Sequence summary endpoint
+	app.Get("/api/sequences/summary", rest.GetSequenceSummary)
+	
+	// Worker status endpoint
+	app.Get("/api/workers/status", rest.GetWorkerStatus)
 	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
@@ -795,17 +803,25 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Validate required fields
+	if request.CampaignDate == "" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Campaign date is required",
+		})
+	}
+	
 	campaignRepo := repository.GetCampaignRepository()
 	campaign := &models.Campaign{
 		UserID:        user.ID,
 		Title:         request.Title,
 		Message:       request.Message,
-		DeviceID:      "", // Will be set later
 		Niche:         request.Niche,
 		ImageURL:      request.ImageURL,
-		ScheduledDate: request.CampaignDate,
+		CampaignDate:  request.CampaignDate,
 		ScheduledTime: request.ScheduledTime,
-		Status:        "pending",
+		Status:        "scheduled",
 	}
 	err = campaignRepo.CreateCampaign(campaign)
 	if err != nil {
@@ -1375,4 +1391,255 @@ func (handler *App) DiagnoseDevice(c *fiber.Ctx) error {
 		Message: "Device diagnostics",
 		Results: diagnostics,
 	})
+}
+// GetCampaignSummary gets campaign statistics
+func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get campaign statistics
+	campaignRepo := repository.GetCampaignRepository()
+	campaigns, err := campaignRepo.GetCampaignsByUser(session.UserID)
+	if err != nil {
+		campaigns = []models.Campaign{}
+	}
+	
+	// Calculate statistics
+	totalCampaigns := len(campaigns)
+	pendingCampaigns := 0
+	sentCampaigns := 0
+	failedCampaigns := 0
+	
+	for _, campaign := range campaigns {
+		switch campaign.Status {
+		case "scheduled", "pending":
+			pendingCampaigns++
+		case "sent":
+			sentCampaigns++
+		case "failed":
+			failedCampaigns++
+		}
+	}
+	
+	// Get broadcast message statistics
+	broadcastRepo := repository.GetBroadcastRepository()
+	broadcastStats, err := broadcastRepo.GetUserBroadcastStats(session.UserID)
+	if err != nil {
+		broadcastStats = map[string]interface{}{
+			"total_messages": 0,
+			"sent_messages": 0,
+			"failed_messages": 0,
+			"pending_messages": 0,
+		}
+	}
+	
+	summary := map[string]interface{}{
+		"campaigns": map[string]interface{}{
+			"total": totalCampaigns,
+			"pending": pendingCampaigns,
+			"sent": sentCampaigns,
+			"failed": failedCampaigns,
+		},
+		"messages": broadcastStats,
+		"recent_campaigns": campaigns[:min(5, len(campaigns))],
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaign summary",
+		Results: summary,
+	})
+}
+
+// GetSequenceSummary gets sequence statistics
+func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get sequence statistics
+	sequenceRepo := repository.GetSequenceRepository()
+	sequences, err := sequenceRepo.GetSequences(session.UserID)
+	if err != nil {
+		sequences = []models.Sequence{}
+	}
+	
+	// Calculate statistics
+	totalSequences := len(sequences)
+	activeSequences := 0
+	pausedSequences := 0
+	draftSequences := 0
+	totalContacts := 0
+	
+	for _, sequence := range sequences {
+		switch sequence.Status {
+		case "active":
+			activeSequences++
+		case "paused":
+			pausedSequences++
+		case "draft":
+			draftSequences++
+		}
+		totalContacts += sequence.ContactsCount
+	}
+	
+	summary := map[string]interface{}{
+		"sequences": map[string]interface{}{
+			"total": totalSequences,
+			"active": activeSequences,
+			"paused": pausedSequences,
+			"draft": draftSequences,
+		},
+		"contacts": map[string]interface{}{
+			"total": totalContacts,
+			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
+		},
+		"recent_sequences": sequences[:min(5, len(sequences))],
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Sequence summary",
+		Results: summary,
+	})
+}
+
+// GetWorkerStatus gets the status of all device workers
+func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user's devices
+	devices, err := userRepo.GetUserDevices(session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	
+	// Get broadcast manager stats
+	broadcastManager := broadcast.GetBroadcastManager()
+	workerStats := broadcastManager.GetWorkerStats()
+	
+	// Get worker status for each device
+	deviceWorkers := []map[string]interface{}{}
+	for _, device := range devices {
+		workerInfo := map[string]interface{}{
+			"device_id": device.ID,
+			"device_name": device.DeviceName,
+			"device_status": device.Status,
+			"worker_status": "not_running",
+			"queue_size": 0,
+			"processed": 0,
+			"failed": 0,
+		}
+		
+		// Find worker stats for this device
+		if workers, ok := workerStats["workers"].([]map[string]interface{}); ok {
+			for _, worker := range workers {
+				if worker["device_id"] == device.ID {
+					workerInfo["worker_status"] = worker["status"]
+					workerInfo["queue_size"] = worker["queue_size"]
+					workerInfo["processed"] = worker["processed"]
+					workerInfo["failed"] = worker["failed"]
+					workerInfo["last_activity"] = worker["last_activity"]
+					break
+				}
+			}
+		}
+		
+		deviceWorkers = append(deviceWorkers, workerInfo)
+	}
+	
+	response := map[string]interface{}{
+		"total_workers": workerStats["total_workers"],
+		"user_devices": len(devices),
+		"connected_devices": countConnectedDevices(devices),
+		"device_workers": deviceWorkers,
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Worker status",
+		Results: response,
+	})
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func countConnectedDevices(devices []*models.UserDevice) int {
+	count := 0
+	for _, device := range devices {
+		if device.Status == "connected" {
+			count++
+		}
+	}
+	return count
 }

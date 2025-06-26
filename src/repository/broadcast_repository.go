@@ -190,3 +190,40 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 	
 	return stats, nil
 }
+
+
+// GetUserBroadcastStats gets broadcast statistics for a user
+func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]interface{}, error) {
+	query := `
+		SELECT 
+			COUNT(*) as total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+			COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+		FROM broadcast_messages
+		WHERE user_id = $1
+	`
+	
+	var total, sent, failed, pending int
+	err := r.db.QueryRow(query, userID).Scan(&total, &sent, &failed, &pending)
+	if err != nil {
+		return nil, err
+	}
+	
+	stats := map[string]interface{}{
+		"total_messages": total,
+		"sent_messages": sent,
+		"failed_messages": failed,
+		"pending_messages": pending,
+		"success_rate": float64(sent) / float64(max(1, total)) * 100,
+	}
+	
+	return stats, nil
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
