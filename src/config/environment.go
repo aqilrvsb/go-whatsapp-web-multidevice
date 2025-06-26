@@ -44,7 +44,9 @@ func InitEnvironment() {
 		WhatsappAccountValidation = false
 	}
 	
-	if storage := os.Getenv("WHATSAPP_CHAT_STORAGE"); storage == "false" {
+	if storage := os.Getenv("WHATSAPP_CHAT_STORAGE"); storage == "true" {
+		WhatsappChatStorage = true
+	} else {
 		WhatsappChatStorage = false
 	}
 }

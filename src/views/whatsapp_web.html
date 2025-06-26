@@ -529,7 +529,27 @@
             const chatList = document.getElementById('chatList');
             chatList.innerHTML = '';
             
-            chats.forEach(chat => {
+            // Filter out chats with no messages if requested
+            const filteredChats = chats.filter(chat => {
+                // Only show chats that have a last message
+                return chat.lastMessage && chat.lastMessage.trim() !== '';
+            });
+            
+            if (filteredChats.length === 0) {
+                chatList.innerHTML = `
+                    <div class="text-center p-4">
+                        <i class="bi bi-chat-text" style="font-size: 48px; color: #667781;"></i>
+                        <p class="text-muted mt-3">No active chats found</p>
+                        <p class="small text-muted">Send or receive a message to see chats here</p>
+                        <button class="btn btn-primary btn-sm mt-2" onclick="syncChats()">
+                            <i class="bi bi-arrow-clockwise"></i> Sync Chats
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredChats.forEach(chat => {
                 const chatItem = document.createElement('div');
                 chatItem.className = 'chat-item';
                 chatItem.onclick = () => selectChat(chat);

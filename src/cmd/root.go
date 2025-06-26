@@ -108,8 +108,8 @@ func initEnvConfig() {
 	if envAccountValidation := viper.GetBool("WHATSAPP_ACCOUNT_VALIDATION"); envAccountValidation {
 		config.WhatsappAccountValidation = envAccountValidation
 	}
-	if envChatStorage := viper.GetBool("WHATSAPP_CHAT_STORAGE"); !envChatStorage {
-		config.WhatsappChatStorage = envChatStorage
+	if envChatStorage := viper.GetBool("WHATSAPP_CHAT_STORAGE"); envChatStorage {
+		config.WhatsappChatStorage = true
 	}
 }
 
