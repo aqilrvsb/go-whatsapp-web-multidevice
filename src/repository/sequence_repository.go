@@ -316,6 +316,8 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	
 	if err == nil {
 		stats["messages_sent"] = messageCount
+	}
+	
 	return stats, nil
 }
 
