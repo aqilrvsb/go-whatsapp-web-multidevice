@@ -28,16 +28,23 @@ type CreateSequenceRequest struct {
 	Name        string                   `json:"name" validate:"required"`
 	Description string                   `json:"description"`
 	UserID      string                   `json:"user_id"`
+	DeviceID    string                   `json:"device_id"`
 	Niche       string                   `json:"niche"`
 	Status      string                   `json:"status"`
+	IsActive    bool                     `json:"is_active"`
 	Steps       []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
 }
 
 // CreateSequenceStepRequest for each step
 type CreateSequenceStepRequest struct {
+	Day             int    `json:"day"`
 	DayNumber       int    `json:"day_number" validate:"required,min=1"`
+	MessageType     string `json:"message_type"`
+	SendTime        string `json:"send_time"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
+	MediaURL        string `json:"media_url"`
+	Caption         string `json:"caption"`
 	MinDelaySeconds int    `json:"min_delay_seconds"`
 	MaxDelaySeconds int    `json:"max_delay_seconds"`
 }
@@ -56,8 +63,14 @@ type SequenceResponse struct {
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
+	UserID        string    `json:"user_id"`
+	DeviceID      string    `json:"device_id"`
 	Niche         string    `json:"niche"`
 	Status        string    `json:"status"`
+	TotalSteps    int       `json:"total_steps"`
+	TotalDays     int       `json:"total_days"`
+	IsActive      bool      `json:"is_active"`
+	ContactCount  int       `json:"contact_count"`
 	ContactsCount int       `json:"contacts_count"`
 	StepCount     int       `json:"step_count"`
 	CreatedAt     time.Time `json:"created_at"`
