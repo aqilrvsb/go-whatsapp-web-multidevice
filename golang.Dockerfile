@@ -7,17 +7,16 @@ RUN apk add --no-cache git gcc musl-dev
 # Set working directory
 WORKDIR /build
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# Copy entire project
+COPY . .
+
+# Change to src directory
+WORKDIR /build/src
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
-COPY . .
-
 # Build the application
-WORKDIR /build/src
 RUN go build -a -ldflags="-w -s" -o /app/whatsapp
 
 # Final stage
@@ -37,7 +36,7 @@ COPY --from=builder /app/whatsapp .
 
 # Copy static files if any
 COPY --from=builder /build/src/views ./views
-COPY --from=builder /build/src/public ./public
+COPY --from=builder /build/src/statics ./statics
 
 # Create necessary directories
 RUN mkdir -p /app/storages /app/sessions && \

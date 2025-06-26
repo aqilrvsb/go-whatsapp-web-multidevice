@@ -7,17 +7,16 @@ RUN apk add --no-cache git
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# Copy entire project
+COPY . .
+
+# Change to src directory where go.mod is located
+WORKDIR /app/src
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
-COPY . .
-
 # Build the application
-WORKDIR /app/src
 RUN go build -o /app/main .
 
 # Runtime stage
@@ -33,7 +32,7 @@ COPY --from=builder /app/main .
 
 # Copy templates and static files
 COPY --from=builder /app/src/views ./views
-COPY --from=builder /app/src/public ./public
+COPY --from=builder /app/src/statics ./statics
 
 # Create directories for storage
 RUN mkdir -p /app/storages /app/sessions
