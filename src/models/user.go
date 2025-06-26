@@ -25,6 +25,7 @@ type UserDevice struct {
 	Status          string    `json:"status"` // online, offline, connecting
 	LastSeen        time.Time `json:"lastSeen"`
 	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 	JID             string    `json:"jid,omitempty"`
 	MinDelaySeconds int       `json:"minDelaySeconds"`
 	MaxDelaySeconds int       `json:"maxDelaySeconds"`

@@ -310,7 +310,7 @@ func (r *userRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 }
 
 // UpdateDeviceStatus updates device status
-func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
+func (r *userRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
 	query := `
 		UPDATE user_devices 
 		SET status = $2, last_seen = CURRENT_TIMESTAMP, phone = $3, jid = $4

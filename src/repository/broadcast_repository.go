@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/google/uuid"
 )
@@ -18,7 +19,7 @@ var broadcastRepo *broadcastRepository
 func GetBroadcastRepository() *broadcastRepository {
 	if broadcastRepo == nil {
 		broadcastRepo = &broadcastRepository{
-			db: db,
+			db: database.GetDB(),
 		}
 	}
 	return broadcastRepo

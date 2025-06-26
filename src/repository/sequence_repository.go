@@ -2,9 +2,9 @@ package repository
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/google/uuid"
 )
@@ -19,7 +19,7 @@ var sequenceRepo *sequenceRepository
 func GetSequenceRepository() *sequenceRepository {
 	if sequenceRepo == nil {
 		sequenceRepo = &sequenceRepository{
-			db: db,
+			db: database.GetDB(),
 		}
 	}
 	return sequenceRepo

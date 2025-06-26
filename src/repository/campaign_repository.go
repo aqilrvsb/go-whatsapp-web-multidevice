@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/google/uuid"
 )
@@ -18,7 +19,7 @@ var campaignRepo *campaignRepository
 func GetCampaignRepository() *campaignRepository {
 	if campaignRepo == nil {
 		campaignRepo = &campaignRepository{
-			db: db,
+			db: database.GetDB(),
 		}
 	}
 	return campaignRepo
