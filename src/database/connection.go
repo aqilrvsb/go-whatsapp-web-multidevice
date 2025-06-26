@@ -136,6 +136,12 @@ func InitializeSchema() error {
 	
 	-- Remove old unique constraint if it exists
 	ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_user_id_campaign_date_key;
+	
+	-- Add missing columns to campaigns if they don't exist
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time TIME;
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled';
 
 	-- Create whatsapp_chats table to store chat list
 	CREATE TABLE IF NOT EXISTS whatsapp_chats (
