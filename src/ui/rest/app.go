@@ -674,14 +674,31 @@ func (handler *App) DeleteLead(c *fiber.Ctx) error {
 
 // GetCampaigns gets all campaigns for the user
 func (handler *App) GetCampaigns(c *fiber.Ctx) error {
-	userEmail := c.Locals("email").(string)
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED", 
+			Message: "No session token",
+		})
+	}
 	
 	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
 			Message: "User not found",
 		})
 	}
@@ -699,23 +716,45 @@ func (handler *App) GetCampaigns(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Group campaigns by date for calendar display
-	campaignsByDate := make(map[string][]repository.Campaign)
-	for _, campaign := range campaigns {
-		campaignsByDate[campaign.CampaignDate] = append(campaignsByDate[campaign.CampaignDate], campaign)
-	}
-	
+	// Return campaigns as array for frontend
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Campaigns retrieved successfully",
-		Results: campaignsByDate,
+		Results: campaigns,
 	})
 }
 
 // CreateCampaign creates a new campaign
 func (handler *App) CreateCampaign(c *fiber.Ctx) error {
-	userEmail := c.Locals("email").(string)
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
 	
 	var request struct {
 		CampaignDate  string `json:"campaign_date"`
@@ -731,16 +770,6 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 			Status:  400,
 			Code:    "BAD_REQUEST",
 			Message: "Invalid request body",
-		})
-	}
-	
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "User not found",
 		})
 	}
 	
@@ -765,7 +794,35 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 // UpdateCampaign updates an existing campaign
 func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	campaignId := c.Params("id")
-	userEmail := c.Locals("email").(string)
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
 	
 	var request struct {
 		Title         string `json:"title"`
@@ -781,16 +838,6 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 			Status:  400,
 			Code:    "BAD_REQUEST",
 			Message: "Invalid request body",
-		})
-	}
-	
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "User not found",
 		})
 	}
 	
@@ -815,14 +862,32 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 // DeleteCampaign deletes a campaign
 func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 	campaignId := c.Params("id")
-	userEmail := c.Locals("email").(string)
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
 	
 	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
 			Message: "User not found",
 		})
 	}

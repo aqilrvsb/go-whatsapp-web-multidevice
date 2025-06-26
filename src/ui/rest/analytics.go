@@ -14,25 +14,24 @@ func (handler *App) GetAnalyticsData(c *fiber.Ctx) error {
 	days := c.Params("days", "7")
 	deviceFilter := c.Query("device", "all")
 	
-	// Get user from session token
-	token := c.Get("Authorization")
-	if token == "" {
-		token = c.Get("X-Auth-Token")
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
 	}
 	
 	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(token)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
-		// Fallback to header for now
-		userID := c.Get("X-User-ID", "")
-		if userID == "" {
-			return c.Status(401).JSON(utils.ResponseData{
-				Status:  401,
-				Code:    "UNAUTHORIZED",
-				Message: "Invalid session",
-			})
-		}
-		session = &models.UserSession{UserID: userID}
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
 	}
 	
 	daysInt := 7
@@ -76,14 +75,18 @@ func (handler *App) GetCustomAnalyticsData(c *fiber.Ctx) error {
 	endStr := c.Query("end")
 	deviceFilter := c.Query("device", "all")
 	
-	// Get user from session token
-	token := c.Get("Authorization")
-	if token == "" {
-		token = c.Get("X-Auth-Token")
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
 	}
 	
 	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(token)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
