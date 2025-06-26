@@ -36,7 +36,7 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	
-	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, sequence.DeviceID, 
+	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, nil, // device_id is NULL - sequences use all user devices
 		sequence.Name, sequence.Description, sequence.Niche, sequence.TotalDays, sequence.IsActive,
 		sequence.CreatedAt, sequence.UpdatedAt)
 		

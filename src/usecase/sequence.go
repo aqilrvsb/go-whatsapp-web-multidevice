@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -30,20 +29,15 @@ func NewSequenceUsecase(waCli *whatsmeow.Client, sendService domainSend.ISendUse
 func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRequest) (domainSequence.SequenceResponse, error) {
 	var response domainSequence.SequenceResponse
 	
-	// Generate UUID if not provided
-	if request.DeviceID == "" {
-		request.DeviceID = uuid.New().String()
-	}
-	
-	// Create sequence
+	// Create sequence - no device_id needed as it will use all user's connected devices
 	sequence := &models.Sequence{
 		UserID:      request.UserID,
-		DeviceID:    request.DeviceID,
 		Name:        request.Name,
 		Description: request.Description,
 		Niche:       request.Niche,
 		TotalDays:   len(request.Steps),
 		IsActive:    request.IsActive,
+		Status:      request.Status,
 	}
 	
 	repo := repository.GetSequenceRepository()
@@ -73,10 +67,11 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		Name:        sequence.Name,
 		Description: sequence.Description,
 		UserID:      sequence.UserID,
-		DeviceID:    sequence.DeviceID,
+		DeviceID:    nil, // Sequences use all user devices
 		TotalSteps:  len(request.Steps),
 		TotalDays:   sequence.TotalDays,
 		IsActive:    sequence.IsActive,
+		Status:      sequence.Status,
 		CreatedAt:   sequence.CreatedAt,
 		UpdatedAt:   sequence.UpdatedAt,
 	}

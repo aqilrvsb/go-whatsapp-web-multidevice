@@ -8,7 +8,7 @@ import (
 type Sequence struct {
 	ID              string         `json:"id" db:"id"`
 	UserID          string         `json:"user_id" db:"user_id"`
-	DeviceID        string         `json:"device_id" db:"device_id"` // Added for compatibility
+	DeviceID        *string        `json:"device_id" db:"device_id"` // Nullable - sequences use all user devices
 	Name            string         `json:"name" db:"name"`
 	Description     string         `json:"description" db:"description"`
 	Niche           string         `json:"niche" db:"niche"`

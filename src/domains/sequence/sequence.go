@@ -28,7 +28,7 @@ type CreateSequenceRequest struct {
 	Name        string                   `json:"name" validate:"required"`
 	Description string                   `json:"description"`
 	UserID      string                   `json:"user_id"`
-	DeviceID    string                   `json:"device_id"`
+	DeviceID    *string                  `json:"device_id"` // Optional - sequences use all user devices
 	Niche       string                   `json:"niche"`
 	Status      string                   `json:"status"`
 	IsActive    bool                     `json:"is_active"`
@@ -65,7 +65,7 @@ type SequenceResponse struct {
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
 	UserID        string    `json:"user_id"`
-	DeviceID      string    `json:"device_id"`
+	DeviceID      *string   `json:"device_id"` // Optional - sequences use all user devices
 	Niche         string    `json:"niche"`
 	Status        string    `json:"status"`
 	TotalSteps    int       `json:"total_steps"`
