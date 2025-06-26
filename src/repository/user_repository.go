@@ -234,7 +234,7 @@ func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserD
 	query := `
 		INSERT INTO user_devices (id, user_id, device_name, status, last_seen, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING created_at, updated_at
+		RETURNING created_at, last_seen
 	`
 	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
 		device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
@@ -313,18 +313,17 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 // GetDevice gets a specific device by ID
 func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, updated_at, last_seen
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, last_seen
 		FROM user_devices
 		WHERE user_id = $1 AND id = $2
 	`
 	
 	var device models.UserDevice
-	var updatedAt sql.NullTime
 	
 	err := r.db.QueryRow(query, userID, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName,
 		&device.Phone, &device.JID, &device.Status,
-		&device.CreatedAt, &updatedAt, &device.LastSeen,
+		&device.CreatedAt, &device.LastSeen,
 	)
 	
 	if err == sql.ErrNoRows {
@@ -333,10 +332,6 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 	
 	if err != nil {
 		return nil, fmt.Errorf("failed to get device: %w", err)
-	}
-	
-	if updatedAt.Valid {
-		device.UpdatedAt = updatedAt.Time
 	}
 	
 	return &device, nil
@@ -345,18 +340,17 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 // GetDeviceByID gets a device by ID only (used for deletion)
 func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, updated_at, last_seen
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, last_seen
 		FROM user_devices
 		WHERE id = $1
 	`
 	
 	var device models.UserDevice
-	var updatedAt sql.NullTime
 	
 	err := r.db.QueryRow(query, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName,
 		&device.Phone, &device.JID, &device.Status,
-		&device.CreatedAt, &updatedAt, &device.LastSeen,
+		&device.CreatedAt, &device.LastSeen,
 	)
 	
 	if err == sql.ErrNoRows {
@@ -365,10 +359,6 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 	
 	if err != nil {
 		return nil, fmt.Errorf("failed to get device: %w", err)
-	}
-	
-	if updatedAt.Valid {
-		device.UpdatedAt = updatedAt.Time
 	}
 	
 	return &device, nil
@@ -420,7 +410,7 @@ func (r *UserRepository) CleanupExpiredSessions() error {
 func (r *UserRepository) UpdateDevicePhone(userID, deviceID, phone string) error {
 	query := `
 		UPDATE user_devices 
-		SET phone = $1, updated_at = CURRENT_TIMESTAMP
+		SET phone = $1, last_seen = CURRENT_TIMESTAMP
 		WHERE user_id = $2 AND id = $3
 	`
 	result, err := r.db.Exec(query, phone, userID, deviceID)
