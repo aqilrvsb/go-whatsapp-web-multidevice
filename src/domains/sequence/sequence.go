@@ -102,6 +102,7 @@ type SequenceStats struct {
 	CompletedContacts int `json:"completed_contacts"`
 	PausedContacts   int `json:"paused_contacts"`
 	TotalMessagesSent int `json:"total_messages_sent"`
+	MessagesSent     int `json:"messages_sent"`
 	SuccessRate      float64 `json:"success_rate"`
 }
 
@@ -120,8 +121,10 @@ type SequenceContactResponse struct {
 	CurrentStep  int        `json:"current_step"`
 	CurrentDay   int        `json:"current_day"`
 	Status       string     `json:"status"`
+	AddedAt      time.Time  `json:"added_at"`
 	EnrolledAt   time.Time  `json:"enrolled_at"`
 	LastSentAt   *time.Time `json:"last_sent_at,omitempty"`
+	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`
 }
 
