@@ -306,10 +306,13 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 	message := ExtractMessageText(evt)
 	utils.RecordMessage(evt.Info.ID, evt.Info.Sender.String(), message)
 	
+	log.Infof("WhatsappChatStorage enabled: %v", config.WhatsappChatStorage)
+	
 	// Save message to WhatsApp storage for all connected devices
-	cm := GetClientManager()
-	allClients := cm.GetAllClients()
-	for deviceID, client := range allClients {
+	if config.WhatsappChatStorage {
+		cm := GetClientManager()
+		allClients := cm.GetAllClients()
+		for deviceID, client := range allClients {
 		// Skip group messages - we only want personal chats
 		if evt.Info.IsGroup || evt.Info.Chat.Server == types.GroupServer {
 			continue
@@ -324,8 +327,15 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 		if evt.Info.Chat.Server != types.DefaultUserServer {
 			continue
 		}
-		// Check if this message belongs to this client
-		if client.Store.ID != nil && evt.Info.MessageSource.Sender.User == client.Store.ID.User {
+		// Check if this message belongs to this client's conversation
+		// Either sent by this client OR sent to this client
+		if client.Store.ID != nil {
+			// For personal chats, check if the message is part of this client's conversations
+			isMyMessage := evt.Info.MessageSource.Sender.User == client.Store.ID.User
+			isToMe := evt.Info.Chat.User == client.Store.ID.User
+			
+			// Save if it's my message OR if it's a message in a chat with me
+			if isMyMessage || isToMe || !evt.Info.IsGroup {
 			// Get sender name
 			senderName := ""
 			if evt.Info.IsFromMe {
@@ -417,7 +427,9 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 			}
 			
 			break
+			}
 		}
+	}
 	}
 	
 	// Record to database for analytics
