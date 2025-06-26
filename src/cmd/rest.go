@@ -117,7 +117,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	}
 	
 	// Start broadcast manager
-	broadcastManager := broadcast.GetBroadcastManager()
+	_ = broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
 	
 	// Start campaign/sequence trigger processor
