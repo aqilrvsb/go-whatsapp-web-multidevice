@@ -285,6 +285,8 @@ func InitializeSchema() error {
 
 	-- Add missing columns to sequence_contacts table  
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMP;
 
 	-- Create sequence_logs table if not exists
 	CREATE TABLE IF NOT EXISTS sequence_logs (
