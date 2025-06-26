@@ -286,7 +286,7 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 }
 
 // GetDeviceByID gets a device by ID
-func (r *userRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
+func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
 	var device models.UserDevice
 	query := `
 		SELECT id, user_id, device_name, phone, jid, status, 
@@ -310,7 +310,7 @@ func (r *userRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 }
 
 // UpdateDeviceStatus updates device status
-func (r *userRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
+func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
 	query := `
 		UPDATE user_devices 
 		SET status = $2, last_seen = CURRENT_TIMESTAMP, phone = $3, jid = $4
