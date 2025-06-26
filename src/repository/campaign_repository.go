@@ -28,21 +28,21 @@ func GetCampaignRepository() *campaignRepository {
 
 // CreateCampaign creates a new campaign
 func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
-	campaign.ID = uuid.New().String()
 	campaign.CreatedAt = time.Now()
 	campaign.UpdatedAt = time.Now()
 	
 	query := `
 		INSERT INTO campaigns 
-		(id, user_id, device_id, title, niche, message, image_url, 
-		 scheduled_date, scheduled_time, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		(user_id, campaign_date, title, niche, message, image_url, 
+		 scheduled_time, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		RETURNING id
 	`
 	
-	_, err := r.db.Exec(query, campaign.ID, campaign.UserID, campaign.DeviceID,
+	err := r.db.QueryRow(query, campaign.UserID, campaign.CampaignDate,
 		campaign.Title, campaign.Niche, campaign.Message, campaign.ImageURL,
-		campaign.ScheduledDate, campaign.ScheduledTime, campaign.Status,
-		campaign.CreatedAt, campaign.UpdatedAt)
+		campaign.ScheduledTime, campaign.Status,
+		campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
 		
 	return err
 }
@@ -50,10 +50,10 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 // GetCampaignByDateAndNiche gets campaigns by date and niche
 func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, device_id, title, niche, message, image_url, 
-		       scheduled_date, scheduled_time, status, created_at, updated_at
+		SELECT id, user_id, title, niche, message, image_url, 
+		       campaign_date, scheduled_time, status, created_at, updated_at
 		FROM campaigns
-		WHERE scheduled_date = $1 AND niche = $2 AND status = 'pending'
+		WHERE campaign_date = $1 AND niche = $2 AND status != 'sent'
 	`
 	
 	rows, err := r.db.Query(query, scheduledDate, niche)
@@ -65,13 +65,20 @@ func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche stri
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
-		err := rows.Scan(&campaign.ID, &campaign.UserID, &campaign.DeviceID,
+		var scheduledTime sql.NullString
+		
+		err := rows.Scan(&campaign.ID, &campaign.UserID,
 			&campaign.Title, &campaign.Niche, &campaign.Message, &campaign.ImageURL,
-			&campaign.ScheduledDate, &campaign.ScheduledTime, &campaign.Status,
+			&campaign.CampaignDate, &scheduledTime, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt)
 		if err != nil {
 			continue
 		}
+		
+		if scheduledTime.Valid {
+			campaign.ScheduledTime = scheduledTime.String
+		}
+		
 		campaigns = append(campaigns, campaign)
 	}
 	
@@ -85,12 +92,12 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 	query := `
 		UPDATE campaigns 
 		SET title = $1, niche = $2, message = $3, image_url = $4,
-		    scheduled_date = $5, scheduled_time = $6, status = $7, updated_at = $8
+		    campaign_date = $5, scheduled_time = $6, status = $7, updated_at = $8
 		WHERE id = $9
 	`
 	
 	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, campaign.Message,
-		campaign.ImageURL, campaign.ScheduledDate, campaign.ScheduledTime,
+		campaign.ImageURL, campaign.CampaignDate, campaign.ScheduledTime,
 		campaign.Status, campaign.UpdatedAt, campaign.ID)
 		
 	return err
@@ -159,10 +166,10 @@ func (r *campaignRepository) DeleteCampaign(campaignID string) error {
 // GetCampaignsByDate gets all campaigns scheduled for a specific date
 func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, title, message, device_id, niche, image_url, 
-		       scheduled_date, scheduled_time, status, created_at, updated_at
+		SELECT id, user_id, title, message, niche, image_url, 
+		       campaign_date, scheduled_time, status, created_at, updated_at
 		FROM campaigns
-		WHERE scheduled_date = $1 AND status = 'pending'
+		WHERE campaign_date = $1 AND status != 'sent'
 		ORDER BY scheduled_time ASC
 	`
 	
@@ -179,8 +186,8 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.DeviceID, &campaign.Niche, &campaign.ImageURL,
-			&campaign.ScheduledDate, &scheduledTime, &campaign.Status,
+			&campaign.Niche, &campaign.ImageURL,
+			&campaign.CampaignDate, &scheduledTime, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
