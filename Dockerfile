@@ -17,7 +17,7 @@ WORKDIR /app/src
 RUN go mod download
 
 # Build the application
-RUN go build -o /app/main .
+RUN go build -o /app/whatsapp .
 
 # Runtime stage
 FROM alpine:latest
@@ -28,7 +28,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/main .
+COPY --from=builder /app/whatsapp .
 
 # Copy templates and static files
 COPY --from=builder /app/src/views ./views
@@ -41,4 +41,4 @@ RUN mkdir -p /app/storages /app/sessions
 EXPOSE 3000
 
 # Run the binary
-CMD ["./main"]
+CMD ["./whatsapp"]
