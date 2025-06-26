@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -28,6 +29,11 @@ func NewSequenceUsecase(waCli *whatsmeow.Client, sendService domainSend.ISendUse
 // CreateSequence creates a new sequence
 func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRequest) (domainSequence.SequenceResponse, error) {
 	var response domainSequence.SequenceResponse
+	
+	// Generate UUID if not provided
+	if request.DeviceID == "" {
+		request.DeviceID = uuid.New().String()
+	}
 	
 	// Create sequence
 	sequence := &models.Sequence{

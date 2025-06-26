@@ -282,8 +282,11 @@
                                         <textarea class="form-control step-content" rows="3" placeholder="Enter your message..."></textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Image URL (Optional)</label>
-                                        <input type="url" class="form-control step-image-url" placeholder="https://example.com/image.jpg">
+                                        <label class="form-label">Image (Optional)</label>
+                                        <input type="file" class="form-control step-image-file" accept="image/*" onchange="compressStepImage(this)">
+                                        <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
+                                        <input type="hidden" class="step-image-url">
+                                        <div class="step-image-preview mt-2"></div>
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6">
@@ -496,8 +499,11 @@
                         <textarea class="form-control step-content" rows="3" placeholder="Enter your message..."></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Image URL (Optional)</label>
-                        <input type="url" class="form-control step-image-url" placeholder="https://example.com/image.jpg">
+                        <label class="form-label">Image (Optional)</label>
+                        <input type="file" class="form-control step-image-file" accept="image/*" onchange="compressStepImage(this)">
+                        <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
+                        <input type="hidden" class="step-image-url">
+                        <div class="step-image-preview mt-2"></div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -640,6 +646,72 @@
                     Swal.fire('Error', 'Failed to delete sequence', 'error');
                 }
             }
+        }
+        
+        function compressStepImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Start with original dimensions
+                    let width = img.width;
+                    let height = img.height;
+                    let quality = 0.9;
+                    
+                    // First resize if image is too large
+                    const maxSize = 1000;
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Find the corresponding hidden input and preview div
+                    const stepDiv = input.closest('.step-input');
+                    const hiddenInput = stepDiv.querySelector('.step-image-url');
+                    const previewDiv = stepDiv.querySelector('.step-image-preview');
+                    
+                    // Compress until under 350KB
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                // Convert to base64
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    hiddenInput.value = e.target.result;
+                                    previewDiv.innerHTML = 
+                                        `<img src="${e.target.result}" class="img-thumbnail" style="max-height: 150px;">
+                                         <small class="d-block mt-1">Size: ${(blob.size / 1024).toFixed(0)}KB</small>`;
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    
+                    tryCompress();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
     </script>
 </body>
