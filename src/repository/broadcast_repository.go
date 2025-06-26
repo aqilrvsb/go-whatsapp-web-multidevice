@@ -9,16 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
-type broadcastRepository struct {
+type BroadcastRepository struct {
 	db *sql.DB
 }
 
-var broadcastRepo *broadcastRepository
+var broadcastRepo *BroadcastRepository
 
 // GetBroadcastRepository returns broadcast repository instance
-func GetBroadcastRepository() *broadcastRepository {
+func GetBroadcastRepository() *BroadcastRepository {
 	if broadcastRepo == nil {
-		broadcastRepo = &broadcastRepository{
+		broadcastRepo = &BroadcastRepository{
 			db: database.GetDB(),
 		}
 	}
@@ -26,38 +26,45 @@ func GetBroadcastRepository() *broadcastRepository {
 }
 
 // QueueMessage adds a message to the queue
-func (r *broadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage) error {
+func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage) error {
 	if msg.ID == "" {
 		msg.ID = uuid.New().String()
 	}
 	
 	query := `
-		INSERT INTO message_queue 
-		(id, device_id, message_type, reference_id, contact_phone, content, 
-		 media_url, caption, priority, status, scheduled_at, created_at)
+		INSERT INTO broadcast_messages 
+		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
+		 message_type, content, media_url, status, scheduled_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	
-	_, err := r.db.Exec(query, msg.ID, msg.DeviceID, msg.Type, msg.ReferenceID,
-		msg.Phone, msg.Content, msg.MediaURL, msg.Caption, msg.Priority,
-		"pending", msg.ScheduledAt, time.Now())
+	// Get user_id from device
+	var userID string
+	err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = $1", msg.DeviceID).Scan(&userID)
+	if err != nil {
+		return err
+	}
+	
+	_, err = r.db.Exec(query, msg.ID, userID, msg.DeviceID, msg.CampaignID,
+		msg.SequenceID, msg.RecipientPhone, msg.Type, msg.Content, 
+		msg.MediaURL, "pending", msg.ScheduledAt, time.Now())
 		
 	return err
 }
 
-// GetPendingMessages gets pending messages for processing
-func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
+// GetPendingMessages gets pending messages for a device
+func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
-		SELECT id, device_id, message_type, reference_id, contact_phone, 
-		       content, media_url, caption, priority, scheduled_at, retry_count
-		FROM message_queue
-		WHERE status = 'pending'
-		AND (scheduled_at IS NULL OR scheduled_at <= $1)
-		ORDER BY priority DESC, created_at ASC
-		LIMIT $2
+		SELECT id, device_id, campaign_id, sequence_id, recipient_phone, 
+		       message_type, content, media_url, scheduled_at
+		FROM broadcast_messages
+		WHERE device_id = $1 AND status = 'pending'
+		AND (scheduled_at IS NULL OR scheduled_at <= $2)
+		ORDER BY created_at ASC
+		LIMIT $3
 	`
 	
-	rows, err := r.db.Query(query, time.Now(), limit)
+	rows, err := r.db.Query(query, deviceID, time.Now(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -66,17 +73,25 @@ func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.B
 	var messages []domainBroadcast.BroadcastMessage
 	for rows.Next() {
 		var msg domainBroadcast.BroadcastMessage
-		var deviceID string
+		var campaignID, sequenceID sql.NullString
+		var scheduledAt sql.NullTime
 		
-		err := rows.Scan(&msg.ID, &deviceID, &msg.Type, &msg.ReferenceID,
-			&msg.Phone, &msg.Content, &msg.MediaURL, &msg.Caption,
-			&msg.Priority, &msg.ScheduledAt, &msg.RetryCount)
+		err := rows.Scan(&msg.ID, &msg.DeviceID, &campaignID, &sequenceID,
+			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt)
 		if err != nil {
 			continue
 		}
 		
-		// Set device ID
-		msg.DeviceID = deviceID
+		if campaignID.Valid {
+			msg.CampaignID = campaignID.String
+		}
+		if sequenceID.Valid {
+			msg.SequenceID = sequenceID.String
+		}
+		if scheduledAt.Valid {
+			msg.ScheduledAt = scheduledAt.Time
+		}
+		
 		messages = append(messages, msg)
 	}
 	
@@ -84,63 +99,46 @@ func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.B
 }
 
 // UpdateMessageStatus updates message status
-func (r *broadcastRepository) UpdateMessageStatus(messageID, status string) error {
+func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
-		UPDATE message_queue 
-		SET status = $1, processed_at = $2
-		WHERE id = $3
-	`
-	
-	_, err := r.db.Exec(query, status, time.Now(), messageID)
-	return err
-}
-
-// SetMessageError sets error message
-func (r *broadcastRepository) SetMessageError(messageID, errorMsg string) error {
-	query := `
-		UPDATE message_queue 
-		SET error_message = $1
-		WHERE id = $2
-	`
-	
-	_, err := r.db.Exec(query, errorMsg, messageID)
-	return err
-}
-
-// CreateBroadcastJob creates a new broadcast job
-func (r *broadcastRepository) CreateBroadcastJob(jobType, referenceID, deviceID string, totalContacts int) (string, error) {
-	jobID := uuid.New().String()
-	
-	query := `
-		INSERT INTO broadcast_jobs 
-		(id, job_type, reference_id, device_id, total_contacts, status, started_at)
-		VALUES ($1, $2, $3, $4, $5, 'running', $6)
-	`
-	
-	_, err := r.db.Exec(query, jobID, jobType, referenceID, deviceID, totalContacts, time.Now())
-	return jobID, err
-}
-
-// UpdateBroadcastJob updates broadcast job progress
-func (r *broadcastRepository) UpdateBroadcastJob(jobID string, processed, successful, failed int) error {
-	query := `
-		UPDATE broadcast_jobs 
-		SET processed_contacts = $1, successful_contacts = $2, failed_contacts = $3
+		UPDATE broadcast_messages 
+		SET status = $1, error_message = $2, sent_at = CASE WHEN $1 = 'sent' THEN $3 ELSE sent_at END
 		WHERE id = $4
 	`
 	
-	_, err := r.db.Exec(query, processed, successful, failed, jobID)
+	_, err := r.db.Exec(query, status, errorMsg, time.Now(), messageID)
 	return err
 }
 
-// CompleteBroadcastJob marks job as completed
-func (r *broadcastRepository) CompleteBroadcastJob(jobID string) error {
+// GetBroadcastStats gets broadcast statistics
+func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]interface{}, error) {
+	stats := make(map[string]interface{})
+	
+	// Get counts by status
 	query := `
-		UPDATE broadcast_jobs 
-		SET status = 'completed', completed_at = $1
-		WHERE id = $2
+		SELECT status, COUNT(*) as count
+		FROM broadcast_messages
+		WHERE device_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+		GROUP BY status
 	`
 	
-	_, err := r.db.Exec(query, time.Now(), jobID)
-	return err
+	rows, err := r.db.Query(query, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	statusCounts := make(map[string]int)
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err == nil {
+			statusCounts[status] = count
+		}
+	}
+	
+	stats["status_counts"] = statusCounts
+	stats["total_24h"] = statusCounts["sent"] + statusCounts["failed"] + statusCounts["pending"]
+	
+	return stats, nil
 }

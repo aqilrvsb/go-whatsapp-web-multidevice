@@ -39,7 +39,14 @@ func InitRestSequence(app *fiber.App, service sequence.ISequenceUsecase) {
 
 // GetSequences gets all sequences for logged in user
 func (controller *Sequence) GetSequences(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID, err := getUserID(c)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Authentication required",
+		})
+	}
 	
 	sequences, err := controller.Service.GetSequences(userID)
 	if err != nil {
@@ -70,7 +77,15 @@ func (controller *Sequence) CreateSequence(c *fiber.Ctx) error {
 	}
 	
 	// Set user ID from session
-	request.UserID = c.Locals("userID").(string)
+	userID, err := getUserID(c)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Authentication required",
+		})
+	}
+	request.UserID = userID
 	
 	response, err := controller.Service.CreateSequence(request)
 	if err != nil {
@@ -272,7 +287,10 @@ func (controller *Sequence) PauseSequence(c *fiber.Ctx) error {
 
 // SequencesPage renders sequences page
 func (controller *Sequence) SequencesPage(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID, err := getUserID(c)
+	if err != nil {
+		return c.Redirect("/login")
+	}
 	
 	// Get user's devices
 	userRepo := repository.GetUserRepository()

@@ -9,7 +9,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
 )
 
 // BroadcastManager manages broadcasting for all devices
@@ -19,21 +18,6 @@ type BroadcastManager struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	maxWorkers   int
-}
-
-// DeviceWorker handles broadcasting for a single device
-type DeviceWorker struct {
-	deviceID      string
-	client        *whatsmeow.Client
-	minDelay      int
-	maxDelay      int
-	queue         chan domainBroadcast.BroadcastMessage
-	ctx           context.Context
-	cancel        context.CancelFunc
-	isRunning     bool
-	mu            sync.Mutex
-	messagesSent  int
-	lastSentTime  time.Time
 }
 
 var (
@@ -95,25 +79,35 @@ func (bm *BroadcastManager) ProcessQueue() {
 // processQueueBatch processes a batch of queued messages
 func (bm *BroadcastManager) processQueueBatch() {
 	repo := repository.GetBroadcastRepository()
-	messages, err := repo.GetPendingMessages(100) // Get 100 messages at a time
 	
-	if err != nil {
-		logrus.Errorf("Failed to get pending messages: %v", err)
-		return
+	// Process messages for each active worker
+	bm.mu.RLock()
+	deviceIDs := make([]string, 0, len(bm.workers))
+	for deviceID := range bm.workers {
+		deviceIDs = append(deviceIDs, deviceID)
 	}
+	bm.mu.RUnlock()
 	
-	for _, msg := range messages {
-		// Get or create worker for device
-		worker := bm.GetOrCreateWorker(msg.DeviceID)
-		if worker != nil {
-			// Send to worker queue
-			select {
-			case worker.queue <- msg:
-				// Mark as processing
-				repo.UpdateMessageStatus(msg.ID, "processing")
-			default:
-				// Queue is full, skip this message
-				logrus.Warnf("Queue full for device %s", msg.DeviceID)
+	for _, deviceID := range deviceIDs {
+		messages, err := repo.GetPendingMessages(deviceID, 50)
+		if err != nil {
+			logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
+			continue
+		}
+		
+		for _, msg := range messages {
+			// Get worker for device
+			worker := bm.GetOrCreateWorker(msg.DeviceID)
+			if worker != nil {
+				// Send to worker queue
+				err := worker.QueueMessage(msg)
+				if err != nil {
+					logrus.Warnf("Failed to queue message: %v", err)
+					repo.UpdateMessageStatus(msg.ID, "failed", err.Error())
+				} else {
+					// Mark as processing
+					repo.UpdateMessageStatus(msg.ID, "processing", "")
+				}
 			}
 		}
 	}
@@ -125,8 +119,11 @@ func (bm *BroadcastManager) GetOrCreateWorker(deviceID string) *DeviceWorker {
 	defer bm.mu.Unlock()
 	
 	// Check if worker exists
-	if worker, exists := bm.workers[deviceID]; exists && worker.isRunning {
-		return worker
+	if worker, exists := bm.workers[deviceID]; exists {
+		status := worker.GetStatus()
+		if status.Status != "stopped" {
+			return worker
+		}
 	}
 	
 	// Check worker limit
@@ -152,21 +149,10 @@ func (bm *BroadcastManager) GetOrCreateWorker(deviceID string) *DeviceWorker {
 	}
 	
 	// Create worker
-	ctx, cancel := context.WithCancel(bm.ctx)
-	worker := &DeviceWorker{
-		deviceID:     deviceID,
-		client:       client,
-		minDelay:     device.MinDelaySeconds,
-		maxDelay:     device.MaxDelaySeconds,
-		queue:        make(chan domainBroadcast.BroadcastMessage, 1000), // Buffer 1000 messages
-		ctx:          ctx,
-		cancel:       cancel,
-		isRunning:    true,
-		lastSentTime: time.Now().Add(-time.Minute), // Allow immediate first send
-	}
+	worker := NewDeviceWorker(deviceID, client, device.MinDelaySeconds, device.MaxDelaySeconds)
 	
 	// Start worker
-	go worker.Run()
+	worker.Start()
 	
 	bm.workers[deviceID] = worker
 	logrus.Infof("Created worker for device %s with delay %d-%d seconds", deviceID, device.MinDelaySeconds, device.MaxDelaySeconds)
@@ -188,17 +174,20 @@ func (bm *BroadcastManager) StopAllWorkers() {
 // CheckWorkerHealth checks health of all workers
 func (bm *BroadcastManager) CheckWorkerHealth() {
 	bm.mu.RLock()
-	workers := make([]*DeviceWorker, 0, len(bm.workers))
-	for _, worker := range bm.workers {
-		workers = append(workers, worker)
+	deviceIDs := make([]string, 0, len(bm.workers))
+	for deviceID, worker := range bm.workers {
+		status := worker.GetStatus()
+		// Check if worker is stuck (no activity for 10 minutes while having queued messages)
+		if status.Status == "processing" && time.Since(status.LastActivity) > 10*time.Minute && status.QueueSize > 0 {
+			deviceIDs = append(deviceIDs, deviceID)
+			logrus.Warnf("Worker for device %s appears stuck, will restart...", deviceID)
+		}
 	}
 	bm.mu.RUnlock()
 	
-	for _, worker := range workers {
-		if !worker.IsHealthy() {
-			logrus.Warnf("Worker for device %s is unhealthy, restarting...", worker.deviceID)
-			bm.RestartWorker(worker.deviceID)
-		}
+	// Restart stuck workers
+	for _, deviceID := range deviceIDs {
+		bm.RestartWorker(deviceID)
 	}
 }
 
@@ -233,12 +222,14 @@ func (bm *BroadcastManager) GetWorkerStats() map[string]interface{} {
 	}
 	
 	for deviceID, worker := range bm.workers {
+		status := worker.GetStatus()
 		workerStats := map[string]interface{}{
 			"device_id":     deviceID,
-			"is_running":    worker.isRunning,
-			"messages_sent": worker.messagesSent,
-			"queue_size":    len(worker.queue),
-			"last_sent":     worker.lastSentTime,
+			"status":        status.Status,
+			"queue_size":    status.QueueSize,
+			"processed":     status.ProcessedCount,
+			"failed":        status.FailedCount,
+			"last_activity": status.LastActivity,
 		}
 		stats["workers"] = append(stats["workers"].([]map[string]interface{}), workerStats)
 	}

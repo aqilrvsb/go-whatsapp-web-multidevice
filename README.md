@@ -28,11 +28,14 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ **Webhooks** - Real-time notifications
 
 ### New Features (June 2025)
-- ✅ **Message Sequences** - Automated drip campaigns with niche targeting
-- ✅ **Broadcast Manager** - Optimized for 3,000+ devices
+- ✅ **Message Sequences** - Automated drip campaigns with individual progress tracking
+- ✅ **Broadcast Manager** - Optimized for 3,000+ devices with worker pools
 - ✅ **Device Rate Limiting** - Custom min/max delay per device
 - ✅ **Campaign Triggers** - Auto-send based on date and niche matching
-- ✅ **Worker Pool System** - Simultaneous message processing
+- ✅ **Worker Pool System** - Parallel message processing with health monitoring
+- ✅ **Sequence UI** - Full-featured interface for creating and managing sequences
+- ✅ **Auto-enrollment** - Automatically add leads to sequences based on niche
+- ✅ **Progress Tracking** - Each contact maintains their own timeline
 
 ### Fixed Issues (June 27, 2025)
 - ✅ Build errors - Go 1.23, correct paths
@@ -228,43 +231,102 @@ When `WHATSAPP_WEBHOOK` is set, you'll receive:
 ## 📧 Message Sequences Feature
 
 ### What are Sequences?
-Automated drip campaigns that send messages over multiple days. Each contact progresses through their own timeline.
+Automated drip campaigns that send messages over multiple days. Unlike campaigns which broadcast to all at once, sequences maintain individual progress for each contact - perfect for onboarding, follow-ups, and nurture campaigns.
+
+### Key Features
+1. **Individual Timeline**: Each contact starts from Day 1 when added, regardless of when others started
+2. **Multi-Step Messages**: Create sequences with unlimited days/steps
+3. **Message Types**: Support for text, images, videos, and documents
+4. **Smart Scheduling**: Set specific send times for each day
+5. **Auto-Enrollment**: Automatically add new leads matching the sequence niche
+6. **Weekend Skipping**: Optional pause on weekends
+7. **Progress Tracking**: Monitor where each contact is in their journey
 
 ### How it Works
-1. **Create Sequence**: Define messages for Day 1, Day 2, etc.
-2. **Set Send Times**: Each day can have specific send time
-3. **Niche Targeting**: Auto-enroll leads based on their niche
-4. **Individual Progress**: New contacts always start from Day 1
+1. **Create Sequence**: 
+   - Name your sequence (e.g., "5-Day Sales Funnel")
+   - Select device to send from
+   - Set niche/category for auto-enrollment
+   - Define messages for each day with send times
 
-### Example Sequence
+2. **Add Contacts**:
+   - Manual: Add specific phone numbers
+   - Automatic: New leads with matching niche are enrolled
+
+3. **Individual Progress**:
+   - Day 1 contact gets Day 1 message today
+   - If new contact added tomorrow, they still start with Day 1
+   - Each contact maintains their own timeline
+
+4. **Message Delivery**:
+   - Background worker checks every minute
+   - Sends messages at scheduled times
+   - Respects device rate limits (min/max delay)
+
+### Example Use Cases
+
+**Onboarding Sequence** (5 days):
 ```
-Day 1 (10:00 AM): Welcome message + introduction
-Day 2 (2:00 PM): Product features + benefits  
-Day 3 (11:00 AM): Customer testimonials
-Day 4 (3:00 PM): Special offer
-Day 5 (10:00 AM): Final reminder
+Day 1 (10:00 AM): Welcome! Here's how to get started...
+Day 2 (2:00 PM): Quick tip: Did you know you can...
+Day 3 (11:00 AM): Case study: How John increased sales by 50%
+Day 4 (3:00 PM): Exclusive offer - 20% off for new users
+Day 5 (10:00 AM): Last chance! Offer expires tonight
 ```
 
-## 🚀 Broadcast Optimization
+**Follow-up Sequence** (3 days):
+```
+Day 1 (9:00 AM): Thanks for your interest! Here's the info...
+Day 2 (2:00 PM): Any questions? We're here to help
+Day 3 (10:00 AM): Special bonus just for you
+```
+
+## 🚀 Broadcast System Architecture
+
+### Optimized for 200 Users × 15 Devices = 3,000+ Connections
 
 ### Device Workers
-- Each device runs its own worker thread
-- Custom delay settings (min/max seconds)
-- Queue-based message processing
-- Automatic retry on failure
+- **Individual Workers**: Each device runs its own message worker
+- **Parallel Processing**: Up to 100 concurrent workers system-wide
+- **Custom Rate Limiting**: Each device has min/max delay settings
+- **Queue Management**: 1000 message buffer per device
+- **Health Monitoring**: Auto-restart stuck workers
+
+### Message Flow
+1. **Campaign/Sequence Trigger** → Message created in database
+2. **Broadcast Manager** → Routes message to appropriate device worker
+3. **Device Worker** → Queues message with rate limiting
+4. **WhatsApp Send** → Message sent with random delay
+5. **Status Update** → Database updated with result
 
 ### Performance Features
-- **Worker Pool**: Up to 100 concurrent workers
-- **Message Queue**: 1000 messages buffer per device
-- **Rate Limiting**: Random delay between min/max
-- **Health Monitoring**: Auto-restart unhealthy workers
+- **Sharded Architecture**: Distributes load across devices
+- **Message Buffering**: Prevents overwhelming WhatsApp
+- **Connection Pooling**: Efficient database usage
+- **In-Memory Queues**: Fast message processing
+- **Automatic Retries**: Failed messages retry with backoff
 
-### Configuration
-```env
-# Device delay settings (per device)
-MIN_DELAY_SECONDS=5
-MAX_DELAY_SECONDS=15
+### Rate Limiting Strategy
 ```
+Per Device Settings:
+- Min Delay: 5-10 seconds (configurable)
+- Max Delay: 15-30 seconds (configurable)
+- Random delay between min/max for each message
+- Prevents pattern detection and bans
+```
+
+### Scaling Guidelines
+- **Small (< 500 devices)**: 2GB RAM, 2 CPU cores
+- **Medium (500-2000 devices)**: 4GB RAM, 4 CPU cores
+- **Large (2000-5000 devices)**: 8GB RAM, 8 CPU cores
+- **Database**: PostgreSQL with connection pooling
+
+### Anti-Ban Best Practices
+1. **Variable Delays**: Random delay between messages
+2. **Human-like Patterns**: Different delays per device
+3. **Message Variety**: Mix text, images, videos
+4. **Gradual Ramp-up**: Start slow with new devices
+5. **Monitor Failed**: Track and adjust if high failure rate
 
 ## 🎉 Summary
 

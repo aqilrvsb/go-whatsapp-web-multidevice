@@ -142,6 +142,10 @@ func InitializeSchema() error {
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time TIME;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled';
+	
+	-- Add min/max delay columns to user_devices
+	ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 5;
+	ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 15;
 
 	-- Create whatsapp_chats table to store chat list
 	CREATE TABLE IF NOT EXISTS whatsapp_chats (
@@ -177,6 +181,69 @@ func InitializeSchema() error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(device_id, message_id)
 	);
+	
+	-- Create sequences table
+	CREATE TABLE IF NOT EXISTS sequences (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
+		name VARCHAR(255) NOT NULL,
+		description TEXT,
+		niche VARCHAR(255),
+		status VARCHAR(50) DEFAULT 'draft',
+		auto_enroll BOOLEAN DEFAULT false,
+		skip_weekends BOOLEAN DEFAULT false,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	
+	-- Create sequence_steps table
+	CREATE TABLE IF NOT EXISTS sequence_steps (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
+		day_number INTEGER NOT NULL,
+		message_type VARCHAR(50) NOT NULL,
+		content TEXT,
+		media_url TEXT,
+		caption TEXT,
+		send_time TIME DEFAULT '10:00:00',
+		delay_days INTEGER DEFAULT 1,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(sequence_id, day_number)
+	);
+	
+	-- Create sequence_contacts table
+	CREATE TABLE IF NOT EXISTS sequence_contacts (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
+		contact_phone VARCHAR(50) NOT NULL,
+		contact_name VARCHAR(255),
+		current_step INTEGER DEFAULT 0,
+		status VARCHAR(50) DEFAULT 'active',
+		enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		last_sent_at TIMESTAMP,
+		next_send_at TIMESTAMP,
+		completed_at TIMESTAMP,
+		UNIQUE(sequence_id, contact_phone)
+	);
+	
+	-- Create broadcast_messages table for tracking
+	CREATE TABLE IF NOT EXISTS broadcast_messages (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
+		campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+		sequence_id UUID REFERENCES sequences(id) ON DELETE SET NULL,
+		recipient_phone VARCHAR(50) NOT NULL,
+		message_type VARCHAR(50) NOT NULL,
+		content TEXT,
+		media_url TEXT,
+		status VARCHAR(50) DEFAULT 'pending',
+		error_message TEXT,
+		scheduled_at TIMESTAMP,
+		sent_at TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 
 	-- Create indexes
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -192,6 +259,13 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_whatsapp_chats_updated ON whatsapp_chats(updated_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_device_chat ON whatsapp_messages(device_id, chat_jid);
 	CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_timestamp ON whatsapp_messages(timestamp DESC);
+	CREATE INDEX IF NOT EXISTS idx_sequences_user_id ON sequences(user_id);
+	CREATE INDEX IF NOT EXISTS idx_sequences_status ON sequences(status);
+	CREATE INDEX IF NOT EXISTS idx_sequence_steps_sequence_id ON sequence_steps(sequence_id);
+	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_sequence_id ON sequence_contacts(sequence_id);
+	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_next_send ON sequence_contacts(next_send_at);
+	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_status ON broadcast_messages(status);
+	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_scheduled ON broadcast_messages(scheduled_at);
 	`
 	
 	_, err := db.Exec(schema)

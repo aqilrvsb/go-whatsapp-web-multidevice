@@ -85,13 +85,8 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 		return
 	}
 	
-	// Create broadcast job
+	// Get broadcast repository
 	broadcastRepo := repository.GetBroadcastRepository()
-	jobID, err := broadcastRepo.CreateBroadcastJob("campaign", campaign.ID, device.ID, len(leads))
-	if err != nil {
-		logrus.Errorf("Failed to create broadcast job: %v", err)
-		return
-	}
 	
 	// Queue messages for each lead
 	successful := 0
@@ -99,17 +94,16 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	for _, lead := range leads {
 		msg := domainBroadcast.BroadcastMessage{
-			DeviceID:    device.ID,
-			Type:        "campaign",
-			ReferenceID: campaign.ID,
-			Phone:       lead.Phone,
-			Content:     campaign.Message,
-			MediaURL:    campaign.ImageURL,
-			Priority:    1,
-			ScheduledAt: time.Now(),
+			DeviceID:       device.ID,
+			CampaignID:     campaign.ID,
+			RecipientPhone: lead.Phone,
+			Type:           "text",
+			Content:        campaign.Message,
+			MediaURL:       campaign.ImageURL,
+			ScheduledAt:    time.Now(),
 		}
 		
-		err := cts.broadcastManager.QueueMessage(device.ID, msg)
+		err := broadcastRepo.QueueMessage(msg)
 		if err != nil {
 			logrus.Errorf("Failed to queue message for %s: %v", lead.Phone, err)
 			failed++
@@ -123,11 +117,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	campaign.Status = "sent"
 	campaignRepo.UpdateCampaign(campaign)
 	
-	// Update broadcast job
-	broadcastRepo.UpdateBroadcastJob(jobID, len(leads), successful, failed)
-	broadcastRepo.CompleteBroadcastJob(jobID)
-	
-	logrus.Infof("Campaign %s completed: %d successful, %d failed", campaign.Title, successful, failed)
+	logrus.Infof("Campaign %s completed: %d messages queued, %d failed", campaign.Title, successful, failed)
 }
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
