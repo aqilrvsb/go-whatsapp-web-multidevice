@@ -1700,103 +1700,6 @@ func (handler *App) ResumeFailedWorkers(c *fiber.Ctx) error {
 	})
 }
 
-// GetSequenceSummary gets sequence statistics
-func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
-	// Get session from cookie
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-
-	user, err := userRepo.GetUserByID(session.UserID)
-	if err != nil {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "USER_NOT_FOUND",
-			Message: "User not found",
-		})
-	}
-
-	// Get sequence statistics (mock data for now)
-	sequences := []map[string]interface{}{
-		{
-			"id":             "1",
-			"name":           "Welcome Series",
-			"description":    "3-day welcome sequence",
-			"status":         "active",
-			"niche":          "general",
-			"contacts_count": 45,
-			"completed_count": 20,
-		},
-		{
-			"id":             "2",
-			"name":           "Promo Merdeka",
-			"description":    "5-day promo sequence",
-			"status":         "paused",
-			"niche":          "retail",
-			"contacts_count": 120,
-			"completed_count": 80,
-		},
-	}
-
-	// Calculate stats
-	totalSequences := len(sequences)
-	activeSequences := 0
-	pausedSequences := 0
-	draftSequences := 0
-	totalContacts := 0
-
-	for _, seq := range sequences {
-		if status, ok := seq["status"].(string); ok {
-			switch status {
-			case "active":
-				activeSequences++
-			case "paused":
-				pausedSequences++
-			case "draft":
-				draftSequences++
-			}
-		}
-		if contacts, ok := seq["contacts_count"].(int); ok {
-			totalContacts += contacts
-		}
-	}
-
-	summary := map[string]interface{}{
-		"sequences": map[string]interface{}{
-			"total":  totalSequences,
-			"active": activeSequences,
-			"paused": pausedSequences,
-			"draft":  draftSequences,
-		},
-		"contacts": map[string]interface{}{
-			"total":                totalContacts,
-			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
-		},
-		"recent_sequences": sequences[:min(5, len(sequences))],
-	}
-
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: "Sequence summary",
-		Results: summary,
-	})
-}
 
 // GetWorkerStatus gets the status of all device workers
 func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
@@ -1839,7 +1742,7 @@ func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
 	for _, device := range devices {
 		workerInfo := map[string]interface{}{
 			"device_id":     device.ID,
-			"device_name":   device.Name,
+			"device_name":   device.DeviceName,
 			"device_status": device.Status,
 			"worker_status": "not_running",
 			"queue_size":    0,
@@ -1887,12 +1790,6 @@ func min(a, b int) int {
 	return b
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 func countConnectedDevices(devices []*models.UserDevice) int {
 	count := 0
@@ -1900,60 +1797,9 @@ func countConnectedDevices(devices []*models.UserDevice) int {
 		if device.Status == "connected" {
 			count++
 		}
-	}
-	return count
-}
-
-
-// ResumeFailedWorkers resumes all failed device workers
-func (handler *App) ResumeFailedWorkers(c *fiber.Ctx) error {
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-
-	// Get all devices for user
-	devices, err := userRepo.GetUserDevices(session.UserID)
-	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "ERROR",
-			Message: "Failed to get devices",
-		})
-	}
-
-	// Resume workers for devices that are connected but have stopped workers
-	resumedCount := 0
-	for _, device := range devices {
-		if device.Status == "connected" {
-			// TODO: Check if worker is stopped and resume
-			// This would interface with your broadcast manager
-			resumedCount++
 		}
 	}
-
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: fmt.Sprintf("Resumed %d workers", resumedCount),
-		Results: map[string]interface{}{
-			"resumed_count": resumedCount,
-		},
-	})
+	return count
 }
 
 // StopAllWorkers stops all running device workers
