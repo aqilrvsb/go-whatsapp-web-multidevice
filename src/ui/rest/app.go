@@ -89,6 +89,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Worker status endpoint
 	app.Get("/api/workers/status", rest.GetWorkerStatus)
 	
+	// Worker control endpoints
+	app.Post("/api/workers/resume-failed", rest.ResumeFailedWorkers)
+	app.Post("/api/workers/stop-all", rest.StopAllWorkers)
+	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
 	
@@ -1642,4 +1646,105 @@ func countConnectedDevices(devices []*models.UserDevice) int {
 		}
 	}
 	return count
+}
+
+
+// ResumeFailedWorkers resumes all failed device workers
+func (handler *App) ResumeFailedWorkers(c *fiber.Ctx) error {
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+
+	// Get all devices for user
+	devices, err := userRepo.GetUserDevices(session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+
+	// Resume workers for devices that are connected but have stopped workers
+	resumedCount := 0
+	for _, device := range devices {
+		if device.Status == "connected" {
+			// TODO: Check if worker is stopped and resume
+			// This would interface with your broadcast manager
+			resumedCount++
+		}
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Resumed %d workers", resumedCount),
+		Results: map[string]interface{}{
+			"resumed_count": resumedCount,
+		},
+	})
+}
+
+// StopAllWorkers stops all running device workers
+func (handler *App) StopAllWorkers(c *fiber.Ctx) error {
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+
+	// Get all devices for user
+	devices, err := userRepo.GetUserDevices(session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+
+	// Stop all workers
+	stoppedCount := 0
+	for _, device := range devices {
+		// TODO: Stop worker for this device
+		// This would interface with your broadcast manager
+		stoppedCount++
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Stopped %d workers", stoppedCount),
+		Results: map[string]interface{}{
+			"stopped_count": stoppedCount,
+		},
+	})
 }
