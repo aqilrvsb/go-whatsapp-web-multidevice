@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ func GetBroadcastRepository() *broadcastRepository {
 }
 
 // QueueMessage adds a message to the queue
-func (r *broadcastRepository) QueueMessage(msg broadcast.BroadcastMessage) error {
+func (r *broadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage) error {
 	if msg.ID == "" {
 		msg.ID = uuid.New().String()
 	}
@@ -45,7 +45,7 @@ func (r *broadcastRepository) QueueMessage(msg broadcast.BroadcastMessage) error
 }
 
 // GetPendingMessages gets pending messages for processing
-func (r *broadcastRepository) GetPendingMessages(limit int) ([]broadcast.BroadcastMessage, error) {
+func (r *broadcastRepository) GetPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
 		SELECT id, device_id, message_type, reference_id, contact_phone, 
 		       content, media_url, caption, priority, scheduled_at, retry_count
@@ -62,9 +62,9 @@ func (r *broadcastRepository) GetPendingMessages(limit int) ([]broadcast.Broadca
 	}
 	defer rows.Close()
 	
-	var messages []broadcast.BroadcastMessage
+	var messages []domainBroadcast.BroadcastMessage
 	for rows.Next() {
-		var msg broadcast.BroadcastMessage
+		var msg domainBroadcast.BroadcastMessage
 		var deviceID string
 		
 		err := rows.Scan(&msg.ID, &deviceID, &msg.Type, &msg.ReferenceID,

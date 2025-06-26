@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
@@ -28,28 +29,13 @@ type DeviceWorker struct {
 	client        *whatsmeow.Client
 	minDelay      int
 	maxDelay      int
-	queue         chan BroadcastMessage
+	queue         chan domainBroadcast.BroadcastMessage
 	ctx           context.Context
 	cancel        context.CancelFunc
 	isRunning     bool
 	mu            sync.Mutex
 	messagesSent  int
 	lastSentTime  time.Time
-}
-
-// BroadcastMessage represents a message to be sent
-type BroadcastMessage struct {
-	ID           string
-	DeviceID     string
-	Type         string // campaign, sequence
-	ReferenceID  string
-	Phone        string
-	Content      string
-	MediaURL     string
-	Caption      string
-	Priority     int
-	ScheduledAt  time.Time
-	RetryCount   int
 }
 
 var (
@@ -174,7 +160,7 @@ func (bm *BroadcastManager) GetOrCreateWorker(deviceID string) *DeviceWorker {
 		client:       client,
 		minDelay:     device.MinDelaySeconds,
 		maxDelay:     device.MaxDelaySeconds,
-		queue:        make(chan BroadcastMessage, 1000), // Buffer 1000 messages
+		queue:        make(chan domainBroadcast.BroadcastMessage, 1000), // Buffer 1000 messages
 		ctx:          ctx,
 		cancel:       cancel,
 		isRunning:    true,
@@ -232,7 +218,7 @@ func (bm *BroadcastManager) RestartWorker(deviceID string) {
 }
 
 // QueueMessage queues a message for broadcasting
-func (bm *BroadcastManager) QueueMessage(deviceID string, msg BroadcastMessage) error {
+func (bm *BroadcastManager) QueueMessage(deviceID string, msg domainBroadcast.BroadcastMessage) error {
 	// Save to database queue
 	repo := repository.GetBroadcastRepository()
 	return repo.QueueMessage(msg)

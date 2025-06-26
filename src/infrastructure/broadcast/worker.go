@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -79,7 +80,7 @@ func (dw *DeviceWorker) applyRateLimit() {
 }
 
 // sendMessage sends a message through WhatsApp
-func (dw *DeviceWorker) sendMessage(msg BroadcastMessage) error {
+func (dw *DeviceWorker) sendMessage(msg domainBroadcast.BroadcastMessage) error {
 	// Ensure client is connected
 	if !dw.client.IsConnected() {
 		return fmt.Errorf("client not connected")
@@ -106,7 +107,7 @@ func (dw *DeviceWorker) sendMessage(msg BroadcastMessage) error {
 }
 
 // sendTextMessage sends text message
-func (dw *DeviceWorker) sendTextMessage(recipient whatsmeow.JID, msg BroadcastMessage) error {
+func (dw *DeviceWorker) sendTextMessage(recipient whatsmeow.JID, msg domainBroadcast.BroadcastMessage) error {
 	message := &whatsmeow.Message{
 		ExtendedTextMessage: &whatsmeow.ExtendedTextMessage{
 			Text: &msg.Content,
@@ -118,7 +119,7 @@ func (dw *DeviceWorker) sendTextMessage(recipient whatsmeow.JID, msg BroadcastMe
 }
 
 // sendImageMessage sends image message
-func (dw *DeviceWorker) sendImageMessage(recipient whatsmeow.JID, msg BroadcastMessage) error {
+func (dw *DeviceWorker) sendImageMessage(recipient whatsmeow.JID, msg domainBroadcast.BroadcastMessage) error {
 	// TODO: Download image from URL and send
 	// For now, return not implemented
 	return fmt.Errorf("image sending not yet implemented")

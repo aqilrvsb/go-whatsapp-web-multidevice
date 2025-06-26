@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -98,7 +99,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	failed := 0
 	
 	for _, lead := range leads {
-		msg := broadcast.BroadcastMessage{
+		msg := domainBroadcast.BroadcastMessage{
 			DeviceID:    device.ID,
 			Type:        "campaign",
 			ReferenceID: campaign.ID,
