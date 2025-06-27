@@ -138,6 +138,7 @@ func InitializeSchema() error {
 	ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_user_id_campaign_date_key;
 	
 	-- Add missing columns to campaigns if they don't exist
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time TIME;

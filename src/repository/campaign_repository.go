@@ -105,11 +105,11 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 // GetCampaigns gets all campaigns for a user
 func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, title, message, device_id, niche, image_url, 
-		       scheduled_date, scheduled_time, status, created_at, updated_at
+		SELECT id, user_id, title, message, COALESCE(device_id, '') as device_id, niche, image_url, 
+		       campaign_date, scheduled_time, status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1
-		ORDER BY scheduled_date DESC, scheduled_time DESC
+		ORDER BY campaign_date DESC, scheduled_time DESC
 	`
 	
 	rows, err := r.db.Query(query, userID)
@@ -126,7 +126,7 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.DeviceID, &campaign.Niche, &campaign.ImageURL,
-			&campaign.ScheduledDate, &scheduledTime, &campaign.Status,
+			&campaign.CampaignDate, &scheduledTime, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
