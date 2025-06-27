@@ -3,6 +3,7 @@
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -76,6 +77,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/leads", rest.CreateLead)
 	app.Put("/api/leads/:id", rest.UpdateLead)
 	app.Delete("/api/leads/:id", rest.DeleteLead)
+	app.Get("/api/devices/:deviceId/leads/export", rest.ExportLeads)
+	app.Post("/api/devices/:deviceId/leads/import", rest.ImportLeads)
 	
 	// Campaign endpoints
 	app.Get("/api/campaigns", rest.GetCampaigns)
@@ -1822,6 +1825,249 @@ func (handler *App) StopAllWorkers(c *fiber.Ctx) error {
 		Message: fmt.Sprintf("Stopped %d workers", stoppedCount),
 		Results: map[string]interface{}{
 			"stopped_count": stoppedCount,
+		},
+	})
+}
+
+
+// ExportLeads exports leads to CSV format
+func (handler *App) ExportLeads(c *fiber.Ctx) error {
+	deviceId := c.Params("deviceId")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get leads
+	leadRepo := repository.GetLeadRepository()
+	leads, err := leadRepo.GetLeadsByDevice(session.UserID, deviceId)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get leads",
+		})
+	}
+	
+	// Convert to CSV
+	var csvContent strings.Builder
+	csvContent.WriteString("name,phone,niche,target_status,additional_note,device_id\n")
+	
+	for _, lead := range leads {
+		csvContent.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+			lead.Name,
+			lead.Phone,
+			lead.Niche,
+			lead.TargetStatus,
+			lead.Notes,
+			lead.DeviceID,
+		))
+	}
+	
+	// Set headers for CSV download
+	c.Set("Content-Type", "text/csv")
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=leads_%s_%s.csv", deviceId, time.Now().Format("2006-01-02")))
+	
+	return c.SendString(csvContent.String())
+}
+
+// ImportLeads imports leads from CSV
+func (handler *App) ImportLeads(c *fiber.Ctx) error {
+	deviceId := c.Params("deviceId")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get the uploaded file
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "No file uploaded",
+		})
+	}
+	
+	// Open the file
+	src, err := file.Open()
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to open file",
+		})
+	}
+	defer src.Close()
+	
+	// Read CSV content
+	content, err := io.ReadAll(src)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to read file",
+		})
+	}
+	
+	// Parse CSV
+	lines := strings.Split(string(content), "\n")
+	if len(lines) < 2 {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "CSV file is empty or invalid",
+		})
+	}
+	
+	// Parse headers
+	headers := strings.Split(strings.ToLower(lines[0]), ",")
+	for i := range headers {
+		headers[i] = strings.Trim(headers[i], "\" \r")
+	}
+	
+	// Find column indices
+	nameIndex := -1
+	phoneIndex := -1
+	nicheIndex := -1
+	targetStatusIndex := -1
+	statusIndex := -1
+	notesIndex := -1
+	journeyIndex := -1
+	deviceIdIndex := -1
+	
+	for i, h := range headers {
+		switch h {
+		case "name":
+			nameIndex = i
+		case "phone":
+			phoneIndex = i
+		case "niche":
+			nicheIndex = i
+		case "target_status":
+			targetStatusIndex = i
+		case "status":
+			statusIndex = i
+		case "additional_note", "notes":
+			notesIndex = i
+		case "journey":
+			journeyIndex = i
+		case "device_id":
+			deviceIdIndex = i
+		}
+	}
+	
+	if nameIndex == -1 || phoneIndex == -1 {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "CSV must have 'name' and 'phone' columns",
+		})
+	}
+	
+	// Process leads
+	leadRepo := repository.GetLeadRepository()
+	successCount := 0
+	errorCount := 0
+	
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		
+		values := strings.Split(line, ",")
+		for j := range values {
+			values[j] = strings.Trim(values[j], "\" \r")
+		}
+		
+		// Get values safely
+		getValue := func(index int) string {
+			if index >= 0 && index < len(values) {
+				return values[index]
+			}
+			return ""
+		}
+		
+		// Get target status (support both columns)
+		targetStatus := getValue(targetStatusIndex)
+		if targetStatus == "" {
+			targetStatus = getValue(statusIndex)
+		}
+		if targetStatus != "prospect" && targetStatus != "customer" {
+			targetStatus = "prospect"
+		}
+		
+		// Get notes
+		notes := getValue(notesIndex)
+		if notes == "" {
+			notes = getValue(journeyIndex)
+		}
+		
+		// Get device ID
+		leadDeviceId := getValue(deviceIdIndex)
+		if leadDeviceId == "" {
+			leadDeviceId = deviceId
+		}
+		
+		lead := &models.Lead{
+			UserID:       session.UserID,
+			DeviceID:     leadDeviceId,
+			Name:         getValue(nameIndex),
+			Phone:        getValue(phoneIndex),
+			Niche:        getValue(nicheIndex),
+			TargetStatus: targetStatus,
+			Notes:        notes,
+		}
+		
+		err := leadRepo.CreateLead(lead)
+		if err != nil {
+			errorCount++
+			log.Printf("Failed to import lead %s: %v", lead.Name, err)
+		} else {
+			successCount++
+		}
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Import completed. Success: %d, Failed: %d", successCount, errorCount),
+		Results: map[string]int{
+			"success": successCount,
+			"failed":  errorCount,
 		},
 	})
 }

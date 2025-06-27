@@ -1,6 +1,7 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 27, 2025**  
+**Last Updated: June 27, 2025 - 8:15 PM**  
 **Status: ✅ All features working with optimized broadcast system**
+**Lead Management: ✅ Fixed with proper authentication and import/export**
 
 ## 🚀 Quick Deploy to Railway
 
@@ -29,6 +30,7 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Webhooks** - Real-time notifications
 - ✅ **Lead Management** - Advanced filtering by niche and status
 - ✅ **Status Targeting** - Target campaigns/sequences by lead status
+- ✅ **Lead Import/Export** - CSV import/export with target_status support
 
 ### Broadcast System Features (June 27, 2025)
 - ✅ **Optimized Worker System** - One worker per device handles both campaigns & sequences
@@ -221,8 +223,22 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
 - **Name**: Contact name (required)
 - **Phone**: Phone number without + (e.g., 60123456789)
 - **Niche**: Single or multiple comma-separated (e.g., EXSTART or EXSTART,ITADRESS)
-- **Status**: `prospect` or `customer`
-- **Additional Note**: Any notes about the lead
+- **Target Status**: `prospect` or `customer` (stored in target_status column)
+- **Additional Note**: Any notes about the lead (stored in journey column)
+- **Device ID**: Automatically assigned from current device
+
+### Database Schema
+The leads table includes:
+- `id` - Auto-incrementing primary key (SERIAL)
+- `device_id` - UUID of the device
+- `user_id` - UUID of the user
+- `name` - Lead name
+- `phone` - Phone number
+- `niche` - Categories/tags
+- `journey` - Additional notes
+- `status` - General status (default: "new")
+- `target_status` - Classification as prospect/customer
+- `created_at` / `updated_at` - Timestamps
 
 ### Adding Leads
 1. Go to device **Lead Management**
@@ -240,12 +256,33 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
 - **By Search**: Search by name, phone, or niche
 
 ### Import/Export
+
+**Export Format:**
+Leads are exported with the following columns:
+- `name` - Lead name
+- `phone` - Phone number
+- `niche` - Categories/tags
+- `target_status` - prospect/customer classification
+- `additional_note` - Notes about the lead
+- `device_id` - Device that owns the lead
+
 **Import CSV Format:**
 ```csv
-name,phone,niche,status,additional_note
-John Doe,60123456789,EXSTART,prospect,New lead from website
-Jane Smith,60987654321,"EXSTART,ITADRESS",customer,Purchased both services
+name,phone,niche,target_status,additional_note,device_id
+John Doe,60123456789,EXSTART,prospect,New lead from website,
+Jane Smith,60987654321,"EXSTART,ITADRESS",customer,Purchased both services,
 ```
+
+**Import Notes:**
+- Required columns: `name`, `phone`
+- Optional columns: `niche`, `target_status`, `additional_note`, `device_id`
+- Default values: target_status="prospect", device_id=current device
+- Supports backward compatibility with `status` column (mapped to `target_status`)
+- Multiple niches can be comma-separated in quotes
+
+**API Endpoints:**
+- Export: `GET /api/devices/:deviceId/leads/export`
+- Import: `POST /api/devices/:deviceId/leads/import` (multipart/form-data with file)
 
 ### Lead Targeting in Campaigns
 Campaigns and sequences can target leads by:

@@ -654,14 +654,14 @@
         
         // Convert to CSV
         function convertToCSV(data) {
-            const headers = ['name', 'phone', 'niche', 'status', 'additional_note', 'last_interaction'];
+            const headers = ['name', 'phone', 'niche', 'target_status', 'additional_note', 'device_id'];
             const rows = data.map(lead => [
                 lead.name,
                 lead.phone,
                 lead.niche || '',
-                lead.status,
-                lead.journey || '',
-                lead.last_interaction || ''
+                lead.target_status || 'prospect',
+                lead.notes || lead.journey || '',
+                lead.device_id || deviceId
             ]);
             
             const csvContent = [
@@ -703,12 +703,23 @@
                 for (let i = 1; i < lines.length; i++) {
                     if (lines[i].trim()) {
                         const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                        
+                        // Get target_status - support both old 'status' and new 'target_status' column names
+                        let targetStatus = values[headers.indexOf('target_status')] || 
+                                         values[headers.indexOf('status')] || 
+                                         'prospect';
+                        
+                        // Validate target_status
+                        if (targetStatus !== 'prospect' && targetStatus !== 'customer') {
+                            targetStatus = 'prospect';
+                        }
+                        
                         newLeads.push({
-                            device_id: deviceId,
+                            device_id: values[headers.indexOf('device_id')] || deviceId,
                             name: values[nameIndex],
                             phone: values[phoneIndex],
                             niche: values[headers.indexOf('niche')] || '',
-                            status: values[headers.indexOf('status')] || 'prospect',
+                            status: targetStatus,  // This will be mapped to target_status in the backend
                             journey: values[headers.indexOf('additional_note')] || values[headers.indexOf('journey')] || ''
                         });
                     }
