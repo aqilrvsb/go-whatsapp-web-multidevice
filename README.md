@@ -27,6 +27,8 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Chat storage** - Save all messages
 - ✅ **Auto-reply** - Automatic responses
 - ✅ **Webhooks** - Real-time notifications
+- ✅ **Lead Management** - Advanced filtering by niche and status
+- ✅ **Status Targeting** - Target campaigns/sequences by lead status
 
 ### Broadcast System Features (June 27, 2025)
 - ✅ **Optimized Worker System** - One worker per device handles both campaigns & sequences
@@ -213,19 +215,63 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
    - Check number status
    - Broadcast messages
 
+## 📋 Lead Management System
+
+### Lead Structure
+- **Name**: Contact name (required)
+- **Phone**: Phone number without + (e.g., 60123456789)
+- **Niche**: Single or multiple comma-separated (e.g., EXSTART or EXSTART,ITADRESS)
+- **Status**: `prospect` or `customer`
+- **Additional Note**: Any notes about the lead
+
+### Adding Leads
+1. Go to device **Lead Management**
+2. Click **Add Lead**
+3. Fill in details:
+   - Name: "John Doe"
+   - Phone: "60123456789" (no + symbol)
+   - Niche: "EXSTART,ITADRESS" (multiple) or "EXSTART" (single)
+   - Status: Select prospect or customer
+   - Additional Note: Optional notes
+
+### Filtering Leads
+- **By Status**: Click status filter chips (All, Prospect, Customer)
+- **By Niche**: Dynamic niche filters appear based on your leads
+- **By Search**: Search by name, phone, or niche
+
+### Import/Export
+**Import CSV Format:**
+```csv
+name,phone,niche,status,additional_note
+John Doe,60123456789,EXSTART,prospect,New lead from website
+Jane Smith,60987654321,"EXSTART,ITADRESS",customer,Purchased both services
+```
+
+### Lead Targeting in Campaigns
+Campaigns and sequences can target leads by:
+1. **Niche**: Exact or partial match (ITADRESS matches EXSTART,ITADRESS)
+2. **Status**: Filter by prospect, customer, or all
+3. **Combined**: Target "ITADRESS" niche + "prospect" status
+
+Example: A lead with niche "EXSTART,ITADRESS" and status "prospect" will receive:
+- ✅ Campaigns targeting "ITADRESS" + "prospect"
+- ✅ Campaigns targeting "EXSTART" + "all"
+- ❌ Campaigns targeting "ITADRESS" + "customer"
+
 ## 🗄️ Database Schema
 
 ### Tables Created Automatically:
 - `users` - User accounts
 - `user_devices` - WhatsApp devices
-- `campaigns` - Marketing campaigns
+- `campaigns` - Marketing campaigns (with target_status field)
 - `whatsapp_chats` - Chat metadata
 - `whatsapp_messages` - Message history
 - `message_analytics` - Tracking data
-- `sequences` - Message sequence projects
+- `sequences` - Message sequence projects (with target_status field)
 - `sequence_steps` - Daily messages in sequences
 - `sequence_contacts` - Contact progress tracking
 - `sequence_logs` - Message send history
+- `leads` - Contact management with niche and status
 
 ## 🔍 Troubleshooting
 
@@ -574,7 +620,34 @@ Both campaigns run simultaneously without interference!
 ## Deployment Trigger - Fri 27/06/2025  1:53:49.15 
 
 
-## Latest Update - June 27, 2025 (4:30 AM)
+## Latest Update - June 27, 2025 (2:00 PM)
+
+### ✅ Lead Management Improvements & Status Targeting!
+
+#### Lead Management Updates
+- **Phone Format**: No + symbol required (60123456789)
+- **Niche Field**: Supports single (EXSTART) or multiple (EXSTART,ITADRESS) niches
+- **Status Options**: Simplified to `prospect` and `customer` only
+- **Additional Note**: Renamed from "Journey/Notes" for clarity
+- **Dynamic Filters**: Niche filters auto-generated from database
+
+#### NEW: Lead Status Targeting for Campaigns & Sequences
+- **Target by Niche AND Status**: Create campaigns for specific audience segments
+- **Target Status Options**:
+  - `all` - Send to all leads matching the niche
+  - `prospect` - Only send to prospects
+  - `customer` - Only send to customers
+- **Smart Matching**: Lead with "EXSTART,ITADRESS" receives messages for campaigns targeting "ITADRESS"
+- **Database Fields**: Added `target_status` column to campaigns and sequences
+
+#### Example Use Cases
+1. **New Customer Welcome**: Target niche "ITADRESS" + status "customer"
+2. **Prospect Nurturing**: Target niche "EXSTART" + status "prospect"
+3. **General Announcement**: Target any niche + status "all"
+
+---
+
+## Previous Update - June 27, 2025 (4:30 AM)
 
 ### ✅ New Dashboard Tabs Added!
 Three new tabs have been added to the dashboard for easy monitoring:
