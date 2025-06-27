@@ -57,10 +57,18 @@ func InitEnvironment() {
 	if redisPassword := os.Getenv("REDIS_PASSWORD"); redisPassword != "" {
 		RedisPassword = redisPassword
 	}
+	if redisHost := os.Getenv("REDIS_HOST"); redisHost != "" {
+		RedisHost = redisHost
+	}
 	if redisHost := os.Getenv("REDISHOST"); redisHost != "" {
 		RedisHost = redisHost
 	}
+	if redisPort := os.Getenv("REDIS_PORT"); redisPort != "" {
+		RedisPort = redisPort
+	}
 	if redisPort := os.Getenv("REDISPORT"); redisPort != "" {
+		RedisPort = redisPort
+	}REDISPORT"); redisPort != "" {
 		RedisPort = redisPort
 	}
 }

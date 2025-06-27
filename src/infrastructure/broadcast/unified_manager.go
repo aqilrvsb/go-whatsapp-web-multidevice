@@ -25,15 +25,31 @@ var (
 // GetBroadcastManager returns the appropriate broadcast manager based on configuration
 func GetBroadcastManager() BroadcastManagerInterface {
 	umOnce.Do(func() {
-		// Check if Redis is available
+		// Check if Redis is available - try multiple env vars
 		redisURL := os.Getenv("REDIS_URL")
-		if redisURL != "" {
-			logrus.Info("Redis URL found, initializing Redis-based broadcast manager")
-			unifiedManager = NewRedisOptimizedBroadcastManager()
-		} else {
-			logrus.Info("No Redis URL found, using in-memory broadcast manager")
-			unifiedManager = NewBasicBroadcastManager()
+		if redisURL == "" {
+			redisURL = os.Getenv("redis_url")
 		}
+		if redisURL == "" {
+			redisURL = os.Getenv("RedisURL")
+		}
+		
+		// Log what we found
+		logrus.Infof("Checking for Redis - REDIS_URL env: '%s'", redisURL)
+		
+		// For now, let's disable Redis to get the app working
+		// We'll enable it once we fix the connection issue
+		if redisURL != "" && redisURL != "redis://default:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:6379" {
+			// Only use Redis if we have a real URL, not a template
+			if redisURL != "redis://[::1]:6379" && redisURL != "redis://localhost:6379" {
+				logrus.Info("Valid Redis URL found, but using in-memory manager for now")
+				// unifiedManager = NewRedisOptimizedBroadcastManager()
+			}
+		}
+		
+		// Use in-memory manager for now
+		logrus.Info("Using in-memory broadcast manager")
+		unifiedManager = NewBasicBroadcastManager()
 	})
 	return unifiedManager
 }
