@@ -33,12 +33,17 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	lead.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO leads (id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO leads (id, user_id, name, phone, email, niche, source, status, target_status, notes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	
+	// Default target_status
+	if lead.TargetStatus == "" {
+		lead.TargetStatus = "customer"
+	}
+	
 	_, err := r.db.Exec(query, lead.ID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Email, lead.Niche, lead.Source, lead.Status, lead.Notes,
+		lead.Email, lead.Niche, lead.Source, lead.Status, lead.TargetStatus, lead.Notes,
 		lead.CreatedAt, lead.UpdatedAt)
 		
 	return err
@@ -53,7 +58,7 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	// - As middle item: niche = 'OTHER,ITADRESS,MORE'
 	// - As last item: niche = 'OTHER,ITADRESS'
 	query := `
-		SELECT id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at
+		SELECT id, user_id, name, phone, email, niche, source, status, COALESCE(target_status, 'customer') as target_status, notes, created_at, updated_at
 		FROM leads
 		WHERE niche = $1 
 		   OR niche LIKE $2 
@@ -78,7 +83,7 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	for rows.Next() {
 		var lead models.Lead
 		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.Notes,
+			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.TargetStatus, &lead.Notes,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			continue
@@ -102,10 +107,10 @@ func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) (
 		return leads, nil
 	}
 	
-	// Filter by status
+	// Filter by target_status
 	var filteredLeads []models.Lead
 	for _, lead := range leads {
-		if lead.Status == status {
+		if lead.TargetStatus == status {
 			filteredLeads = append(filteredLeads, lead)
 		}
 	}
@@ -138,7 +143,7 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 	for rows.Next() {
 		var lead models.Lead
 		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.Notes,
+			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.TargetStatus, &lead.Notes,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			continue

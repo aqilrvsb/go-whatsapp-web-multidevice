@@ -451,7 +451,7 @@
                                 ${lead.niche ? `<span class="ms-3"><i class="bi bi-briefcase text-muted"></i> ${lead.niche}</span>` : ''}
                             </p>
                             <div class="d-flex align-items-center">
-                                <span class="lead-status ${lead.status}">${lead.status.toUpperCase()}</span>
+                                <span class="lead-status ${lead.target_status || lead.status}">${(lead.target_status || lead.status || '').toUpperCase()}</span>
                                 <span class="text-muted small ms-3">Last interaction: ${lastInteraction}</span>
                             </div>
                             ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
@@ -484,7 +484,7 @@
             
             // Status filter
             if (currentFilter !== 'all') {
-                filtered = filtered.filter(lead => lead.status === currentFilter);
+                filtered = filtered.filter(lead => (lead.target_status || lead.status) === currentFilter);
             }
             
             // Niche filter
@@ -539,7 +539,7 @@
                 document.getElementById('leadName').value = lead.name;
                 document.getElementById('leadPhone').value = lead.phone;
                 document.getElementById('leadNiche').value = lead.niche || '';
-                document.getElementById('leadStatus').value = lead.status;
+                document.getElementById('leadStatus').value = lead.target_status || lead.status || 'prospect';
                 document.getElementById('leadJourney').value = lead.journey || '';
                 leadModal.show();
             }

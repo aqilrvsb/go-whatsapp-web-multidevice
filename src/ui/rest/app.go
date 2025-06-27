@@ -602,7 +602,7 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		Phone    string `json:"phone"`
 		Niche    string `json:"niche"`
 		Journey  string `json:"journey"`
-		Status   string `json:"status"`
+		Status   string `json:"status"` // This will be target_status from frontend
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -625,14 +625,15 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 	
 	leadRepo := repository.GetLeadRepository()
 	lead := &models.Lead{
-		UserID: user.ID,
-		Name:   request.Name,
-		Phone:  request.Phone,
-		Email:  "",
-		Niche:  request.Niche,
-		Source: "manual", // Set source as manual since it's added from UI
-		Status: request.Status,
-		Notes:  request.Journey, // Map journey to notes field
+		UserID:       user.ID,
+		Name:         request.Name,
+		Phone:        request.Phone,
+		Email:        "",
+		Niche:        request.Niche,
+		Source:       "manual", // Set source as manual since it's added from UI
+		Status:       "", // Keep empty for backward compatibility
+		TargetStatus: request.Status, // Map status from frontend to target_status
+		Notes:        request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.CreateLead(lead)
 	if err != nil {
@@ -702,14 +703,15 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 	
 	leadRepo := repository.GetLeadRepository()
 	lead := &models.Lead{
-		UserID: user.ID,  // Use the user ID
-		Name:   request.Name,
-		Phone:  request.Phone,
-		Email:  "",
-		Niche:  request.Niche,
-		Source: "manual", // Keep source as manual
-		Status: request.Status,
-		Notes:  request.Journey, // Map journey to notes field
+		UserID:       user.ID,  // Use the user ID
+		Name:         request.Name,
+		Phone:        request.Phone,
+		Email:        "",
+		Niche:        request.Niche,
+		Source:       "manual", // Keep source as manual
+		Status:       "", // Keep empty for backward compatibility
+		TargetStatus: request.Status, // Map status from frontend to target_status
+		Notes:        request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.UpdateLead(leadId, lead)
 	if err != nil {
