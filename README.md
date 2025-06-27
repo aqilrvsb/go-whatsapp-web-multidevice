@@ -89,6 +89,48 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
+### Latest Updates (June 28, 2025 - 8:00 AM)
+
+#### 🌍 Complete Timezone & Campaign Execution Fix
+- **Fixed PostgreSQL Time Parsing**: Handles empty strings and invalid time formats gracefully
+- **Timezone-Aware Campaigns**: All campaigns now work correctly with Malaysia timezone (UTC+8)
+- **Robust Error Handling**: Campaign triggers continue even with invalid data
+- **Smart Time Validation**: Database validates time formats before saving
+- **Immediate Execution**: Campaigns with NULL/empty time run immediately
+
+#### 🎯 What We've Achieved Today:
+1. **Campaigns Now Work Globally**: Server can be anywhere, campaigns execute in user's timezone
+2. **PostgreSQL Optimization**: Database handles all timezone conversions efficiently
+3. **Error Recovery**: System continues running even with bad data
+4. **User Isolation**: Complete security - users only see their own data
+5. **Redis Integration**: Ultra-scale support for 3000+ devices remains intact
+
+#### 🔧 Technical Improvements:
+- Removed complex timezone calculations from Go code
+- Let PostgreSQL handle timezone conversions with `AT TIME ZONE`
+- Added proper NULL handling for scheduled_time
+- Created database constraints to prevent invalid time formats
+- Simplified campaign trigger logic for better maintainability
+
+#### 🚀 How to Use:
+1. **Create Campaign**: Set any date/time in Malaysia timezone
+2. **Automatic Execution**: Campaigns run when scheduled time arrives
+3. **Immediate Send**: Leave time empty to send immediately
+4. **Monitor Progress**: Check Worker Status for real-time updates
+
+#### 🐛 Fixed Issues:
+- ✅ "invalid input syntax for type time" errors
+- ✅ Timezone mismatches between server and user
+- ✅ Campaign not triggering at scheduled time
+- ✅ Worker status not showing user's devices only
+- ✅ Date parsing errors with mixed formats
+
+#### 📊 Database Migrations:
+Run these migrations in order:
+1. `database/001_add_timestamptz_to_campaigns.sql` - Adds timezone support
+2. `database/002_comprehensive_timezone_migration.sql` - Complete migration
+3. `database/003_fix_scheduled_time_validation.sql` - Time format validation
+
 ### Latest Updates (June 28, 2025 - 12:50 AM)
 
 #### 🔒 Enhanced User Isolation for Worker Status APIs

@@ -263,7 +263,12 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, 
 		       COALESCE(target_status, 'all') as target_status, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '00:00:00') as scheduled_time, 
+		       campaign_date, 
+		       CASE 
+		           WHEN scheduled_time IS NULL THEN NULL
+		           WHEN scheduled_time = '' THEN NULL
+		           ELSE scheduled_time::text
+		       END as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -275,7 +280,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 		    OR scheduled_time = '00:00:00'
 		    OR 
 		    -- Otherwise check if scheduled time has passed (using Malaysia timezone)
-		    (campaign_date || ' ' || scheduled_time)::timestamp AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+		    (campaign_date || ' ' || COALESCE(NULLIF(scheduled_time::text, ''), '00:00:00'))::timestamp AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
 		  )
 		ORDER BY campaign_date, scheduled_time
 	`
@@ -289,17 +294,25 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
+		var scheduledTime sql.NullString
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
-			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
+			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
 			log.Printf("Error scanning campaign: %v", err)
 			continue
+		}
+		
+		// Handle NULL scheduled_time
+		if scheduledTime.Valid {
+			campaign.ScheduledTime = scheduledTime.String
+		} else {
+			campaign.ScheduledTime = ""
 		}
 		
 		campaigns = append(campaigns, campaign)
