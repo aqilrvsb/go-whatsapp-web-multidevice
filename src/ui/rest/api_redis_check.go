@@ -32,6 +32,8 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 	managerType := "unknown"
 	
 	switch manager.(type) {
+	case *broadcast.UltraScaleRedisManager:
+		managerType = "Ultra Scale Redis Manager (3000+ devices)"
 	case *broadcast.RedisOptimizedBroadcastManager:
 		managerType = "Redis Optimized Manager"
 	case *broadcast.BasicBroadcastManager:
@@ -72,7 +74,9 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 			"final_redis_url":  redisURL,
 			"is_redis_enabled": managerType == "Redis Optimized Manager",
 			"message": func() string {
-				if managerType == "Redis Optimized Manager" {
+				if managerType == "Ultra Scale Redis Manager (3000+ devices)" {
+					return "✅ Ultra Scale Redis is properly configured and running! Ready for 3000+ devices!"
+				} else if managerType == "Redis Optimized Manager" {
 					return "✅ Redis is properly configured and running!"
 				}
 				return "❌ Redis is not being used. Check your environment variables."

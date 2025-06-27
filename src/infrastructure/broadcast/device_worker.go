@@ -99,8 +99,6 @@ func (dw *DeviceWorker) GetStatus() domainBroadcast.WorkerStatus {
 
 // processMessages processes messages from the queue
 func (dw *DeviceWorker) processMessages() {
-	var lastGroupID string
-	
 	for {
 		select {
 		case <-dw.ctx.Done():
@@ -135,23 +133,12 @@ func (dw *DeviceWorker) processMessages() {
 			// Determine delay based on message grouping
 			var delay time.Duration
 			
-			// Check if this message is part of a group
-			if msg.GroupID != nil && *msg.GroupID != "" {
-				if lastGroupID == *msg.GroupID {
-					// Same group (e.g., text following image) - use 3 second delay
-					delay = 3 * time.Second
-					logrus.Debugf("Using 3 second delay for grouped message (group: %s)", *msg.GroupID)
-				} else {
-					// New group (different lead) - use random delay between min/max
-					delay = dw.getRandomDelay()
-					lastGroupID = *msg.GroupID
-					logrus.Debugf("Using random delay %v for new lead (group: %s)", delay, *msg.GroupID)
-				}
-			} else {
-				// No group - use random delay
-				delay = dw.getRandomDelay()
-				lastGroupID = ""
-			}
+			// Always use random delay between messages
+			delay = dw.getRandomDelay()
+			
+			// Log the message processing
+			logrus.Infof("Processing message for %s - Type: %s, Has image: %v, Has text: %v", 
+				msg.RecipientPhone, msg.Type, msg.MediaURL != "", msg.Content != "")
 			
 			time.Sleep(delay)
 		}

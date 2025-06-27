@@ -107,6 +107,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/system/status", rest.GetSystemStatus)
 	app.Get("/api/system/redis-check", rest.CheckRedisStatus)
 	
+	// Worker status endpoints
+	app.Get("/api/workers/status", rest.CheckAllWorkersStatus)
+	app.Get("/api/workers/device/:deviceId", rest.CheckDeviceWorkerStatus)
+	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
 	

@@ -1,0 +1,129 @@
+package rest
+
+import (
+	"fmt"
+	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/gofiber/fiber/v2"
+)
+
+func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	if deviceID == "" {
+		return c.JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Device ID is required",
+		})
+	}
+	
+	// Get broadcast manager
+	manager := broadcast.GetBroadcastManager()
+	
+	// Get worker status
+	status, exists := manager.GetWorkerStatus(deviceID)
+	
+	if !exists {
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "SUCCESS",
+			Message: "Worker status",
+			Results: map[string]interface{}{
+				"device_id": deviceID,
+				"worker_exists": false,
+				"status": "no_worker",
+				"message": "No worker running for this device. Worker will start automatically when messages are queued.",
+			},
+		})
+	}
+	
+	// Worker exists, return detailed status
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS", 
+		Message: "Worker status",
+		Results: map[string]interface{}{
+			"device_id": deviceID,
+			"worker_exists": true,
+			"status": status.Status,
+			"queue_size": status.QueueSize,
+			"processed_count": status.ProcessedCount,
+			"failed_count": status.FailedCount,
+			"last_activity": status.LastActivity,
+			"is_active": status.Status == "active" || status.Status == "processing",
+			"message": func() string {
+				switch status.Status {
+				case "active", "processing":
+					return "✅ Worker is active and processing messages"
+				case "idle":
+					return "💤 Worker is idle, waiting for messages"
+				case "error":
+					return "❌ Worker encountered an error"
+				default:
+					return "❓ Worker status: " + status.Status
+				}
+			}(),
+		},
+	})
+}
+
+// CheckAllWorkersStatus returns status for all workers
+func (rest *App) CheckAllWorkersStatus(c *fiber.Ctx) error {
+	// Get broadcast manager
+	manager := broadcast.GetBroadcastManager()
+	
+	// Get all worker statuses
+	statuses := manager.GetAllWorkerStatus()
+	
+	// Count statistics
+	totalWorkers := len(statuses)
+	activeWorkers := 0
+	idleWorkers := 0
+	errorWorkers := 0
+	totalQueued := 0
+	totalProcessed := 0
+	totalFailed := 0
+	
+	for _, status := range statuses {
+		totalQueued += status.QueueSize
+		totalProcessed += status.ProcessedCount
+		totalFailed += status.FailedCount
+		
+		switch status.Status {
+		case "active", "processing":
+			activeWorkers++
+		case "idle":
+			idleWorkers++
+		case "error":
+			errorWorkers++
+		}
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "All workers status",
+		Results: map[string]interface{}{
+			"summary": map[string]interface{}{
+				"total_workers": totalWorkers,
+				"active_workers": activeWorkers,
+				"idle_workers": idleWorkers,
+				"error_workers": errorWorkers,
+				"total_queued": totalQueued,
+				"total_processed": totalProcessed,
+				"total_failed": totalFailed,
+			},
+			"workers": statuses,
+			"message": func() string {
+				if totalWorkers == 0 {
+					return "No workers currently running"
+				} else if activeWorkers > 0 {
+					return fmt.Sprintf("✅ %d workers active out of %d total", activeWorkers, totalWorkers)
+				} else {
+					return fmt.Sprintf("💤 All %d workers are idle", totalWorkers)
+				}
+			}(),
+		},
+	})
+}

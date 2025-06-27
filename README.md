@@ -1,13 +1,16 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 27, 2025 - 2:30 PM**  
+**Last Updated: June 27, 2025 - 3:00 PM**  
 **Status: ✅ Production-ready with Ultra Scale Redis support for 3000+ devices**
-**Architecture: ✅ Redis-optimized for massive scale operations**
+**Architecture: ✅ Redis-optimized with single-message delivery**
 
 ## 🚀 NEW: Ultra Scale Redis Implementation for 3000+ Devices
 
-### What's New (June 27, 2025 - 2:30 PM)
+### What's New (June 27, 2025 - 3:00 PM)
 - **Ultra Scale Redis Manager**: Purpose-built for handling 3000+ WhatsApp devices
 - **Device-Specific Queues**: Each device has its own Redis queue for optimal distribution
+- **Worker Status API**: New endpoints to monitor worker health and status
+- **Single Message Delivery**: Image+text now sent as one message with caption (no more 3-second delays)
+- **Redis Status Check**: Built-in endpoint to verify Redis configuration
 - **3000 Concurrent Workers**: Increased from 500 to support massive scale
 - **Distributed Locking**: Multi-server support with Redis-based coordination
 - **Performance Optimizations**: 
@@ -195,23 +198,26 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 
 ## 🔥 Key System Capabilities
 
-### Message Sending Logic
+### Message Sending Logic (Updated June 27, 2025)
 ```
-Two-Part Messages (Image + Text):
-1. Send image (no caption)
-2. Wait 3 seconds
-3. Send text message
-4. Wait random delay (min-max)
-5. Process next lead
+Image + Text Messages:
+1. Send single image message with caption
+2. Wait random delay (min-max)
+3. Process next lead
 
-Single Messages:
-1. Send message (text or image)
+Text Only Messages:
+1. Send text message
+2. Wait random delay (min-max)
+3. Process next lead
+
+Image Only Messages:
+1. Send image without caption
 2. Wait random delay (min-max)
 3. Process next lead
 ```
 
 ### Worker Architecture
-- **500 max concurrent workers** system-wide
+- **3000 max concurrent workers** with Redis (increased from 500)
 - **1,000 message queue** per worker
 - **Auto-scaling** based on load
 - **Health monitoring** every 30 seconds
@@ -276,6 +282,34 @@ If Redis isn't detected:
 2. Check that REDIS_URL doesn't contain template variables like `${{`
 3. Verify the URL uses `redis://` scheme
 4. Make sure it's not using localhost
+
+## 👷 Monitoring Workers & System Status
+
+### Check Worker Status for Specific Device:
+```
+GET https://your-app.up.railway.app/api/workers/device/{deviceId}
+```
+
+Shows:
+- Worker existence and status (active/idle/error)
+- Queue size and processing statistics
+- Last activity timestamp
+
+### Check All Workers:
+```
+GET https://your-app.up.railway.app/api/workers/status
+```
+
+Shows:
+- Total active/idle/error workers
+- Combined queue sizes and statistics
+- Overall system health
+
+### Quick Status Checks:
+- **Redis Status**: `/api/system/redis-check`
+- **System Status**: `/api/system/status`
+- **Device Worker**: `/api/workers/device/{id}`
+- **All Workers**: `/api/workers/status`
 
 ## 🔧 Installation & Deployment
 
@@ -966,33 +1000,28 @@ Both campaign and sequence triggers are fully operational with proper multi-devi
 - **Daily processing**: Messages sent at scheduled times
 - **Progress tracking**: Each contact maintains individual timeline
 - **Multi-device support**: Distributes across all user devices
-- **Message logic**:
-  - If has image → Send image first (no caption)
-  - If has text → Send text after image (3 second gap)
-  - Only image → Send just image
-  - Only text → Send just text
+- **Message logic** (Updated June 27, 2025):
+  - Image + Text → Send as single image message with caption
+  - Only image → Send image without caption
+  - Only text → Send text message
 - **Delay logic**:
-  - Between image/text for same lead: Fixed 3 seconds
-  - Between different leads: Random delay (device min/max settings)
+  - Between different messages: Random delay (device min/max settings)
+  - No more 3-second delay for image+text combinations
 
 #### Example Message Flow:
 ```
 User A (15 connected devices) creates "Promo Merdeka" sequence:
 
 Lead 1 (Image + Text):
-→ Device A3 sends image to +60123456789
-→ Wait 3 seconds
-→ Device A3 sends text to +60123456789
+→ Device A3 sends image with caption to +60123456789
 → Wait 10-20 seconds (random based on device settings)
 
 Lead 2 (Text only):
 → Device A7 sends text to +60987654321
 → Wait 10-20 seconds
 
-Lead 3 (Image + Text):
-→ Device A11 sends image to +60111222333
-→ Wait 3 seconds
-→ Device A11 sends text to +60111222333
+Lead 3 (Image only):
+→ Device A11 sends image without caption to +60111222333
 → Wait 10-20 seconds
 
 ... continues distributing across all 15 devices
@@ -1221,6 +1250,15 @@ For optimal performance with 3000 devices:
 ### Additional Resources
 - 📖 [Redis Implementation Guide](REDIS_IMPLEMENTATION_GUIDE.md)
 - 📊 [3000 Device Configuration Guide](3000_DEVICE_CONFIG_GUIDE.md)
+- 🔧 [Deployment Script](deploy_redis_3000_devices.bat)
+
+**Your system is now ready for massive scale operations! 🚀**
+
+
+### Additional Resources
+- 📖 [Redis Implementation Guide](REDIS_IMPLEMENTATION_GUIDE.md)
+- 📊 [3000 Device Configuration Guide](3000_DEVICE_CONFIG_GUIDE.md)
+- 👷 [Redis & Worker Status Guide](REDIS_AND_WORKER_STATUS_GUIDE.md)
 - 🔧 [Deployment Script](deploy_redis_3000_devices.bat)
 
 **Your system is now ready for massive scale operations! 🚀**
