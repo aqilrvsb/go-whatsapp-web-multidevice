@@ -10,14 +10,22 @@ type BroadcastMessage struct {
 	CampaignID     *int    // Pointer to allow null
 	SequenceID     *string // Pointer to allow null
 	RecipientPhone string
-	Type           string // text, image, video, document
+	RecipientJID   string  // WhatsApp JID format
+	Type           string  // text, image, video, document
 	Content        string
+	Message        string  // Alias for Content
 	MediaURL       string
+	ImageURL       string  // Alias for MediaURL
 	Caption        string
 	ScheduledAt    time.Time
 	Status         string
-	GroupID        *string // For grouping related messages (e.g., image + text)
-	GroupOrder     *int    // Order within the group (1 for image, 2 for text)
+	GroupID        string  // For grouping related messages
+	GroupOrder     int     // Order within the group
+	RetryCount     int     // Number of retry attempts
+	CreatedAt      time.Time
+	// Delay settings from campaign/sequence
+	MinDelay       int
+	MaxDelay       int
 }
 
 // WorkerStatus represents the status of a device worker

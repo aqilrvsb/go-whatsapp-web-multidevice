@@ -36,4 +36,10 @@ var (
 	WhatsappTypeGroup                    = "@g.us"
 	WhatsappAccountValidation            = true
 	WhatsappChatStorage                  = true
+	
+	// Redis Configuration
+	RedisURL      string
+	RedisPassword string
+	RedisHost     = "localhost"
+	RedisPort     = "6379"
 )

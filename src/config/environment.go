@@ -49,4 +49,18 @@ func InitEnvironment() {
 	} else {
 		WhatsappChatStorage = false
 	}
+	
+	// Redis settings
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		RedisURL = redisURL
+	}
+	if redisPassword := os.Getenv("REDIS_PASSWORD"); redisPassword != "" {
+		RedisPassword = redisPassword
+	}
+	if redisHost := os.Getenv("REDISHOST"); redisHost != "" {
+		RedisHost = redisHost
+	}
+	if redisPort := os.Getenv("REDISPORT"); redisPort != "" {
+		RedisPort = redisPort
+	}
 }
