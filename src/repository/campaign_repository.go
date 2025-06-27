@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -112,8 +113,10 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 		ORDER BY campaign_date DESC, scheduled_time DESC
 	`
 	
+	log.Printf("Getting campaigns for user: %s", userID)
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
+		log.Printf("Error querying campaigns: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -130,6 +133,7 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
+			log.Printf("Error scanning campaign: %v", err)
 			continue
 		}
 		
@@ -137,9 +141,11 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 			campaign.ScheduledTime = scheduledTime.String
 		}
 		
+		log.Printf("Found campaign: ID=%d, Date=%s, Title=%s", campaign.ID, campaign.CampaignDate, campaign.Title)
 		campaigns = append(campaigns, campaign)
 	}
 	
+	log.Printf("Total campaigns found: %d", len(campaigns))
 	return campaigns, nil
 }
 
