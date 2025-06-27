@@ -138,6 +138,8 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 			Content:        campaign.Message,
 			MediaURL:       campaign.ImageURL,
 			ScheduledAt:    time.Now(),
+			MinDelay:       campaign.MinDelaySeconds,
+			MaxDelay:       campaign.MaxDelaySeconds,
 		}
 		
 		err := broadcastRepo.QueueMessage(msg)

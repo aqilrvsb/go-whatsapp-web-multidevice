@@ -130,15 +130,22 @@ func (dw *DeviceWorker) processMessages() {
 			dw.status = "idle"
 			dw.mu.Unlock()
 			
-			// Determine delay based on message grouping
+			// Determine delay based on message's campaign/sequence settings
 			var delay time.Duration
 			
-			// Always use random delay between messages
-			delay = dw.getRandomDelay()
+			// Use delays from the message (set by campaign/sequence)
+			if msg.MinDelay > 0 || msg.MaxDelay > 0 {
+				delay = getRandomDelayBetween(msg.MinDelay, msg.MaxDelay)
+				logrus.Debugf("Using campaign/sequence delays: %d-%d seconds", msg.MinDelay, msg.MaxDelay)
+			} else {
+				// Fallback to device defaults if message doesn't have delays
+				delay = dw.getRandomDelay()
+				logrus.Debugf("Using device default delays: %d-%d seconds", dw.minDelay, dw.maxDelay)
+			}
 			
 			// Log the message processing
-			logrus.Infof("Processing message for %s - Type: %s, Has image: %v, Has text: %v", 
-				msg.RecipientPhone, msg.Type, msg.MediaURL != "", msg.Content != "")
+			logrus.Infof("Processing message for %s - Type: %s, Has image: %v, Has text: %v, Delay: %v", 
+				msg.RecipientPhone, msg.Type, msg.MediaURL != "", msg.Content != "", delay)
 			
 			time.Sleep(delay)
 		}
@@ -303,4 +310,19 @@ func downloadMedia(url string) ([]byte, error) {
 	}
 	
 	return io.ReadAll(resp.Body)
+}
+// getRandomDelayBetween returns a random delay between min and max seconds
+func getRandomDelayBetween(minDelay, maxDelay int) time.Duration {
+	if minDelay <= 0 && maxDelay <= 0 {
+		// Default delays if not set
+		minDelay = 10
+		maxDelay = 30
+	}
+	
+	if minDelay == maxDelay || maxDelay <= minDelay {
+		return time.Duration(minDelay) * time.Second
+	}
+	
+	delay := rand.Intn(maxDelay-minDelay) + minDelay
+	return time.Duration(delay) * time.Second
 }

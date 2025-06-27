@@ -1,16 +1,17 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 27, 2025 - 3:00 PM**  
+**Last Updated: June 27, 2025 - 3:30 PM**  
 **Status: ✅ Production-ready with Ultra Scale Redis support for 3000+ devices**
-**Architecture: ✅ Redis-optimized with single-message delivery**
+**Architecture: ✅ Redis-optimized with campaign/sequence-based delays**
 
 ## 🚀 NEW: Ultra Scale Redis Implementation for 3000+ Devices
 
-### What's New (June 27, 2025 - 3:00 PM)
+### What's New (June 27, 2025 - 3:30 PM)
 - **Ultra Scale Redis Manager**: Purpose-built for handling 3000+ WhatsApp devices
 - **Device-Specific Queues**: Each device has its own Redis queue for optimal distribution
 - **Worker Status API**: New endpoints to monitor worker health and status
 - **Single Message Delivery**: Image+text now sent as one message with caption (no more 3-second delays)
 - **Redis Status Check**: Built-in endpoint to verify Redis configuration
+- **Campaign/Sequence Delays**: Fixed - delays now properly come from campaigns/sequences, not devices
 - **3000 Concurrent Workers**: Increased from 500 to support massive scale
 - **Distributed Locking**: Multi-server support with Redis-based coordination
 - **Performance Optimizations**: 

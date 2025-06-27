@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/go-redis/redis/v8"
@@ -222,25 +221,9 @@ func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWor
 		return nil
 	}
 	
-	// Get device settings from database
-	db := database.GetDB()
-	var minDelay, maxDelay int
-	row := db.QueryRow(`
-		SELECT min_delay_seconds, max_delay_seconds 
-		FROM user_devices 
-		WHERE id = $1
-	`, deviceID)
-	
-	if err := row.Scan(&minDelay, &maxDelay); err == nil {
-		// Use configured delays
-	} else {
-		// Default delays
-		minDelay = 10
-		maxDelay = 30
-	}
-	
 	// Create worker using the existing constructor
-	worker := NewDeviceWorker(deviceID, client, minDelay, maxDelay)
+	// Pass default delays that will be overridden by message-specific delays
+	worker := NewDeviceWorker(deviceID, client, 10, 30)
 	
 	return worker
 }

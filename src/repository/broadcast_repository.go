@@ -85,15 +85,21 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	return err
 }
 
-// GetPendingMessages gets pending messages for a device
+// GetPendingMessages gets pending messages for a device with campaign/sequence delays
 func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
-		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
-		       message_type, content, media_url, scheduled_at, group_id, group_order
-		FROM broadcast_messages
-		WHERE device_id = $1 AND status = 'pending'
-		AND (scheduled_at IS NULL OR scheduled_at <= $2)
-		ORDER BY group_id NULLS LAST, group_order NULLS LAST, created_at ASC
+		SELECT 
+			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
+			bm.recipient_phone, bm.message_type, bm.content, bm.media_url, 
+			bm.scheduled_at, bm.group_id, bm.group_order,
+			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) as min_delay,
+			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) as max_delay
+		FROM broadcast_messages bm
+		LEFT JOIN campaigns c ON bm.campaign_id = c.id
+		LEFT JOIN sequences s ON bm.sequence_id = s.id
+		WHERE bm.device_id = $1 AND bm.status = 'pending'
+		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= $2)
+		ORDER BY bm.group_id NULLS LAST, bm.group_order NULLS LAST, bm.created_at ASC
 		LIMIT $3
 	`
 	
@@ -114,7 +120,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		
 		err := rows.Scan(&msg.ID, &userID, &msg.DeviceID, &campaignID, &sequenceID,
 			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
-			&groupID, &groupOrder)
+			&groupID, &groupOrder, &msg.MinDelay, &msg.MaxDelay)
 		if err != nil {
 			continue
 		}

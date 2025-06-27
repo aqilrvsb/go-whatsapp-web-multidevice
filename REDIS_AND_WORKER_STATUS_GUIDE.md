@@ -208,6 +208,7 @@ curl https://your-app.up.railway.app/api/workers/status
 2. Check queue size
 3. Monitor failed count
 4. Review device connection status
+
 ## Message Delay Configuration
 
 Delays are configured at the **campaign or sequence level**, not per device. All devices follow the same delay settings from the campaign/sequence.
@@ -267,27 +268,11 @@ Campaign with min=10, max=30 being sent by 15 devices:
 - Device A3: Sends to Lead 5, waits 11 seconds, sends to Lead 6
 - All devices use same 10-30 range, but random within that range
 
+## ✅ Implementation Status
 
-## ⚠️ Implementation Note
-
-**Current Implementation** (as of June 27, 2025):
-The system currently reads delays from the `user_devices` table, which means delays are per-device. This is a known issue that needs to be corrected.
-
-**Correct Implementation** (to be fixed):
-- Delays should come from campaigns/sequences
-- When a campaign creates messages, it should pass its min/max delays
-- When a sequence creates messages, it should pass step-specific or sequence-level delays
-- All devices processing the same campaign/sequence should use the same delay range
-
-**Workaround**:
-Until this is fixed, you can set all devices to use the same delays:
-```sql
--- Set all active devices to use same delays
-UPDATE user_devices 
-SET 
-    min_delay_seconds = 10,
-    max_delay_seconds = 30
-WHERE is_active = true;
-```
-
-This ensures consistent behavior across all devices.
+**Fixed** (as of June 27, 2025):
+- ✅ Delays now properly come from campaigns/sequences
+- ✅ All devices use the same delay range when processing the same campaign/sequence
+- ✅ Campaign messages include min/max delays from the campaign
+- ✅ Sequence messages will include delays from sequence/step settings
+- ✅ Worker uses message-specific delays with fallback to defaults
