@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
@@ -2119,11 +2120,34 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Get user devices
-	userDeviceRepo := repository.GetUserDeviceRepository()
-	devices, err := userDeviceRepo.GetAllDevicesByUserID(session.UserID)
+	// Get user devices - use direct query
+	db := database.Connection()
+	query := `
+		SELECT id, name, phone, status, jid, created_at, last_seen
+		FROM user_devices
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := db.Query(query, session.UserID)
 	if err != nil {
-		devices = []models.UserDevice{}
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	defer rows.Close()
+	
+	devices := []models.UserDevice{}
+	for rows.Next() {
+		var device models.UserDevice
+		err := rows.Scan(&device.ID, &device.Name, &device.Phone, &device.Status, 
+			&device.JID, &device.CreatedAt, &device.LastSeen)
+		if err != nil {
+			continue
+		}
+		device.UserID = session.UserID
+		devices = append(devices, device)
 	}
 	
 	// For now, return mock data until broadcast message tracking is implemented
