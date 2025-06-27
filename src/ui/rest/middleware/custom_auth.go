@@ -104,6 +104,7 @@ func CustomAuth() fiber.Handler {
 		// Store user info in context for use in handlers
 		c.Locals("userID", session.UserID)
 		c.Locals("userEmail", session.UserID) // Assuming userID is email
+		c.Locals("email", session.UserID) // Add this for backward compatibility
 		c.Locals("session", session)
 		
 		return c.Next()

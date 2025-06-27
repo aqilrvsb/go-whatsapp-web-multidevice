@@ -7,7 +7,6 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
-	"github.com/google/uuid"
 )
 
 type leadRepository struct {
@@ -28,23 +27,32 @@ func GetLeadRepository() *leadRepository {
 
 // CreateLead creates a new lead
 func (r *leadRepository) CreateLead(lead *models.Lead) error {
-	lead.ID = uuid.New().String()
+	// Let database generate the ID (SERIAL)
 	lead.CreatedAt = time.Now()
 	lead.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO leads (id, user_id, name, phone, email, niche, source, status, target_status, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id
 	`
 	
-	// Default target_status
-	if lead.TargetStatus == "" {
-		lead.TargetStatus = "customer"
+	// Map Notes to journey column
+	journey := lead.Notes
+	
+	// Map TargetStatus to status column
+	status := lead.TargetStatus
+	if status == "" {
+		status = "prospect"
 	}
 	
-	_, err := r.db.Exec(query, lead.ID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Email, lead.Niche, lead.Source, lead.Status, lead.TargetStatus, lead.Notes,
-		lead.CreatedAt, lead.UpdatedAt)
+	var id int
+	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
+		lead.Niche, journey, status, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
+	
+	if err == nil {
+		lead.ID = fmt.Sprintf("%d", id)
+	}
 		
 	return err
 }

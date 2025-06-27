@@ -525,37 +525,28 @@ func (handler *App) DeviceLeadsView(c *fiber.Ctx) error {
 func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 	deviceId := c.Params("deviceId")
 	
-	// Safely get email from context
-	emailInterface := c.Locals("email")
-	if emailInterface == nil {
+	// Get session from cookie - same as campaigns
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
-	}
-	
-	userEmail, ok := emailInterface.(string)
-	if !ok {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid user session",
+			Message: "No session token",
 		})
 	}
 	
 	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not found",
+			Message: "Invalid session",
 		})
 	}
 	
 	leadRepo := repository.GetLeadRepository()
-	leads, err := leadRepo.GetLeadsByDevice(user.ID, deviceId)
+	leads, err := leadRepo.GetLeadsByDevice(session.UserID, deviceId)
 	if err != nil {
 		log.Printf("Error getting leads: %v", err)
 		// Return empty array instead of error
@@ -577,22 +568,23 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 
 // CreateLead creates a new lead
 func (handler *App) CreateLead(c *fiber.Ctx) error {
-	// Safely get email from context
-	emailInterface := c.Locals("email")
-	if emailInterface == nil {
+	// Get session from cookie - same as campaigns
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not authenticated",
+			Message: "No session token",
 		})
 	}
 	
-	userEmail, ok := emailInterface.(string)
-	if !ok {
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "Invalid user session",
+			Message: "Invalid session",
 		})
 	}
 	
@@ -613,19 +605,10 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		})
 	}
 	
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "User not found",
-		})
-	}
-	
 	leadRepo := repository.GetLeadRepository()
 	lead := &models.Lead{
-		UserID:       user.ID,
+		UserID:       session.UserID,
+		DeviceID:     request.DeviceID,
 		Name:         request.Name,
 		Phone:        request.Phone,
 		Email:        "",
@@ -656,31 +639,33 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 func (handler *App) UpdateLead(c *fiber.Ctx) error {
 	leadId := c.Params("id")
 	
-	// Safely get email from context
-	emailInterface := c.Locals("email")
-	if emailInterface == nil {
+	// Get session from cookie - same as campaigns
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not authenticated",
+			Message: "No session token",
 		})
 	}
 	
-	userEmail, ok := emailInterface.(string)
-	if !ok {
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "Invalid user session",
+			Message: "Invalid session",
 		})
 	}
 	
 	var request struct {
-		Name    string `json:"name"`
-		Phone   string `json:"phone"`
-		Niche   string `json:"niche"`
-		Journey string `json:"journey"`
-		Status  string `json:"status"`
+		DeviceID string `json:"device_id"`
+		Name     string `json:"name"`
+		Phone    string `json:"phone"`
+		Niche    string `json:"niche"`
+		Journey  string `json:"journey"`
+		Status   string `json:"status"`
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -691,19 +676,10 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		})
 	}
 	
-	userRepo := repository.GetUserRepository()
-	user, err := userRepo.GetUserByEmail(userEmail)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "User not found",
-		})
-	}
-	
 	leadRepo := repository.GetLeadRepository()
 	lead := &models.Lead{
-		UserID:       user.ID,  // Use the user ID
+		UserID:       session.UserID,
+		DeviceID:     request.DeviceID,
 		Name:         request.Name,
 		Phone:        request.Phone,
 		Email:        "",
@@ -734,34 +710,28 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 func (handler *App) DeleteLead(c *fiber.Ctx) error {
 	leadId := c.Params("id")
 	
-	// Safely get email from context
-	emailInterface := c.Locals("email")
-	if emailInterface == nil {
+	// Get session from cookie - same as campaigns
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
-	}
-	
-	userEmail, ok := emailInterface.(string)
-	if !ok {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid user session",
+			Message: "No session token",
 		})
 	}
 	
 	userRepo := repository.GetUserRepository()
-	_, err := userRepo.GetUserByEmail(userEmail)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED",
-			Message: "User not found",
+			Message: "Invalid session",
 		})
 	}
+	
+	// Just verify the user exists but we don't need to use the result
+	_ = session.UserID
 	
 	leadRepo := repository.GetLeadRepository()
 	err = leadRepo.DeleteLead(leadId)
