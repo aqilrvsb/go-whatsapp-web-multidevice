@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
@@ -29,50 +30,67 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 	
 	campaignRepo := repository.GetCampaignRepository()
 	
-	// Load Malaysia timezone
+	// Use fixed UTC+8 offset for Malaysia if timezone loading fails
 	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	if err != nil {
-		logrus.Warnf("Failed to load Malaysia timezone, using UTC: %v", err)
-		loc = time.UTC
+		logrus.Warnf("Failed to load Malaysia timezone, using fixed UTC+8: %v", err)
+		loc = time.FixedZone("UTC+8", 8*60*60) // 8 hours ahead of UTC
 	}
 	
-	// Get today in Malaysia timezone
+	// Get current time in Malaysia
 	nowMalaysia := time.Now().In(loc)
-	today := nowMalaysia.Format("2006-01-02")
+	todayMalaysia := nowMalaysia.Format("2006-01-02")
 	
-	// Also check yesterday and tomorrow to handle any edge cases
-	yesterday := nowMalaysia.Add(-24 * time.Hour).Format("2006-01-02")
-	tomorrow := nowMalaysia.Add(24 * time.Hour).Format("2006-01-02")
+	// Also get UTC time for comparison
+	nowUTC := time.Now().UTC()
+	todayUTC := nowUTC.Format("2006-01-02")
 	
-	// Get campaigns for all three dates
+	logrus.Infof("Server UTC time: %s, Malaysia time: %s", nowUTC.Format("2006-01-02 15:04:05"), nowMalaysia.Format("2006-01-02 15:04:05"))
+	
+	// Get campaigns for both UTC and Malaysia dates to handle timezone differences
 	var campaigns []models.Campaign
+	campaignsMap := make(map[int]bool) // To avoid duplicates
 	
-	campaignsYesterday, _ := campaignRepo.GetCampaignsByDate(yesterday)
-	campaigns = append(campaigns, campaignsYesterday...)
+	// Check UTC date and surrounding dates
+	dates := []string{
+		nowUTC.Add(-24 * time.Hour).Format("2006-01-02"),
+		todayUTC,
+		nowUTC.Add(24 * time.Hour).Format("2006-01-02"),
+		todayMalaysia, // Also check Malaysia date
+	}
 	
-	campaignsToday, _ := campaignRepo.GetCampaignsByDate(today)
-	campaigns = append(campaigns, campaignsToday...)
+	for _, date := range dates {
+		dateCampaigns, err := campaignRepo.GetCampaignsByDate(date)
+		if err == nil {
+			for _, c := range dateCampaigns {
+				if _, exists := campaignsMap[c.ID]; !exists {
+					campaigns = append(campaigns, c)
+					campaignsMap[c.ID] = true
+				}
+			}
+		}
+	}
 	
-	campaignsTomorrow, _ := campaignRepo.GetCampaignsByDate(tomorrow)
-	campaigns = append(campaigns, campaignsTomorrow...)
-	
-	logrus.Infof("Found %d campaigns (checking %s, %s, %s)", len(campaigns), yesterday, today, tomorrow)
+	logrus.Infof("Found %d unique campaigns (checking dates: %v)", len(campaigns), dates)
 	
 	for _, campaign := range campaigns {
+		logrus.Infof("Checking campaign: %s (ID: %d, Status: %s, ScheduledTime: '%s')", 
+			campaign.Title, campaign.ID, campaign.Status, campaign.ScheduledTime)
+		
 		// Check if already processed
 		if campaign.Status == "sent" {
+			logrus.Infof("Campaign %d already sent, skipping", campaign.ID)
 			continue
 		}
 		
 		// Check if it's time to send
-		if campaign.ScheduledTime == "" {
-			// If no scheduled time, send immediately
-			logrus.Infof("Campaign %d has no scheduled time, sending now", campaign.ID)
+		scheduledTimeStr := strings.TrimSpace(campaign.ScheduledTime)
+		if scheduledTimeStr == "" || scheduledTimeStr == "00:00:00" || strings.Contains(scheduledTimeStr, "0001-01-01") {
+			// If no scheduled time, midnight, or default date, send immediately
+			logrus.Infof("Campaign %d has no/default scheduled time ('%s'), sending now", campaign.ID, campaign.ScheduledTime)
 			go cts.executeCampaign(&campaign)
 		} else {
 			// Parse the scheduled time
-			now := time.Now()
-			
 			// Extract just the date part from CampaignDate (in case it has timestamp)
 			campaignDateOnly := campaign.CampaignDate
 			if len(campaignDateOnly) > 10 {
@@ -92,10 +110,27 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 				continue
 			}
 			
-			if now.After(scheduledTime) {
+			// Use Malaysia timezone for comparison
+			loc := time.FixedZone("UTC+8", 8*60*60)
+			nowMalaysia := time.Now().In(loc)
+			
+			// The scheduled time is assumed to be in Malaysia time
+			scheduledMalaysia := time.Date(
+				scheduledTime.Year(), scheduledTime.Month(), scheduledTime.Day(),
+				scheduledTime.Hour(), scheduledTime.Minute(), scheduledTime.Second(), 0, loc)
+			
+			logrus.Infof("Campaign %d: Now Malaysia: %s, Scheduled: %s", 
+				campaign.ID, 
+				nowMalaysia.Format("2006-01-02 15:04:05"), 
+				scheduledMalaysia.Format("2006-01-02 15:04:05"))
+			
+			if nowMalaysia.After(scheduledMalaysia) || nowMalaysia.Equal(scheduledMalaysia) {
 				// Time to send this campaign
 				logrus.Infof("Campaign %d scheduled time reached, sending now", campaign.ID)
 				go cts.executeCampaign(&campaign)
+			} else {
+				timeDiff := scheduledMalaysia.Sub(nowMalaysia)
+				logrus.Infof("Campaign %d not yet time, will trigger in %v", campaign.ID, timeDiff)
 			}
 		}
 	}
