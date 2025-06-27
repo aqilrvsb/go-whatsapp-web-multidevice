@@ -2090,7 +2090,7 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 // GetCampaignDeviceReport gets device-wise report for a campaign
 func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	campaignIdStr := c.Params("id")
-	campaignId, err := strconv.Atoi(campaignIdStr)
+	_, err := strconv.Atoi(campaignIdStr)
 	if err != nil {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
@@ -2120,10 +2120,10 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	}
 	
 	// Get user devices
-	deviceRepo := repository.GetDeviceRepository()
-	devices, err := deviceRepo.GetDevicesByUserID(session.UserID)
+	userDeviceRepo := repository.GetUserDeviceRepository()
+	devices, err := userDeviceRepo.GetAllDevicesByUserID(session.UserID)
 	if err != nil {
-		devices = []models.Device{}
+		devices = []models.UserDevice{}
 	}
 	
 	// For now, return mock data until broadcast message tracking is implemented
@@ -2192,7 +2192,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 // GetCampaignDeviceLeads gets lead details for a specific device in a campaign
 func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	campaignIdStr := c.Params("id")
-	campaignId, err := strconv.Atoi(campaignIdStr)
+	_, err := strconv.Atoi(campaignIdStr)
 	if err != nil {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
@@ -2201,7 +2201,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		})
 	}
 	
-	deviceId := c.Params("deviceId")
+	_ = c.Params("deviceId")
 	status := c.Query("status", "all")
 	
 	// Get session from cookie
@@ -2215,7 +2215,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	}
 	
 	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
+	_, err = userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,

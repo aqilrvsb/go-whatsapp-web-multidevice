@@ -1,7 +1,7 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 27, 2025 - 8:15 PM**  
-**Status: ✅ All features working with optimized broadcast system**
-**Lead Management: ✅ Fixed with proper authentication and import/export**
+**Last Updated: June 28, 2025 - 2:45 AM**  
+**Status: ✅ All features working with enhanced campaign analytics**
+**Lead Management: ✅ Complete with targeting and device reporting**
 
 ## 🚀 Quick Deploy to Railway
 
@@ -15,6 +15,7 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - **Campaign & sequence automation** with proper rate limiting
 - **Two-part message support** (image + text)
 - **Real-time analytics** and worker monitoring
+- **Device-wise campaign reporting** with lead tracking
 - **Enterprise-grade architecture** for massive scale
 
 ## ✅ Current Status (All Working)
@@ -31,6 +32,26 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Management** - Advanced filtering by niche and status
 - ✅ **Status Targeting** - Target campaigns/sequences by lead status
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
+- ✅ **Device Analytics** - Detailed campaign performance per device
+
+### Latest Updates (June 28, 2025 - 2:45 AM)
+- ✅ **Campaign Summary Enhancements**:
+  - Target status display (prospect/customer) with colored badges
+  - Message preview modal showing WhatsApp-style message
+  - Single date filter and date range filter
+  - Time column showing scheduled_time
+  - Default view shows today/tomorrow only
+- ✅ **Campaign Creation Improvements**:
+  - Removed "All Leads" option - only prospect/customer
+  - Auto-set current time if not specified
+  - Backend validation for target_status
+- ✅ **Device Report Feature**:
+  - New "Device Report" column in campaign summary
+  - Comprehensive analytics per device
+  - Shows active/disconnected devices
+  - Lead distribution and success rates
+  - Clickable lead counts for detailed views
+  - Success rate progress bars
 
 ### Broadcast System Features (June 27, 2025)
 - ✅ **Optimized Worker System** - One worker per device handles both campaigns & sequences
@@ -181,6 +202,39 @@ railway variables set REDIS_URL='${{REDIS_URL}}'
 railway variables set WHATSAPP_CHAT_STORAGE=true
 ```
 
+## 📈 Campaign Summary Dashboard
+
+### Features
+The enhanced Campaign Summary tab provides comprehensive campaign analytics with:
+
+**1. Smart Date Filtering**
+- **Default View**: Shows only today and tomorrow campaigns
+- **Single Date Filter**: Quick filter for specific date
+- **Date Range Filter**: View campaigns across multiple days
+- **Info Alert**: Notifies about default filter applied
+
+**2. Enhanced Table Display**
+- **Title**: Campaign name
+- **Date**: Formatted with day name (e.g., Mon, Jun 2, 2025)
+- **Time**: Scheduled time for campaign
+- **Niche**: Target category
+- **Target Status**: Color-coded badges (prospect/customer)
+- **Status**: Campaign execution status
+- **Actions**: Preview message button
+- **Device Report**: Access detailed device analytics
+
+**3. Message Preview**
+Click the eye icon to see:
+- Campaign details in organized format
+- WhatsApp-style message preview
+- Image preview if campaign has image
+- Accurate representation of how recipients will see the message
+
+**4. Filtering Options**
+- Clear button resets to default (today/tomorrow)
+- Filters update statistics in real-time
+- Client-side filtering for instant results
+
 ## 💻 Usage Guide
 
 ### 1. Access Dashboard
@@ -216,6 +270,44 @@ railway variables set WHATSAPP_CHAT_STORAGE=true
    - Send images
    - Check number status
    - Broadcast messages
+
+## 📊 Campaign Device Report
+
+### Overview
+The Device Report feature provides comprehensive analytics for how campaigns perform across multiple devices. Access it by clicking the "Device Report" button in the Campaign Summary table.
+
+### Report Components
+
+**1. Campaign Details**
+- Title, Niche, Target Status
+- Date, Time, Current Status
+
+**2. Overall Statistics**
+- **Total Devices**: Number of devices participating in the campaign
+- **Active Devices**: Devices currently online
+- **Disconnected Devices**: Devices that went offline during campaign
+- **Total Leads**: All leads to be sent across all devices
+- **Status Breakdown**: Pending, Success, Failed counts
+
+**3. Device-wise Analytics Table**
+- **Device Name & Status**: Shows if device is active or disconnected
+- **Clickable Lead Counts**:
+  - Total Leads: Click to see all leads for this device
+  - Pending: Click to see only pending leads
+  - Success: Click to see successfully sent leads
+  - Failed: Click to see failed leads
+- **Success Rate**: Visual progress bar showing percentage
+
+**4. Lead Details Modal**
+When clicking any count in the device table:
+- Shows detailed list with Name, Phone, Status, Sent Time
+- Filtered by selected status (all/pending/success/failed)
+
+### Use Cases
+1. **Identify Bottlenecks**: See which devices are underperforming
+2. **Monitor Progress**: Track real-time campaign distribution
+3. **Troubleshoot Issues**: Identify disconnected devices affecting delivery
+4. **Optimize Performance**: Balance load across devices based on success rates
 
 ## 📋 Lead Management System
 
