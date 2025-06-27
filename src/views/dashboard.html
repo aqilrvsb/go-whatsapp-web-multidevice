@@ -784,9 +784,18 @@
                         <h4 class="mb-1">Campaign Summary</h4>
                         <p class="text-muted mb-0">Overview of all your campaign activities</p>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="loadCampaignSummary()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    <div class="d-flex gap-2">
+                        <!-- Date Filter -->
+                        <input type="date" id="campaignFilterStartDate" class="form-control form-control-sm" style="width: auto;">
+                        <span class="align-self-center">to</span>
+                        <input type="date" id="campaignFilterEndDate" class="form-control form-control-sm" style="width: auto;">
+                        <button class="btn btn-outline-primary btn-sm" onclick="filterCampaigns()">
+                            <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="loadCampaignSummary()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="campaignSummaryContent">
@@ -805,9 +814,18 @@
                         <h4 class="mb-1">Sequence Summary</h4>
                         <p class="text-muted mb-0">Overview of all your sequence activities</p>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="loadSequenceSummary()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+                    <div class="d-flex gap-2">
+                        <!-- Date Filter -->
+                        <input type="date" id="sequenceFilterStartDate" class="form-control form-control-sm" style="width: auto;">
+                        <span class="align-self-center">to</span>
+                        <input type="date" id="sequenceFilterEndDate" class="form-control form-control-sm" style="width: auto;">
+                        <button class="btn btn-outline-primary btn-sm" onclick="filterSequences()">
+                            <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="loadSequenceSummary()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="sequenceSummaryContent">
@@ -947,6 +965,108 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="saveCampaign()">Save Campaign</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Preview Modal -->
+    <div class="modal fade" id="campaignPreviewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Campaign Message Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Campaign Details</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Title:</strong></td>
+                                    <td id="previewTitle"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Niche:</strong></td>
+                                    <td id="previewNiche"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target:</strong></td>
+                                    <td id="previewTarget"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Date:</strong></td>
+                                    <td id="previewDate"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Time:</strong></td>
+                                    <td id="previewTime"></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3">WhatsApp Preview</h6>
+                            <div class="border rounded p-3" style="background: #f0f2f5;">
+                                <div class="whatsapp-preview" style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                    <div id="previewImage" class="mb-2"></div>
+                                    <div id="previewMessage" style="white-space: pre-wrap; word-break: break-word;"></div>
+                                    <div class="text-end mt-2">
+                                        <small class="text-muted" id="previewTimestamp"></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sequence Preview Modal -->
+    <div class="modal fade" id="sequencePreviewModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Sequence Messages Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <h6 class="mb-3">Sequence Details</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td width="150"><strong>Name:</strong></td>
+                                    <td id="seqPreviewName"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Niche:</strong></td>
+                                    <td id="seqPreviewNiche"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target:</strong></td>
+                                    <td id="seqPreviewTarget"></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total Days:</strong></td>
+                                    <td id="seqPreviewDays"></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="mb-3">Message Timeline</h6>
+                            <div id="sequenceMessagesPreview"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -2965,7 +3085,9 @@
                                                     <th>Title</th>
                                                     <th>Date</th>
                                                     <th>Niche</th>
+                                                    <th>Target Status</th>
                                                     <th>Status</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -2975,9 +3097,19 @@
                                                         <td>${campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-'}</td>
                                                         <td>${campaign.niche || '-'}</td>
                                                         <td>
+                                                            <span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">
+                                                                ${campaign.target_status || 'all'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
                                                             <span class="badge bg-${getStatusColor(campaign.status)}">
                                                                 ${campaign.status}
                                                             </span>
+                                                        </td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary" onclick="previewCampaignMessage(${JSON.stringify(campaign).replace(/"/g, '&quot;')})" title="Preview Message">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 `).join('')}
@@ -3083,8 +3215,10 @@
                                                 <tr>
                                                     <th>Name</th>
                                                     <th>Niche</th>
+                                                    <th>Target Status</th>
                                                     <th>Contacts</th>
                                                     <th>Status</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -3092,11 +3226,21 @@
                                                     <tr>
                                                         <td>${sequence.name}</td>
                                                         <td>${sequence.niche || '-'}</td>
+                                                        <td>
+                                                            <span class="badge bg-${sequence.target_status === 'all' ? 'info' : sequence.target_status === 'prospect' ? 'primary' : 'success'}">
+                                                                ${sequence.target_status || 'all'}
+                                                            </span>
+                                                        </td>
                                                         <td>${sequence.contacts_count}</td>
                                                         <td>
                                                             <span class="badge bg-${getStatusColor(sequence.status)}">
                                                                 ${sequence.status}
                                                             </span>
+                                                        </td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary" onclick="previewSequenceMessages(${JSON.stringify(sequence).replace(/"/g, '&quot;')})" title="Preview Messages">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 `).join('')}
@@ -3287,6 +3431,153 @@
                 default:
                     return 'warning';
             }
+        }
+        
+        // Campaign Preview Function
+        function previewCampaignMessage(campaign) {
+            // Populate modal with campaign data
+            document.getElementById('previewTitle').textContent = campaign.title || '-';
+            document.getElementById('previewNiche').textContent = campaign.niche || '-';
+            document.getElementById('previewTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || 'all'}</span>`;
+            document.getElementById('previewDate').textContent = campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-';
+            document.getElementById('previewTime').textContent = campaign.scheduled_time || '-';
+            
+            // Show image if exists
+            const imageDiv = document.getElementById('previewImage');
+            if (campaign.image_url) {
+                imageDiv.innerHTML = `<img src="${campaign.image_url}" class="img-fluid rounded mb-2" style="max-height: 300px;">`;
+            } else {
+                imageDiv.innerHTML = '';
+            }
+            
+            // Show message
+            document.getElementById('previewMessage').textContent = campaign.message || 'No message content';
+            
+            // Set timestamp
+            const now = new Date();
+            document.getElementById('previewTimestamp').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('campaignPreviewModal'));
+            modal.show();
+        }
+        
+        // Campaign Filter Function
+        function filterCampaigns() {
+            const startDate = document.getElementById('campaignFilterStartDate').value;
+            const endDate = document.getElementById('campaignFilterEndDate').value;
+            
+            let url = '/api/campaigns/summary';
+            const params = new URLSearchParams();
+            
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displayCampaignSummary(data.results);
+                    } else {
+                        showAlert('danger', 'Failed to filter campaigns');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error filtering campaigns:', error);
+                    showAlert('danger', 'Error filtering campaigns');
+                });
+        }
+        
+        // Sequence Preview Function
+        function previewSequenceMessages(sequence) {
+            // Populate modal with sequence data
+            document.getElementById('seqPreviewName').textContent = sequence.name || '-';
+            document.getElementById('seqPreviewNiche').textContent = sequence.niche || '-';
+            document.getElementById('seqPreviewTarget').innerHTML = `<span class="badge bg-${sequence.target_status === 'all' ? 'info' : sequence.target_status === 'prospect' ? 'primary' : 'success'}">${sequence.target_status || 'all'}</span>`;
+            document.getElementById('seqPreviewDays').textContent = sequence.total_days || '-';
+            
+            // We need to fetch the sequence steps
+            fetch(`/api/sequences/${sequence.id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results.steps) {
+                        let stepsHtml = '<div class="timeline">';
+                        
+                        data.results.steps.forEach((step, index) => {
+                            stepsHtml += `
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Day ${step.day} - ${step.send_time || 'Not set'}</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <strong>Message Type:</strong> ${step.message_type || 'text'}<br>
+                                                <strong>Min Delay:</strong> ${step.min_delay_seconds}s<br>
+                                                <strong>Max Delay:</strong> ${step.max_delay_seconds}s
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="border rounded p-3" style="background: #f0f2f5;">
+                                                    <div class="whatsapp-preview" style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                                        ${step.media_url ? `<img src="${step.media_url}" class="img-fluid rounded mb-2" style="max-height: 200px;">` : ''}
+                                                        <div style="white-space: pre-wrap; word-break: break-word;">${step.message || 'No message content'}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        stepsHtml += '</div>';
+                        document.getElementById('sequenceMessagesPreview').innerHTML = stepsHtml;
+                    } else {
+                        document.getElementById('sequenceMessagesPreview').innerHTML = '<p class="text-muted">No steps found</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sequence steps:', error);
+                    document.getElementById('sequenceMessagesPreview').innerHTML = '<p class="text-danger">Error loading steps</p>';
+                });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('sequencePreviewModal'));
+            modal.show();
+        }
+        
+        // Sequence Filter Function
+        function filterSequences() {
+            const startDate = document.getElementById('sequenceFilterStartDate').value;
+            const endDate = document.getElementById('sequenceFilterEndDate').value;
+            
+            let url = '/api/sequences/summary';
+            const params = new URLSearchParams();
+            
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displaySequenceSummary(data.results);
+                    } else {
+                        showAlert('danger', 'Failed to filter sequences');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error filtering sequences:', error);
+                    showAlert('danger', 'Error filtering sequences');
+                });
         }
         
         // Auto-refresh for worker status
