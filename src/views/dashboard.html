@@ -916,6 +916,23 @@
                             <label class="form-label">Scheduled Time (Optional)</label>
                             <input type="time" class="form-control" id="campaignTime">
                         </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Min Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="campaignMinDelay" min="1" value="10" placeholder="10">
+                                    <small class="text-muted">Minimum delay between messages</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Max Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="campaignMaxDelay" min="1" value="30" placeholder="30">
+                                    <small class="text-muted">Maximum delay between messages</small>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -2384,8 +2401,11 @@
                         // Group campaigns by date
                         data.results.forEach(campaign => {
                             // Ensure date is in YYYY-MM-DD format
-                            const date = campaign.campaign_date.split('T')[0];
-                            console.log('Campaign date:', date, 'Title:', campaign.title);
+                            let date = campaign.campaign_date;
+                            if (date.includes('T')) {
+                                date = date.split('T')[0];
+                            }
+                            console.log('Processing campaign:', campaign.title, 'Date:', date, 'Time:', campaign.scheduled_time);
                             if (!campaigns[date]) {
                                 campaigns[date] = [];
                             }
@@ -2463,7 +2483,9 @@
                 niche: document.getElementById('campaignNiche').value || '',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
-                scheduled_time: scheduledTime
+                scheduled_time: scheduledTime,
+                min_delay_seconds: parseInt(document.getElementById('campaignMinDelay').value) || 10,
+                max_delay_seconds: parseInt(document.getElementById('campaignMaxDelay').value) || 30
             };
             
             const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
@@ -2587,6 +2609,8 @@
             document.getElementById('campaignNiche').value = campaign.niche || '';
             document.getElementById('campaignMessage').value = campaign.message || '';
             document.getElementById('campaignTime').value = campaign.scheduled_time || '';
+            document.getElementById('campaignMinDelay').value = campaign.min_delay_seconds || 10;
+            document.getElementById('campaignMaxDelay').value = campaign.max_delay_seconds || 30;
             document.getElementById('campaignImageUrl').value = campaign.image_url || '';
             
             // Show image preview if exists

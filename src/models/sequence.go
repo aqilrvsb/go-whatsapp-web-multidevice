@@ -15,6 +15,9 @@ type Sequence struct {
 	Status          string         `json:"status" db:"status"` // draft, active, paused
 	TotalDays       int            `json:"total_days" db:"total_days"` // Added
 	IsActive        bool           `json:"is_active" db:"is_active"`   // Added
+	ScheduleTime    string         `json:"schedule_time" db:"schedule_time"`
+	MinDelaySeconds int            `json:"min_delay_seconds" db:"min_delay_seconds"`
+	MaxDelaySeconds int            `json:"max_delay_seconds" db:"max_delay_seconds"`
 	ContactsCount   int            `json:"contacts_count" db:"contacts_count"`
 	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at" db:"updated_at"`
@@ -29,6 +32,7 @@ type SequenceStep struct {
 	DayNumber        int       `json:"day_number" db:"day_number"`
 	MessageType      string    `json:"message_type" db:"message_type"`
 	SendTime         string    `json:"send_time" db:"send_time"`
+	ScheduleTime     string    `json:"schedule_time" db:"schedule_time"`
 	Content          string    `json:"content" db:"content"`
 	MediaURL         string    `json:"media_url" db:"media_url"`
 	ImageURL         string    `json:"image_url" db:"image_url"`

@@ -128,7 +128,9 @@ func InitializeSchema() error {
 		niche VARCHAR(255),
 		message TEXT NOT NULL,
 		image_url TEXT,
-		scheduled_time TIME,
+		scheduled_time TIMESTAMP,
+		min_delay_seconds INTEGER DEFAULT 10,
+		max_delay_seconds INTEGER DEFAULT 30,
 		status VARCHAR(50) DEFAULT 'scheduled',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -141,8 +143,10 @@ func InitializeSchema() error {
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
-	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time TIME;
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time TIMESTAMP;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled';
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
 	
 	-- Add min/max delay columns to user_devices
 	ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 5;
@@ -190,6 +194,9 @@ func InitializeSchema() error {
 		name VARCHAR(255) NOT NULL,
 		description TEXT,
 		niche VARCHAR(255),
+		schedule_time VARCHAR(10),
+		min_delay_seconds INTEGER DEFAULT 10,
+		max_delay_seconds INTEGER DEFAULT 30,
 		status VARCHAR(50) DEFAULT 'draft',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -202,6 +209,7 @@ func InitializeSchema() error {
 		day_number INTEGER NOT NULL,
 		content TEXT,
 		image_url TEXT,
+		schedule_time VARCHAR(10),
 		min_delay_seconds INTEGER DEFAULT 5,
 		max_delay_seconds INTEGER DEFAULT 15,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -277,6 +285,9 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 0;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(10);
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
 	
 	-- Make device_id nullable since sequences use all user devices
 	ALTER TABLE sequences ALTER COLUMN device_id DROP NOT NULL;
@@ -288,6 +299,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS media_url TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(10);
 
 	-- Add missing columns to sequence_contacts table  
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;

@@ -44,17 +44,13 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 		}
 		
 		// Check if it's time to send
-		scheduledTime, err := time.Parse("15:04", campaign.ScheduledTime)
-		if err != nil {
-			logrus.Errorf("Invalid scheduled time for campaign %s: %v", campaign.ID, err)
+		if campaign.ScheduledTime == nil {
+			logrus.Warnf("Campaign %d has no scheduled time", campaign.ID)
 			continue
 		}
 		
 		now := time.Now()
-		campaignTime := time.Date(now.Year(), now.Month(), now.Day(), 
-			scheduledTime.Hour(), scheduledTime.Minute(), 0, 0, now.Location())
-		
-		if now.After(campaignTime) {
+		if now.After(*campaign.ScheduledTime) {
 			// Time to send this campaign
 			go cts.executeCampaign(&campaign)
 		}

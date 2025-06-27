@@ -791,12 +791,14 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	var request struct {
-		CampaignDate  string `json:"campaign_date"`
-		Title         string `json:"title"`
-		Niche         string `json:"niche"`
-		Message       string `json:"message"`
-		ImageURL      string `json:"image_url"`
-		ScheduledTime string `json:"scheduled_time"`
+		CampaignDate    string `json:"campaign_date"`
+		Title           string `json:"title"`
+		Niche           string `json:"niche"`
+		Message         string `json:"message"`
+		ImageURL        string `json:"image_url"`
+		ScheduledTime   string `json:"scheduled_time"`
+		MinDelaySeconds int    `json:"min_delay_seconds"`
+		MaxDelaySeconds int    `json:"max_delay_seconds"`
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -816,16 +818,29 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Parse scheduled time if provided
+	var scheduledTime *time.Time
+	if request.ScheduledTime != "" {
+		// Combine campaign date with scheduled time
+		dateTimeStr := request.CampaignDate + " " + request.ScheduledTime + ":00"
+		parsedTime, err := time.Parse("2006-01-02 15:04:05", dateTimeStr)
+		if err == nil {
+			scheduledTime = &parsedTime
+		}
+	}
+	
 	campaignRepo := repository.GetCampaignRepository()
 	campaign := &models.Campaign{
-		UserID:        user.ID,
-		Title:         request.Title,
-		Message:       request.Message,
-		Niche:         request.Niche,
-		ImageURL:      request.ImageURL,
-		CampaignDate:  request.CampaignDate,
-		ScheduledTime: request.ScheduledTime,
-		Status:        "scheduled",
+		UserID:          user.ID,
+		Title:           request.Title,
+		Message:         request.Message,
+		Niche:           request.Niche,
+		ImageURL:        request.ImageURL,
+		CampaignDate:    request.CampaignDate,
+		ScheduledTime:   scheduledTime,
+		MinDelaySeconds: request.MinDelaySeconds,
+		MaxDelaySeconds: request.MaxDelaySeconds,
+		Status:          "scheduled",
 	}
 	err = campaignRepo.CreateCampaign(campaign)
 	if err != nil {
@@ -886,12 +901,15 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	}
 	
 	var request struct {
-		Title         string `json:"title"`
-		Niche         string `json:"niche"`
-		Message       string `json:"message"`
-		ImageURL      string `json:"image_url"`
-		ScheduledTime string `json:"scheduled_time"`
-		Status        string `json:"status"`
+		Title           string `json:"title"`
+		Niche           string `json:"niche"`
+		Message         string `json:"message"`
+		ImageURL        string `json:"image_url"`
+		ScheduledTime   string `json:"scheduled_time"`
+		CampaignDate    string `json:"campaign_date"`
+		MinDelaySeconds int    `json:"min_delay_seconds"`
+		MaxDelaySeconds int    `json:"max_delay_seconds"`
+		Status          string `json:"status"`
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -902,16 +920,30 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Parse scheduled time if provided
+	var scheduledTime *time.Time
+	if request.ScheduledTime != "" && request.CampaignDate != "" {
+		// Combine campaign date with scheduled time
+		dateTimeStr := request.CampaignDate + " " + request.ScheduledTime + ":00"
+		parsedTime, err := time.Parse("2006-01-02 15:04:05", dateTimeStr)
+		if err == nil {
+			scheduledTime = &parsedTime
+		}
+	}
+	
 	campaignRepo := repository.GetCampaignRepository()
 	campaign := &models.Campaign{
-		ID:            campaignId,
-		UserID:        user.ID,
-		Title:         request.Title,
-		Message:       request.Message,
-		Niche:         request.Niche,
-		ImageURL:      request.ImageURL,
-		ScheduledTime: request.ScheduledTime,
-		Status:        request.Status,
+		ID:              campaignId,
+		UserID:          user.ID,
+		Title:           request.Title,
+		Message:         request.Message,
+		Niche:           request.Niche,
+		ImageURL:        request.ImageURL,
+		CampaignDate:    request.CampaignDate,
+		ScheduledTime:   scheduledTime,
+		MinDelaySeconds: request.MinDelaySeconds,
+		MaxDelaySeconds: request.MaxDelaySeconds,
+		Status:          request.Status,
 	}
 	err = campaignRepo.UpdateCampaign(campaign)
 	if err != nil {

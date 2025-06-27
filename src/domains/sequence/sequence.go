@@ -25,14 +25,17 @@ type ISequenceUsecase interface {
 
 // CreateSequenceRequest for creating new sequence - simplified
 type CreateSequenceRequest struct {
-	Name        string                   `json:"name" validate:"required"`
-	Description string                   `json:"description"`
-	UserID      string                   `json:"user_id"`
-	DeviceID    *string                  `json:"device_id"` // Optional - sequences use all user devices
-	Niche       string                   `json:"niche"`
-	Status      string                   `json:"status"`
-	IsActive    bool                     `json:"is_active"`
-	Steps       []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
+	Name            string                      `json:"name" validate:"required"`
+	Description     string                      `json:"description"`
+	UserID          string                      `json:"user_id"`
+	DeviceID        *string                     `json:"device_id"` // Optional - sequences use all user devices
+	Niche           string                      `json:"niche"`
+	Status          string                      `json:"status"`
+	IsActive        bool                        `json:"is_active"`
+	ScheduleTime    string                      `json:"schedule_time"`
+	MinDelaySeconds int                         `json:"min_delay_seconds"`
+	MaxDelaySeconds int                         `json:"max_delay_seconds"`
+	Steps           []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
 }
 
 // CreateSequenceStepRequest for each step
@@ -41,6 +44,7 @@ type CreateSequenceStepRequest struct {
 	DayNumber       int    `json:"day_number" validate:"required,min=1"`
 	MessageType     string `json:"message_type"`
 	SendTime        string `json:"send_time"`
+	ScheduleTime    string `json:"schedule_time"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
 	MediaURL        string `json:"media_url"`
@@ -51,32 +55,38 @@ type CreateSequenceStepRequest struct {
 
 // UpdateSequenceRequest for updating sequence
 type UpdateSequenceRequest struct {
-	Name        string                   `json:"name"`
-	Description string                   `json:"description"`
-	Niche       string                   `json:"niche"`
-	Status      string                   `json:"status"`
-	IsActive    bool                     `json:"is_active"`
-	Steps       []CreateSequenceStepRequest `json:"steps"`
+	Name            string                      `json:"name"`
+	Description     string                      `json:"description"`
+	Niche           string                      `json:"niche"`
+	Status          string                      `json:"status"`
+	IsActive        bool                        `json:"is_active"`
+	ScheduleTime    string                      `json:"schedule_time"`
+	MinDelaySeconds int                         `json:"min_delay_seconds"`
+	MaxDelaySeconds int                         `json:"max_delay_seconds"`
+	Steps           []CreateSequenceStepRequest `json:"steps"`
 }
 
 // SequenceResponse basic sequence info
 type SequenceResponse struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	UserID        string    `json:"user_id"`
-	DeviceID      *string   `json:"device_id"` // Optional - sequences use all user devices
-	Niche         string    `json:"niche"`
-	Status        string    `json:"status"`
-	TotalSteps    int       `json:"total_steps"`
-	TotalDays     int       `json:"total_days"`
-	IsActive      bool      `json:"is_active"`
-	ContactCount  int       `json:"contact_count"`
-	ContactsCount int       `json:"contacts_count"`
-	StepCount     int       `json:"step_count"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	Steps         []SequenceStepResponse `json:"steps,omitempty"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description"`
+	UserID          string                 `json:"user_id"`
+	DeviceID        *string                `json:"device_id"` // Optional - sequences use all user devices
+	Niche           string                 `json:"niche"`
+	Status          string                 `json:"status"`
+	TotalSteps      int                    `json:"total_steps"`
+	TotalDays       int                    `json:"total_days"`
+	IsActive        bool                   `json:"is_active"`
+	ScheduleTime    string                 `json:"schedule_time"`
+	MinDelaySeconds int                    `json:"min_delay_seconds"`
+	MaxDelaySeconds int                    `json:"max_delay_seconds"`
+	ContactCount    int                    `json:"contact_count"`
+	ContactsCount   int                    `json:"contacts_count"`
+	StepCount       int                    `json:"step_count"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
+	Steps           []SequenceStepResponse `json:"steps,omitempty"`
 }
 
 // SequenceStepResponse for each step
@@ -87,6 +97,7 @@ type SequenceStepResponse struct {
 	DayNumber       int    `json:"day_number"`
 	MessageType     string `json:"message_type"`
 	SendTime        string `json:"send_time"`
+	ScheduleTime    string `json:"schedule_time"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
 	MediaURL        string `json:"media_url"`
