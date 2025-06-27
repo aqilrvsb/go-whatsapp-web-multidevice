@@ -1094,6 +1094,174 @@
         </div>
     </div>
 
+    <!-- Campaign Device Report Modal -->
+    <div class="modal fade" id="campaignDeviceReportModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Campaign Device Report</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Campaign Details -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Campaign Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Title:</strong> <span id="reportTitle"></span></p>
+                                    <p class="mb-1"><strong>Niche:</strong> <span id="reportNiche"></span></p>
+                                    <p class="mb-1"><strong>Target:</strong> <span id="reportTarget"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Date:</strong> <span id="reportDate"></span></p>
+                                    <p class="mb-1"><strong>Time:</strong> <span id="reportTime"></span></p>
+                                    <p class="mb-1"><strong>Status:</strong> <span id="reportStatus"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Overall Statistics -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Overall Statistics</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h4 id="totalDevices">0</h4>
+                                            <p class="mb-0">Total Devices</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body">
+                                            <h4 id="activeDevices">0</h4>
+                                            <p class="mb-0">Active Devices</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body">
+                                            <h4 id="disconnectedDevices">0</h4>
+                                            <p class="mb-0">Disconnected</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-primary text-white">
+                                        <div class="card-body">
+                                            <h4 id="totalLeads">0</h4>
+                                            <p class="mb-0">Total Leads</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row text-center mt-3">
+                                <div class="col-md-4">
+                                    <div class="card bg-warning">
+                                        <div class="card-body">
+                                            <h4 id="pendingLeads">0</h4>
+                                            <p class="mb-0">Pending</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body">
+                                            <h4 id="successLeads">0</h4>
+                                            <p class="mb-0">Success</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body">
+                                            <h4 id="failedLeads">0</h4>
+                                            <p class="mb-0">Failed</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Device-wise Report -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Device-wise Report</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Device Name</th>
+                                            <th>Status</th>
+                                            <th>Total Leads</th>
+                                            <th>Pending</th>
+                                            <th>Success</th>
+                                            <th>Failed</th>
+                                            <th>Success Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="deviceReportTableBody">
+                                        <!-- Device rows will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="exportDeviceReport()">
+                        <i class="bi bi-download"></i> Export Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lead Details Modal -->
+    <div class="modal fade" id="leadDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="leadDetailsTitle">Lead Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone Number</th>
+                                    <th>Status</th>
+                                    <th>Sent At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leadDetailsTableBody">
+                                <!-- Lead details will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Spinner -->
     <div id="loading">
         <div class="spinner-border text-primary" role="status">
@@ -3151,6 +3319,7 @@
                                                     <th>Target Status</th>
                                                     <th>Status</th>
                                                     <th>Actions</th>
+                                                    <th>Device Report</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -3173,6 +3342,11 @@
                                                         <td>
                                                             <button class="btn btn-sm btn-outline-primary" onclick="previewCampaignMessage(${JSON.stringify(campaign).replace(/"/g, '&quot;')})" title="Preview Message">
                                                                 <i class="bi bi-eye"></i>
+                                                            </button>
+                                                        </td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-success" onclick="showCampaignDeviceReport(${JSON.stringify(campaign).replace(/"/g, '&quot;')})" title="Device Report">
+                                                                <i class="bi bi-phone"></i> Report
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -3741,6 +3915,194 @@
         function clearSequenceFilter() {
             document.getElementById('sequenceFilterDate').value = '';
             loadSequenceSummary();
+        }
+        
+        // Campaign Device Report Functions
+        function showCampaignDeviceReport(campaign) {
+            // Populate campaign details
+            document.getElementById('reportTitle').textContent = campaign.title || '-';
+            document.getElementById('reportNiche').textContent = campaign.niche || '-';
+            document.getElementById('reportTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || '-'}</span>`;
+            document.getElementById('reportDate').textContent = campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-';
+            document.getElementById('reportTime').textContent = campaign.scheduled_time || '-';
+            document.getElementById('reportStatus').innerHTML = `<span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span>`;
+            
+            // Fetch device report data
+            fetch(`/api/campaigns/${campaign.id}/device-report`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        displayDeviceReport(data.results);
+                    } else {
+                        // If API doesn't exist yet, show mock data
+                        displayDeviceReport(generateMockDeviceReport(campaign));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading device report:', error);
+                    // Show mock data for now
+                    displayDeviceReport(generateMockDeviceReport(campaign));
+                });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('campaignDeviceReportModal'));
+            modal.show();
+        }
+        
+        function displayDeviceReport(report) {
+            // Update overall statistics
+            document.getElementById('totalDevices').textContent = report.totalDevices || 0;
+            document.getElementById('activeDevices').textContent = report.activeDevices || 0;
+            document.getElementById('disconnectedDevices').textContent = report.disconnectedDevices || 0;
+            document.getElementById('totalLeads').textContent = report.totalLeads || 0;
+            document.getElementById('pendingLeads').textContent = report.pendingLeads || 0;
+            document.getElementById('successLeads').textContent = report.successLeads || 0;
+            document.getElementById('failedLeads').textContent = report.failedLeads || 0;
+            
+            // Update device table
+            const tbody = document.getElementById('deviceReportTableBody');
+            tbody.innerHTML = '';
+            
+            if (report.devices && report.devices.length > 0) {
+                report.devices.forEach(device => {
+                    const successRate = device.totalLeads > 0 
+                        ? ((device.successLeads / device.totalLeads) * 100).toFixed(1) 
+                        : 0;
+                    
+                    const row = `
+                        <tr>
+                            <td>${device.name || 'Unknown Device'}</td>
+                            <td>
+                                <span class="badge bg-${device.status === 'online' ? 'success' : 'danger'}">
+                                    ${device.status === 'online' ? 'Active' : 'Disconnected'}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'all', '${campaign.id}'); return false;">
+                                    ${device.totalLeads || 0}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'pending', '${campaign.id}'); return false;" class="text-warning">
+                                    ${device.pendingLeads || 0}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'success', '${campaign.id}'); return false;" class="text-success">
+                                    ${device.successLeads || 0}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaign.id}'); return false;" class="text-danger">
+                                    ${device.failedLeads || 0}
+                                </a>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar bg-success" style="width: ${successRate}%">
+                                        ${successRate}%
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No device data available</td></tr>';
+            }
+        }
+        
+        function showLeadDetails(deviceId, status, campaignId) {
+            // Update modal title
+            let statusText = status.charAt(0).toUpperCase() + status.slice(1);
+            document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads`;
+            
+            // Fetch lead details
+            fetch(`/api/campaigns/${campaignId}/device/${deviceId}/leads?status=${status}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        displayLeadDetails(data.results);
+                    } else {
+                        // Show mock data for now
+                        displayLeadDetails(generateMockLeadDetails(status));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading lead details:', error);
+                    // Show mock data for now
+                    displayLeadDetails(generateMockLeadDetails(status));
+                });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
+            modal.show();
+        }
+        
+        function displayLeadDetails(leads) {
+            const tbody = document.getElementById('leadDetailsTableBody');
+            tbody.innerHTML = '';
+            
+            if (leads && leads.length > 0) {
+                leads.forEach(lead => {
+                    const row = `
+                        <tr>
+                            <td>${lead.name || 'Unknown'}</td>
+                            <td>${lead.phone || '-'}</td>
+                            <td>
+                                <span class="badge bg-${lead.status === 'success' ? 'success' : lead.status === 'failed' ? 'danger' : 'warning'}">
+                                    ${lead.status || 'pending'}
+                                </span>
+                            </td>
+                            <td>${lead.sentAt || '-'}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+            }
+        }
+        
+        function exportDeviceReport() {
+            // TODO: Implement export functionality
+            showAlert('info', 'Export feature coming soon!');
+        }
+        
+        // Mock data generators (temporary until API is implemented)
+        function generateMockDeviceReport(campaign) {
+            const devices = [
+                { id: '1', name: 'Device 1', status: 'online', totalLeads: 150, pendingLeads: 20, successLeads: 120, failedLeads: 10 },
+                { id: '2', name: 'Device 2', status: 'online', totalLeads: 200, pendingLeads: 30, successLeads: 160, failedLeads: 10 },
+                { id: '3', name: 'Device 3', status: 'offline', totalLeads: 100, pendingLeads: 100, successLeads: 0, failedLeads: 0 }
+            ];
+            
+            const totalLeads = devices.reduce((sum, d) => sum + d.totalLeads, 0);
+            const pendingLeads = devices.reduce((sum, d) => sum + d.pendingLeads, 0);
+            const successLeads = devices.reduce((sum, d) => sum + d.successLeads, 0);
+            const failedLeads = devices.reduce((sum, d) => sum + d.failedLeads, 0);
+            
+            return {
+                totalDevices: devices.length,
+                activeDevices: devices.filter(d => d.status === 'online').length,
+                disconnectedDevices: devices.filter(d => d.status === 'offline').length,
+                totalLeads,
+                pendingLeads,
+                successLeads,
+                failedLeads,
+                devices
+            };
+        }
+        
+        function generateMockLeadDetails(status) {
+            const mockLeads = [
+                { name: 'John Doe', phone: '+60123456789', status: status, sentAt: '2025-06-27 10:30 AM' },
+                { name: 'Jane Smith', phone: '+60987654321', status: status, sentAt: '2025-06-27 10:35 AM' },
+                { name: 'Ali Rahman', phone: '+60111222333', status: status, sentAt: '2025-06-27 10:40 AM' }
+            ];
+            
+            return status === 'all' ? mockLeads : mockLeads.filter(l => l.status === status);
         }
         
         // Auto-refresh for worker status

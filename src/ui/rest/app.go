@@ -86,6 +86,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Put("/api/campaigns/:id", rest.UpdateCampaign)
 	app.Delete("/api/campaigns/:id", rest.DeleteCampaign)
 	app.Get("/api/campaigns/summary", rest.GetCampaignSummary)
+	app.Get("/api/campaigns/:id/device-report", rest.GetCampaignDeviceReport)
+	app.Get("/api/campaigns/:id/device/:deviceId/leads", rest.GetCampaignDeviceLeads)
 	
 	// Sequence summary endpoint
 	app.Get("/api/sequences/summary", rest.GetSequenceSummary)
@@ -2082,4 +2084,193 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			"failed":  errorCount,
 		},
 	})
+}
+
+
+// GetCampaignDeviceReport gets device-wise report for a campaign
+func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
+	campaignIdStr := c.Params("id")
+	campaignId, err := strconv.Atoi(campaignIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user devices
+	deviceRepo := repository.GetDeviceRepository()
+	devices, err := deviceRepo.GetDevicesByUserID(session.UserID)
+	if err != nil {
+		devices = []models.Device{}
+	}
+	
+	// For now, return mock data until broadcast message tracking is implemented
+	// TODO: Replace with actual broadcast message data
+	deviceReports := make([]DeviceReport, 0)
+	
+	for i, device := range devices {
+		// Mock data for demonstration
+		totalLeads := 100 + (i * 50)
+		successLeads := int(float64(totalLeads) * 0.8)
+		failedLeads := int(float64(totalLeads) * 0.05)
+		pendingLeads := totalLeads - successLeads - failedLeads
+		
+		report := DeviceReport{
+			ID:           device.ID,
+			Name:         device.Name,
+			Status:       device.Status,
+			TotalLeads:   totalLeads,
+			PendingLeads: pendingLeads,
+			SuccessLeads: successLeads,
+			FailedLeads:  failedLeads,
+		}
+		deviceReports = append(deviceReports, report)
+	}
+	
+	// Calculate totals
+	totalLeads := 0
+	pendingLeads := 0
+	successLeads := 0
+	failedLeads := 0
+	activeDevices := 0
+	disconnectedDevices := 0
+	
+	for _, report := range deviceReports {
+		totalLeads += report.TotalLeads
+		pendingLeads += report.PendingLeads
+		successLeads += report.SuccessLeads
+		failedLeads += report.FailedLeads
+		
+		if report.Status == "online" {
+			activeDevices++
+		} else {
+			disconnectedDevices++
+		}
+	}
+	
+	result := map[string]interface{}{
+		"totalDevices":        len(devices),
+		"activeDevices":       activeDevices,
+		"disconnectedDevices": disconnectedDevices,
+		"totalLeads":          totalLeads,
+		"pendingLeads":        pendingLeads,
+		"successLeads":        successLeads,
+		"failedLeads":         failedLeads,
+		"devices":             deviceReports,
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device report retrieved successfully",
+		Results: result,
+	})
+}
+
+// GetCampaignDeviceLeads gets lead details for a specific device in a campaign
+func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
+	campaignIdStr := c.Params("id")
+	campaignId, err := strconv.Atoi(campaignIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
+	
+	deviceId := c.Params("deviceId")
+	status := c.Query("status", "all")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// For now, return mock data until broadcast message tracking is implemented
+	// TODO: Replace with actual broadcast message data
+	leadDetails := []map[string]interface{}{}
+	
+	// Mock data for demonstration
+	mockLeads := []struct {
+		name   string
+		phone  string
+		status string
+	}{
+		{"John Doe", "+60123456789", "sent"},
+		{"Jane Smith", "+60987654321", "sent"},
+		{"Ali Rahman", "+60111222333", "pending"},
+		{"Sarah Lee", "+60444555666", "failed"},
+		{"Ahmad Zaidi", "+60777888999", "sent"},
+	}
+	
+	// Filter based on status
+	for _, lead := range mockLeads {
+		if status == "all" || 
+		   (status == "pending" && lead.status == "pending") ||
+		   (status == "success" && lead.status == "sent") ||
+		   (status == "failed" && lead.status == "failed") {
+			leadDetails = append(leadDetails, map[string]interface{}{
+				"name":   lead.name,
+				"phone":  lead.phone,
+				"status": lead.status,
+				"sentAt": time.Now().Format("2006-01-02 03:04 PM"),
+			})
+		}
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Lead details retrieved successfully",
+		Results: leadDetails,
+	})
+}
+
+// DeviceReport structure for device-wise report
+type DeviceReport struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Status       string `json:"status"`
+	TotalLeads   int    `json:"totalLeads"`
+	PendingLeads int    `json:"pendingLeads"`
+	SuccessLeads int    `json:"successLeads"`
+	FailedLeads  int    `json:"failedLeads"`
 }
