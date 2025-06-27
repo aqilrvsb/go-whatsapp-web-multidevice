@@ -158,7 +158,7 @@ func (ct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) {
 	logrus.Infof("Using %d devices for campaign %d", len(devices), campaign.ID)
 	
 	// Ensure workers exist for all devices
-	ct.ensureWorkersForDevices(devices, campaign.MinDelaySeconds, campaign.MaxDelaySeconds)
+	ct.ensureWorkersForDevices(devices)
 	
 	// Create broadcast messages
 	broadcastMessages := ct.createBroadcastMessages(campaign, leads, devices)
@@ -206,7 +206,7 @@ func (ct *OptimizedCampaignTrigger) getUserDevices(userID string) ([]*models.Use
 }
 
 // ensureWorkersForDevices creates workers for all devices if not exists
-func (ct *OptimizedCampaignTrigger) ensureWorkersForDevices(devices []*models.UserDevice, minDelay, maxDelay int) {
+func (ct *OptimizedCampaignTrigger) ensureWorkersForDevices(devices []*models.UserDevice) {
 	for _, device := range devices {
 		// Get WhatsApp client for device
 		client := ct.whatsappService.GetDeviceByID(device.ID)
@@ -215,8 +215,8 @@ func (ct *OptimizedCampaignTrigger) ensureWorkersForDevices(devices []*models.Us
 			continue
 		}
 		
-		// Create or get worker
-		_, err := ct.broadcastManager.CreateOrGetWorker(device.ID, client, minDelay, maxDelay)
+		// Create or get worker (no need to pass delays here, they're per-message)
+		_, err := ct.broadcastManager.CreateOrGetWorker(device.ID, client)
 		if err != nil {
 			logrus.Errorf("Failed to create worker for device %s: %v", device.ID, err)
 		}
@@ -269,7 +269,7 @@ func (ct *OptimizedCampaignTrigger) createBroadcastMessages(campaign *models.Cam
 			continue
 		}
 		
-		// Create domain message
+		// Create domain message with delay settings
 		domainMsg := &domainBroadcast.BroadcastMessage{
 			ID:           broadcastMsg.ID,
 			DeviceID:     device.ID,
@@ -281,6 +281,8 @@ func (ct *OptimizedCampaignTrigger) createBroadcastMessages(campaign *models.Cam
 			GroupOrder:   i,
 			RetryCount:   0,
 			CreatedAt:    time.Now(),
+			MinDelay:     campaign.MinDelaySeconds,
+			MaxDelay:     campaign.MaxDelaySeconds,
 		}
 		
 		messages = append(messages, domainMsg)

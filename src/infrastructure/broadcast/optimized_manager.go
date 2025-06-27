@@ -72,6 +72,9 @@ type BroadcastMessage struct {
 	GroupOrder   int
 	RetryCount   int
 	CreatedAt    time.Time
+	// Delay settings from campaign/sequence
+	MinDelay     int
+	MaxDelay     int
 }
 
 // NewOptimizedBroadcastManager creates a new optimized broadcast manager
@@ -95,7 +98,7 @@ func NewOptimizedBroadcastManager() *OptimizedBroadcastManager {
 }
 
 // CreateOrGetWorker creates a new worker or returns existing one
-func (m *OptimizedBroadcastManager) CreateOrGetWorker(deviceID string, device *whatsmeow.Client, minDelay, maxDelay int) (*DeviceWorker, error) {
+func (m *OptimizedBroadcastManager) CreateOrGetWorker(deviceID string, device *whatsmeow.Client) (*DeviceWorker, error) {
 	m.workersMutex.Lock()
 	defer m.workersMutex.Unlock()
 	
@@ -118,8 +121,6 @@ func (m *OptimizedBroadcastManager) CreateOrGetWorker(deviceID string, device *w
 		Queue:           make(chan *BroadcastMessage, config.WorkerQueueSize),
 		Status:          "active",
 		LastActivity:    time.Now(),
-		MinDelay:        minDelay,
-		MaxDelay:        maxDelay,
 		ctx:             workerCtx,
 		cancel:          workerCancel,
 		lastResetMinute: time.Now(),
@@ -172,12 +173,8 @@ func (m *OptimizedBroadcastManager) workerRoutine(worker *DeviceWorker) {
 				continue
 			}
 			
-			// Process message
-			m.processMessage(worker, msg)
-			
-			// Random delay between messages
-			delay := time.Duration(worker.MinDelay+rand.Intn(worker.MaxDelay-worker.MinDelay+1)) * time.Second
-			time.Sleep(delay)
+			// Process message with proper delays
+			m.processMessageWithDelay(worker, msg)
 			
 		case <-idleTimer.C:
 			// Worker has been idle for too long
@@ -187,8 +184,8 @@ func (m *OptimizedBroadcastManager) workerRoutine(worker *DeviceWorker) {
 	}
 }
 
-// processMessage sends a single message
-func (m *OptimizedBroadcastManager) processMessage(worker *DeviceWorker, msg *BroadcastMessage) {
+// processMessageWithDelay sends a message with proper delay handling
+func (m *OptimizedBroadcastManager) processMessageWithDelay(worker *DeviceWorker, msg *BroadcastMessage) {
 	worker.mutex.Lock()
 	worker.LastActivity = time.Now()
 	worker.mutex.Unlock()
@@ -204,14 +201,41 @@ func (m *OptimizedBroadcastManager) processMessage(worker *DeviceWorker, msg *Br
 		return
 	}
 	
-	// Send message based on type
+	// Determine if this is a two-part message (image + text)
+	hasImage := msg.ImageURL != ""
+	hasText := msg.Message != ""
+	
 	var sendErr error
-	if msg.ImageURL != "" {
-		// Send image message
-		sendErr = m.sendImageMessage(worker.Device, recipientJID, msg.ImageURL, msg.Message)
-	} else {
-		// Send text message
+	
+	if hasImage && hasText {
+		// TWO-PART MESSAGE: Send image first, then text
+		logrus.Debugf("Sending two-part message to %s (image + text)", recipientJID.String())
+		
+		// 1. Send image without caption
+		sendErr = m.sendImageMessage(worker.Device, recipientJID, msg.ImageURL, "")
+		if sendErr != nil {
+			m.handleFailedMessage(worker, msg, sendErr)
+			return
+		}
+		
+		// 2. Wait 3 seconds between image and text
+		time.Sleep(3 * time.Second)
+		
+		// 3. Send text message
 		sendErr = m.sendTextMessage(worker.Device, recipientJID, msg.Message)
+		if sendErr != nil {
+			m.handleFailedMessage(worker, msg, sendErr)
+			return
+		}
+	} else if hasImage {
+		// Image only
+		sendErr = m.sendImageMessage(worker.Device, recipientJID, msg.ImageURL, "")
+	} else if hasText {
+		// Text only
+		sendErr = m.sendTextMessage(worker.Device, recipientJID, msg.Message)
+	} else {
+		logrus.Warnf("Message has no content: %s", msg.ID)
+		return
 	}
 	
 	if sendErr != nil {
@@ -219,21 +243,51 @@ func (m *OptimizedBroadcastManager) processMessage(worker *DeviceWorker, msg *Br
 	} else {
 		m.handleSuccessMessage(worker, msg)
 	}
+	
+	// Apply random delay between different leads
+	// Use message-specific delays if provided, otherwise use worker defaults
+	minDelay := msg.MinDelay
+	maxDelay := msg.MaxDelay
+	if minDelay == 0 || maxDelay == 0 {
+		minDelay = config.DefaultMinDelaySeconds
+		maxDelay = config.DefaultMaxDelaySeconds
+	}
+	
+	// Calculate random delay
+	delay := minDelay
+	if maxDelay > minDelay {
+		delay = minDelay + rand.Intn(maxDelay-minDelay+1)
+	}
+	
+	logrus.Debugf("Waiting %d seconds before next message (min: %d, max: %d)", delay, minDelay, maxDelay)
+	time.Sleep(time.Duration(delay) * time.Second)
 }
 
 // sendTextMessage sends a text message
 func (m *OptimizedBroadcastManager) sendTextMessage(device *whatsmeow.Client, recipient whatsmeow.JID, message string) error {
-	// Implementation would go here
+	// TODO: Implement actual WhatsApp sending
 	// For now, just log
-	logrus.Debugf("Sending text message to %s", recipient.String())
+	logrus.Infof("Sending text to %s: %s", recipient.String(), message)
+	
+	// Simulate sending
+	time.Sleep(100 * time.Millisecond)
+	
 	return nil
 }
 
 // sendImageMessage sends an image message
 func (m *OptimizedBroadcastManager) sendImageMessage(device *whatsmeow.Client, recipient whatsmeow.JID, imageURL, caption string) error {
-	// Implementation would go here
+	// TODO: Implement actual WhatsApp image sending
 	// For now, just log
-	logrus.Debugf("Sending image message to %s", recipient.String())
+	if caption != "" {
+		logrus.Infof("Sending image with caption to %s: %s (caption: %s)", recipient.String(), imageURL, caption)
+	} else {
+		logrus.Infof("Sending image to %s: %s", recipient.String(), imageURL)
+	}
+	
+	// Simulate sending
+	time.Sleep(200 * time.Millisecond)
+	
 	return nil
 }
 
@@ -253,7 +307,14 @@ func (m *OptimizedBroadcastManager) handleSuccessMessage(worker *DeviceWorker, m
 	broadcastRepo := repository.GetBroadcastRepository()
 	_ = broadcastRepo.UpdateBroadcastStatus(msg.ID, "sent", "")
 	
-	logrus.Debugf("Message sent successfully to %s via device %s", msg.RecipientJID, worker.DeviceID)
+	// Log based on message type
+	if msg.CampaignID != nil {
+		logrus.Infof("Campaign message sent to %s via device %s", msg.RecipientJID, worker.DeviceID)
+	} else if msg.SequenceID != nil {
+		logrus.Infof("Sequence message sent to %s via device %s", msg.RecipientJID, worker.DeviceID)
+	} else {
+		logrus.Debugf("Message sent to %s via device %s", msg.RecipientJID, worker.DeviceID)
+	}
 }
 
 // handleFailedMessage handles failed message send
@@ -339,6 +400,14 @@ func (m *OptimizedBroadcastManager) QueueMessage(deviceID string, msg *Broadcast
 	select {
 	case worker.Queue <- msg:
 		atomic.AddInt64(&m.totalPending, 1)
+		
+		// Log queue action
+		if msg.CampaignID != nil {
+			logrus.Debugf("Queued campaign message for device %s (queue size: %d)", deviceID, len(worker.Queue))
+		} else if msg.SequenceID != nil {
+			logrus.Debugf("Queued sequence message for device %s (queue size: %d)", deviceID, len(worker.Queue))
+		}
+		
 		return nil
 	default:
 		return fmt.Errorf("queue full for device %s", deviceID)
