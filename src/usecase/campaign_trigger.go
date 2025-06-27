@@ -29,25 +29,34 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 	
 	campaignRepo := repository.GetCampaignRepository()
 	
-	// Get both today and tomorrow to handle timezone differences
-	today := time.Now().Format("2006-01-02")
-	tomorrow := time.Now().Add(24 * time.Hour).Format("2006-01-02")
-	
-	// Get campaigns for both dates
-	campaignsToday, err := campaignRepo.GetCampaignsByDate(today)
+	// Load Malaysia timezone
+	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	if err != nil {
-		return err
+		logrus.Warnf("Failed to load Malaysia timezone, using UTC: %v", err)
+		loc = time.UTC
 	}
 	
-	campaignsTomorrow, err := campaignRepo.GetCampaignsByDate(tomorrow)
-	if err != nil {
-		return err
-	}
+	// Get today in Malaysia timezone
+	nowMalaysia := time.Now().In(loc)
+	today := nowMalaysia.Format("2006-01-02")
 	
-	// Combine campaigns
-	campaigns := append(campaignsToday, campaignsTomorrow...)
+	// Also check yesterday and tomorrow to handle any edge cases
+	yesterday := nowMalaysia.Add(-24 * time.Hour).Format("2006-01-02")
+	tomorrow := nowMalaysia.Add(24 * time.Hour).Format("2006-01-02")
 	
-	logrus.Infof("Found %d campaigns scheduled for today/tomorrow", len(campaigns))
+	// Get campaigns for all three dates
+	var campaigns []models.Campaign
+	
+	campaignsYesterday, _ := campaignRepo.GetCampaignsByDate(yesterday)
+	campaigns = append(campaigns, campaignsYesterday...)
+	
+	campaignsToday, _ := campaignRepo.GetCampaignsByDate(today)
+	campaigns = append(campaigns, campaignsToday...)
+	
+	campaignsTomorrow, _ := campaignRepo.GetCampaignsByDate(tomorrow)
+	campaigns = append(campaigns, campaignsTomorrow...)
+	
+	logrus.Infof("Found %d campaigns (checking %s, %s, %s)", len(campaigns), yesterday, today, tomorrow)
 	
 	for _, campaign := range campaigns {
 		// Check if already processed
