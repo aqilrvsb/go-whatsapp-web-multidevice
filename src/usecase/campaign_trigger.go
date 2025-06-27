@@ -28,15 +28,26 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 	logrus.Info("Processing campaign triggers...")
 	
 	campaignRepo := repository.GetCampaignRepository()
-	today := time.Now().Format("2006-01-02")
 	
-	// Get campaigns scheduled for today
-	campaigns, err := campaignRepo.GetCampaignsByDate(today)
+	// Get both today and tomorrow to handle timezone differences
+	today := time.Now().Format("2006-01-02")
+	tomorrow := time.Now().Add(24 * time.Hour).Format("2006-01-02")
+	
+	// Get campaigns for both dates
+	campaignsToday, err := campaignRepo.GetCampaignsByDate(today)
 	if err != nil {
 		return err
 	}
 	
-	logrus.Infof("Found %d campaigns scheduled for today", len(campaigns))
+	campaignsTomorrow, err := campaignRepo.GetCampaignsByDate(tomorrow)
+	if err != nil {
+		return err
+	}
+	
+	// Combine campaigns
+	campaigns := append(campaignsToday, campaignsTomorrow...)
+	
+	logrus.Infof("Found %d campaigns scheduled for today/tomorrow", len(campaigns))
 	
 	for _, campaign := range campaigns {
 		// Check if already processed
