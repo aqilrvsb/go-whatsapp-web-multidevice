@@ -4,27 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	// Redis queue keys
-	campaignQueuePrefix  = "broadcast:queue:campaign:"
-	sequenceQueuePrefix  = "broadcast:queue:sequence:"
-	deadLetterPrefix     = "broadcast:queue:dead:"
-	metricsPrefix        = "broadcast:metrics:"
-	rateLimitPrefix      = "broadcast:ratelimit:"
-	workerStatusKey      = "broadcast:workers"
-	workerLockPrefix     = "broadcast:lock:"
+	// Redis queue keys - using unique names to avoid conflicts
+	ultraCampaignQueuePrefix  = "ultra:queue:campaign:"
+	ultraSequenceQueuePrefix  = "ultra:queue:sequence:"
+	ultraDeadLetterPrefix     = "ultra:queue:dead:"
+	ultraMetricsPrefix        = "ultra:metrics:"
+	ultraRateLimitPrefix      = "ultra:ratelimit:"
+	ultraWorkerStatusKey      = "ultra:workers"
+	ultraWorkerLockPrefix     = "ultra:lock:"
 	
 	// Performance settings for 3000 devices
 	maxConcurrentWorkers = 3000
@@ -51,6 +52,14 @@ type UltraScaleRedisManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+}
+
+// UltraRedisMessage represents a message in Redis queue (unique name to avoid conflict)
+type UltraRedisMessage struct {
+	Message   domainBroadcast.BroadcastMessage `json:"message"`
+	Priority  int                              `json:"priority"`
+	Timestamp time.Time                        `json:"timestamp"`
+	Retries   int                              `json:"retries"`
 }
 
 // NewUltraScaleRedisManager creates a manager optimized for 3000+ devices
@@ -130,13 +139,13 @@ func (um *UltraScaleRedisManager) SendMessage(msg domainBroadcast.BroadcastMessa
 	// Use device-specific queue for better distribution
 	var queueKey string
 	if msg.CampaignID != nil {
-		queueKey = fmt.Sprintf("%s%s", campaignQueuePrefix, msg.DeviceID)
+		queueKey = fmt.Sprintf("%s%s", ultraCampaignQueuePrefix, msg.DeviceID)
 	} else {
-		queueKey = fmt.Sprintf("%s%s", sequenceQueuePrefix, msg.DeviceID)
+		queueKey = fmt.Sprintf("%s%s", ultraSequenceQueuePrefix, msg.DeviceID)
 	}
 	
 	// Create Redis message
-	redisMsg := RedisMessage{
+	redisMsg := UltraRedisMessage{
 		Message:   msg,
 		Priority:  getPriority(msg),
 		Timestamp: time.Now(),
@@ -170,7 +179,7 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 	
 	if !exists {
 		// Try to acquire lock for this device
-		lockKey := fmt.Sprintf("%s%s", workerLockPrefix, deviceID)
+		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		locked, err := um.redisClient.SetNX(um.ctx, lockKey, "1", lockTTL).Result()
 		if err != nil || !locked {
 			// Another server is handling this device
@@ -203,6 +212,39 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 	}
 }
 
+// createDeviceWorker creates a new device worker
+func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWorker {
+	// Get WhatsApp client
+	clientManager := whatsapp.GetClientManager()
+	client, err := clientManager.GetClient(deviceID)
+	if err != nil || client == nil {
+		logrus.Errorf("Failed to get WhatsApp client for device %s: %v", deviceID, err)
+		return nil
+	}
+	
+	// Get device settings from database
+	db := database.GetDB()
+	var minDelay, maxDelay int
+	row := db.QueryRow(`
+		SELECT min_delay_seconds, max_delay_seconds 
+		FROM user_devices 
+		WHERE id = $1
+	`, deviceID)
+	
+	if err := row.Scan(&minDelay, &maxDelay); err == nil {
+		// Use configured delays
+	} else {
+		// Default delays
+		minDelay = 10
+		maxDelay = 30
+	}
+	
+	// Create worker using the existing constructor
+	worker := NewDeviceWorker(deviceID, client, minDelay, maxDelay)
+	
+	return worker
+}
+
 // runWorker runs a device worker with optimizations
 func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorker) {
 	defer um.wg.Done()
@@ -213,14 +255,20 @@ func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorke
 		um.workersMutex.Unlock()
 		
 		// Release lock
-		lockKey := fmt.Sprintf("%s%s", workerLockPrefix, deviceID)
+		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		um.redisClient.Del(um.ctx, lockKey)
+		
+		// Stop the worker
+		worker.Stop()
 	}()
 	
+	// Start the worker
+	worker.Start()
+	
 	// Queue keys for this device
-	campaignQueue := fmt.Sprintf("%s%s", campaignQueuePrefix, deviceID)
-	sequenceQueue := fmt.Sprintf("%s%s", sequenceQueuePrefix, deviceID)
-	deadLetterQueue := fmt.Sprintf("%s%s", deadLetterPrefix, deviceID)
+	campaignQueue := fmt.Sprintf("%s%s", ultraCampaignQueuePrefix, deviceID)
+	sequenceQueue := fmt.Sprintf("%s%s", ultraSequenceQueuePrefix, deviceID)
+	deadLetterQueue := fmt.Sprintf("%s%s", ultraDeadLetterPrefix, deviceID)
 	
 	idleCount := 0
 	maxIdle := 100 // Stop worker after 100 idle checks (10 seconds)
@@ -263,7 +311,7 @@ func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorke
 			
 			// Extend lock periodically
 			if idleCount%20 == 0 {
-				lockKey := fmt.Sprintf("%s%s", workerLockPrefix, deviceID)
+				lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 				um.redisClient.Expire(um.ctx, lockKey, lockTTL)
 			}
 		}
@@ -271,13 +319,13 @@ func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorke
 }
 
 // popMessage pops a message from queue
-func (um *UltraScaleRedisManager) popMessage(queueKey string) *RedisMessage {
+func (um *UltraScaleRedisManager) popMessage(queueKey string) *UltraRedisMessage {
 	result, err := um.redisClient.RPop(um.ctx, queueKey).Result()
 	if err != nil || result == "" {
 		return nil
 	}
 	
-	var msg RedisMessage
+	var msg UltraRedisMessage
 	if err := json.Unmarshal([]byte(result), &msg); err != nil {
 		logrus.Errorf("Failed to unmarshal message: %v", err)
 		return nil
@@ -287,7 +335,7 @@ func (um *UltraScaleRedisManager) popMessage(queueKey string) *RedisMessage {
 }
 
 // processMessage processes a single message
-func (um *UltraScaleRedisManager) processMessage(worker *DeviceWorker, msg *RedisMessage) error {
+func (um *UltraScaleRedisManager) processMessage(worker *DeviceWorker, msg *UltraRedisMessage) error {
 	start := time.Now()
 	
 	// Send the message
@@ -306,8 +354,15 @@ func (um *UltraScaleRedisManager) processMessage(worker *DeviceWorker, msg *Redi
 	return nil
 }
 
+// updateProcessingTime updates processing time metrics
+func (um *UltraScaleRedisManager) updateProcessingTime(deviceID string, duration time.Duration) {
+	key := fmt.Sprintf("%s%s:processing_time", ultraMetricsPrefix, deviceID)
+	um.redisClient.LPush(um.ctx, key, duration.Milliseconds())
+	um.redisClient.LTrim(um.ctx, key, 0, 99) // Keep last 100 values
+}
+
 // handleFailedMessage handles failed messages
-func (um *UltraScaleRedisManager) handleFailedMessage(msg *RedisMessage, deadLetterQueue string, err error) {
+func (um *UltraScaleRedisManager) handleFailedMessage(msg *UltraRedisMessage, deadLetterQueue string, err error) {
 	msg.Retries++
 	
 	// If retries exceeded, move to dead letter
@@ -346,18 +401,18 @@ func (um *UltraScaleRedisManager) processQueues() {
 // checkPendingQueues checks for queues with messages but no workers
 func (um *UltraScaleRedisManager) checkPendingQueues() {
 	// Get all queue keys
-	campaignQueues, _ := um.redisClient.Keys(um.ctx, campaignQueuePrefix+"*").Result()
-	sequenceQueues, _ := um.redisClient.Keys(um.ctx, sequenceQueuePrefix+"*").Result()
+	campaignQueues, _ := um.redisClient.Keys(um.ctx, ultraCampaignQueuePrefix+"*").Result()
+	sequenceQueues, _ := um.redisClient.Keys(um.ctx, ultraSequenceQueuePrefix+"*").Result()
 	
 	allQueues := append(campaignQueues, sequenceQueues...)
 	
 	for _, queueKey := range allQueues {
 		// Extract device ID from queue key
 		var deviceID string
-		if strings.HasPrefix(queueKey, campaignQueuePrefix) {
-			deviceID = strings.TrimPrefix(queueKey, campaignQueuePrefix)
+		if strings.HasPrefix(queueKey, ultraCampaignQueuePrefix) {
+			deviceID = strings.TrimPrefix(queueKey, ultraCampaignQueuePrefix)
 		} else {
-			deviceID = strings.TrimPrefix(queueKey, sequenceQueuePrefix)
+			deviceID = strings.TrimPrefix(queueKey, ultraSequenceQueuePrefix)
 		}
 		
 		// Check if queue has messages
@@ -402,13 +457,13 @@ func (um *UltraScaleRedisManager) performHealthCheck() {
 	
 	// Check and extend locks
 	for _, deviceID := range deviceIDs {
-		lockKey := fmt.Sprintf("%s%s", workerLockPrefix, deviceID)
+		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		um.redisClient.Expire(um.ctx, lockKey, lockTTL)
 	}
 	
 	// Update global metrics
-	um.redisClient.Set(um.ctx, "broadcast:stats:active_workers", workerCount, 0)
-	um.redisClient.Set(um.ctx, "broadcast:stats:max_workers", maxConcurrentWorkers, 0)
+	um.redisClient.Set(um.ctx, "ultra:stats:active_workers", workerCount, 0)
+	um.redisClient.Set(um.ctx, "ultra:stats:max_workers", maxConcurrentWorkers, 0)
 }
 
 // flushMetrics periodically flushes batched metrics to Redis
@@ -438,7 +493,7 @@ func (um *UltraScaleRedisManager) flushMetricsBatch() {
 	// Use pipeline for efficiency
 	pipe := um.redisClient.Pipeline()
 	for metric, count := range batch {
-		key := fmt.Sprintf("%s%s", metricsPrefix, metric)
+		key := fmt.Sprintf("%s%s", ultraMetricsPrefix, metric)
 		pipe.IncrBy(um.ctx, key, count)
 	}
 	pipe.Exec(um.ctx)
@@ -464,7 +519,7 @@ func (um *UltraScaleRedisManager) cleanupDeadLetters() {
 			return
 		case <-ticker.C:
 			// Clean up old dead letters
-			deadLetterQueues, _ := um.redisClient.Keys(um.ctx, deadLetterPrefix+"*").Result()
+			deadLetterQueues, _ := um.redisClient.Keys(um.ctx, ultraDeadLetterPrefix+"*").Result()
 			for _, queue := range deadLetterQueues {
 				count, _ := um.redisClient.LLen(um.ctx, queue).Result()
 				if count > 1000 {
@@ -475,34 +530,128 @@ func (um *UltraScaleRedisManager) cleanupDeadLetters() {
 		}
 	}
 }
-) int {
+
+// GetWorkerStatus returns status for a specific device
+func (um *UltraScaleRedisManager) GetWorkerStatus(deviceID string) (domainBroadcast.WorkerStatus, bool) {
+	// Check in-memory first
+	um.workersMutex.RLock()
+	worker, exists := um.workers[deviceID]
+	um.workersMutex.RUnlock()
+	
+	if exists && worker != nil {
+		return worker.GetStatus(), true
+	}
+	
+	// Check Redis for distributed status
+	data, err := um.redisClient.HGet(um.ctx, ultraWorkerStatusKey, deviceID).Result()
+	if err != nil {
+		return domainBroadcast.WorkerStatus{}, false
+	}
+	
+	var status map[string]interface{}
+	if err := json.Unmarshal([]byte(data), &status); err != nil {
+		return domainBroadcast.WorkerStatus{}, false
+	}
+	
+	// Get queue lengths
+	campaignQueue := fmt.Sprintf("%s%s", ultraCampaignQueuePrefix, deviceID)
+	sequenceQueue := fmt.Sprintf("%s%s", ultraSequenceQueuePrefix, deviceID)
+	
+	campaignCount, _ := um.redisClient.LLen(um.ctx, campaignQueue).Result()
+	sequenceCount, _ := um.redisClient.LLen(um.ctx, sequenceQueue).Result()
+	
+	return domainBroadcast.WorkerStatus{
+		DeviceID:     deviceID,
+		Status:       status["status"].(string),
+		QueueSize:    int(campaignCount + sequenceCount),
+		LastActivity: time.Unix(int64(status["last_activity"].(float64)), 0),
+	}, true
+}
+
+// GetAllWorkerStatus returns status for all workers
+func (um *UltraScaleRedisManager) GetAllWorkerStatus() []domainBroadcast.WorkerStatus {
+	var statuses []domainBroadcast.WorkerStatus
+	
+	// Get all workers from Redis (includes workers on other servers)
+	workers, _ := um.redisClient.HGetAll(um.ctx, ultraWorkerStatusKey).Result()
+	
+	for deviceID, data := range workers {
+		var status map[string]interface{}
+		if err := json.Unmarshal([]byte(data), &status); err != nil {
+			continue
+		}
+		
+		// Get queue lengths
+		campaignQueue := fmt.Sprintf("%s%s", ultraCampaignQueuePrefix, deviceID)
+		sequenceQueue := fmt.Sprintf("%s%s", ultraSequenceQueuePrefix, deviceID)
+		
+		campaignCount, _ := um.redisClient.LLen(um.ctx, campaignQueue).Result()
+		sequenceCount, _ := um.redisClient.LLen(um.ctx, sequenceQueue).Result()
+		
+		statuses = append(statuses, domainBroadcast.WorkerStatus{
+			DeviceID:     deviceID,
+			Status:       status["status"].(string),
+			QueueSize:    int(campaignCount + sequenceCount),
+			LastActivity: time.Unix(int64(status["last_activity"].(float64)), 0),
+		})
+	}
+	
+	return statuses
+}
+
+// StopAllWorkers stops all workers gracefully
+func (um *UltraScaleRedisManager) StopAllWorkers() error {
+	logrus.Info("Stopping all workers...")
+	
+	um.workersMutex.Lock()
+	for deviceID, worker := range um.workers {
+		worker.Stop()
+		logrus.Infof("Stopped worker for device %s", deviceID)
+	}
+	um.workersMutex.Unlock()
+	
+	// Wait for all to stop
+	time.Sleep(2 * time.Second)
+	
+	return nil
+}
+
+// ResumeFailedWorkers resumes workers that have failed
+func (um *UltraScaleRedisManager) ResumeFailedWorkers() error {
+	logrus.Info("Resuming failed workers...")
+	
+	// Check all queues for pending messages
+	um.checkPendingQueues()
+	
+	return nil
+}
+
+// Stop gracefully stops the manager
+func (um *UltraScaleRedisManager) Stop() {
+	logrus.Info("Stopping Ultra Scale Redis Manager...")
+	
+	// Stop accepting new messages
+	um.cancel()
+	
+	// Stop all workers
+	um.StopAllWorkers()
+	
+	// Wait for all goroutines
+	um.wg.Wait()
+	
+	// Close Redis connection
+	um.redisClient.Close()
+	
+	logrus.Info("Ultra Scale Redis Manager stopped")
+}
+
+// Helper function to determine message priority
+func getPriority(msg domainBroadcast.BroadcastMessage) int {
 	if msg.CampaignID != nil {
 		return 1 // High priority for campaigns
 	}
 	return 5 // Normal priority for sequences
-}
-
-// RedisMessage represents a message in Redis queue
-type RedisMessage struct {
-	Message   domainBroadcast.BroadcastMessage `json:"message"`
-	Priority  int                              `json:"priority"`
-	Timestamp time.Time                        `json:"timestamp"`
-	Retries   int                              `json:"retries"`
 }
 
 // Interface compliance check
 var _ BroadcastManagerInterface = (*UltraScaleRedisManager)(nil)
-) int {
-	if msg.CampaignID != nil {
-		return 1 // High priority for campaigns
-	}
-	return 5 // Normal priority for sequences
-}
-
-// RedisMessage represents a message in Redis queue
-type RedisMessage struct {
-	Message   domainBroadcast.BroadcastMessage `json:"message"`
-	Priority  int                              `json:"priority"`
-	Timestamp time.Time                        `json:"timestamp"`
-	Retries   int                              `json:"retries"`
-}
