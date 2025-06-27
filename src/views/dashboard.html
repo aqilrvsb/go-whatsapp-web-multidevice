@@ -727,11 +727,18 @@
                         <h4 class="mb-1">Campaign Calendar</h4>
                         <p class="text-muted mb-0">Plan and schedule your WhatsApp broadcast campaigns</p>
                     </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadCampaigns()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Campaigns
+                    </button>
                 </div>
                 
                 <!-- Calendar Container -->
                 <div class="card">
                     <div class="card-body">
+                        <!-- Debug info -->
+                        <div id="campaignDebug" class="alert alert-info mb-3" style="display: none;">
+                            <small>Debug: <span id="debugInfo"></span></small>
+                        </div>
                         <!-- Calendar controls will be added here by JavaScript -->
                         <div id="campaignCalendar"></div>
                     </div>
@@ -2177,6 +2184,12 @@
             // Clear any existing content
             calendarContainer.innerHTML = '';
             
+            // Remove any existing controls
+            const existingControls = document.getElementById('calendarControls');
+            if (existingControls) {
+                existingControls.remove();
+            }
+            
             // Create controls container
             const controlsContainer = document.createElement('div');
             controlsContainer.id = 'calendarControls';
@@ -2240,6 +2253,11 @@
                 const dayElement = document.createElement('div');
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 dayElement.className = 'calendar-day';
+                
+                // Debug logging
+                if (day === 2 && currentMonth === 5) { // June is month 5 (0-indexed)
+                    console.log('Checking June 2:', dateStr, 'Campaigns:', campaigns[dateStr]);
+                }
                 
                 // Check if this is today
                 if (dateStr === todayStr) {
@@ -2354,20 +2372,57 @@
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
                         campaigns = {};
                         console.log('Processing campaigns:', data.results.length);
+                        
+                        // Show debug info
+                        const debugDiv = document.getElementById('campaignDebug');
+                        const debugInfo = document.getElementById('debugInfo');
+                        if (debugDiv && debugInfo) {
+                            debugDiv.style.display = 'block';
+                            debugInfo.textContent = `Found ${data.results.length} campaigns. `;
+                        }
+                        
                         // Group campaigns by date
                         data.results.forEach(campaign => {
                             // Ensure date is in YYYY-MM-DD format
                             const date = campaign.campaign_date.split('T')[0];
+                            console.log('Campaign date:', date, 'Title:', campaign.title);
                             if (!campaigns[date]) {
                                 campaigns[date] = [];
                             }
                             campaigns[date].push(campaign);
                         });
+                        
                         console.log('Grouped campaigns:', campaigns);
+                        console.log('Campaign dates:', Object.keys(campaigns));
+                        console.log('Current calendar showing:', currentYear + '-' + (currentMonth + 1));
+                        
+                        // Update debug info
+                        if (debugInfo) {
+                            debugInfo.textContent += `Dates: ${Object.keys(campaigns).join(', ')}`;
+                        }
+                        
                         renderCalendar();
+                    } else {
+                        // Show no campaigns message
+                        const debugDiv = document.getElementById('campaignDebug');
+                        const debugInfo = document.getElementById('debugInfo');
+                        if (debugDiv && debugInfo) {
+                            debugDiv.style.display = 'block';
+                            debugDiv.className = 'alert alert-warning mb-3';
+                            debugInfo.textContent = 'No campaigns found or error loading campaigns.';
+                        }
                     }
                 })
-                .catch(error => console.error('Error loading campaigns:', error));
+                .catch(error => {
+                    console.error('Error loading campaigns:', error);
+                    const debugDiv = document.getElementById('campaignDebug');
+                    const debugInfo = document.getElementById('debugInfo');
+                    if (debugDiv && debugInfo) {
+                        debugDiv.style.display = 'block';
+                        debugDiv.className = 'alert alert-danger mb-3';
+                        debugInfo.textContent = 'Error loading campaigns: ' + error.message;
+                    }
+                });
         }
         
         function openCampaignModal(date) {
