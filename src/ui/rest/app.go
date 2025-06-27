@@ -841,6 +841,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		CampaignDate    string `json:"campaign_date"`
 		Title           string `json:"title"`
 		Niche           string `json:"niche"`
+		TargetStatus    string `json:"target_status"`
 		Message         string `json:"message"`
 		ImageURL        string `json:"image_url"`
 		ScheduledTime   string `json:"scheduled_time"`
@@ -874,12 +875,19 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		scheduledTime = time.Now().Format("15:04")
 	}
 	
+	// Validate and set target_status
+	targetStatus := request.TargetStatus
+	if targetStatus != "prospect" && targetStatus != "customer" && targetStatus != "all" {
+		targetStatus = "all"
+	}
+	
 	campaignRepo := repository.GetCampaignRepository()
 	campaign := &models.Campaign{
 		UserID:          user.ID,
 		Title:           request.Title,
 		Message:         request.Message,
 		Niche:           request.Niche,
+		TargetStatus:    targetStatus,
 		ImageURL:        request.ImageURL,
 		CampaignDate:    request.CampaignDate,
 		ScheduledTime:   scheduledTime,

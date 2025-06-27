@@ -143,6 +143,7 @@ func InitializeSchema() error {
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'all';
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time VARCHAR(10);
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled';
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;

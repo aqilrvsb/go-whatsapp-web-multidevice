@@ -103,13 +103,19 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 	
 	query := `
 		UPDATE campaigns 
-		SET title = $1, niche = $2, message = $3, image_url = $4,
-		    campaign_date = $5, scheduled_time = $6, min_delay_seconds = $7, 
-		    max_delay_seconds = $8, status = $9, updated_at = $10
-		WHERE id = $11
+		SET title = $1, niche = $2, target_status = $3, message = $4, image_url = $5,
+		    campaign_date = $6, scheduled_time = $7, min_delay_seconds = $8, 
+		    max_delay_seconds = $9, status = $10, updated_at = $11
+		WHERE id = $12
 	`
 	
-	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, campaign.Message,
+	// Default target_status to 'all' if not set
+	targetStatus := campaign.TargetStatus
+	if targetStatus == "" {
+		targetStatus = "all"
+	}
+	
+	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, targetStatus, campaign.Message,
 		campaign.ImageURL, campaign.CampaignDate, campaign.ScheduledTime,
 		campaign.MinDelaySeconds, campaign.MaxDelaySeconds,
 		campaign.Status, campaign.UpdatedAt, campaign.ID)
@@ -120,7 +126,8 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 // GetCampaigns gets all campaigns for a user
 func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, title, message, niche, image_url, 
+		SELECT id, user_id, title, message, niche, 
+		       COALESCE(target_status, 'all') as target_status, image_url, 
 		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
@@ -129,10 +136,8 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 		ORDER BY campaign_date DESC, scheduled_time DESC
 	`
 	
-	log.Printf("Getting campaigns for user: %s", userID)
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
-		log.Printf("Error querying campaigns: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -143,22 +148,18 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.ImageURL,
+			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
 			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
-			log.Printf("Error scanning campaign: %v", err)
 			continue
 		}
 		
-		log.Printf("Found campaign: ID=%d, Date=%s, Time=%s, Title=%s", 
-			campaign.ID, campaign.CampaignDate, campaign.ScheduledTime, campaign.Title)
 		campaigns = append(campaigns, campaign)
 	}
 	
-	log.Printf("Total campaigns found: %d", len(campaigns))
 	return campaigns, nil
 }
 

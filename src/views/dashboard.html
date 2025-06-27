@@ -901,7 +901,8 @@
                         <div class="mb-3">
                             <label class="form-label">Target Lead Status <span class="text-danger">*</span></label>
                             <select class="form-select" id="campaignTargetStatus" required>
-                                <option value="prospect" selected>Prospect</option>
+                                <option value="all">All Leads</option>
+                                <option value="prospect">Prospect</option>
                                 <option value="customer">Customer</option>
                             </select>
                         </div>
@@ -2337,6 +2338,7 @@
                                 </div>
                                 <div style="color: #666; font-size: 8px; margin-top: 1px;">
                                     <i class="bi bi-tag-fill" style="font-size: 8px;"></i> ${campaign.niche || 'General'} 
+                                    ${campaign.target_status ? `<i class="bi bi-people-fill" style="font-size: 8px;" title="Target: ${campaign.target_status}"></i> ${campaign.target_status}` : ''}
                                     ${campaign.scheduled_time ? `<i class="bi bi-clock" style="font-size: 8px;"></i> ${campaign.scheduled_time.slice(0,5)}` : ''}
                                     ${campaign.image_url ? '<i class="bi bi-image" title="Has image" style="font-size: 8px;"></i>' : ''}
                                 </div>
@@ -2398,13 +2400,13 @@
                         campaigns = {};
                         console.log('Processing campaigns:', data.results.length);
                         
-                        // Show debug info
-                        const debugDiv = document.getElementById('campaignDebug');
-                        const debugInfo = document.getElementById('debugInfo');
-                        if (debugDiv && debugInfo) {
-                            debugDiv.style.display = 'block';
-                            debugInfo.textContent = `Found ${data.results.length} campaigns. `;
-                        }
+                        // Hide debug info - uncomment for debugging
+                        // const debugDiv = document.getElementById('campaignDebug');
+                        // const debugInfo = document.getElementById('debugInfo');
+                        // if (debugDiv && debugInfo) {
+                        //     debugDiv.style.display = 'block';
+                        //     debugInfo.textContent = `Found ${data.results.length} campaigns. `;
+                        // }
                         
                         // Group campaigns by date
                         data.results.forEach(campaign => {
@@ -2424,32 +2426,33 @@
                         console.log('Campaign dates:', Object.keys(campaigns));
                         console.log('Current calendar showing:', currentYear + '-' + (currentMonth + 1));
                         
-                        // Update debug info
-                        if (debugInfo) {
-                            debugInfo.textContent += `Dates: ${Object.keys(campaigns).join(', ')}`;
-                        }
+                        // Update debug info - uncomment for debugging
+                        // if (debugInfo) {
+                        //     debugInfo.textContent += `Dates: ${Object.keys(campaigns).join(', ')}`;
+                        // }
                         
                         renderCalendar();
                     } else {
-                        // Show no campaigns message
-                        const debugDiv = document.getElementById('campaignDebug');
-                        const debugInfo = document.getElementById('debugInfo');
-                        if (debugDiv && debugInfo) {
-                            debugDiv.style.display = 'block';
-                            debugDiv.className = 'alert alert-warning mb-3';
-                            debugInfo.textContent = 'No campaigns found or error loading campaigns.';
-                        }
+                        // Show no campaigns message - uncomment for debugging
+                        // const debugDiv = document.getElementById('campaignDebug');
+                        // const debugInfo = document.getElementById('debugInfo');
+                        // if (debugDiv && debugInfo) {
+                        //     debugDiv.style.display = 'block';
+                        //     debugDiv.className = 'alert alert-warning mb-3';
+                        //     debugInfo.textContent = 'No campaigns found or error loading campaigns.';
+                        // }
                     }
                 })
                 .catch(error => {
                     console.error('Error loading campaigns:', error);
-                    const debugDiv = document.getElementById('campaignDebug');
-                    const debugInfo = document.getElementById('debugInfo');
-                    if (debugDiv && debugInfo) {
-                        debugDiv.style.display = 'block';
-                        debugDiv.className = 'alert alert-danger mb-3';
-                        debugInfo.textContent = 'Error loading campaigns: ' + error.message;
-                    }
+                    // Hide error debug info - uncomment for debugging
+                    // const debugDiv = document.getElementById('campaignDebug');
+                    // const debugInfo = document.getElementById('debugInfo');
+                    // if (debugDiv && debugInfo) {
+                    //     debugDiv.style.display = 'block';
+                    //     debugDiv.className = 'alert alert-danger mb-3';
+                    //     debugInfo.textContent = 'Error loading campaigns: ' + error.message;
+                    // }
                 });
         }
         
@@ -2490,7 +2493,7 @@
                 campaign_date: campaignDate,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
-                target_status: document.getElementById('campaignTargetStatus').value || 'prospect',
+                target_status: document.getElementById('campaignTargetStatus').value || 'all',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
                 scheduled_time: scheduledTime,
@@ -2624,6 +2627,7 @@
             document.getElementById('campaignDate').value = dateStr;
             document.getElementById('campaignTitle').value = campaign.title || '';
             document.getElementById('campaignNiche').value = campaign.niche || '';
+            document.getElementById('campaignTargetStatus').value = campaign.target_status || 'all';
             document.getElementById('campaignMessage').value = campaign.message || '';
             document.getElementById('campaignTime').value = campaign.scheduled_time || '';
             document.getElementById('campaignMinDelay').value = campaign.min_delay_seconds || 10;
