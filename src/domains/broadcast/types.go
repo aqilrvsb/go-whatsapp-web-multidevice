@@ -19,8 +19,8 @@ type BroadcastMessage struct {
 	Caption        string
 	ScheduledAt    time.Time
 	Status         string
-	GroupID        string  // For grouping related messages
-	GroupOrder     int     // Order within the group
+	GroupID        *string // For grouping related messages (pointer to allow null)
+	GroupOrder     *int    // Order within the group (pointer to allow null)
 	RetryCount     int     // Number of retry attempts
 	CreatedAt      time.Time
 	// Delay settings from campaign/sequence

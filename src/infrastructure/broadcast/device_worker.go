@@ -270,6 +270,39 @@ func (dw *DeviceWorker) healthCheck() {
 	}
 }
 
+// SendMessage sends a message (implements direct sending without queue)
+func (dw *DeviceWorker) SendMessage(msg domainBroadcast.BroadcastMessage) error {
+	return dw.sendMessage(msg)
+}
+
+// Run starts the worker processes
+func (dw *DeviceWorker) Run() {
+	dw.Start()
+}
+
+// IsHealthy checks if the worker is healthy
+func (dw *DeviceWorker) IsHealthy() bool {
+	dw.mu.RLock()
+	defer dw.mu.RUnlock()
+	
+	// Check if stuck processing
+	if dw.status == "processing" && time.Since(dw.lastActivity) > 10*time.Minute {
+		return false
+	}
+	
+	// Check if stopped
+	if dw.status == "stopped" {
+		return false
+	}
+	
+	// Check if client is still connected
+	if dw.client == nil || !dw.client.IsConnected() {
+		return false
+	}
+	
+	return true
+}
+
 // downloadMedia downloads media from URL
 func downloadMedia(url string) ([]byte, error) {
 	resp, err := http.Get(url)

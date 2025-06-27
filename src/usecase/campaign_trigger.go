@@ -13,7 +13,7 @@ import (
 
 // CampaignTriggerService handles campaign and sequence triggers
 type CampaignTriggerService struct {
-	broadcastManager *broadcast.BroadcastManager
+	broadcastManager broadcast.BroadcastManagerInterface
 }
 
 // NewCampaignTriggerService creates new trigger service

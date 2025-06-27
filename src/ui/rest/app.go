@@ -10,6 +10,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
@@ -1602,10 +1603,17 @@ func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
 	
 	// Get broadcast manager stats
 	broadcastManager := broadcast.GetBroadcastManager()
-	workerStats := broadcastManager.GetWorkerStats()
+	workerStats := broadcastManager.GetAllWorkerStatus()
 	
 	// Get worker status for each device
 	deviceWorkers := []map[string]interface{}{}
+	
+	// Convert worker statuses to a map for easy lookup
+	workerStatusMap := make(map[string]domainBroadcast.WorkerStatus)
+	for _, status := range workerStats {
+		workerStatusMap[status.DeviceID] = status
+	}
+	
 	for _, device := range devices {
 		workerInfo := map[string]interface{}{
 			"device_id": device.ID,
@@ -1618,24 +1626,19 @@ func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
 		}
 		
 		// Find worker stats for this device
-		if workers, ok := workerStats["workers"].([]map[string]interface{}); ok {
-			for _, worker := range workers {
-				if worker["device_id"] == device.ID {
-					workerInfo["worker_status"] = worker["status"]
-					workerInfo["queue_size"] = worker["queue_size"]
-					workerInfo["processed"] = worker["processed"]
-					workerInfo["failed"] = worker["failed"]
-					workerInfo["last_activity"] = worker["last_activity"]
-					break
-				}
-			}
+		if status, exists := workerStatusMap[device.ID]; exists {
+			workerInfo["worker_status"] = status.Status
+			workerInfo["queue_size"] = status.QueueSize
+			workerInfo["processed"] = status.ProcessedCount
+			workerInfo["failed"] = status.FailedCount
+			workerInfo["last_activity"] = status.LastActivity
 		}
 		
 		deviceWorkers = append(deviceWorkers, workerInfo)
 	}
 	
 	response := map[string]interface{}{
-		"total_workers": workerStats["total_workers"],
+		"total_workers": len(workerStats),
 		"user_devices": len(devices),
 		"connected_devices": countConnectedDevices(devices),
 		"device_workers": deviceWorkers,

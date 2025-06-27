@@ -4,18 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
+)
+
+const (
+	// Redis queue keys
+	campaignQueueKey  = "broadcast:queue:campaign"
+	sequenceQueueKey  = "broadcast:queue:sequence"
+	deadLetterKey     = "broadcast:queue:dead"
+	metricsPrefix     = "broadcast:metrics:"
+	rateLimitPrefix   = "broadcast:ratelimit:"
+	workerStatusKey   = "broadcast:workers"
+	
+	// Queue priorities
+	priorityHigh   = 1
+	priorityNormal = 5
+	priorityLow    = 10
 )
 
 // RedisOptimizedBroadcastManager handles broadcasting with Redis queues for ultimate scale
@@ -26,790 +39,517 @@ type RedisOptimizedBroadcastManager struct {
 	activeWorkers int32
 	maxWorkers    int32
 	
-	// Metrics stored in Redis for multi-server support
-	metricsPrefix string
-	
 	// Control
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
 
-// DeviceWorker represents a worker for a specific device
-type DeviceWorker struct {
-	DeviceID        string
-	Device          *whatsmeow.Client
-	Status          string
-	LastActivity    time.Time
-	
-	// Rate limiting (stored in Redis for persistence)
-	rateLimitPrefix string
-	
-	// Control
-	ctx    context.Context
-	cancel context.CancelFunc
-	mutex  sync.Mutex
+// RedisMessage represents a message in Redis queue
+type RedisMessage struct {
+	Message   domainBroadcast.BroadcastMessage `json:"message"`
+	Priority  int                              `json:"priority"`
+	Timestamp time.Time                        `json:"timestamp"`
+	Retries   int                              `json:"retries"`
 }
 
-// NewRedisOptimizedBroadcastManager creates manager with Redis support
+// NewRedisOptimizedBroadcastManager creates a new Redis-based broadcast manager
 func NewRedisOptimizedBroadcastManager() *RedisOptimizedBroadcastManager {
-	ctx, cancel := context.WithCancel(context.Background())
-	
-	// Get Redis URL from environment
-	redisURL := config.GetRedisURL() // You'll need to add this to config
+	// Initialize Redis client
+	redisURL := config.RedisURL
 	if redisURL == "" {
-		logrus.Warn("Redis URL not configured, falling back to localhost")
-		redisURL = "redis://localhost:6379"
+		// Fallback to individual settings
+		redisHost := config.RedisHost
+		redisPort := config.RedisPort
+		redisPassword := config.RedisPassword
+		
+		if redisHost == "" {
+			redisHost = "localhost"
+		}
+		if redisPort == "" {
+			redisPort = "6379"
+		}
+		
+		redisURL = fmt.Sprintf("redis://:%s@%s:%s/0", redisPassword, redisHost, redisPort)
 	}
 	
-	// Parse Redis URL
 	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
 		logrus.Fatalf("Failed to parse Redis URL: %v", err)
 	}
 	
-	// Configure connection pool for high performance
-	opt.PoolSize = 100
-	opt.MinIdleConns = 10
-	opt.MaxRetries = 3
-	opt.DialTimeout = 5 * time.Second
-	opt.ReadTimeout = 3 * time.Second
-	opt.WriteTimeout = 3 * time.Second
-	
-	// Connect to Redis
-	rdb := redis.NewClient(opt)
+	redisClient := redis.NewClient(opt)
 	
 	// Test connection
-	if err := rdb.Ping(ctx).Err(); err != nil {
+	ctx := context.Background()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
 		logrus.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	
+	logrus.Info("Successfully connected to Redis")
+	
+	ctx, cancel := context.WithCancel(context.Background())
 	manager := &RedisOptimizedBroadcastManager{
-		redisClient:   rdb,
-		workers:       make(map[string]*DeviceWorker),
-		maxWorkers:    int32(config.MaxConcurrentWorkers),
-		metricsPrefix: "broadcast:metrics:",
-		ctx:           ctx,
-		cancel:        cancel,
+		redisClient: redisClient,
+		workers:     make(map[string]*DeviceWorker),
+		maxWorkers:  500, // Can handle many more workers with Redis
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	
-	// Initialize metrics in Redis
-	manager.initializeMetrics()
-	
-	// Start background routines
-	go manager.healthCheckRoutine()
-	go manager.metricsRoutine()
-	go manager.queueMonitorRoutine()
-	go manager.deadLetterQueueProcessor()
-	
-	logrus.Info("Redis-optimized broadcast manager initialized with ultimate performance")
+	// Start manager routines
+	go manager.processQueues()
+	go manager.monitorWorkers()
+	go manager.cleanupDeadLetters()
 	
 	return manager
 }
 
-// initializeMetrics sets up Redis metrics keys
-func (m *RedisOptimizedBroadcastManager) initializeMetrics() {
-	keys := []string{
-		m.metricsPrefix + "total_processed",
-		m.metricsPrefix + "total_failed",
-		m.metricsPrefix + "total_pending",
-		m.metricsPrefix + "active_workers",
+// SendMessage adds a message to the appropriate Redis queue
+func (rm *RedisOptimizedBroadcastManager) SendMessage(msg domainBroadcast.BroadcastMessage) error {
+	// Determine queue and priority
+	queueKey := sequenceQueueKey
+	priority := priorityNormal
+	
+	if msg.CampaignID != nil {
+		queueKey = campaignQueueKey
+		priority = priorityHigh // Campaigns get higher priority
 	}
 	
-	for _, key := range keys {
-		m.redisClient.SetNX(m.ctx, key, 0, 0)
+	// Create Redis message
+	redisMsg := RedisMessage{
+		Message:   msg,
+		Priority:  priority,
+		Timestamp: time.Now(),
+		Retries:   0,
 	}
-}
-
-// QueueMessage queues a message to Redis with priority support
-func (m *RedisOptimizedBroadcastManager) QueueMessage(deviceID string, msg *domainBroadcast.BroadcastMessage) error {
+	
 	// Serialize message
-	data, err := json.Marshal(msg)
+	data, err := json.Marshal(redisMsg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %v", err)
 	}
 	
-	// Determine queue based on type (priority for campaigns)
-	var queueKey string
-	if msg.CampaignID != nil {
-		queueKey = fmt.Sprintf("queue:priority:device:%s", deviceID)
-	} else {
-		queueKey = fmt.Sprintf("queue:device:%s", deviceID)
+	// Add to Redis queue with priority score
+	score := float64(priority)*1e10 + float64(time.Now().Unix())
+	if err := rm.redisClient.ZAdd(rm.ctx, queueKey, &redis.Z{
+		Score:  score,
+		Member: string(data),
+	}).Err(); err != nil {
+		return fmt.Errorf("failed to add message to queue: %v", err)
 	}
 	
-	// Push to Redis list (FIFO queue)
-	pipe := m.redisClient.Pipeline()
-	pipe.RPush(m.ctx, queueKey, data)
-	pipe.Incr(m.ctx, m.metricsPrefix+"total_pending")
-	pipe.Expire(m.ctx, queueKey, 7*24*time.Hour) // 7 days expiry
-	
-	// Track queue size
-	pipe.HIncrBy(m.ctx, "queue:sizes", deviceID, 1)
-	
-	_, err = pipe.Exec(m.ctx)
-	if err != nil {
-		return fmt.Errorf("failed to queue message: %v", err)
-	}
-	
-	// Wake up worker if sleeping
-	m.notifyWorker(deviceID)
-	
-	logrus.Debugf("Queued message to device %s (type: %s)", deviceID, msg.Type)
+	// Update metrics
+	rm.incrementMetric("messages:queued")
 	
 	return nil
 }
 
-// CreateOrGetWorker creates a new worker or returns existing one
-func (m *RedisOptimizedBroadcastManager) CreateOrGetWorker(deviceID string, device *whatsmeow.Client) (*DeviceWorker, error) {
-	m.workersMutex.Lock()
-	defer m.workersMutex.Unlock()
-	
-	// Check if worker already exists
-	if worker, exists := m.workers[deviceID]; exists {
-		return worker, nil
+// processQueues continuously processes messages from Redis queues
+func (rm *RedisOptimizedBroadcastManager) processQueues() {
+	for {
+		select {
+		case <-rm.ctx.Done():
+			return
+		default:
+			// Process campaign queue first (higher priority)
+			rm.processQueue(campaignQueueKey)
+			
+			// Then process sequence queue
+			rm.processQueue(sequenceQueueKey)
+			
+			// Small delay to prevent CPU spinning
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+// processQueue processes messages from a specific queue
+func (rm *RedisOptimizedBroadcastManager) processQueue(queueKey string) {
+	// Get batch of messages
+	results, err := rm.redisClient.ZPopMin(rm.ctx, queueKey, 10).Result()
+	if err != nil || len(results) == 0 {
+		return
 	}
 	
-	// Check if we can create more workers
-	currentWorkers := atomic.LoadInt32(&m.activeWorkers)
-	if currentWorkers >= m.maxWorkers {
-		return nil, fmt.Errorf("max workers limit reached: %d", m.maxWorkers)
+	for _, result := range results {
+		// Deserialize message
+		var redisMsg RedisMessage
+		if err := json.Unmarshal([]byte(result.Member.(string)), &redisMsg); err != nil {
+			logrus.Errorf("Failed to unmarshal message: %v", err)
+			continue
+		}
+		
+		// Process message
+		if err := rm.processMessage(redisMsg); err != nil {
+			logrus.Errorf("Failed to process message: %v", err)
+			// Add to retry queue
+			rm.retryMessage(redisMsg)
+		}
+	}
+}
+
+// processMessage processes a single message
+func (rm *RedisOptimizedBroadcastManager) processMessage(redisMsg RedisMessage) error {
+	msg := redisMsg.Message
+	
+	// Get or create worker
+	worker := rm.getOrCreateWorker(msg.DeviceID)
+	if worker == nil {
+		return fmt.Errorf("no worker available for device %s", msg.DeviceID)
+	}
+	
+	// Check rate limiting
+	if !rm.checkRateLimit(msg.DeviceID) {
+		return fmt.Errorf("rate limit exceeded for device %s", msg.DeviceID)
+	}
+	
+	// Send message through worker
+	startTime := time.Now()
+	err := worker.SendMessage(msg)
+	processingTime := time.Since(startTime)
+	
+	// Update metrics
+	if err == nil {
+		rm.incrementMetric("messages:sent")
+		rm.updateProcessingTime(msg.DeviceID, processingTime)
+		
+		// Update message status in database
+		repo := repository.GetBroadcastRepository()
+		repo.UpdateMessageStatus(msg.ID, "sent", "")
+	} else {
+		rm.incrementMetric("messages:failed")
+		return err
+	}
+	
+	return nil
+}
+
+// getOrCreateWorker gets or creates a worker for a device
+func (rm *RedisOptimizedBroadcastManager) getOrCreateWorker(deviceID string) *DeviceWorker {
+	rm.workersMutex.RLock()
+	worker, exists := rm.workers[deviceID]
+	rm.workersMutex.RUnlock()
+	
+	if exists && worker.IsHealthy() {
+		return worker
 	}
 	
 	// Create new worker
-	workerCtx, workerCancel := context.WithCancel(m.ctx)
-	worker := &DeviceWorker{
-		DeviceID:        deviceID,
-		Device:          device,
-		Status:          "active",
-		LastActivity:    time.Now(),
-		rateLimitPrefix: fmt.Sprintf("ratelimit:device:%s:", deviceID),
-		ctx:             workerCtx,
-		cancel:          workerCancel,
+	rm.workersMutex.Lock()
+	defer rm.workersMutex.Unlock()
+	
+	// Check if we've hit max workers
+	currentWorkers := atomic.LoadInt32(&rm.activeWorkers)
+	if currentWorkers >= rm.maxWorkers {
+		logrus.Warnf("Max workers reached (%d), cannot create worker for device %s", rm.maxWorkers, deviceID)
+		return nil
 	}
 	
-	// Start worker routine
-	m.wg.Add(1)
-	go m.workerRoutine(worker)
+	// Get device
+	clientManager := whatsapp.GetClientManager()
+	client, err := clientManager.GetClient(deviceID)
+	if err != nil || client == nil {
+		logrus.Errorf("Failed to get device %s: %v", deviceID, err)
+		return nil
+	}
 	
-	// Store worker
-	m.workers[deviceID] = worker
-	atomic.AddInt32(&m.activeWorkers, 1)
+	// Create new worker
+	worker = NewDeviceWorker(deviceID, client, 10, 30)
+	rm.workers[deviceID] = worker
 	
-	// Update Redis metrics
-	m.redisClient.Incr(m.ctx, m.metricsPrefix+"active_workers")
+	// Update worker count
+	atomic.AddInt32(&rm.activeWorkers, 1)
 	
-	logrus.Infof("Created worker for device %s (total workers: %d)", deviceID, currentWorkers+1)
-	return worker, nil
-}
-
-// workerRoutine processes messages from Redis queue with ultimate efficiency
-func (m *RedisOptimizedBroadcastManager) workerRoutine(worker *DeviceWorker) {
-	defer m.wg.Done()
-	defer func() {
-		atomic.AddInt32(&m.activeWorkers, -1)
-		m.redisClient.Decr(m.ctx, m.metricsPrefix+"active_workers")
-		worker.Status = "stopped"
-		logrus.Infof("Worker for device %s stopped", worker.DeviceID)
+	// Start worker
+	go func() {
+		worker.Run()
+		// When worker stops, update count
+		atomic.AddInt32(&rm.activeWorkers, -1)
 	}()
 	
-	priorityQueue := fmt.Sprintf("queue:priority:device:%s", worker.DeviceID)
-	normalQueue := fmt.Sprintf("queue:device:%s", worker.DeviceID)
-	workerKey := fmt.Sprintf("worker:status:%s", worker.DeviceID)
-	
 	// Update worker status in Redis
-	m.updateWorkerStatus(worker, "active", 0)
+	rm.updateWorkerStatus(deviceID, "active")
 	
-	// Idle counter
-	idleCount := 0
-	maxIdleCount := 600 // 10 minutes of idle (1 second checks)
-	
-	for {
-		select {
-		case <-worker.ctx.Done():
-			return
-		default:
-			// Check rate limits
-			if !m.checkRateLimits(worker) {
-				time.Sleep(time.Second)
-				continue
-			}
-			
-			// Try to get message from priority queue first, then normal queue
-			var data []byte
-			var err error
-			
-			// Use BLPOP for efficient waiting (1 second timeout)
-			result, err := m.redisClient.BLPop(m.ctx, time.Second, priorityQueue, normalQueue).Result()
-			
-			if err == redis.Nil {
-				// No messages, increment idle counter
-				idleCount++
-				if idleCount >= maxIdleCount {
-					logrus.Infof("Worker %s idle timeout", worker.DeviceID)
-					return
-				}
-				continue
-			} else if err != nil {
-				logrus.Errorf("Redis error for worker %s: %v", worker.DeviceID, err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			
-			// Reset idle counter
-			idleCount = 0
-			
-			// result[0] is the queue name, result[1] is the data
-			data = []byte(result[1])
-			
-			// Update queue size
-			m.redisClient.HIncrBy(m.ctx, "queue:sizes", worker.DeviceID, -1)
-			
-			// Deserialize message
-			var msg domainBroadcast.BroadcastMessage
-			if err := json.Unmarshal(data, &msg); err != nil {
-				logrus.Errorf("Failed to unmarshal message: %v", err)
-				continue
-			}
-			
-			// Update worker status
-			m.updateWorkerStatus(worker, "processing", 0)
-			
-			// Process message with proper delays
-			m.processMessageWithDelay(worker, &msg)
-		}
-	}
+	logrus.Infof("Created new worker for device %s", deviceID)
+	return worker
 }
 
-// processMessageWithDelay sends a message with proper delay handling
-func (m *RedisOptimizedBroadcastManager) processMessageWithDelay(worker *DeviceWorker, msg *domainBroadcast.BroadcastMessage) {
-	startTime := time.Now()
+// checkRateLimit checks if device can send another message
+func (rm *RedisOptimizedBroadcastManager) checkRateLimit(deviceID string) bool {
+	key := fmt.Sprintf("%s%s", rateLimitPrefix, deviceID)
 	
-	// Update metrics
-	m.redisClient.Decr(m.ctx, m.metricsPrefix+"total_pending")
+	// Check minute rate limit (20/min)
+	minuteKey := fmt.Sprintf("%s:minute:%d", key, time.Now().Unix()/60)
+	count, _ := rm.redisClient.Incr(rm.ctx, minuteKey).Result()
+	rm.redisClient.Expire(rm.ctx, minuteKey, 2*time.Minute)
 	
-	// Prepare recipient JID
-	recipientJID, err := whatsmeow.ParseJID(msg.RecipientJID)
-	if err != nil {
-		logrus.Errorf("Invalid JID %s: %v", msg.RecipientJID, err)
-		m.handleFailedMessage(worker, msg, err)
-		return
-	}
-	
-	// Determine if this is a two-part message (image + text)
-	hasImage := msg.ImageURL != "" || msg.MediaURL != ""
-	hasText := msg.Message != "" || msg.Content != ""
-	
-	var sendErr error
-	
-	if hasImage && hasText {
-		// TWO-PART MESSAGE: Send image first, then text
-		logrus.Debugf("Sending two-part message to %s (image + text)", recipientJID.String())
-		
-		// 1. Send image without caption
-		imageURL := msg.ImageURL
-		if imageURL == "" {
-			imageURL = msg.MediaURL
-		}
-		sendErr = m.sendImageMessage(worker.Device, recipientJID, imageURL, "")
-		if sendErr != nil {
-			m.handleFailedMessage(worker, msg, sendErr)
-			return
-		}
-		
-		// 2. Wait 3 seconds between image and text
-		time.Sleep(3 * time.Second)
-		
-		// 3. Send text message
-		text := msg.Message
-		if text == "" {
-			text = msg.Content
-		}
-		sendErr = m.sendTextMessage(worker.Device, recipientJID, text)
-		if sendErr != nil {
-			m.handleFailedMessage(worker, msg, sendErr)
-			return
-		}
-	} else if hasImage {
-		// Image only
-		imageURL := msg.ImageURL
-		if imageURL == "" {
-			imageURL = msg.MediaURL
-		}
-		sendErr = m.sendImageMessage(worker.Device, recipientJID, imageURL, "")
-	} else if hasText {
-		// Text only
-		text := msg.Message
-		if text == "" {
-			text = msg.Content
-		}
-		sendErr = m.sendTextMessage(worker.Device, recipientJID, text)
-	} else {
-		logrus.Warnf("Message has no content: %s", msg.ID)
-		return
-	}
-	
-	if sendErr != nil {
-		m.handleFailedMessage(worker, msg, sendErr)
-	} else {
-		m.handleSuccessMessage(worker, msg)
-	}
-	
-	// Record processing time
-	processingTime := time.Since(startTime)
-	m.recordProcessingTime(worker.DeviceID, processingTime)
-	
-	// Apply random delay between different leads
-	minDelay := msg.MinDelay
-	maxDelay := msg.MaxDelay
-	if minDelay == 0 || maxDelay == 0 {
-		minDelay = config.DefaultMinDelaySeconds
-		maxDelay = config.DefaultMaxDelaySeconds
-	}
-	
-	// Calculate random delay
-	delay := minDelay
-	if maxDelay > minDelay {
-		delay = minDelay + rand.Intn(maxDelay-minDelay+1)
-	}
-	
-	logrus.Debugf("Waiting %d seconds before next message (min: %d, max: %d)", delay, minDelay, maxDelay)
-	time.Sleep(time.Duration(delay) * time.Second)
-}
-
-// Additional helper methods...
-
-func (m *RedisOptimizedBroadcastManager) sendTextMessage(device *whatsmeow.Client, recipient whatsmeow.JID, message string) error {
-	// TODO: Implement actual WhatsApp sending
-	logrus.Infof("Sending text to %s: %s", recipient.String(), message)
-	time.Sleep(100 * time.Millisecond) // Simulate sending
-	return nil
-}
-
-func (m *RedisOptimizedBroadcastManager) sendImageMessage(device *whatsmeow.Client, recipient whatsmeow.JID, imageURL, caption string) error {
-	// TODO: Implement actual WhatsApp image sending
-	if caption != "" {
-		logrus.Infof("Sending image with caption to %s: %s (caption: %s)", recipient.String(), imageURL, caption)
-	} else {
-		logrus.Infof("Sending image to %s: %s", recipient.String(), imageURL)
-	}
-	time.Sleep(200 * time.Millisecond) // Simulate sending
-	return nil
-}
-
-func (m *RedisOptimizedBroadcastManager) handleSuccessMessage(worker *DeviceWorker, msg *domainBroadcast.BroadcastMessage) {
-	// Update metrics in Redis
-	pipe := m.redisClient.Pipeline()
-	pipe.Incr(m.ctx, m.metricsPrefix+"total_processed")
-	pipe.HIncrBy(m.ctx, fmt.Sprintf("worker:stats:%s", worker.DeviceID), "processed", 1)
-	pipe.Exec(m.ctx)
-	
-	// Update rate limit counters
-	m.incrementRateLimit(worker)
-	
-	// Update broadcast message status in database
-	broadcastRepo := repository.GetBroadcastRepository()
-	_ = broadcastRepo.UpdateBroadcastStatus(msg.ID, "sent", "")
-	
-	// Log based on message type
-	if msg.CampaignID != nil {
-		logrus.Infof("Campaign message sent to %s via device %s", msg.RecipientJID, worker.DeviceID)
-	} else if msg.SequenceID != nil {
-		logrus.Infof("Sequence message sent to %s via device %s", msg.RecipientJID, worker.DeviceID)
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) handleFailedMessage(worker *DeviceWorker, msg *domainBroadcast.BroadcastMessage, err error) {
-	// Update metrics
-	pipe := m.redisClient.Pipeline()
-	pipe.Incr(m.ctx, m.metricsPrefix+"total_failed")
-	pipe.HIncrBy(m.ctx, fmt.Sprintf("worker:stats:%s", worker.DeviceID), "failed", 1)
-	pipe.Exec(m.ctx)
-	
-	msg.RetryCount++
-	
-	// Retry logic with exponential backoff
-	if msg.RetryCount < config.RetryAttempts {
-		retryDelay := time.Duration(msg.RetryCount*msg.RetryCount) * time.Minute
-		retryTime := time.Now().Add(retryDelay)
-		
-		// Add to retry queue with score as retry time
-		retryKey := fmt.Sprintf("queue:retry:device:%s", worker.DeviceID)
-		data, _ := json.Marshal(msg)
-		m.redisClient.ZAdd(m.ctx, retryKey, &redis.Z{
-			Score:  float64(retryTime.Unix()),
-			Member: data,
-		})
-		
-		logrus.Warnf("Message to %s queued for retry #%d in %v", msg.RecipientJID, msg.RetryCount, retryDelay)
-	} else {
-		// Max retries reached, move to dead letter queue
-		dlqKey := "queue:dead_letter"
-		data, _ := json.Marshal(msg)
-		m.redisClient.RPush(m.ctx, dlqKey, data)
-		
-		// Update status in database
-		broadcastRepo := repository.GetBroadcastRepository()
-		_ = broadcastRepo.UpdateBroadcastStatus(msg.ID, "failed", err.Error())
-		
-		logrus.Errorf("Message to %s failed after %d retries: %v", msg.RecipientJID, msg.RetryCount, err)
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) checkRateLimits(worker *DeviceWorker) bool {
-	now := time.Now()
-	
-	// Get current counters from Redis
-	pipe := m.redisClient.Pipeline()
-	minuteKey := worker.rateLimitPrefix + "minute:" + now.Format("200601021504")
-	hourKey := worker.rateLimitPrefix + "hour:" + now.Format("2006010215")
-	dayKey := worker.rateLimitPrefix + "day:" + now.Format("20060102")
-	
-	minuteCmd := pipe.Get(m.ctx, minuteKey)
-	hourCmd := pipe.Get(m.ctx, hourKey)
-	dayCmd := pipe.Get(m.ctx, dayKey)
-	pipe.Exec(m.ctx)
-	
-	// Check limits
-	minuteCount, _ := minuteCmd.Int()
-	if minuteCount >= config.MessagesPerMinute {
-		logrus.Warnf("Device %s hit minute rate limit", worker.DeviceID)
+	if count > 20 {
 		return false
 	}
 	
-	hourCount, _ := hourCmd.Int()
-	if hourCount >= config.MessagesPerHour {
-		logrus.Warnf("Device %s hit hour rate limit", worker.DeviceID)
+	// Check hour rate limit (500/hour)
+	hourKey := fmt.Sprintf("%s:hour:%d", key, time.Now().Unix()/3600)
+	count, _ = rm.redisClient.Incr(rm.ctx, hourKey).Result()
+	rm.redisClient.Expire(rm.ctx, hourKey, 2*time.Hour)
+	
+	if count > 500 {
 		return false
 	}
 	
-	dayCount, _ := dayCmd.Int()
-	if dayCount >= config.MessagesPerDay {
-		logrus.Warnf("Device %s hit day rate limit", worker.DeviceID)
+	// Check day rate limit (5000/day)
+	dayKey := fmt.Sprintf("%s:day:%s", key, time.Now().Format("2006-01-02"))
+	count, _ = rm.redisClient.Incr(rm.ctx, dayKey).Result()
+	rm.redisClient.Expire(rm.ctx, dayKey, 25*time.Hour)
+	
+	if count > 5000 {
 		return false
 	}
 	
 	return true
 }
 
-func (m *RedisOptimizedBroadcastManager) incrementRateLimit(worker *DeviceWorker) {
-	now := time.Now()
+// retryMessage adds message back to queue with exponential backoff
+func (rm *RedisOptimizedBroadcastManager) retryMessage(redisMsg RedisMessage) {
+	redisMsg.Retries++
 	
-	pipe := m.redisClient.Pipeline()
-	
-	// Increment counters with appropriate expiry
-	minuteKey := worker.rateLimitPrefix + "minute:" + now.Format("200601021504")
-	pipe.Incr(m.ctx, minuteKey)
-	pipe.Expire(m.ctx, minuteKey, 2*time.Minute)
-	
-	hourKey := worker.rateLimitPrefix + "hour:" + now.Format("2006010215")
-	pipe.Incr(m.ctx, hourKey)
-	pipe.Expire(m.ctx, hourKey, 2*time.Hour)
-	
-	dayKey := worker.rateLimitPrefix + "day:" + now.Format("20060102")
-	pipe.Incr(m.ctx, dayKey)
-	pipe.Expire(m.ctx, dayKey, 25*time.Hour)
-	
-	pipe.Exec(m.ctx)
-}
-
-func (m *RedisOptimizedBroadcastManager) updateWorkerStatus(worker *DeviceWorker, status string, queueSize int) {
-	worker.mutex.Lock()
-	worker.Status = status
-	worker.LastActivity = time.Now()
-	worker.mutex.Unlock()
-	
-	// Update in Redis
-	workerKey := fmt.Sprintf("worker:status:%s", worker.DeviceID)
-	m.redisClient.HSet(m.ctx, workerKey,
-		"status", status,
-		"last_activity", worker.LastActivity.Unix(),
-		"queue_size", queueSize,
-	)
-	m.redisClient.Expire(m.ctx, workerKey, 24*time.Hour)
-}
-
-func (m *RedisOptimizedBroadcastManager) notifyWorker(deviceID string) {
-	// Publish notification to wake up sleeping workers
-	m.redisClient.Publish(m.ctx, fmt.Sprintf("worker:notify:%s", deviceID), "wake")
-}
-
-func (m *RedisOptimizedBroadcastManager) recordProcessingTime(deviceID string, duration time.Duration) {
-	key := fmt.Sprintf("worker:performance:%s", deviceID)
-	m.redisClient.HIncrByFloat(m.ctx, key, "total_time_ms", duration.Seconds()*1000)
-	m.redisClient.HIncrBy(m.ctx, key, "message_count", 1)
-}
-
-// Background routines
-
-func (m *RedisOptimizedBroadcastManager) healthCheckRoutine() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-m.ctx.Done():
-			return
-		case <-ticker.C:
-			m.performHealthCheck()
-		}
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) performHealthCheck() {
-	m.workersMutex.RLock()
-	workers := make([]*DeviceWorker, 0, len(m.workers))
-	for _, w := range m.workers {
-		workers = append(workers, w)
-	}
-	m.workersMutex.RUnlock()
-	
-	for _, worker := range workers {
-		// Check worker health in Redis
-		workerKey := fmt.Sprintf("worker:status:%s", worker.DeviceID)
-		lastActivity, err := m.redisClient.HGet(m.ctx, workerKey, "last_activity").Int64()
-		if err == nil {
-			if time.Now().Unix()-lastActivity > 600 { // 10 minutes
-				logrus.Warnf("Worker %s appears stuck", worker.DeviceID)
-				// Could implement restart logic here
-			}
-		}
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) metricsRoutine() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-m.ctx.Done():
-			return
-		case <-ticker.C:
-			m.reportMetrics()
-		}
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) reportMetrics() {
-	// Get metrics from Redis
-	pipe := m.redisClient.Pipeline()
-	processedCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_processed")
-	failedCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_failed")
-	pendingCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_pending")
-	workersCmd := pipe.Get(m.ctx, m.metricsPrefix+"active_workers")
-	pipe.Exec(m.ctx)
-	
-	processed, _ := processedCmd.Int64()
-	failed, _ := failedCmd.Int64()
-	pending, _ := pendingCmd.Int64()
-	workers, _ := workersCmd.Int()
-	
-	logrus.WithFields(logrus.Fields{
-		"active_workers":  workers,
-		"total_processed": processed,
-		"total_failed":    failed,
-		"total_pending":   pending,
-		"max_workers":     m.maxWorkers,
-	}).Info("Broadcast manager metrics")
-}
-
-func (m *RedisOptimizedBroadcastManager) queueMonitorRoutine() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-m.ctx.Done():
-			return
-		case <-ticker.C:
-			m.monitorQueues()
-		}
-	}
-}
-
-func (m *RedisOptimizedBroadcastManager) monitorQueues() {
-	// Get all queue sizes
-	queueSizes, err := m.redisClient.HGetAll(m.ctx, "queue:sizes").Result()
-	if err != nil {
+	// Max 3 retries
+	if redisMsg.Retries > 3 {
+		// Move to dead letter queue
+		rm.moveToDeadLetter(redisMsg)
 		return
 	}
 	
-	// Process retry queues
-	m.workersMutex.RLock()
-	for deviceID := range m.workers {
-		retryKey := fmt.Sprintf("queue:retry:device:%s", deviceID)
-		now := float64(time.Now().Unix())
-		
-		// Get messages ready for retry
-		messages, err := m.redisClient.ZRangeByScoreWithScores(m.ctx, retryKey, &redis.ZRangeBy{
-			Min: "0",
-			Max: fmt.Sprintf("%f", now),
-		}).Result()
-		
-		if err == nil && len(messages) > 0 {
-			// Re-queue messages for retry
-			for _, z := range messages {
-				data := z.Member.(string)
-				normalQueue := fmt.Sprintf("queue:device:%s", deviceID)
-				
-				pipe := m.redisClient.Pipeline()
-				pipe.RPush(m.ctx, normalQueue, data)
-				pipe.ZRem(m.ctx, retryKey, z.Member)
-				pipe.Exec(m.ctx)
-			}
-			
-			logrus.Infof("Re-queued %d messages for retry on device %s", len(messages), deviceID)
-		}
-	}
-	m.workersMutex.RUnlock()
+	// Calculate backoff delay (1min, 4min, 9min)
+	delay := time.Duration(redisMsg.Retries*redisMsg.Retries) * time.Minute
 	
-	// Log queue status
-	totalQueued := 0
-	for deviceID, sizeStr := range queueSizes {
-		size, _ := redis.NewStringResult(sizeStr, nil).Int()
-		totalQueued += size
-		if size > 100 {
-			logrus.Warnf("Device %s has %d messages queued", deviceID, size)
-		}
+	// Re-add to queue with future timestamp
+	redisMsg.Timestamp = time.Now().Add(delay)
+	
+	data, _ := json.Marshal(redisMsg)
+	score := float64(redisMsg.Priority)*1e10 + float64(redisMsg.Timestamp.Unix())
+	
+	queueKey := sequenceQueueKey
+	if redisMsg.Message.CampaignID != nil {
+		queueKey = campaignQueueKey
 	}
 	
-	if totalQueued > 0 {
-		logrus.Infof("Total messages queued across all devices: %d", totalQueued)
+	rm.redisClient.ZAdd(rm.ctx, queueKey, &redis.Z{
+		Score:  score,
+		Member: string(data),
+	})
+}
+
+// moveToDeadLetter moves failed message to dead letter queue
+func (rm *RedisOptimizedBroadcastManager) moveToDeadLetter(redisMsg RedisMessage) {
+	data, _ := json.Marshal(redisMsg)
+	rm.redisClient.LPush(rm.ctx, deadLetterKey, string(data))
+	rm.incrementMetric("messages:dead_letter")
+	
+	// Update message status in database
+	repo := repository.GetBroadcastRepository()
+	repo.UpdateMessageStatus(redisMsg.Message.ID, "failed", "Max retries exceeded")
+}
+
+// monitorWorkers monitors worker health
+func (rm *RedisOptimizedBroadcastManager) monitorWorkers() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-rm.ctx.Done():
+			return
+		case <-ticker.C:
+			rm.checkWorkerHealth()
+		}
 	}
 }
 
-func (m *RedisOptimizedBroadcastManager) deadLetterQueueProcessor() {
+// checkWorkerHealth checks health of all workers
+func (rm *RedisOptimizedBroadcastManager) checkWorkerHealth() {
+	rm.workersMutex.RLock()
+	deviceIDs := make([]string, 0, len(rm.workers))
+	for deviceID := range rm.workers {
+		deviceIDs = append(deviceIDs, deviceID)
+	}
+	rm.workersMutex.RUnlock()
+	
+	for _, deviceID := range deviceIDs {
+		rm.workersMutex.RLock()
+		worker := rm.workers[deviceID]
+		rm.workersMutex.RUnlock()
+		
+		if worker != nil && !worker.IsHealthy() {
+			logrus.Warnf("Worker for device %s is unhealthy, removing", deviceID)
+			
+			// Stop worker
+			worker.Stop()
+			
+			// Remove from map
+			rm.workersMutex.Lock()
+			delete(rm.workers, deviceID)
+			rm.workersMutex.Unlock()
+			
+			// Update status in Redis
+			rm.updateWorkerStatus(deviceID, "failed")
+		}
+	}
+}
+
+// cleanupDeadLetters periodically processes dead letter queue
+func (rm *RedisOptimizedBroadcastManager) cleanupDeadLetters() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	
 	for {
 		select {
-		case <-m.ctx.Done():
+		case <-rm.ctx.Done():
 			return
 		case <-ticker.C:
-			m.processDLQ()
+			// Process old dead letters (could implement retry logic here)
+			count, _ := rm.redisClient.LLen(rm.ctx, deadLetterKey).Result()
+			if count > 1000 {
+				// Trim old messages
+				rm.redisClient.LTrim(rm.ctx, deadLetterKey, 0, 999)
+			}
 		}
 	}
 }
 
-func (m *RedisOptimizedBroadcastManager) processDLQ() {
-	dlqKey := "queue:dead_letter"
-	count, err := m.redisClient.LLen(m.ctx, dlqKey).Result()
-	if err != nil || count == 0 {
-		return
-	}
-	
-	logrus.Warnf("Dead letter queue has %d failed messages", count)
-	
-	// Optional: Implement logic to retry DLQ messages or alert admins
+// Metric helpers
+func (rm *RedisOptimizedBroadcastManager) incrementMetric(metric string) {
+	key := fmt.Sprintf("%s%s", metricsPrefix, metric)
+	rm.redisClient.Incr(rm.ctx, key)
 }
 
-// GetWorkerStatus returns comprehensive status from Redis
-func (m *RedisOptimizedBroadcastManager) GetWorkerStatus() map[string]interface{} {
-	// Get metrics from Redis
-	pipe := m.redisClient.Pipeline()
-	processedCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_processed")
-	failedCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_failed")
-	pendingCmd := pipe.Get(m.ctx, m.metricsPrefix+"total_pending")
-	workersCmd := pipe.Get(m.ctx, m.metricsPrefix+"active_workers")
-	pipe.Exec(m.ctx)
+func (rm *RedisOptimizedBroadcastManager) updateProcessingTime(deviceID string, duration time.Duration) {
+	key := fmt.Sprintf("%s%s:processing_time", metricsPrefix, deviceID)
+	rm.redisClient.LPush(rm.ctx, key, duration.Milliseconds())
+	rm.redisClient.LTrim(rm.ctx, key, 0, 99) // Keep last 100 values
+}
+
+func (rm *RedisOptimizedBroadcastManager) updateWorkerStatus(deviceID, status string) {
+	data := map[string]interface{}{
+		"device_id":     deviceID,
+		"status":        status,
+		"last_activity": time.Now().Unix(),
+	}
+	jsonData, _ := json.Marshal(data)
+	rm.redisClient.HSet(rm.ctx, workerStatusKey, deviceID, string(jsonData))
+}
+
+// Interface implementations
+func (rm *RedisOptimizedBroadcastManager) GetWorkerStatus(deviceID string) (domainBroadcast.WorkerStatus, bool) {
+	// First check in-memory
+	rm.workersMutex.RLock()
+	worker, exists := rm.workers[deviceID]
+	rm.workersMutex.RUnlock()
 	
-	processed, _ := processedCmd.Int64()
-	failed, _ := failedCmd.Int64()
-	pending, _ := pendingCmd.Int64()
-	activeWorkers, _ := workersCmd.Int()
+	if exists && worker != nil {
+		return worker.GetStatus(), true
+	}
 	
-	// Get queue sizes
-	queueSizes, _ := m.redisClient.HGetAll(m.ctx, "queue:sizes").Result()
+	// Check Redis for status
+	data, err := rm.redisClient.HGet(rm.ctx, workerStatusKey, deviceID).Result()
+	if err != nil {
+		return domainBroadcast.WorkerStatus{}, false
+	}
 	
-	// Get worker details
-	workers := make([]map[string]interface{}, 0)
-	m.workersMutex.RLock()
-	for deviceID, worker := range m.workers {
-		// Get stats from Redis
-		statsKey := fmt.Sprintf("worker:stats:%s", deviceID)
-		stats, _ := m.redisClient.HGetAll(m.ctx, statsKey).Result()
-		
-		processedCount, _ := redis.NewStringResult(stats["processed"], nil).Int64()
-		failedCount, _ := redis.NewStringResult(stats["failed"], nil).Int64()
-		queueSize, _ := redis.NewStringResult(queueSizes[deviceID], nil).Int()
-		
-		// Get performance metrics
-		perfKey := fmt.Sprintf("worker:performance:%s", deviceID)
-		perf, _ := m.redisClient.HGetAll(m.ctx, perfKey).Result()
-		
-		totalTimeMs, _ := redis.NewStringResult(perf["total_time_ms"], nil).Float64()
-		messageCount, _ := redis.NewStringResult(perf["message_count"], nil).Int64()
-		
-		avgProcessingTime := float64(0)
-		if messageCount > 0 {
-			avgProcessingTime = totalTimeMs / float64(messageCount)
+	var status map[string]interface{}
+	if err := json.Unmarshal([]byte(data), &status); err != nil {
+		return domainBroadcast.WorkerStatus{}, false
+	}
+	
+	return domainBroadcast.WorkerStatus{
+		DeviceID:     deviceID,
+		Status:       status["status"].(string),
+		LastActivity: time.Unix(int64(status["last_activity"].(float64)), 0),
+	}, true
+}
+
+func (rm *RedisOptimizedBroadcastManager) GetAllWorkerStatus() []domainBroadcast.WorkerStatus {
+	statuses := []domainBroadcast.WorkerStatus{}
+	
+	// Get all from Redis
+	allData, err := rm.redisClient.HGetAll(rm.ctx, workerStatusKey).Result()
+	if err != nil {
+		return statuses
+	}
+	
+	for deviceID, data := range allData {
+		var status map[string]interface{}
+		if err := json.Unmarshal([]byte(data), &status); err != nil {
+			continue
 		}
 		
-		workerInfo := map[string]interface{}{
-			"device_id":           deviceID,
-			"status":              worker.Status,
-			"queue_size":          queueSize,
-			"processed":           processedCount,
-			"failed":              failedCount,
-			"last_activity":       worker.LastActivity,
-			"avg_processing_time": fmt.Sprintf("%.2f ms", avgProcessingTime),
+		// Get queue sizes from Redis
+		campaignCount, _ := rm.redisClient.ZCard(rm.ctx, campaignQueueKey).Result()
+		sequenceCount, _ := rm.redisClient.ZCard(rm.ctx, sequenceQueueKey).Result()
+		
+		workerStatus := domainBroadcast.WorkerStatus{
+			DeviceID:     deviceID,
+			Status:       status["status"].(string),
+			QueueSize:    int(campaignCount + sequenceCount),
+			LastActivity: time.Unix(int64(status["last_activity"].(float64)), 0),
 		}
-		workers = append(workers, workerInfo)
+		
+		// Get metrics from Redis
+		sentKey := fmt.Sprintf("%s%s:sent", metricsPrefix, deviceID)
+		failedKey := fmt.Sprintf("%s%s:failed", metricsPrefix, deviceID)
+		
+		sent, _ := rm.redisClient.Get(rm.ctx, sentKey).Int()
+		failed, _ := rm.redisClient.Get(rm.ctx, failedKey).Int()
+		
+		workerStatus.ProcessedCount = sent
+		workerStatus.FailedCount = failed
+		
+		statuses = append(statuses, workerStatus)
 	}
-	m.workersMutex.RUnlock()
 	
-	// Get DLQ count
-	dlqCount, _ := m.redisClient.LLen(m.ctx, "queue:dead_letter").Result()
-	
-	return map[string]interface{}{
-		"active_workers":    activeWorkers,
-		"max_workers":       m.maxWorkers,
-		"total_processed":   processed,
-		"total_failed":      failed,
-		"total_pending":     pending,
-		"dead_letter_count": dlqCount,
-		"workers":           workers,
-		"redis_connected":   m.redisClient.Ping(m.ctx).Err() == nil,
-	}
+	return statuses
 }
 
-// Shutdown gracefully shuts down the broadcast manager
-func (m *RedisOptimizedBroadcastManager) Shutdown() {
-	logrus.Info("Shutting down Redis-optimized broadcast manager...")
+func (rm *RedisOptimizedBroadcastManager) StopAllWorkers() error {
+	rm.workersMutex.Lock()
+	defer rm.workersMutex.Unlock()
 	
-	// Cancel context
-	m.cancel()
-	
-	// Stop all workers
-	m.workersMutex.Lock()
-	for _, worker := range m.workers {
-		worker.cancel()
+	for deviceID, worker := range rm.workers {
+		if worker != nil {
+			worker.Stop()
+			rm.updateWorkerStatus(deviceID, "stopped")
+		}
 	}
-	m.workersMutex.Unlock()
 	
-	// Wait for all workers to finish
-	m.wg.Wait()
+	rm.workers = make(map[string]*DeviceWorker)
+	atomic.StoreInt32(&rm.activeWorkers, 0)
 	
-	// Close Redis connection
-	m.redisClient.Close()
-	
-	logrus.Info("Redis-optimized broadcast manager shutdown complete")
+	logrus.Info("All workers stopped")
+	return nil
 }
 
-// Global instance with Redis support
-var globalRedisManager *RedisOptimizedBroadcastManager
-var redisOnce sync.Once
-
-// GetRedisOptimizedBroadcastManager returns the global Redis-optimized instance
-func GetRedisOptimizedBroadcastManager() *RedisOptimizedBroadcastManager {
-	redisOnce.Do(func() {
-		globalRedisManager = NewRedisOptimizedBroadcastManager()
-	})
-	return globalRedisManager
-}
-
-// For backward compatibility, redirect to Redis version
-func GetBroadcastManager() *RedisOptimizedBroadcastManager {
-	return GetRedisOptimizedBroadcastManager()
+func (rm *RedisOptimizedBroadcastManager) ResumeFailedWorkers() error {
+	// Get all failed workers from Redis
+	allData, err := rm.redisClient.HGetAll(rm.ctx, workerStatusKey).Result()
+	if err != nil {
+		return err
+	}
+	
+	resumed := 0
+	for deviceID, data := range allData {
+		var status map[string]interface{}
+		if err := json.Unmarshal([]byte(data), &status); err != nil {
+			continue
+		}
+		
+		if status["status"] == "failed" {
+			// Try to create worker
+			if worker := rm.getOrCreateWorker(deviceID); worker != nil {
+				resumed++
+			}
+		}
+	}
+	
+	logrus.Infof("Resumed %d failed workers", resumed)
+	return nil
 }
