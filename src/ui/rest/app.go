@@ -916,7 +916,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		ScheduledTime:   scheduledTime,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
-		Status:          "scheduled",
+		Status:          "pending",
 	}
 	err = campaignRepo.CreateCampaign(campaign)
 	if err != nil {
