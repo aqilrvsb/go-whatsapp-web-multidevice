@@ -1,7 +1,7 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 28, 2025 - 2:45 AM**  
-**Status: ✅ All features working with enhanced campaign analytics**
-**Lead Management: ✅ Complete with targeting and device reporting**
+**Last Updated: June 28, 2025 - 3:30 AM**  
+**Status: ✅ All features working with real-time campaign analytics**
+**Lead Management: ✅ Complete with retry functionality and device reporting**
 
 ## 🚀 Quick Deploy to Railway
 
@@ -34,7 +34,16 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
-### Latest Updates (June 28, 2025 - 2:45 AM)
+### Latest Updates (June 28, 2025 - 3:30 AM)
+- ✅ **Real-time Campaign Analytics**:
+  - Device reports now use actual broadcast_messages data
+  - Real message counts (pending/sent/failed) per device
+  - Actual lead details with names and timestamps
+- ✅ **Failed Message Retry**:
+  - Added retry button for failed messages in device report
+  - One-click retry for all failed messages per device
+  - Updates status to pending and triggers reprocessing
+  - Automatic report refresh after retry
 - ✅ **Campaign Summary Enhancements**:
   - Target status display (prospect/customer) with colored badges
   - Message preview modal showing WhatsApp-style message
@@ -52,6 +61,7 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
   - Lead distribution and success rates
   - Clickable lead counts for detailed views
   - Success rate progress bars
+  - Retry functionality for failed messages
 
 ### Broadcast System Features (June 27, 2025)
 - ✅ **Optimized Worker System** - One worker per device handles both campaigns & sequences
@@ -295,8 +305,9 @@ The Device Report feature provides comprehensive analytics for how campaigns per
   - Total Leads: Click to see all leads for this device
   - Pending: Click to see only pending leads
   - Success: Click to see successfully sent leads
-  - Failed: Click to see failed leads
+  - Failed: Click to see failed leads (with retry button if > 0)
 - **Success Rate**: Visual progress bar showing percentage
+- **Retry Failed**: Button appears next to failed count for quick retry
 
 **4. Lead Details Modal**
 When clicking any count in the device table:
@@ -308,6 +319,23 @@ When clicking any count in the device table:
 2. **Monitor Progress**: Track real-time campaign distribution
 3. **Troubleshoot Issues**: Identify disconnected devices affecting delivery
 4. **Optimize Performance**: Balance load across devices based on success rates
+5. **Retry Failed Messages**: One-click retry for failed messages per device
+
+### Failed Message Retry Feature
+The retry functionality allows you to quickly resend failed messages:
+- **Retry Button**: Appears next to failed count when failures exist
+- **Bulk Retry**: Retries all failed messages for a specific device
+- **Status Update**: Changes failed messages to pending status
+- **Auto Processing**: Triggers broadcast worker to reprocess messages
+- **Real-time Feedback**: Shows count of messages queued for retry
+- **Auto Refresh**: Updates report after 2 seconds
+
+### Real-time Data
+The device report now uses actual data from the broadcast_messages table:
+- **Accurate Counts**: Real pending/sent/failed message counts
+- **Live Updates**: Data reflects current campaign status
+- **Lead Details**: Shows actual recipient information with timestamps
+- **Performance Metrics**: Based on actual delivery results
 
 ## 📋 Lead Management System
 

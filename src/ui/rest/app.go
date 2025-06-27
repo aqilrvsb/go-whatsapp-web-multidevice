@@ -2405,14 +2405,10 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 	rowsAffected, _ := result.RowsAffected()
 	
 	// Get the broadcast manager and trigger processing
-	broadcastManager := broadcast.GetGlobalBroadcastManager()
+	broadcastManager := broadcast.GetBroadcastManager()
 	if broadcastManager != nil {
 		// Find the device and ensure worker is running
-		userDeviceRepo := repository.GetUserRepository()
-		device, err := userDeviceRepo.GetDeviceByID(deviceId)
-		if err == nil && device != nil {
-			broadcastManager.EnsureDeviceWorker(device.ID)
-		}
+		broadcastManager.EnsureDeviceWorker(deviceId)
 	}
 	
 	return c.JSON(utils.ResponseData{
