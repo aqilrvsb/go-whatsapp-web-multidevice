@@ -786,11 +786,12 @@
                     </div>
                     <div class="d-flex gap-2">
                         <!-- Date Filter -->
-                        <input type="date" id="campaignFilterStartDate" class="form-control form-control-sm" style="width: auto;">
-                        <span class="align-self-center">to</span>
-                        <input type="date" id="campaignFilterEndDate" class="form-control form-control-sm" style="width: auto;">
+                        <input type="date" id="campaignFilterDate" class="form-control form-control-sm" style="width: auto;">
                         <button class="btn btn-outline-primary btn-sm" onclick="filterCampaigns()">
                             <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearCampaignFilter()">
+                            <i class="bi bi-x-circle"></i> Clear
                         </button>
                         <button class="btn btn-primary btn-sm" onclick="loadCampaignSummary()">
                             <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -816,11 +817,12 @@
                     </div>
                     <div class="d-flex gap-2">
                         <!-- Date Filter -->
-                        <input type="date" id="sequenceFilterStartDate" class="form-control form-control-sm" style="width: auto;">
-                        <span class="align-self-center">to</span>
-                        <input type="date" id="sequenceFilterEndDate" class="form-control form-control-sm" style="width: auto;">
+                        <input type="date" id="sequenceFilterDate" class="form-control form-control-sm" style="width: auto;">
                         <button class="btn btn-outline-primary btn-sm" onclick="filterSequences()">
                             <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearSequenceFilter()">
+                            <i class="bi bi-x-circle"></i> Clear
                         </button>
                         <button class="btn btn-primary btn-sm" onclick="loadSequenceSummary()">
                             <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -2983,10 +2985,20 @@
         // Campaign Summary Functions
         // Helper function to format campaign date with day name
         function formatCampaignDate(dateStr) {
-            const date = new Date(dateStr);
-            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-            const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            return `${dayName}, ${formatted}`;
+            if (!dateStr) return '-';
+            
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) {
+                    // If invalid date, just return the string as is
+                    return dateStr;
+                }
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                return `${dayName}, ${formatted}`;
+            } catch (e) {
+                return dateStr || '-';
+            }
         }
         
         function loadCampaignSummary() {
@@ -3084,6 +3096,7 @@
                                                 <tr>
                                                     <th>Title</th>
                                                     <th>Date</th>
+                                                    <th>Time</th>
                                                     <th>Niche</th>
                                                     <th>Target Status</th>
                                                     <th>Status</th>
@@ -3095,6 +3108,7 @@
                                                     <tr>
                                                         <td>${campaign.title}</td>
                                                         <td>${campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-'}</td>
+                                                        <td>${campaign.scheduled_time || '-'}</td>
                                                         <td>${campaign.niche || '-'}</td>
                                                         <td>
                                                             <span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">
@@ -3464,32 +3478,50 @@
         
         // Campaign Filter Function
         function filterCampaigns() {
-            const startDate = document.getElementById('campaignFilterStartDate').value;
-            const endDate = document.getElementById('campaignFilterEndDate').value;
+            const filterDate = document.getElementById('campaignFilterDate').value;
             
-            let url = '/api/campaigns/summary';
-            const params = new URLSearchParams();
-            
-            if (startDate) params.append('start_date', startDate);
-            if (endDate) params.append('end_date', endDate);
-            
-            if (params.toString()) {
-                url += '?' + params.toString();
+            if (!filterDate) {
+                loadCampaignSummary();
+                return;
             }
             
-            fetch(url)
+            // Filter the existing campaigns data client-side
+            fetch('/api/campaigns/summary')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS') {
-                        displayCampaignSummary(data.results);
-                    } else {
-                        showAlert('danger', 'Failed to filter campaigns');
+                    if (data.code === 'SUCCESS' && data.results) {
+                        // Filter campaigns by date
+                        const filteredResults = {
+                            ...data.results,
+                            recent_campaigns: data.results.recent_campaigns.filter(campaign => {
+                                if (!campaign.campaign_date) return false;
+                                const campaignDate = campaign.campaign_date.split('T')[0];
+                                return campaignDate === filterDate;
+                            })
+                        };
+                        
+                        // Update counts
+                        const filteredCampaigns = filteredResults.recent_campaigns;
+                        filteredResults.campaigns = {
+                            total: filteredCampaigns.length,
+                            pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
+                            sent: filteredCampaigns.filter(c => c.status === 'sent').length,
+                            failed: filteredCampaigns.filter(c => c.status === 'failed').length
+                        };
+                        
+                        displayCampaignSummary(filteredResults);
                     }
                 })
                 .catch(error => {
                     console.error('Error filtering campaigns:', error);
                     showAlert('danger', 'Error filtering campaigns');
                 });
+        }
+        
+        // Clear Campaign Filter
+        function clearCampaignFilter() {
+            document.getElementById('campaignFilterDate').value = '';
+            loadCampaignSummary();
         }
         
         // Sequence Preview Function
@@ -3552,32 +3584,50 @@
         
         // Sequence Filter Function
         function filterSequences() {
-            const startDate = document.getElementById('sequenceFilterStartDate').value;
-            const endDate = document.getElementById('sequenceFilterEndDate').value;
+            const filterDate = document.getElementById('sequenceFilterDate').value;
             
-            let url = '/api/sequences/summary';
-            const params = new URLSearchParams();
-            
-            if (startDate) params.append('start_date', startDate);
-            if (endDate) params.append('end_date', endDate);
-            
-            if (params.toString()) {
-                url += '?' + params.toString();
+            if (!filterDate) {
+                loadSequenceSummary();
+                return;
             }
             
-            fetch(url)
+            // Filter the existing sequences data client-side
+            fetch('/api/sequences/summary')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS') {
-                        displaySequenceSummary(data.results);
-                    } else {
-                        showAlert('danger', 'Failed to filter sequences');
+                    if (data.code === 'SUCCESS' && data.results) {
+                        // Filter sequences by created date
+                        const filteredResults = {
+                            ...data.results,
+                            recent_sequences: data.results.recent_sequences.filter(sequence => {
+                                if (!sequence.created_at) return false;
+                                const sequenceDate = sequence.created_at.split('T')[0];
+                                return sequenceDate === filterDate;
+                            })
+                        };
+                        
+                        // Update counts
+                        const filteredSequences = filteredResults.recent_sequences;
+                        filteredResults.sequences = {
+                            total: filteredSequences.length,
+                            active: filteredSequences.filter(s => s.status === 'active').length,
+                            paused: filteredSequences.filter(s => s.status === 'paused').length,
+                            draft: filteredSequences.filter(s => s.status === 'draft').length
+                        };
+                        
+                        displaySequenceSummary(filteredResults);
                     }
                 })
                 .catch(error => {
                     console.error('Error filtering sequences:', error);
                     showAlert('danger', 'Error filtering sequences');
                 });
+        }
+        
+        // Clear Sequence Filter
+        function clearSequenceFilter() {
+            document.getElementById('sequenceFilterDate').value = '';
+            loadSequenceSummary();
         }
         
         // Auto-refresh for worker status

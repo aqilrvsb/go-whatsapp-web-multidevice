@@ -183,7 +183,7 @@ func (r *campaignRepository) DeleteCampaign(campaignID int) error {
 // GetCampaignsByDate gets all campaigns scheduled for a specific date
 func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, title, message, niche, image_url, 
+		SELECT id, user_id, title, message, niche, target_status, image_url, 
 		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
@@ -204,7 +204,7 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.ImageURL,
+			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
 			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
@@ -222,7 +222,7 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 // GetCampaignsByUser gets all campaigns for a user
 func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
 	query := `
-		SELECT id, user_id, title, message, niche, image_url, 
+		SELECT id, user_id, title, message, niche, target_status, image_url, 
 		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
@@ -243,7 +243,7 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.ImageURL,
+			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
 			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
@@ -265,7 +265,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 	currentTime := now.Format("15:04")
 	
 	query := `
-		SELECT id, user_id, title, message, niche, image_url, 
+		SELECT id, user_id, title, message, niche, target_status, image_url, 
 		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
@@ -288,7 +288,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.ImageURL,
+			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
 			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
