@@ -260,23 +260,27 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 
 // GetPendingCampaigns gets campaigns ready to be sent
 func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
-	now := time.Now()
-	todayStr := now.Format("2006-01-02")
-	currentTime := now.Format("15:04")
-	
 	query := `
-		SELECT id, user_id, title, message, niche, target_status, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
+		SELECT id, user_id, title, message, niche, 
+		       COALESCE(target_status, 'all') as target_status, image_url, 
+		       campaign_date, COALESCE(scheduled_time::text, '00:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
-		WHERE status = 'scheduled' 
-		  AND campaign_date <= $1
-		  AND (scheduled_time IS NULL OR scheduled_time <= $2)
+		WHERE status = 'pending'
+		  AND (
+		    -- If scheduled_time is NULL or empty, run immediately
+		    scheduled_time IS NULL 
+		    OR scheduled_time = ''
+		    OR scheduled_time = '00:00:00'
+		    OR 
+		    -- Otherwise check if scheduled time has passed (using Malaysia timezone)
+		    (campaign_date || ' ' || scheduled_time)::timestamp AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+		  )
 		ORDER BY campaign_date, scheduled_time
 	`
 	
-	rows, err := r.db.Query(query, todayStr, currentTime)
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -294,14 +298,13 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
-			log.Printf("Error scanning pending campaign: %v", err)
+			log.Printf("Error scanning campaign: %v", err)
 			continue
 		}
 		
 		campaigns = append(campaigns, campaign)
 	}
 	
-	log.Printf("Found %d pending campaigns ready to send", len(campaigns))
 	return campaigns, nil
 }
 

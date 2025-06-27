@@ -1,8 +1,6 @@
 package usecase
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
@@ -30,109 +28,21 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 	
 	campaignRepo := repository.GetCampaignRepository()
 	
-	// Use fixed UTC+8 offset for Malaysia if timezone loading fails
-	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	// Get pending campaigns that are ready to send
+	campaigns, err := campaignRepo.GetPendingCampaigns()
 	if err != nil {
-		logrus.Warnf("Failed to load Malaysia timezone, using fixed UTC+8: %v", err)
-		loc = time.FixedZone("UTC+8", 8*60*60) // 8 hours ahead of UTC
+		logrus.Errorf("Failed to get pending campaigns: %v", err)
+		return err
 	}
 	
-	// Get current time in Malaysia
-	nowMalaysia := time.Now().In(loc)
-	todayMalaysia := nowMalaysia.Format("2006-01-02")
-	
-	// Also get UTC time for comparison
-	nowUTC := time.Now().UTC()
-	todayUTC := nowUTC.Format("2006-01-02")
-	
-	logrus.Infof("Server UTC time: %s, Malaysia time: %s", nowUTC.Format("2006-01-02 15:04:05"), nowMalaysia.Format("2006-01-02 15:04:05"))
-	
-	// Get campaigns for both UTC and Malaysia dates to handle timezone differences
-	var campaigns []models.Campaign
-	campaignsMap := make(map[int]bool) // To avoid duplicates
-	
-	// Check UTC date and surrounding dates
-	dates := []string{
-		nowUTC.Add(-24 * time.Hour).Format("2006-01-02"),
-		todayUTC,
-		nowUTC.Add(24 * time.Hour).Format("2006-01-02"),
-		todayMalaysia, // Also check Malaysia date
-	}
-	
-	for _, date := range dates {
-		dateCampaigns, err := campaignRepo.GetCampaignsByDate(date)
-		if err == nil {
-			for _, c := range dateCampaigns {
-				if _, exists := campaignsMap[c.ID]; !exists {
-					campaigns = append(campaigns, c)
-					campaignsMap[c.ID] = true
-				}
-			}
-		}
-	}
-	
-	logrus.Infof("Found %d unique campaigns (checking dates: %v)", len(campaigns), dates)
+	logrus.Infof("Found %d campaigns ready to process", len(campaigns))
 	
 	for _, campaign := range campaigns {
-		logrus.Infof("Checking campaign: %s (ID: %d, Status: %s, ScheduledTime: '%s')", 
-			campaign.Title, campaign.ID, campaign.Status, campaign.ScheduledTime)
+		logrus.Infof("Checking campaign: %s (ID: %d, Status: %s, Date: %s, Time: %s)", 
+			campaign.Title, campaign.ID, campaign.Status, campaign.CampaignDate, campaign.ScheduledTime)
 		
-		// Check if already processed
-		if campaign.Status == "sent" {
-			logrus.Infof("Campaign %d already sent, skipping", campaign.ID)
-			continue
-		}
-		
-		// Check if it's time to send
-		scheduledTimeStr := strings.TrimSpace(campaign.ScheduledTime)
-		if scheduledTimeStr == "" || scheduledTimeStr == "00:00:00" || strings.Contains(scheduledTimeStr, "0001-01-01") {
-			// If no scheduled time, midnight, or default date, send immediately
-			logrus.Infof("Campaign %d has no/default scheduled time ('%s'), sending now", campaign.ID, campaign.ScheduledTime)
-			go cts.executeCampaign(&campaign)
-		} else {
-			// Parse the scheduled time
-			// Extract just the date part from CampaignDate (in case it has timestamp)
-			campaignDateOnly := campaign.CampaignDate
-			if len(campaignDateOnly) > 10 {
-				campaignDateOnly = campaignDateOnly[:10] // Take only YYYY-MM-DD
-			}
-			
-			// Extract just the time part from ScheduledTime
-			scheduledTimeOnly := campaign.ScheduledTime
-			if len(scheduledTimeOnly) > 8 {
-				scheduledTimeOnly = scheduledTimeOnly[:8] // Take only HH:MM:SS
-			}
-			
-			scheduledTimeStr := fmt.Sprintf("%s %s", campaignDateOnly, scheduledTimeOnly)
-			scheduledTime, err := time.Parse("2006-01-02 15:04:05", scheduledTimeStr)
-			if err != nil {
-				logrus.Errorf("Failed to parse scheduled time for campaign %d: %v (tried to parse: %s)", campaign.ID, err, scheduledTimeStr)
-				continue
-			}
-			
-			// Use Malaysia timezone for comparison
-			loc := time.FixedZone("UTC+8", 8*60*60)
-			nowMalaysia := time.Now().In(loc)
-			
-			// The scheduled time is assumed to be in Malaysia time
-			scheduledMalaysia := time.Date(
-				scheduledTime.Year(), scheduledTime.Month(), scheduledTime.Day(),
-				scheduledTime.Hour(), scheduledTime.Minute(), scheduledTime.Second(), 0, loc)
-			
-			logrus.Infof("Campaign %d: Now Malaysia: %s, Scheduled: %s", 
-				campaign.ID, 
-				nowMalaysia.Format("2006-01-02 15:04:05"), 
-				scheduledMalaysia.Format("2006-01-02 15:04:05"))
-			
-			if nowMalaysia.After(scheduledMalaysia) || nowMalaysia.Equal(scheduledMalaysia) {
-				// Time to send this campaign
-				logrus.Infof("Campaign %d scheduled time reached, sending now", campaign.ID)
-				go cts.executeCampaign(&campaign)
-			} else {
-				timeDiff := scheduledMalaysia.Sub(nowMalaysia)
-				logrus.Infof("Campaign %d not yet time, will trigger in %v", campaign.ID, timeDiff)
-			}
-		}
+		// Execute campaign
+		go cts.executeCampaign(&campaign)
 	}
 	
 	return nil
@@ -227,6 +137,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	logrus.Infof("Campaign %s completed: %d messages queued across %d devices, %d failed", 
 		campaign.Title, successful, len(connectedDevices), failed)
 }
+
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 	logrus.Info("Processing sequence triggers for new leads...")
@@ -287,6 +198,124 @@ func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 	return nil
 }
 
+// ProcessDailySequenceMessages processes sequence messages for contacts
+func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
+	logrus.Info("Processing daily sequence messages...")
+	
+	sequenceRepo := repository.GetSequenceRepository()
+	broadcastRepo := repository.GetBroadcastRepository()
+	userRepo := repository.GetUserRepository()
+	
+	// Get active sequences
+	sequences, err := sequenceRepo.GetActiveSequencesWithNiche()
+	if err != nil {
+		return err
+	}
+	
+	for _, sequence := range sequences {
+		// Get all active contacts in this sequence
+		contacts, err := sequenceRepo.GetSequenceContacts(sequence.ID)
+		if err != nil {
+			logrus.Errorf("Failed to get contacts for sequence %s: %v", sequence.ID, err)
+			continue
+		}
+		
+		for _, contact := range contacts {
+			// Check if 24 hours have passed since last message
+			if contact.LastMessageAt != nil {
+				timeSince := time.Since(*contact.LastMessageAt)
+				if timeSince < 24*time.Hour {
+					continue // Not time yet
+				}
+			}
+			
+			// Get the next step for this contact
+			nextDay := contact.CurrentDay + 1
+			if nextDay > sequence.TotalDays {
+				// Contact has completed the sequence
+				sequenceRepo.MarkContactCompleted(contact.ID)
+				continue
+			}
+			
+			// Get step for the next day
+			steps, err := sequenceRepo.GetSequenceSteps(sequence.ID)
+			if err != nil {
+				continue
+			}
+			
+			var nextStep *models.SequenceStep
+			for _, step := range steps {
+				if step.Day == nextDay {
+					nextStep = &step
+					break
+				}
+			}
+			
+			if nextStep == nil {
+				continue // No step found for this day
+			}
+			
+			// Get user's connected devices
+			devices, err := userRepo.GetUserDevices(sequence.UserID)
+			if err != nil {
+				continue
+			}
+			
+			// Find a connected device
+			var device *models.UserDevice
+			for _, d := range devices {
+				if d.Status == "connected" {
+					device = d
+					break
+				}
+			}
+			
+			if device == nil {
+				logrus.Warnf("No connected device for sequence %s", sequence.Name)
+				continue
+			}
+			
+			// Queue the message
+			msg := domainBroadcast.BroadcastMessage{
+				UserID:         sequence.UserID,
+				DeviceID:       device.ID,
+				SequenceID:     &sequence.ID,
+				RecipientPhone: contact.ContactPhone,
+				Type:           nextStep.MessageType,
+				Content:        nextStep.Content,
+				MediaURL:       nextStep.MediaURL,
+				ScheduledAt:    time.Now(),
+				MinDelay:       5,  // Default delays for sequences
+				MaxDelay:       15,
+			}
+			
+			err = broadcastRepo.QueueMessage(msg)
+			if err != nil {
+				logrus.Errorf("Failed to queue sequence message: %v", err)
+			} else {
+				// Update contact progress
+				sequenceRepo.UpdateContactProgress(contact.ID, nextDay, "active")
+				
+				// Log the message
+				log := &models.SequenceLog{
+					SequenceID: sequence.ID,
+					ContactID:  contact.ID,
+					StepID:     nextStep.ID,
+					Day:        nextDay,
+					Status:     "sent",
+					SentAt:     time.Now(),
+				}
+				sequenceRepo.CreateSequenceLog(log)
+				
+				logrus.Infof("Queued sequence message for %s (day %d of %s)", 
+					contact.ContactPhone, nextDay, sequence.Name)
+			}
+		}
+	}
+	
+	return nil
+}
+
 // StartTriggerProcessor starts the background processor for triggers
 func StartTriggerProcessor() {
 	cts := NewCampaignTriggerService()
@@ -306,6 +335,11 @@ func StartTriggerProcessor() {
 			// Process sequence triggers for new leads
 			if err := cts.ProcessSequenceTriggers(); err != nil {
 				logrus.Errorf("Error processing sequence triggers: %v", err)
+			}
+			
+			// Process daily sequence messages
+			if err := cts.ProcessDailySequenceMessages(); err != nil {
+				logrus.Errorf("Error processing daily sequence messages: %v", err)
 			}
 		}
 	}
