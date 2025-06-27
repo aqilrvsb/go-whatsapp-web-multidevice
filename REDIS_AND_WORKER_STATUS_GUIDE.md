@@ -150,18 +150,24 @@ User A (15 connected devices) creates campaign:
 
 Lead 1 (Image + Text):
 → Device A3 sends image with caption to +60123456789
-→ Wait 10-20 seconds (random delay)
+→ Wait 10-20 seconds (random delay based on device's min/max settings)
 
 Lead 2 (Text only):
 → Device A7 sends text to +60987654321
-→ Wait 10-20 seconds
+→ Wait 15-25 seconds (different device might have different settings)
 
 Lead 3 (Image only):
 → Device A11 sends image to +60111222333
-→ Wait 10-20 seconds
+→ Wait 10-30 seconds (device specific random delay)
 
 ... continues distributing across all 15 devices
 ```
+
+**Important Notes**:
+- Each device has its own `min_delay_seconds` and `max_delay_seconds`
+- The delay between messages is always random within this range
+- No more fixed 3-second delays for grouped messages
+- This natural randomization helps avoid WhatsApp detection
 
 ## 4. 🎯 Quick Status Check Commands
 
@@ -202,3 +208,55 @@ curl https://your-app.up.railway.app/api/workers/status
 2. Check queue size
 3. Monitor failed count
 4. Review device connection status
+## Setting Device Delays
+
+Each device can have custom delay settings stored in the database:
+
+### Database Configuration:
+```sql
+-- Set delays for a specific device
+UPDATE user_devices 
+SET 
+    min_delay_seconds = 10,
+    max_delay_seconds = 30
+WHERE id = 'device-uuid-here';
+
+-- Set delays for all active devices
+UPDATE user_devices 
+SET 
+    min_delay_seconds = 15,
+    max_delay_seconds = 45
+WHERE is_active = true;
+
+-- Different delays for different device groups
+-- Newer devices with conservative settings
+UPDATE user_devices 
+SET 
+    min_delay_seconds = 20,
+    max_delay_seconds = 60
+WHERE created_at > NOW() - INTERVAL '7 days';
+
+-- Trusted older devices with faster settings
+UPDATE user_devices 
+SET 
+    min_delay_seconds = 5,
+    max_delay_seconds = 15
+WHERE created_at < NOW() - INTERVAL '30 days'
+AND is_active = true;
+```
+
+### How Delays Work:
+1. **Before sending each message**, the worker calls `getRandomDelay()`
+2. **Random calculation**: `delay = random(min, max)`
+3. **Applied after every message**, regardless of type
+4. **Device-specific**: Each device uses its own settings
+
+### Example Delay Patterns:
+If device has min=10, max=30:
+- Message 1: Wait 17 seconds
+- Message 2: Wait 11 seconds  
+- Message 3: Wait 28 seconds
+- Message 4: Wait 19 seconds
+- Message 5: Wait 13 seconds
+
+This randomization makes the messaging pattern appear more human-like!

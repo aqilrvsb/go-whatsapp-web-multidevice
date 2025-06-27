@@ -202,19 +202,25 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 ```
 Image + Text Messages:
 1. Send single image message with caption
-2. Wait random delay (min-max)
+2. Wait random delay between min_delay and max_delay seconds
 3. Process next lead
 
 Text Only Messages:
 1. Send text message
-2. Wait random delay (min-max)
+2. Wait random delay between min_delay and max_delay seconds
 3. Process next lead
 
 Image Only Messages:
 1. Send image without caption
-2. Wait random delay (min-max)
+2. Wait random delay between min_delay and max_delay seconds
 3. Process next lead
 ```
+
+**Delay Configuration**:
+- Each device has `min_delay_seconds` and `max_delay_seconds` settings
+- Default: min=10 seconds, max=30 seconds
+- Actual delay: Random value between min and max for each message
+- Example: If min=10, max=30, delays will be: 15s, 22s, 11s, 28s, etc.
 
 ### Worker Architecture
 - **3000 max concurrent workers** with Redis (increased from 500)
