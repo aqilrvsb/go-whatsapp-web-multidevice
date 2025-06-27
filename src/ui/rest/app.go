@@ -877,8 +877,12 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	
 	// Validate and set target_status
 	targetStatus := request.TargetStatus
-	if targetStatus != "prospect" && targetStatus != "customer" && targetStatus != "all" {
-		targetStatus = "all"
+	if targetStatus != "prospect" && targetStatus != "customer" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Target status must be either 'prospect' or 'customer'",
+		})
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()

@@ -784,12 +784,26 @@
                         <h4 class="mb-1">Campaign Summary</h4>
                         <p class="text-muted mb-0">Overview of all your campaign activities</p>
                     </div>
-                    <div class="d-flex gap-2">
-                        <!-- Date Filter -->
-                        <input type="date" id="campaignFilterDate" class="form-control form-control-sm" style="width: auto;">
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Single Date Filter -->
+                        <input type="date" id="campaignFilterDate" class="form-control form-control-sm" style="width: auto;" placeholder="Filter by date">
                         <button class="btn btn-outline-primary btn-sm" onclick="filterCampaigns()">
                             <i class="bi bi-funnel"></i> Filter
                         </button>
+                        
+                        <!-- Separator -->
+                        <div class="vr mx-2"></div>
+                        
+                        <!-- Date Range Filter -->
+                        <span class="text-muted small">Range:</span>
+                        <input type="date" id="campaignRangeStart" class="form-control form-control-sm" style="width: auto;">
+                        <span class="text-muted small">to</span>
+                        <input type="date" id="campaignRangeEnd" class="form-control form-control-sm" style="width: auto;">
+                        <button class="btn btn-outline-info btn-sm" onclick="filterCampaignsByRange()">
+                            <i class="bi bi-calendar-range"></i> Apply Range
+                        </button>
+                        
+                        <!-- Clear and Refresh -->
                         <button class="btn btn-outline-secondary btn-sm" onclick="clearCampaignFilter()">
                             <i class="bi bi-x-circle"></i> Clear
                         </button>
@@ -797,6 +811,12 @@
                             <i class="bi bi-arrow-clockwise"></i> Refresh
                         </button>
                     </div>
+                </div>
+                
+                <!-- Info alert for default filter -->
+                <div id="campaignFilterInfo" class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="bi bi-info-circle"></i> Showing campaigns for <strong>today and tomorrow</strong> only. Use filters above to see more dates.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
                 
                 <div id="campaignSummaryContent">
@@ -921,7 +941,7 @@
                         <div class="mb-3">
                             <label class="form-label">Target Lead Status <span class="text-danger">*</span></label>
                             <select class="form-select" id="campaignTargetStatus" required>
-                                <option value="all">All Leads</option>
+                                <option value="">Select Target Status</option>
                                 <option value="prospect">Prospect</option>
                                 <option value="customer">Customer</option>
                             </select>
@@ -2615,7 +2635,7 @@
                 campaign_date: campaignDate,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
-                target_status: document.getElementById('campaignTargetStatus').value || 'all',
+                target_status: document.getElementById('campaignTargetStatus').value || 'prospect',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
                 scheduled_time: scheduledTime,
@@ -2749,7 +2769,7 @@
             document.getElementById('campaignDate').value = dateStr;
             document.getElementById('campaignTitle').value = campaign.title || '';
             document.getElementById('campaignNiche').value = campaign.niche || '';
-            document.getElementById('campaignTargetStatus').value = campaign.target_status || 'all';
+            document.getElementById('campaignTargetStatus').value = campaign.target_status || 'prospect';
             document.getElementById('campaignMessage').value = campaign.message || '';
             document.getElementById('campaignTime').value = campaign.scheduled_time || '';
             document.getElementById('campaignMinDelay').value = campaign.min_delay_seconds || 10;
@@ -3001,12 +3021,42 @@
             }
         }
         
-        function loadCampaignSummary() {
+        function loadCampaignSummary(showAll = false) {
             fetch('/api/campaigns/summary')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS') {
-                        displayCampaignSummary(data.results);
+                    if (data.code === 'SUCCESS' && data.results) {
+                        let filteredResults = data.results;
+                        
+                        // Filter to show only today and tomorrow by default
+                        if (!showAll) {
+                            const today = new Date();
+                            const tomorrow = new Date(today);
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            
+                            const todayStr = today.toISOString().split('T')[0];
+                            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                            
+                            filteredResults = {
+                                ...data.results,
+                                recent_campaigns: data.results.recent_campaigns.filter(campaign => {
+                                    if (!campaign.campaign_date) return false;
+                                    const campaignDate = campaign.campaign_date.split('T')[0];
+                                    return campaignDate === todayStr || campaignDate === tomorrowStr;
+                                })
+                            };
+                            
+                            // Update counts for filtered data
+                            const filteredCampaigns = filteredResults.recent_campaigns;
+                            filteredResults.campaigns = {
+                                total: filteredCampaigns.length,
+                                pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
+                                sent: filteredCampaigns.filter(c => c.status === 'sent').length,
+                                failed: filteredCampaigns.filter(c => c.status === 'failed').length
+                            };
+                        }
+                        
+                        displayCampaignSummary(filteredResults);
                     } else {
                         document.getElementById('campaignSummaryContent').innerHTML = 
                             '<div class="alert alert-danger">Failed to load campaign summary</div>';
@@ -3485,6 +3535,13 @@
                 return;
             }
             
+            // Hide the info alert
+            document.getElementById('campaignFilterInfo').style.display = 'none';
+            
+            // Clear range filters
+            document.getElementById('campaignRangeStart').value = '';
+            document.getElementById('campaignRangeEnd').value = '';
+            
             // Filter the existing campaigns data client-side
             fetch('/api/campaigns/summary')
                 .then(response => response.json())
@@ -3521,7 +3578,63 @@
         // Clear Campaign Filter
         function clearCampaignFilter() {
             document.getElementById('campaignFilterDate').value = '';
-            loadCampaignSummary();
+            document.getElementById('campaignRangeStart').value = '';
+            document.getElementById('campaignRangeEnd').value = '';
+            document.getElementById('campaignFilterInfo').style.display = 'block';
+            loadCampaignSummary(); // This will show today and tomorrow only
+        }
+        
+        // Filter Campaigns by Date Range
+        function filterCampaignsByRange() {
+            const startDate = document.getElementById('campaignRangeStart').value;
+            const endDate = document.getElementById('campaignRangeEnd').value;
+            
+            if (!startDate || !endDate) {
+                showAlert('warning', 'Please select both start and end dates');
+                return;
+            }
+            
+            if (startDate > endDate) {
+                showAlert('warning', 'Start date must be before end date');
+                return;
+            }
+            
+            // Hide the info alert
+            document.getElementById('campaignFilterInfo').style.display = 'none';
+            
+            // Clear single date filter
+            document.getElementById('campaignFilterDate').value = '';
+            
+            fetch('/api/campaigns/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        // Filter campaigns by date range
+                        const filteredResults = {
+                            ...data.results,
+                            recent_campaigns: data.results.recent_campaigns.filter(campaign => {
+                                if (!campaign.campaign_date) return false;
+                                const campaignDate = campaign.campaign_date.split('T')[0];
+                                return campaignDate >= startDate && campaignDate <= endDate;
+                            })
+                        };
+                        
+                        // Update counts
+                        const filteredCampaigns = filteredResults.recent_campaigns;
+                        filteredResults.campaigns = {
+                            total: filteredCampaigns.length,
+                            pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
+                            sent: filteredCampaigns.filter(c => c.status === 'sent').length,
+                            failed: filteredCampaigns.filter(c => c.status === 'failed').length
+                        };
+                        
+                        displayCampaignSummary(filteredResults);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error filtering campaigns:', error);
+                    showAlert('danger', 'Error filtering campaigns');
+                });
         }
         
         // Sequence Preview Function
