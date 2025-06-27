@@ -217,10 +217,11 @@ Image Only Messages:
 ```
 
 **Delay Configuration**:
-- Each device has `min_delay_seconds` and `max_delay_seconds` settings
-- Default: min=10 seconds, max=30 seconds
+- Delays are set at the **campaign/sequence level**, not per device
+- All devices use the same min/max delay from the campaign/sequence
+- Default: min=10 seconds, max=30 seconds  
 - Actual delay: Random value between min and max for each message
-- Example: If min=10, max=30, delays will be: 15s, 22s, 11s, 28s, etc.
+- Example: Campaign with min=10, max=30 → delays: 15s, 22s, 11s, 28s, etc.
 
 ### Worker Architecture
 - **3000 max concurrent workers** with Redis (increased from 500)

@@ -208,55 +208,86 @@ curl https://your-app.up.railway.app/api/workers/status
 2. Check queue size
 3. Monitor failed count
 4. Review device connection status
-## Setting Device Delays
+## Message Delay Configuration
 
-Each device can have custom delay settings stored in the database:
+Delays are configured at the **campaign or sequence level**, not per device. All devices follow the same delay settings from the campaign/sequence.
 
-### Database Configuration:
+### Campaign Delays:
+When creating a campaign, you set:
+- `min_delay_seconds`: Minimum delay between messages
+- `max_delay_seconds`: Maximum delay between messages
+
+Example:
+```json
+{
+  "title": "Promo Merdeka",
+  "min_delay_seconds": 10,
+  "max_delay_seconds": 30,
+  "message": "Special discount today!"
+}
+```
+
+### Sequence Delays:
+Sequences can have:
+1. **Sequence-level delays**: Applied to all steps
+2. **Step-level delays**: Override for specific days
+
+Example:
+```json
+{
+  "name": "7-Day Welcome Series",
+  "min_delay_seconds": 15,
+  "max_delay_seconds": 45,
+  "steps": [
+    {
+      "day": 1,
+      "content": "Welcome!",
+      "min_delay_seconds": 5,  // Override for Day 1
+      "max_delay_seconds": 10
+    },
+    {
+      "day": 2,
+      "content": "Check our products"
+      // Uses sequence-level delays (15-45)
+    }
+  ]
+}
+```
+
+### How It Works:
+1. **Campaign sends message** → Uses campaign's min/max delays
+2. **Sequence sends message** → Uses step delays (if set) OR sequence delays
+3. **All devices** sending the same campaign/sequence use the same delays
+4. **Random calculation**: Each message waits random(min, max) seconds
+
+### Example:
+Campaign with min=10, max=30 being sent by 15 devices:
+- Device A1: Sends to Lead 1, waits 17 seconds, sends to Lead 2
+- Device A2: Sends to Lead 3, waits 24 seconds, sends to Lead 4  
+- Device A3: Sends to Lead 5, waits 11 seconds, sends to Lead 6
+- All devices use same 10-30 range, but random within that range
+
+
+## ⚠️ Implementation Note
+
+**Current Implementation** (as of June 27, 2025):
+The system currently reads delays from the `user_devices` table, which means delays are per-device. This is a known issue that needs to be corrected.
+
+**Correct Implementation** (to be fixed):
+- Delays should come from campaigns/sequences
+- When a campaign creates messages, it should pass its min/max delays
+- When a sequence creates messages, it should pass step-specific or sequence-level delays
+- All devices processing the same campaign/sequence should use the same delay range
+
+**Workaround**:
+Until this is fixed, you can set all devices to use the same delays:
 ```sql
--- Set delays for a specific device
+-- Set all active devices to use same delays
 UPDATE user_devices 
 SET 
     min_delay_seconds = 10,
     max_delay_seconds = 30
-WHERE id = 'device-uuid-here';
-
--- Set delays for all active devices
-UPDATE user_devices 
-SET 
-    min_delay_seconds = 15,
-    max_delay_seconds = 45
 WHERE is_active = true;
-
--- Different delays for different device groups
--- Newer devices with conservative settings
-UPDATE user_devices 
-SET 
-    min_delay_seconds = 20,
-    max_delay_seconds = 60
-WHERE created_at > NOW() - INTERVAL '7 days';
-
--- Trusted older devices with faster settings
-UPDATE user_devices 
-SET 
-    min_delay_seconds = 5,
-    max_delay_seconds = 15
-WHERE created_at < NOW() - INTERVAL '30 days'
-AND is_active = true;
 ```
 
-### How Delays Work:
-1. **Before sending each message**, the worker calls `getRandomDelay()`
-2. **Random calculation**: `delay = random(min, max)`
-3. **Applied after every message**, regardless of type
-4. **Device-specific**: Each device uses its own settings
-
-### Example Delay Patterns:
-If device has min=10, max=30:
-- Message 1: Wait 17 seconds
-- Message 2: Wait 11 seconds  
-- Message 3: Wait 28 seconds
-- Message 4: Wait 19 seconds
-- Message 5: Wait 13 seconds
-
-This randomization makes the messaging pattern appear more human-like!
+This ensures consistent behavior across all devices.
