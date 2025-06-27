@@ -226,6 +226,105 @@
             background: #e9ecef;
             padding: 1px;
             border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .calendar-month-year {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .calendar-header {
+            background: var(--primary);
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .calendar-day {
+            background: white;
+            min-height: 100px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .calendar-day:hover {
+            background: #f8f9fa;
+            transform: scale(1.02);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        .calendar-day.other-month {
+            color: #ccc;
+            background: #fafafa;
+        }
+        
+        .calendar-day.has-campaign {
+            background: #e3f2fd;
+            border: 2px solid var(--primary);
+        }
+        
+        .calendar-day.today {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        
+        .calendar-day.today.has-campaign {
+            background: linear-gradient(135deg, #fff3cd 50%, #e3f2fd 50%);
+            border: 2px solid var(--primary);
+        }
+        
+        .calendar-date {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+        
+        .calendar-date span {
+            display: block;
+        }
+        
+        .calendar-campaigns {
+            margin-top: 4px;
+            font-size: 11px;
+        }
+        
+        .campaign-item {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            overflow: hidden;
+        }
+        
+        .campaign-item .badge {
+            font-size: 9px;
+            padding: 1px 4px;
+            flex-shrink: 0;
+        }
+        
+        .campaign-item small {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .calendar-header {
@@ -2117,11 +2216,20 @@
                 calendar.appendChild(day);
             }
             
+            // Get today's date for comparison
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
             // Add current month's days
             for (let day = 1; day <= daysInMonth; day++) {
                 const dayElement = document.createElement('div');
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 dayElement.className = 'calendar-day';
+                
+                // Check if this is today
+                if (dateStr === todayStr) {
+                    dayElement.className += ' today';
+                }
                 
                 // Get campaigns for this date
                 const dayCampaigns = campaigns[dateStr] || [];
@@ -2185,8 +2293,15 @@
                     }
                 }
                 
+                // Get day name
+                const dayDate = new Date(currentYear, currentMonth, day);
+                const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
+                
                 dayElement.innerHTML = `
-                    <div class="calendar-date" onclick="openCampaignModal('${dateStr}')">${day}</div>
+                    <div class="calendar-date" onclick="openCampaignModal('${dateStr}')" style="position: relative;">
+                        <span style="font-size: 16px; font-weight: bold;">${day}</span>
+                        <span style="font-size: 10px; color: #666; display: block; margin-top: -2px;">${dayName}</span>
+                    </div>
                     <div class="campaign-container">${campaignHTML}</div>
                 `;
                 calendar.appendChild(dayElement);
@@ -2250,9 +2365,14 @@
             const existingCampaigns = campaigns[date] || [];
             const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
             
+            // Format date with day name
+            const dateObj = new Date(date);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            
             // Set modal data for new campaign
             document.getElementById('campaignDate').value = date;
-            document.getElementById('campaignModalTitle').textContent = `Create Campaign - ${new Date(date).toLocaleDateString()}`;
+            document.getElementById('campaignModalTitle').textContent = `Create Campaign - ${dayName}, ${formattedDate}`;
             document.getElementById('campaignForm').reset();
             document.getElementById('campaignId').value = '';
             document.getElementById('campaignDate').value = date;
@@ -2412,7 +2532,10 @@
             }
             
             // Update modal title
-            document.getElementById('campaignModalTitle').textContent = `Edit Campaign - ${new Date(dateStr).toLocaleDateString()}`;
+            const dateObj = new Date(dateStr);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            document.getElementById('campaignModalTitle').textContent = `Edit Campaign - ${dayName}, ${formattedDate}`;
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
@@ -2627,6 +2750,14 @@
         });
         
         // Campaign Summary Functions
+        // Helper function to format campaign date with day name
+        function formatCampaignDate(dateStr) {
+            const date = new Date(dateStr);
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+            const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            return `${dayName}, ${formatted}`;
+        }
+        
         function loadCampaignSummary() {
             fetch('/api/campaigns/summary')
                 .then(response => response.json())
@@ -2730,7 +2861,7 @@
                                                 ${summary.recent_campaigns.map(campaign => `
                                                     <tr>
                                                         <td>${campaign.title}</td>
-                                                        <td>${campaign.campaign_date}</td>
+                                                        <td>${campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-'}</td>
                                                         <td>${campaign.niche || '-'}</td>
                                                         <td>
                                                             <span class="badge bg-${getStatusColor(campaign.status)}">
