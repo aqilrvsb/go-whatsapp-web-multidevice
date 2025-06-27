@@ -59,7 +59,8 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, niche, message, image_url, 
-		       campaign_date, scheduled_time, min_delay_seconds, max_delay_seconds, 
+		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
 		WHERE campaign_date = $1 AND niche = $2 AND status != 'sent'
@@ -74,19 +75,14 @@ func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche stri
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
-		var scheduledTime sql.NullTime
 		
 		err := rows.Scan(&campaign.ID, &campaign.UserID,
 			&campaign.Title, &campaign.Niche, &campaign.Message, &campaign.ImageURL,
-			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds, 
+			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds, 
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt)
 		if err != nil {
 			continue
-		}
-		
-		if scheduledTime.Valid {
-			campaign.ScheduledTime = &scheduledTime.Time
 		}
 		
 		campaigns = append(campaigns, campaign)
@@ -119,7 +115,8 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, scheduled_time, min_delay_seconds, max_delay_seconds, 
+		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1
@@ -137,12 +134,11 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
-		var scheduledTime sql.NullTime
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.Niche, &campaign.ImageURL,
-			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds,
+			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
@@ -151,18 +147,14 @@ func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, err
 			continue
 		}
 		
-		if scheduledTime.Valid {
-			campaign.ScheduledTime = &scheduledTime.Time
-		}
-		
-		log.Printf("Found campaign: ID=%d, Date=%s, Title=%s", campaign.ID, campaign.CampaignDate, campaign.Title)
+		log.Printf("Found campaign: ID=%d, Date=%s, Time=%s, Title=%s", 
+			campaign.ID, campaign.CampaignDate, campaign.ScheduledTime, campaign.Title)
 		campaigns = append(campaigns, campaign)
 	}
 	
 	log.Printf("Total campaigns found: %d", len(campaigns))
 	return campaigns, nil
 }
-
 
 // DeleteCampaign deletes a campaign
 func (r *campaignRepository) DeleteCampaign(campaignID int) error {
@@ -181,12 +173,12 @@ func (r *campaignRepository) DeleteCampaign(campaignID int) error {
 	return nil
 }
 
-
 // GetCampaignsByDate gets all campaigns scheduled for a specific date
 func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, scheduled_time, min_delay_seconds, max_delay_seconds, 
+		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
 		WHERE campaign_date = $1 AND status != 'sent'
@@ -202,21 +194,16 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
-		var scheduledTime sql.NullTime
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.Niche, &campaign.ImageURL,
-			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds,
+			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
 		if err != nil {
 			continue
-		}
-		
-		if scheduledTime.Valid {
-			campaign.ScheduledTime = &scheduledTime.Time
 		}
 		
 		campaigns = append(campaigns, campaign)
@@ -229,7 +216,8 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, scheduled_time, min_delay_seconds, max_delay_seconds, 
+		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1
@@ -245,12 +233,11 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 	var campaigns []models.Campaign
 	for rows.Next() {
 		var campaign models.Campaign
-		var scheduledTime sql.NullTime
 		
 		err := rows.Scan(
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.Niche, &campaign.ImageURL,
-			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds,
+			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
 			&campaign.MaxDelaySeconds, &campaign.Status,
 			&campaign.CreatedAt, &campaign.UpdatedAt,
 		)
@@ -258,12 +245,62 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 			continue
 		}
 		
-		if scheduledTime.Valid {
-			campaign.ScheduledTime = &scheduledTime.Time
+		campaigns = append(campaigns, campaign)
+	}
+	
+	return campaigns, nil
+}
+
+// GetPendingCampaigns gets campaigns ready to be sent
+func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
+	now := time.Now()
+	todayStr := now.Format("2006-01-02")
+	currentTime := now.Format("15:04")
+	
+	query := `
+		SELECT id, user_id, title, message, niche, image_url, 
+		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       min_delay_seconds, max_delay_seconds, 
+		       status, created_at, updated_at
+		FROM campaigns
+		WHERE status = 'scheduled' 
+		  AND campaign_date <= $1
+		  AND (scheduled_time IS NULL OR scheduled_time <= $2)
+		ORDER BY campaign_date, scheduled_time
+	`
+	
+	rows, err := r.db.Query(query, todayStr, currentTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var campaign models.Campaign
+		
+		err := rows.Scan(
+			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
+			&campaign.Niche, &campaign.ImageURL,
+			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
+			&campaign.MaxDelaySeconds, &campaign.Status,
+			&campaign.CreatedAt, &campaign.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("Error scanning pending campaign: %v", err)
+			continue
 		}
 		
 		campaigns = append(campaigns, campaign)
 	}
 	
+	log.Printf("Found %d pending campaigns ready to send", len(campaigns))
 	return campaigns, nil
+}
+
+// UpdateCampaignStatus updates campaign status
+func (r *campaignRepository) UpdateCampaignStatus(campaignID int, status string) error {
+	query := `UPDATE campaigns SET status = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.db.Exec(query, status, time.Now(), campaignID)
+	return err
 }

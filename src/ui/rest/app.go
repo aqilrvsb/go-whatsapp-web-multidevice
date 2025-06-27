@@ -819,14 +819,12 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	// Parse scheduled time if provided
-	var scheduledTime *time.Time
+	var scheduledTime string
 	if request.ScheduledTime != "" {
-		// Combine campaign date with scheduled time
-		dateTimeStr := request.CampaignDate + " " + request.ScheduledTime + ":00"
-		parsedTime, err := time.Parse("2006-01-02 15:04:05", dateTimeStr)
-		if err == nil {
-			scheduledTime = &parsedTime
-		}
+		scheduledTime = request.ScheduledTime
+	} else {
+		// Default to current time if not provided
+		scheduledTime = time.Now().Format("15:04")
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
@@ -921,14 +919,9 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	}
 	
 	// Parse scheduled time if provided
-	var scheduledTime *time.Time
-	if request.ScheduledTime != "" && request.CampaignDate != "" {
-		// Combine campaign date with scheduled time
-		dateTimeStr := request.CampaignDate + " " + request.ScheduledTime + ":00"
-		parsedTime, err := time.Parse("2006-01-02 15:04:05", dateTimeStr)
-		if err == nil {
-			scheduledTime = &parsedTime
-		}
+	var scheduledTime string
+	if request.ScheduledTime != "" {
+		scheduledTime = request.ScheduledTime
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"time"
 
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
@@ -44,15 +45,25 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 		}
 		
 		// Check if it's time to send
-		if campaign.ScheduledTime == nil {
-			logrus.Warnf("Campaign %d has no scheduled time", campaign.ID)
-			continue
-		}
-		
-		now := time.Now()
-		if now.After(*campaign.ScheduledTime) {
-			// Time to send this campaign
+		if campaign.ScheduledTime == "" {
+			// If no scheduled time, send immediately
+			logrus.Infof("Campaign %d has no scheduled time, sending now", campaign.ID)
 			go cts.executeCampaign(&campaign)
+		} else {
+			// Parse the scheduled time
+			now := time.Now()
+			scheduledTimeStr := fmt.Sprintf("%s %s:00", campaign.CampaignDate, campaign.ScheduledTime)
+			scheduledTime, err := time.Parse("2006-01-02 15:04:05", scheduledTimeStr)
+			if err != nil {
+				logrus.Errorf("Failed to parse scheduled time for campaign %d: %v", campaign.ID, err)
+				continue
+			}
+			
+			if now.After(scheduledTime) {
+				// Time to send this campaign
+				logrus.Infof("Campaign %d scheduled time reached, sending now", campaign.ID)
+				go cts.executeCampaign(&campaign)
+			}
 		}
 	}
 	
