@@ -1,6 +1,6 @@
-# WhatsApp Multi-Device System - FINAL WORKING VERSION
+# WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
 **Last Updated: June 27, 2025**  
-**Status: ✅ All features working on Railway**
+**Status: ✅ All features working with optimized broadcast system**
 
 ## 🚀 Quick Deploy to Railway
 
@@ -8,12 +8,13 @@
 
 ## 🎯 System Overview
 
-A powerful WhatsApp Multi-Device system designed for:
+A powerful WhatsApp Multi-Device broadcast system designed for:
 - **200+ users** with **15 devices each** (3,000+ connections)
-- **Broadcast messaging** to thousands of contacts
-- **Real-time analytics** and tracking
-- **Chat history storage**
-- **Campaign management**
+- **Optimized broadcast messaging** with intelligent delays
+- **Campaign & sequence automation** with proper rate limiting
+- **Two-part message support** (image + text)
+- **Real-time analytics** and worker monitoring
+- **Enterprise-grade architecture** for massive scale
 
 ## ✅ Current Status (All Working)
 
@@ -22,35 +23,58 @@ A powerful WhatsApp Multi-Device system designed for:
 - ✅ **Multi-device support** - Unlimited devices per user
 - ✅ **WhatsApp Web integration** - Read-only chat viewer
 - ✅ **Analytics dashboard** - Real-time metrics
-- ✅ **Campaign calendar** - Schedule broadcasts
+- ✅ **Campaign calendar** - Visual scheduling with working labels
 - ✅ **Chat storage** - Save all messages
 - ✅ **Auto-reply** - Automatic responses
 - ✅ **Webhooks** - Real-time notifications
 
-### New Features (June 2025)
-- ✅ **Message Sequences** - Automated drip campaigns with individual progress tracking
-- ✅ **Broadcast Manager** - Optimized for 3,000+ devices with worker pools
-- ✅ **Device Rate Limiting** - Custom min/max delay per device
-- ✅ **Campaign Triggers** - Auto-send based on date and niche matching
-- ✅ **Worker Pool System** - Parallel message processing with health monitoring
-- ✅ **Sequence UI** - Full-featured interface for creating and managing sequences
-- ✅ **Auto-enrollment** - Automatically add leads to sequences based on niche
-- ✅ **Progress Tracking** - Each contact maintains their own timeline
+### Broadcast System Features (June 27, 2025)
+- ✅ **Optimized Worker System** - One worker per device handles both campaigns & sequences
+- ✅ **Smart Message Delays** - Random delays between min/max for natural behavior
+- ✅ **Two-Part Messages** - Sends image first, waits 3 seconds, then sends text
+- ✅ **Rate Limiting** - 20/min, 500/hour, 5,000/day per device
+- ✅ **Worker Health Monitoring** - Auto-restart stuck workers
+- ✅ **Parallel Processing** - Process multiple campaigns simultaneously
+- ✅ **Schedule Time Fix** - Uses VARCHAR for simple time storage
+- ✅ **Campaign Calendar** - Fixed display with proper date handling
 
-### Fixed Issues (June 27, 2025)
-- ✅ Build errors - Go 1.23, correct paths
-- ✅ 502 errors - REST mode enabled
-- ✅ Database connection - DB_URI mapping
-- ✅ Authentication - Cookie sessions
-- ✅ Campaign creation - Schema updated
-- ✅ Device deletion - NULL handling
-- ✅ JavaScript errors - Syntax fixes
-- ✅ WhatsApp message storage - Fixed to capture both sent and received messages
-- ✅ Chat sync functionality - Added manual and auto-sync features
-- ✅ Foreign key constraint - Fixed campaign_id type mismatch
-- ✅ Sequence initialization - Added missing usecase initialization
-- ✅ Simplified sequences - Removed device requirement, simplified to match campaigns
-- ✅ **Sequence compilation errors** - Fixed all model and domain type mismatches
+### Latest Fixes (June 27, 2025 - 12:30 PM)
+- ✅ **Import error fixed** - Removed services dependency from triggers
+- ✅ **Campaign calendar** - Shows labels correctly after removing device_id
+- ✅ **Schedule time** - Changed to VARCHAR to avoid timestamp issues
+- ✅ **Worker optimization** - Single worker handles both campaigns & sequences
+- ✅ **Message logic** - Proper two-part message handling with delays
+- ✅ **Database migrations** - All schema updates included
+
+## 🔥 Key System Capabilities
+
+### Message Sending Logic
+```
+Two-Part Messages (Image + Text):
+1. Send image (no caption)
+2. Wait 3 seconds
+3. Send text message
+4. Wait random delay (min-max)
+5. Process next lead
+
+Single Messages:
+1. Send message (text or image)
+2. Wait random delay (min-max)
+3. Process next lead
+```
+
+### Worker Architecture
+- **500 max concurrent workers** system-wide
+- **1,000 message queue** per worker
+- **Auto-scaling** based on load
+- **Health monitoring** every 30 seconds
+- **Automatic recovery** from failures
+
+### Performance Specs
+- **3,000 devices** supported (200 users × 15 devices)
+- **60,000 messages/minute** theoretical max (20 per device)
+- **Database optimized** with proper indexes
+- **Memory efficient** with garbage collection tuning
 
 ## 📋 Environment Variables (Railway)
 

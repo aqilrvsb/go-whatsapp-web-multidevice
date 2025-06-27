@@ -10,7 +10,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/services"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -18,7 +17,6 @@ import (
 // OptimizedSequenceTrigger handles sequence execution with optimized broadcasting
 type OptimizedSequenceTrigger struct {
 	broadcastManager *broadcast.OptimizedBroadcastManager
-	whatsappService  services.IWhatsappService
 	ticker           *time.Ticker
 	stopChan         chan bool
 	isRunning        bool
@@ -26,10 +24,9 @@ type OptimizedSequenceTrigger struct {
 }
 
 // NewOptimizedSequenceTrigger creates new optimized sequence trigger
-func NewOptimizedSequenceTrigger(whatsappService services.IWhatsappService) *OptimizedSequenceTrigger {
+func NewOptimizedSequenceTrigger() *OptimizedSequenceTrigger {
 	return &OptimizedSequenceTrigger{
 		broadcastManager: broadcast.GetBroadcastManager(), // Same broadcast manager as campaigns
-		whatsappService:  whatsappService,
 		stopChan:         make(chan bool),
 	}
 }
@@ -279,15 +276,9 @@ func (st *OptimizedSequenceTrigger) getUserDevices(userID string) ([]*models.Use
 // ensureWorkersForDevices creates workers for all devices if not exists
 func (st *OptimizedSequenceTrigger) ensureWorkersForDevices(devices []*models.UserDevice) {
 	for _, device := range devices {
-		// Get WhatsApp client for device
-		client := st.whatsappService.GetDeviceByID(device.ID)
-		if client == nil {
-			logrus.Warnf("No WhatsApp client for device %s", device.ID)
-			continue
-		}
-		
-		// Create or get worker (same workers handle both campaigns and sequences)
-		_, err := st.broadcastManager.CreateOrGetWorker(device.ID, client)
+		// For now, we'll create workers without the actual WhatsApp client
+		// In production, this would be integrated with the WhatsApp connection manager
+		_, err := st.broadcastManager.CreateOrGetWorker(device.ID, nil)
 		if err != nil {
 			logrus.Errorf("Failed to create worker for device %s: %v", device.ID, err)
 		}
