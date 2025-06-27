@@ -59,7 +59,7 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, niche, message, image_url, 
-		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -115,7 +115,7 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -177,7 +177,7 @@ func (r *campaignRepository) DeleteCampaign(campaignID int) error {
 func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -216,7 +216,7 @@ func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.
 func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -259,7 +259,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 	
 	query := `
 		SELECT id, user_id, title, message, niche, image_url, 
-		       campaign_date, COALESCE(scheduled_time, '') as scheduled_time, 
+		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
