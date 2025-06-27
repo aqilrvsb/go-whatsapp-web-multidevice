@@ -77,6 +77,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	// Get leads matching the campaign niche AND status
 	leadRepo := repository.GetLeadRepository()
 	var leads []models.Lead
+	var err error
 	
 	// Check if campaign has target_status field
 	targetStatus := campaign.TargetStatus
