@@ -2,7 +2,9 @@ package rest
 
 import (
 	"fmt"
+	"database/sql"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/gofiber/fiber/v2"
@@ -38,6 +40,49 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get current campaign/sequence info
+	db := database.GetDB()
+	var currentCampaign, currentSequence map[string]interface{}
+	
+	// Check for active campaign messages
+	var campaignTitle, campaignStatus string
+	var campaignID int
+	err := db.QueryRow(`
+		SELECT DISTINCT c.id, c.title, c.status 
+		FROM broadcast_messages bm 
+		JOIN campaigns c ON bm.campaign_id = c.id 
+		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
+		ORDER BY bm.created_at DESC 
+		LIMIT 1
+	`, deviceID).Scan(&campaignID, &campaignTitle, &campaignStatus)
+	
+	if err == nil {
+		currentCampaign = map[string]interface{}{
+			"id": campaignID,
+			"name": campaignTitle,
+			"status": campaignStatus,
+		}
+	}
+	
+	// Check for active sequence messages
+	var sequenceID, sequenceName, sequenceStatus string
+	err = db.QueryRow(`
+		SELECT DISTINCT s.id, s.name, s.status 
+		FROM broadcast_messages bm 
+		JOIN sequences s ON bm.sequence_id = s.id 
+		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
+		ORDER BY bm.created_at DESC 
+		LIMIT 1
+	`, deviceID).Scan(&sequenceID, &sequenceName, &sequenceStatus)
+	
+	if err == nil {
+		currentSequence = map[string]interface{}{
+			"id": sequenceID,
+			"name": sequenceName,
+			"status": sequenceStatus,
+		}
+	}
+	
 	// Worker exists, return detailed status
 	return c.JSON(utils.ResponseData{
 		Status:  200,
@@ -52,6 +97,8 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 			"failed_count": status.FailedCount,
 			"last_activity": status.LastActivity,
 			"is_active": status.Status == "active" || status.Status == "processing",
+			"current_campaign": currentCampaign,
+			"current_sequence": currentSequence,
 			"message": func() string {
 				switch status.Status {
 				case "active", "processing":

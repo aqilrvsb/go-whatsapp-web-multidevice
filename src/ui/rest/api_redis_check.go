@@ -81,6 +81,7 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 				}
 				return "❌ Redis is not being used. Check your environment variables."
 			}(),
+			"is_redis_enabled": managerType == "Ultra Scale Redis Manager (3000+ devices)" || managerType == "Redis Optimized Manager",
 		},
 	})
 }

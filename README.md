@@ -1,17 +1,18 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 27, 2025 - 3:30 PM**  
+**Last Updated: June 27, 2025 - 4:00 PM**  
 **Status: ✅ Production-ready with Ultra Scale Redis support for 3000+ devices**
 **Architecture: ✅ Redis-optimized with campaign/sequence-based delays**
 
 ## 🚀 NEW: Ultra Scale Redis Implementation for 3000+ Devices
 
-### What's New (June 27, 2025 - 3:30 PM)
+### What's New (June 27, 2025 - 4:00 PM)
 - **Ultra Scale Redis Manager**: Purpose-built for handling 3000+ WhatsApp devices
 - **Device-Specific Queues**: Each device has its own Redis queue for optimal distribution
 - **Worker Status API**: New endpoints to monitor worker health and status
 - **Single Message Delivery**: Image+text now sent as one message with caption (no more 3-second delays)
 - **Redis Status Check**: Built-in endpoint to verify Redis configuration
 - **Campaign/Sequence Delays**: Fixed - delays now properly come from campaigns/sequences, not devices
+- **User-Friendly Status Pages**: Beautiful UI for checking Redis, device workers, and all workers
 - **3000 Concurrent Workers**: Increased from 500 to support massive scale
 - **Distributed Locking**: Multi-server support with Redis-based coordination
 - **Performance Optimizations**: 
@@ -293,30 +294,39 @@ If Redis isn't detected:
 
 ## 👷 Monitoring Workers & System Status
 
-### Check Worker Status for Specific Device:
-```
-GET https://your-app.up.railway.app/api/workers/device/{deviceId}
-```
+### Quick Access Icons
+In the dashboard navigation bar, you'll find 3 convenient status check buttons:
+- 🟢 **Redis** - Check Redis connection status
+- 🔵 **Device Worker** - Check specific device worker status
+- 🟡 **All Workers** - View all workers overview
 
-Shows:
-- Worker existence and status (active/idle/error)
-- Queue size and processing statistics
+### Status Pages
+
+#### 1. Redis Status Page (`/status/redis`)
+- Visual confirmation of Redis connection
+- Environment variable validation
+- Real-time connection checks
+- Shows which broadcast manager is active
+
+#### 2. Device Worker Status (`/status/device-worker`)
+- Enter any device ID to check its worker
+- Shows queue size, processed, and failed counts
+- Displays current campaign/sequence being processed
+- Success rate visualization
 - Last activity timestamp
 
-### Check All Workers:
-```
-GET https://your-app.up.railway.app/api/workers/status
-```
+#### 3. All Workers Overview (`/status/all-workers`)
+- Summary statistics for all workers
+- Real-time worker table with:
+  - Status indicators (active/idle/error)
+  - Queue sizes
+  - Success rates with progress bars
+  - Auto-refresh every 5 seconds
+- Total processed/failed message counts
 
-Shows:
-- Total active/idle/error workers
-- Combined queue sizes and statistics
-- Overall system health
-
-### Quick Status Checks:
+### API Endpoints (for developers)
 - **Redis Status**: `/api/system/redis-check`
-- **System Status**: `/api/system/status`
-- **Device Worker**: `/api/workers/device/{id}`
+- **Device Worker**: `/api/workers/device/{deviceId}`
 - **All Workers**: `/api/workers/status`
 
 ## 🔧 Installation & Deployment

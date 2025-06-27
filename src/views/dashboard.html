@@ -484,6 +484,19 @@
                 <button class="btn btn-sm btn-outline-primary ms-2" onclick="window.location.href='/dashboard'">
                     <i class="bi bi-house"></i> Home
                 </button>
+                
+                <!-- System Status Icons -->
+                <div class="btn-group ms-3" role="group">
+                    <button class="btn btn-sm btn-outline-success" onclick="checkRedisStatus()" title="Check Redis Status">
+                        <i class="bi bi-database-check"></i> Redis
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="checkDeviceWorker()" title="Check Device Worker">
+                        <i class="bi bi-cpu"></i> Device Worker
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="checkAllWorkers()" title="Check All Workers">
+                        <i class="bi bi-diagram-3"></i> All Workers
+                    </button>
+                </div>
             </div>
             <div class="breadcrumb mb-0">
                 <span class="text-muted">You are here: </span>
@@ -4198,6 +4211,19 @@
             const toast = new bootstrap.Toast(toastElement.firstElementChild);
             toastContainer.appendChild(toastElement.firstElementChild);
             toast.show();
+        }
+        
+        // System Status Check Functions
+        function checkRedisStatus() {
+            window.open('/status/redis', 'RedisStatus', 'width=900,height=700');
+        }
+        
+        function checkDeviceWorker() {
+            window.open('/status/device-worker', 'DeviceWorkerStatus', 'width=900,height=700');
+        }
+        
+        function checkAllWorkers() {
+            window.open('/status/all-workers', 'AllWorkersStatus', 'width=1200,height=800');
         }
     </script>
 </body>
