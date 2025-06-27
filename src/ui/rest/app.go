@@ -2121,9 +2121,9 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	}
 	
 	// Get user devices - use direct query
-	db := database.Connection()
+	db := database.GetDB()
 	query := `
-		SELECT id, name, phone, status, jid, created_at, last_seen
+		SELECT id, device_name, phone, status, jid, created_at, last_seen
 		FROM user_devices
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -2141,7 +2141,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	devices := []models.UserDevice{}
 	for rows.Next() {
 		var device models.UserDevice
-		err := rows.Scan(&device.ID, &device.Name, &device.Phone, &device.Status, 
+		err := rows.Scan(&device.ID, &device.DeviceName, &device.Phone, &device.Status, 
 			&device.JID, &device.CreatedAt, &device.LastSeen)
 		if err != nil {
 			continue
@@ -2163,7 +2163,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		
 		report := DeviceReport{
 			ID:           device.ID,
-			Name:         device.Name,
+			Name:         device.DeviceName,
 			Status:       device.Status,
 			TotalLeads:   totalLeads,
 			PendingLeads: pendingLeads,
