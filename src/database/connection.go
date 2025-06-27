@@ -248,6 +248,7 @@ func InitializeSchema() error {
 		scheduled_at TIMESTAMP,
 		sent_at TIMESTAMP,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		group_id VARCHAR(255),
 		group_order INTEGER
 	);
@@ -287,6 +288,9 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 0;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(10);
+	
+	-- Add missing columns to broadcast_messages if they don't exist
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
 	

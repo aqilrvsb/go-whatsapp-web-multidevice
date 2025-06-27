@@ -3996,6 +3996,11 @@
                                 <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaign.id}'); return false;" class="text-danger">
                                     ${device.failedLeads || 0}
                                 </a>
+                                ${device.failedLeads > 0 ? `
+                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="retryFailedMessages('${device.id}', '${campaign.id}'); return false;" title="Retry Failed Messages">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                ` : ''}
                             </td>
                             <td>
                                 <div class="progress" style="height: 20px;">
@@ -4093,6 +4098,40 @@
                 failedLeads,
                 devices
             };
+        }
+        
+        function retryFailedMessages(deviceId, campaignId) {
+            if (!confirm('Are you sure you want to retry all failed messages for this device?')) {
+                return;
+            }
+            
+            showToast('Retrying failed messages...', 'info');
+            
+            // Call API to retry failed messages
+            fetch(`/api/campaigns/${campaignId}/device/${deviceId}/retry-failed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    showToast('Failed messages queued for retry!', 'success');
+                    // Refresh the device report
+                    setTimeout(() => {
+                        const campaign = { id: campaignId };
+                        showCampaignDeviceReport(campaign);
+                    }, 2000);
+                } else {
+                    showToast(data.message || 'Failed to retry messages', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error retrying messages:', error);
+                showToast('Error retrying messages', 'error');
+            });
         }
         
         function generateMockLeadDetails(status) {

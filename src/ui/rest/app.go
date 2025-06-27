@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -89,6 +90,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/campaigns/summary", rest.GetCampaignSummary)
 	app.Get("/api/campaigns/:id/device-report", rest.GetCampaignDeviceReport)
 	app.Get("/api/campaigns/:id/device/:deviceId/leads", rest.GetCampaignDeviceLeads)
+	app.Post("/api/campaigns/:id/device/:deviceId/retry-failed", rest.RetryCampaignFailedMessages)
 	
 	// Sequence summary endpoint
 	app.Get("/api/sequences/summary", rest.GetSequenceSummary)
@@ -2091,7 +2093,7 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 // GetCampaignDeviceReport gets device-wise report for a campaign
 func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	campaignIdStr := c.Params("id")
-	_, err := strconv.Atoi(campaignIdStr)
+	campaignId, err := strconv.Atoi(campaignIdStr)
 	if err != nil {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
@@ -2139,6 +2141,8 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	defer rows.Close()
 	
 	devices := []models.UserDevice{}
+	deviceMap := make(map[string]*DeviceReport)
+	
 	for rows.Next() {
 		var device models.UserDevice
 		err := rows.Scan(&device.ID, &device.DeviceName, &device.Phone, &device.Status, 
@@ -2148,32 +2152,50 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		}
 		device.UserID = session.UserID
 		devices = append(devices, device)
-	}
-	
-	// For now, return mock data until broadcast message tracking is implemented
-	// TODO: Replace with actual broadcast message data
-	deviceReports := make([]DeviceReport, 0)
-	
-	for i, device := range devices {
-		// Mock data for demonstration
-		totalLeads := 100 + (i * 50)
-		successLeads := int(float64(totalLeads) * 0.8)
-		failedLeads := int(float64(totalLeads) * 0.05)
-		pendingLeads := totalLeads - successLeads - failedLeads
 		
-		report := DeviceReport{
-			ID:           device.ID,
-			Name:         device.DeviceName,
-			Status:       device.Status,
-			TotalLeads:   totalLeads,
-			PendingLeads: pendingLeads,
-			SuccessLeads: successLeads,
-			FailedLeads:  failedLeads,
+		// Initialize device report
+		deviceMap[device.ID] = &DeviceReport{
+			ID:     device.ID,
+			Name:   device.DeviceName,
+			Status: device.Status,
 		}
-		deviceReports = append(deviceReports, report)
 	}
 	
-	// Calculate totals
+	// Get real broadcast message data for this campaign
+	messageQuery := `
+		SELECT device_id, status, COUNT(*) as count
+		FROM broadcast_messages
+		WHERE campaign_id = $1 AND user_id = $2
+		GROUP BY device_id, status
+	`
+	msgRows, err := db.Query(messageQuery, campaignId, session.UserID)
+	if err == nil {
+		defer msgRows.Close()
+		
+		for msgRows.Next() {
+			var deviceId, status string
+			var count int
+			if err := msgRows.Scan(&deviceId, &status, &count); err != nil {
+				continue
+			}
+			
+			if report, exists := deviceMap[deviceId]; exists {
+				report.TotalLeads += count
+				
+				switch status {
+				case "pending":
+					report.PendingLeads += count
+				case "sent", "delivered":
+					report.SuccessLeads += count
+				case "failed":
+					report.FailedLeads += count
+				}
+			}
+		}
+	}
+	
+	// Convert map to slice and calculate totals
+	deviceReports := make([]DeviceReport, 0, len(deviceMap))
 	totalLeads := 0
 	pendingLeads := 0
 	successLeads := 0
@@ -2181,7 +2203,8 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	activeDevices := 0
 	disconnectedDevices := 0
 	
-	for _, report := range deviceReports {
+	for _, report := range deviceMap {
+		deviceReports = append(deviceReports, *report)
 		totalLeads += report.TotalLeads
 		pendingLeads += report.PendingLeads
 		successLeads += report.SuccessLeads
@@ -2216,7 +2239,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 // GetCampaignDeviceLeads gets lead details for a specific device in a campaign
 func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	campaignIdStr := c.Params("id")
-	_, err := strconv.Atoi(campaignIdStr)
+	campaignId, err := strconv.Atoi(campaignIdStr)
 	if err != nil {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
@@ -2225,7 +2248,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		})
 	}
 	
-	_ = c.Params("deviceId")
+	deviceId := c.Params("deviceId")
 	status := c.Query("status", "all")
 	
 	// Get session from cookie
@@ -2239,7 +2262,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	}
 	
 	userRepo := repository.GetUserRepository()
-	_, err = userRepo.GetSession(sessionToken)
+	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
@@ -2248,36 +2271,65 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		})
 	}
 	
-	// For now, return mock data until broadcast message tracking is implemented
-	// TODO: Replace with actual broadcast message data
-	leadDetails := []map[string]interface{}{}
+	// Get real broadcast message data
+	db := database.GetDB()
+	query := `
+		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
+		FROM broadcast_messages bm
+		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
+		WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
+	`
 	
-	// Mock data for demonstration
-	mockLeads := []struct {
-		name   string
-		phone  string
-		status string
-	}{
-		{"John Doe", "+60123456789", "sent"},
-		{"Jane Smith", "+60987654321", "sent"},
-		{"Ali Rahman", "+60111222333", "pending"},
-		{"Sarah Lee", "+60444555666", "failed"},
-		{"Ahmad Zaidi", "+60777888999", "sent"},
+	// Add status filter if not "all"
+	if status != "all" {
+		if status == "success" {
+			query += ` AND bm.status IN ('sent', 'delivered')`
+		} else if status == "pending" {
+			query += ` AND bm.status = 'pending'`
+		} else if status == "failed" {
+			query += ` AND bm.status = 'failed'`
+		}
 	}
 	
-	// Filter based on status
-	for _, lead := range mockLeads {
-		if status == "all" || 
-		   (status == "pending" && lead.status == "pending") ||
-		   (status == "success" && lead.status == "sent") ||
-		   (status == "failed" && lead.status == "failed") {
-			leadDetails = append(leadDetails, map[string]interface{}{
-				"name":   lead.name,
-				"phone":  lead.phone,
-				"status": lead.status,
-				"sentAt": time.Now().Format("2006-01-02 03:04 PM"),
-			})
+	query += ` ORDER BY bm.created_at DESC LIMIT 100`
+	
+	rows, err := db.Query(query, campaignId, deviceId, session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get lead details",
+		})
+	}
+	defer rows.Close()
+	
+	leadDetails := []map[string]interface{}{}
+	for rows.Next() {
+		var phone, msgStatus string
+		var sentAt sql.NullTime
+		var name sql.NullString
+		
+		err := rows.Scan(&phone, &msgStatus, &sentAt, &name)
+		if err != nil {
+			continue
 		}
+		
+		leadName := "Unknown"
+		if name.Valid && name.String != "" {
+			leadName = name.String
+		}
+		
+		sentTime := "-"
+		if sentAt.Valid {
+			sentTime = sentAt.Time.Format("2006-01-02 03:04 PM")
+		}
+		
+		leadDetails = append(leadDetails, map[string]interface{}{
+			"name":   leadName,
+			"phone":  phone,
+			"status": msgStatus,
+			"sentAt": sentTime,
+		})
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -2297,4 +2349,78 @@ type DeviceReport struct {
 	PendingLeads int    `json:"pendingLeads"`
 	SuccessLeads int    `json:"successLeads"`
 	FailedLeads  int    `json:"failedLeads"`
+}
+
+// RetryCampaignFailedMessages retries failed messages for a specific device
+func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
+	campaignIdStr := c.Params("id")
+	campaignId, err := strconv.Atoi(campaignIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
+	
+	deviceId := c.Params("deviceId")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Update failed messages to pending status for retry
+	db := database.GetDB()
+	query := `
+		UPDATE broadcast_messages
+		SET status = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE campaign_id = $1 AND device_id = $2 AND user_id = $3 AND status = 'failed'
+	`
+	
+	result, err := db.Exec(query, campaignId, deviceId, session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to retry messages",
+		})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	
+	// Get the broadcast manager and trigger processing
+	broadcastManager := broadcast.GetGlobalBroadcastManager()
+	if broadcastManager != nil {
+		// Find the device and ensure worker is running
+		userDeviceRepo := repository.GetUserRepository()
+		device, err := userDeviceRepo.GetDeviceByID(deviceId)
+		if err == nil && device != nil {
+			broadcastManager.EnsureDeviceWorker(device.ID)
+		}
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Successfully queued %d messages for retry", rowsAffected),
+		Results: map[string]interface{}{
+			"retried": rowsAffected,
+		},
+	})
 }
