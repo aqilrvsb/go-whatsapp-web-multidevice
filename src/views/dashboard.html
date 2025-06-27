@@ -2271,9 +2271,9 @@
                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 dayElement.className = 'calendar-day';
                 
-                // Debug logging
-                if (day === 2 && currentMonth === 5) { // June is month 5 (0-indexed)
-                    console.log('Checking June 2:', dateStr, 'Campaigns:', campaigns[dateStr]);
+                // Debug logging for specific dates
+                if (campaigns[dateStr]) {
+                    console.log(`Found campaigns for ${dateStr}:`, campaigns[dateStr]);
                 }
                 
                 // Check if this is today
@@ -2469,6 +2469,7 @@
         
         function saveCampaign() {
             const campaignId = document.getElementById('campaignId').value;
+            const campaignDate = document.getElementById('campaignDate').value;
             
             // Auto-set current time if not provided
             let scheduledTime = document.getElementById('campaignTime').value;
@@ -2478,7 +2479,7 @@
             }
             
             const campaignData = {
-                campaign_date: document.getElementById('campaignDate').value,
+                campaign_date: campaignDate,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
                 message: document.getElementById('campaignMessage').value || '',
@@ -2487,6 +2488,13 @@
                 min_delay_seconds: parseInt(document.getElementById('campaignMinDelay').value) || 10,
                 max_delay_seconds: parseInt(document.getElementById('campaignMaxDelay').value) || 30
             };
+            
+            // Add campaign_date to update requests as well
+            if (campaignId) {
+                campaignData.campaign_date = campaignDate;
+            }
+            
+            console.log('Saving campaign with data:', campaignData);
             
             const url = campaignId ? `/api/campaigns/${campaignId}` : '/api/campaigns';
             const method = campaignId ? 'PUT' : 'POST';
