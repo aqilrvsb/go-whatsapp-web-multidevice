@@ -50,25 +50,36 @@ func InitEnvironment() {
 		WhatsappChatStorage = false
 	}
 	
-	// Redis settings
-	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+	// Redis settings - check multiple possible env var names
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = os.Getenv("redis_url")
+	}
+	if redisURL == "" {
+		redisURL = os.Getenv("RedisURL")
+	}
+	// Only set if it's not a template variable
+	if redisURL != "" && !strings.Contains(redisURL, "${{") {
 		RedisURL = redisURL
 	}
+	
 	if redisPassword := os.Getenv("REDIS_PASSWORD"); redisPassword != "" {
 		RedisPassword = redisPassword
 	}
+	
+	// Check both REDIS_HOST and REDISHOST
 	if redisHost := os.Getenv("REDIS_HOST"); redisHost != "" {
 		RedisHost = redisHost
 	}
 	if redisHost := os.Getenv("REDISHOST"); redisHost != "" {
 		RedisHost = redisHost
 	}
+	
+	// Check both REDIS_PORT and REDISPORT
 	if redisPort := os.Getenv("REDIS_PORT"); redisPort != "" {
 		RedisPort = redisPort
 	}
 	if redisPort := os.Getenv("REDISPORT"); redisPort != "" {
-		RedisPort = redisPort
-	}REDISPORT"); redisPort != "" {
 		RedisPort = redisPort
 	}
 }

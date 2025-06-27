@@ -2,8 +2,10 @@ package broadcast
 
 import (
 	"os"
+	"strings"
 	"sync"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/sirupsen/logrus"
 )
@@ -25,31 +27,30 @@ var (
 // GetBroadcastManager returns the appropriate broadcast manager based on configuration
 func GetBroadcastManager() BroadcastManagerInterface {
 	umOnce.Do(func() {
-		// Check if Redis is available - try multiple env vars
-		redisURL := os.Getenv("REDIS_URL")
+		// Initialize config first
+		config.InitEnvironment()
+		
+		// Check if Redis is available
+		redisURL := config.RedisURL
 		if redisURL == "" {
-			redisURL = os.Getenv("redis_url")
-		}
-		if redisURL == "" {
-			redisURL = os.Getenv("RedisURL")
+			redisURL = os.Getenv("REDIS_URL")
 		}
 		
 		// Log what we found
-		logrus.Infof("Checking for Redis - REDIS_URL env: '%s'", redisURL)
+		logrus.Infof("Checking for Redis - URL: '%s'", redisURL)
 		
-		// For now, let's disable Redis to get the app working
-		// We'll enable it once we fix the connection issue
-		if redisURL != "" && redisURL != "redis://default:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:6379" {
-			// Only use Redis if we have a real URL, not a template
-			if redisURL != "redis://[::1]:6379" && redisURL != "redis://localhost:6379" {
-				logrus.Info("Valid Redis URL found, but using in-memory manager for now")
-				// unifiedManager = NewRedisOptimizedBroadcastManager()
-			}
+		// Check if we have a valid Redis URL
+		if redisURL != "" && 
+		   !strings.Contains(redisURL, "${{") && 
+		   !strings.Contains(redisURL, "localhost") && 
+		   !strings.Contains(redisURL, "[::1]") &&
+		   (strings.Contains(redisURL, "redis://") || strings.Contains(redisURL, "rediss://")) {
+			logrus.Info("Valid Redis URL found, initializing Redis-based broadcast manager")
+			unifiedManager = NewRedisOptimizedBroadcastManager()
+		} else {
+			logrus.Info("No valid Redis URL found, using in-memory broadcast manager")
+			unifiedManager = NewBasicBroadcastManager()
 		}
-		
-		// Use in-memory manager for now
-		logrus.Info("Using in-memory broadcast manager")
-		unifiedManager = NewBasicBroadcastManager()
 	})
 	return unifiedManager
 }
