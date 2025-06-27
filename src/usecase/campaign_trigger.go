@@ -72,10 +72,23 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 		} else {
 			// Parse the scheduled time
 			now := time.Now()
-			scheduledTimeStr := fmt.Sprintf("%s %s:00", campaign.CampaignDate, campaign.ScheduledTime)
+			
+			// Extract just the date part from CampaignDate (in case it has timestamp)
+			campaignDateOnly := campaign.CampaignDate
+			if len(campaignDateOnly) > 10 {
+				campaignDateOnly = campaignDateOnly[:10] // Take only YYYY-MM-DD
+			}
+			
+			// Extract just the time part from ScheduledTime
+			scheduledTimeOnly := campaign.ScheduledTime
+			if len(scheduledTimeOnly) > 8 {
+				scheduledTimeOnly = scheduledTimeOnly[:8] // Take only HH:MM:SS
+			}
+			
+			scheduledTimeStr := fmt.Sprintf("%s %s", campaignDateOnly, scheduledTimeOnly)
 			scheduledTime, err := time.Parse("2006-01-02 15:04:05", scheduledTimeStr)
 			if err != nil {
-				logrus.Errorf("Failed to parse scheduled time for campaign %d: %v", campaign.ID, err)
+				logrus.Errorf("Failed to parse scheduled time for campaign %d: %v (tried to parse: %s)", campaign.ID, err, scheduledTimeStr)
 				continue
 			}
 			
@@ -182,6 +195,16 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 	logrus.Info("Processing sequence triggers for new leads...")
+	
+	// Load Malaysia timezone for consistent processing
+	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	if err != nil {
+		logrus.Warnf("Failed to load Malaysia timezone for sequences, using UTC: %v", err)
+		loc = time.UTC
+	}
+	
+	nowMalaysia := time.Now().In(loc)
+	logrus.Infof("Processing sequences at Malaysia time: %s", nowMalaysia.Format("2006-01-02 15:04:05"))
 	
 	sequenceRepo := repository.GetSequenceRepository()
 	leadRepo := repository.GetLeadRepository()
