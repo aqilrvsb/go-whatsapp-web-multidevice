@@ -2,11 +2,13 @@ package rest
 
 import (
 	"fmt"
-	"database/sql"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -17,6 +19,27 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 			Status:  400,
 			Code:    "BAD_REQUEST",
 			Message: "Device ID is required",
+		})
+	}
+	
+	// Get user ID from context
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	// Verify device ownership
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil || device.UserID != userID {
+		return c.JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "FORBIDDEN",
+			Message: "Device not found or access denied",
 		})
 	}
 	
@@ -33,6 +56,7 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 			Message: "Worker status",
 			Results: map[string]interface{}{
 				"device_id": deviceID,
+				"device_name": device.DeviceName,
 				"worker_exists": false,
 				"status": "no_worker",
 				"message": "No worker running for this device. Worker will start automatically when messages are queued.",
@@ -44,17 +68,18 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	db := database.GetDB()
 	var currentCampaign, currentSequence map[string]interface{}
 	
-	// Check for active campaign messages
+	// Check for active campaign messages (with user validation)
 	var campaignTitle, campaignStatus string
 	var campaignID int
-	err := db.QueryRow(`
+	err = db.QueryRow(`
 		SELECT DISTINCT c.id, c.title, c.status 
 		FROM broadcast_messages bm 
 		JOIN campaigns c ON bm.campaign_id = c.id 
 		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
+		AND c.user_id = $2
 		ORDER BY bm.created_at DESC 
 		LIMIT 1
-	`, deviceID).Scan(&campaignID, &campaignTitle, &campaignStatus)
+	`, deviceID, userID).Scan(&campaignID, &campaignTitle, &campaignStatus)
 	
 	if err == nil {
 		currentCampaign = map[string]interface{}{
@@ -64,16 +89,17 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Check for active sequence messages
+	// Check for active sequence messages (with user validation)
 	var sequenceID, sequenceName, sequenceStatus string
 	err = db.QueryRow(`
 		SELECT DISTINCT s.id, s.name, s.status 
 		FROM broadcast_messages bm 
 		JOIN sequences s ON bm.sequence_id = s.id 
 		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
+		AND s.user_id = $2
 		ORDER BY bm.created_at DESC 
 		LIMIT 1
-	`, deviceID).Scan(&sequenceID, &sequenceName, &sequenceStatus)
+	`, deviceID, userID).Scan(&sequenceID, &sequenceName, &sequenceStatus)
 	
 	if err == nil {
 		currentSequence = map[string]interface{}{
@@ -115,13 +141,39 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	})
 }
 
-// CheckAllWorkersStatus returns status for all workers
+// CheckAllWorkersStatus returns status for all workers for user's devices only
 func (rest *App) CheckAllWorkersStatus(c *fiber.Ctx) error {
+	// Get user ID from context
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	// Get user's devices
+	userRepo := repository.GetUserRepository()
+	devices, err := userRepo.GetUserDevices(userID)
+	if err != nil {
+		return c.JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get user devices",
+		})
+	}
+	
 	// Get broadcast manager
 	manager := broadcast.GetBroadcastManager()
 	
-	// Get all worker statuses
-	statuses := manager.GetAllWorkerStatus()
+	// Get worker statuses for user's devices only
+	statuses := make([]domainBroadcast.WorkerStatus, 0)
+	for _, device := range devices {
+		if status, exists := manager.GetWorkerStatus(device.ID); exists {
+			statuses = append(statuses, status)
+		}
+	}
 	
 	// Count statistics
 	totalWorkers := len(statuses)

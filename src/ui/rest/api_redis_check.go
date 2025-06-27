@@ -62,6 +62,8 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 		"validations":   validationChecks,
 	}).Info("Redis status check")
 	
+	isRedisEnabled := managerType == "Ultra Scale Redis Manager (3000+ devices)" || managerType == "Redis Optimized Manager"
+	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
@@ -72,7 +74,7 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 			"environment_vars": envVars,
 			"validation_checks": validationChecks,
 			"final_redis_url":  redisURL,
-			"is_redis_enabled": managerType == "Redis Optimized Manager",
+			"is_redis_enabled": isRedisEnabled,
 			"message": func() string {
 				if managerType == "Ultra Scale Redis Manager (3000+ devices)" {
 					return "✅ Ultra Scale Redis is properly configured and running! Ready for 3000+ devices!"
@@ -81,7 +83,6 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 				}
 				return "❌ Redis is not being used. Check your environment variables."
 			}(),
-			"is_redis_enabled": managerType == "Ultra Scale Redis Manager (3000+ devices)" || managerType == "Redis Optimized Manager",
 		},
 	})
 }

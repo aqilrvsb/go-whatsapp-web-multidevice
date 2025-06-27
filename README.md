@@ -89,7 +89,18 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
-### Latest Updates (June 28, 2025 - 4:00 AM)
+### Latest Updates (June 28, 2025 - 12:50 AM)
+
+#### 🔒 Enhanced User Isolation for Worker Status APIs
+- **Fixed Worker Status Endpoints**: All worker status checks now properly filter by user ID
+- **Device Ownership Validation**: 
+  - `/api/workers/device/:deviceId` - Validates device belongs to authenticated user
+  - Returns 403 Forbidden if attempting to access another user's device
+- **User-Scoped Worker Lists**: 
+  - `/api/workers/status` - Only shows workers for user's own devices
+  - No exposure of other users' worker information
+- **Campaign/Sequence Filtering**: Worker status only shows campaigns/sequences owned by the user
+- **Security First**: Complete isolation ensures users cannot see or interact with other users' data
 
 #### 🎯 Campaign Management Revolution
 - **Smart Targeting**: Campaigns now exclusively target prospect/customer segments (removed "all" option)
