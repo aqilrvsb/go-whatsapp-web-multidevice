@@ -595,9 +595,9 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		Phone:  request.Phone,
 		Email:  "",
 		Niche:  request.Niche,
-		Source: request.Journey,
+		Source: "manual", // Set source as manual since it's added from UI
 		Status: request.Status,
-		Notes:  "",
+		Notes:  request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.CreateLead(lead)
 	if err != nil {
@@ -654,9 +654,9 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		Phone:  request.Phone,
 		Email:  "",
 		Niche:  request.Niche,
-		Source: request.Journey,
+		Source: "manual", // Keep source as manual
 		Status: request.Status,
-		Notes:  "",
+		Notes:  request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.UpdateLead(leadId, lead)
 	if err != nil {

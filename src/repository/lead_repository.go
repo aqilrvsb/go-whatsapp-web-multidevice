@@ -44,16 +44,31 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	return err
 }
 
-// GetLeadsByNiche gets all leads matching a niche
+// GetLeadsByNiche gets all leads matching a niche (supports comma-separated niches)
 func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
+	// Use LIKE pattern to match leads that contain this niche
+	// This will match:
+	// - Exact match: niche = 'ITADRESS'
+	// - As first item: niche = 'ITADRESS,OTHER'
+	// - As middle item: niche = 'OTHER,ITADRESS,MORE'
+	// - As last item: niche = 'OTHER,ITADRESS'
 	query := `
 		SELECT id, user_id, name, phone, email, niche, source, status, notes, created_at, updated_at
 		FROM leads
-		WHERE niche = $1
+		WHERE niche = $1 
+		   OR niche LIKE $2 
+		   OR niche LIKE $3 
+		   OR niche LIKE $4
 		ORDER BY created_at DESC
 	`
 	
-	rows, err := r.db.Query(query, niche)
+	// Pattern matching for comma-separated values
+	exactMatch := niche
+	startsWithPattern := niche + ",%"
+	endsWithPattern := "%," + niche
+	containsPattern := "%," + niche + ",%"
+	
+	rows, err := r.db.Query(query, exactMatch, startsWithPattern, endsWithPattern, containsPattern)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +87,30 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	}
 	
 	return leads, nil
+}
+
+// GetLeadsByNicheAndStatus gets all leads matching a niche AND status
+func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) ([]models.Lead, error) {
+	// First, get all leads matching the niche
+	leads, err := r.GetLeadsByNiche(niche)
+	if err != nil {
+		return nil, err
+	}
+	
+	// If status is "all", return all leads matching the niche
+	if status == "all" || status == "" {
+		return leads, nil
+	}
+	
+	// Filter by status
+	var filteredLeads []models.Lead
+	for _, lead := range leads {
+		if lead.Status == status {
+			filteredLeads = append(filteredLeads, lead)
+		}
+	}
+	
+	return filteredLeads, nil
 }
 
 // GetNewLeadsForSequence gets new leads matching niche that aren't in sequence

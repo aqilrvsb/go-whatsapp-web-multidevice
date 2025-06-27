@@ -12,6 +12,7 @@ type Sequence struct {
 	Name            string         `json:"name" db:"name"`
 	Description     string         `json:"description" db:"description"`
 	Niche           string         `json:"niche" db:"niche"`
+	TargetStatus    string         `json:"target_status" db:"target_status"` // prospect, customer, all
 	Status          string         `json:"status" db:"status"` // draft, active, paused
 	TotalDays       int            `json:"total_days" db:"total_days"` // Added
 	IsActive        bool           `json:"is_active" db:"is_active"`   // Added

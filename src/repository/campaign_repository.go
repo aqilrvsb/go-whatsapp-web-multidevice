@@ -41,14 +41,20 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	
 	query := `
 		INSERT INTO campaigns 
-		(user_id, campaign_date, title, niche, message, image_url, 
+		(user_id, campaign_date, title, niche, target_status, message, image_url, 
 		 scheduled_time, min_delay_seconds, max_delay_seconds, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id
 	`
 	
+	// Default target_status to 'all' if not set
+	targetStatus := campaign.TargetStatus
+	if targetStatus == "" {
+		targetStatus = "all"
+	}
+	
 	err := r.db.QueryRow(query, campaign.UserID, campaign.CampaignDate,
-		campaign.Title, campaign.Niche, campaign.Message, campaign.ImageURL,
+		campaign.Title, campaign.Niche, targetStatus, campaign.Message, campaign.ImageURL,
 		campaign.ScheduledTime, campaign.MinDelaySeconds, campaign.MaxDelaySeconds, 
 		campaign.Status, campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
 		

@@ -11,6 +11,7 @@ type Campaign struct {
 	DeviceID        string    `json:"device_id" db:"device_id"`
 	Title           string    `json:"title" db:"title"`
 	Niche           string    `json:"niche" db:"niche"`
+	TargetStatus    string    `json:"target_status" db:"target_status"` // prospect, customer, all
 	Message         string    `json:"message" db:"message"`
 	ImageURL        string    `json:"image_url" db:"image_url"`
 	CampaignDate    string    `json:"campaign_date" db:"campaign_date"`

@@ -895,7 +895,16 @@
                         <div class="mb-3">
                             <label class="form-label">Niche/Category <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="campaignNiche" required 
-                                   placeholder="e.g., Promotion, Announcement, Reminder">
+                                   placeholder="e.g., EXSTART, ITADRESS">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Target Lead Status <span class="text-danger">*</span></label>
+                            <select class="form-select" id="campaignTargetStatus" required>
+                                <option value="all">All Leads</option>
+                                <option value="prospect">Prospects Only</option>
+                                <option value="customer">Customers Only</option>
+                            </select>
                         </div>
                         
                         <div class="mb-3">
@@ -2482,6 +2491,7 @@
                 campaign_date: campaignDate,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
+                target_status: document.getElementById('campaignTargetStatus').value || 'all',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
                 scheduled_time: scheduledTime,

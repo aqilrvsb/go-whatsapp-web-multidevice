@@ -74,15 +74,23 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	logrus.Infof("Executing campaign: %s", campaign.Title)
 	
-	// Get leads matching the campaign niche
+	// Get leads matching the campaign niche AND status
 	leadRepo := repository.GetLeadRepository()
-	leads, err := leadRepo.GetLeadsByNiche(campaign.Niche)
+	var leads []models.Lead
+	
+	// Check if campaign has target_status field
+	targetStatus := campaign.TargetStatus
+	if targetStatus == "" {
+		targetStatus = "all" // Default to all if not set
+	}
+	
+	leads, err = leadRepo.GetLeadsByNicheAndStatus(campaign.Niche, targetStatus)
 	if err != nil {
 		logrus.Errorf("Failed to get leads for campaign %s: %v", campaign.ID, err)
 		return
 	}
 	
-	logrus.Infof("Found %d leads matching niche: %s", len(leads), campaign.Niche)
+	logrus.Infof("Found %d leads matching niche: %s and status: %s", len(leads), campaign.Niche, targetStatus)
 	
 	// Get ALL connected devices for the user
 	userRepo := repository.GetUserRepository()
