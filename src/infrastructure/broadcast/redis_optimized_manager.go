@@ -92,7 +92,7 @@ func NewRedisOptimizedBroadcastManager() *RedisOptimizedBroadcastManager {
 	manager := &RedisOptimizedBroadcastManager{
 		redisClient: redisClient,
 		workers:     make(map[string]*DeviceWorker),
-		maxWorkers:  500, // Can handle many more workers with Redis
+		maxWorkers:  3000, // Can handle 3000 devices with Redis
 		ctx:         ctx,
 		cancel:      cancel,
 	}

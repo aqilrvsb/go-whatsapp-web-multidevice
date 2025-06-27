@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -101,6 +102,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Worker control endpoints
 	app.Post("/api/workers/resume-failed", rest.ResumeFailedWorkers)
 	app.Post("/api/workers/stop-all", rest.StopAllWorkers)
+	
+	// System status endpoint
+	app.Get("/api/system/status", rest.GetSystemStatus)
+	app.Get("/api/system/redis-check", rest.CheckRedisStatus)
 	
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
@@ -2414,5 +2419,68 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 		Results: map[string]interface{}{
 			"retried": rowsAffected,
 		},
+	})
+}
+
+// GetSystemStatus returns current system configuration status
+func (handler *App) GetSystemStatus(c *fiber.Ctx) error {
+	// Check Redis status
+	redisURL := config.RedisURL
+	if redisURL == "" {
+		redisURL = os.Getenv("REDIS_URL")
+	}
+	
+	redisEnabled := false
+	redisInfo := "Not configured"
+	
+	if redisURL != "" {
+		// Mask password in URL for security
+		if strings.Contains(redisURL, "@") {
+			parts := strings.Split(redisURL, "@")
+			if len(parts) > 1 {
+				redisInfo = "redis://***@" + parts[1]
+			}
+		}
+		
+		// Check if Redis is actually being used
+		if redisURL != "" && 
+		   !strings.Contains(redisURL, "${{") && 
+		   !strings.Contains(redisURL, "localhost") && 
+		   !strings.Contains(redisURL, "[::1]") &&
+		   (strings.Contains(redisURL, "redis://") || strings.Contains(redisURL, "rediss://")) {
+			redisEnabled = true
+		}
+	}
+	
+	// Get broadcast manager type
+	broadcastType := "In-Memory"
+	if redisEnabled {
+		broadcastType = "Redis-Optimized"
+	}
+	
+	// Get worker stats
+	broadcastManager := broadcast.GetBroadcastManager()
+	workerStats := broadcastManager.GetAllWorkerStatus()
+	
+	status := map[string]interface{}{
+		"redis": map[string]interface{}{
+			"enabled": redisEnabled,
+			"url":     redisInfo,
+		},
+		"broadcast": map[string]interface{}{
+			"type":          broadcastType,
+			"activeWorkers": len(workerStats),
+		},
+		"environment": map[string]interface{}{
+			"appDebug": config.AppDebug,
+			"appPort":  config.AppPort,
+		},
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "System status",
+		Results: status,
 	})
 }

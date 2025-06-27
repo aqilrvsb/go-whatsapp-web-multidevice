@@ -45,8 +45,8 @@ func GetBroadcastManager() BroadcastManagerInterface {
 		   !strings.Contains(redisURL, "localhost") && 
 		   !strings.Contains(redisURL, "[::1]") &&
 		   (strings.Contains(redisURL, "redis://") || strings.Contains(redisURL, "rediss://")) {
-			logrus.Info("Valid Redis URL found, initializing Redis-based broadcast manager")
-			unifiedManager = NewRedisOptimizedBroadcastManager()
+			logrus.Info("Valid Redis URL found, initializing Ultra Scale Redis broadcast manager for 3000+ devices")
+			unifiedManager = NewUltraScaleRedisManager()
 		} else {
 			logrus.Info("No valid Redis URL found, using in-memory broadcast manager")
 			unifiedManager = NewBasicBroadcastManager()
