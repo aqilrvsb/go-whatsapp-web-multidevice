@@ -524,7 +524,25 @@ func (handler *App) DeviceLeadsView(c *fiber.Ctx) error {
 // GetDeviceLeads gets all leads for a specific device
 func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 	deviceId := c.Params("deviceId")
-	userEmail := c.Locals("email").(string)
+	
+	// Safely get email from context
+	emailInterface := c.Locals("email")
+	if emailInterface == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	userEmail, ok := emailInterface.(string)
+	if !ok {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid user session",
+		})
+	}
 	
 	userRepo := repository.GetUserRepository()
 	user, err := userRepo.GetUserByEmail(userEmail)
@@ -559,7 +577,24 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 
 // CreateLead creates a new lead
 func (handler *App) CreateLead(c *fiber.Ctx) error {
-	userEmail := c.Locals("email").(string)
+	// Safely get email from context
+	emailInterface := c.Locals("email")
+	if emailInterface == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	userEmail, ok := emailInterface.(string)
+	if !ok {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid user session",
+		})
+	}
 	
 	var request struct {
 		DeviceID string `json:"device_id"`
@@ -619,7 +654,25 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 // UpdateLead updates an existing lead
 func (handler *App) UpdateLead(c *fiber.Ctx) error {
 	leadId := c.Params("id")
-	userEmail := c.Locals("email").(string)
+	
+	// Safely get email from context
+	emailInterface := c.Locals("email")
+	if emailInterface == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	userEmail, ok := emailInterface.(string)
+	if !ok {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid user session",
+		})
+	}
 	
 	var request struct {
 		Name    string `json:"name"`
@@ -678,7 +731,25 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 // DeleteLead deletes a lead
 func (handler *App) DeleteLead(c *fiber.Ctx) error {
 	leadId := c.Params("id")
-	userEmail := c.Locals("email").(string)
+	
+	// Safely get email from context
+	emailInterface := c.Locals("email")
+	if emailInterface == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User not authenticated",
+		})
+	}
+	
+	userEmail, ok := emailInterface.(string)
+	if !ok {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid user session",
+		})
+	}
 	
 	userRepo := repository.GetUserRepository()
 	_, err := userRepo.GetUserByEmail(userEmail)

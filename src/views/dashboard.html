@@ -901,9 +901,8 @@
                         <div class="mb-3">
                             <label class="form-label">Target Lead Status <span class="text-danger">*</span></label>
                             <select class="form-select" id="campaignTargetStatus" required>
-                                <option value="all">All Leads</option>
-                                <option value="prospect">Prospects Only</option>
-                                <option value="customer">Customers Only</option>
+                                <option value="prospect" selected>Prospect</option>
+                                <option value="customer">Customer</option>
                             </select>
                         </div>
                         
@@ -2491,7 +2490,7 @@
                 campaign_date: campaignDate,
                 title: document.getElementById('campaignTitle').value || '',
                 niche: document.getElementById('campaignNiche').value || '',
-                target_status: document.getElementById('campaignTargetStatus').value || 'all',
+                target_status: document.getElementById('campaignTargetStatus').value || 'prospect',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
                 scheduled_time: scheduledTime,

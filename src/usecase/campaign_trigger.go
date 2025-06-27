@@ -82,7 +82,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	// Check if campaign has target_status field
 	targetStatus := campaign.TargetStatus
 	if targetStatus == "" {
-		targetStatus = "all" // Default to all if not set
+		targetStatus = "prospect" // Default to prospect if not set
 	}
 	
 	leads, err = leadRepo.GetLeadsByNicheAndStatus(campaign.Niche, targetStatus)

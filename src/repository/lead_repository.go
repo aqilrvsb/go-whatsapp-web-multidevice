@@ -97,8 +97,8 @@ func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) (
 		return nil, err
 	}
 	
-	// If status is "all", return all leads matching the niche
-	if status == "all" || status == "" {
+	// If no status specified, return all leads matching the niche
+	if status == "" {
 		return leads, nil
 	}
 	
