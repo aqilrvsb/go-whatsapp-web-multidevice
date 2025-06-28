@@ -150,16 +150,6 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 	// Only log when there's actual work to do
 	
-	// Load Malaysia timezone for consistent processing
-	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
-	if err != nil {
-		if !timezoneWarningLogged {
-			logrus.Warnf("Failed to load Malaysia timezone for sequences, using UTC: %v", err)
-			timezoneWarningLogged = true
-		}
-		loc = time.UTC
-	}
-	
 	sequenceRepo := repository.GetSequenceRepository()
 	leadRepo := repository.GetLeadRepository()
 	

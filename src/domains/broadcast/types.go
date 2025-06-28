@@ -30,12 +30,14 @@ type BroadcastMessage struct {
 
 // WorkerStatus represents the status of a device worker
 type WorkerStatus struct {
-	DeviceID       string
-	Status         string
-	QueueSize      int
-	ProcessedCount int
-	FailedCount    int
-	LastActivity   time.Time
+	DeviceID          string
+	Status            string
+	QueueSize         int
+	ProcessedCount    int
+	FailedCount       int
+	LastActivity      time.Time
+	CurrentCampaignID int
+	CurrentSequenceID string
 }
 
 // BroadcastRequest represents a broadcast request

@@ -1,35 +1,17 @@
 @echo off
-echo Fixing syntax error in sequence repository...
+cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 
-cd C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
-
+echo === Fixing syntax error in campaign_repository.go ===
 echo.
-echo Running quick syntax check...
-cd src
-go build ./... 2>&1 | findstr /C:"syntax error"
-if %ERRORLEVEL% == 0 (
-    echo Syntax errors found, please check!
-) else (
-    echo No syntax errors detected!
-)
-cd ..
 
-echo.
-echo Git status...
-git status
+git add src/repository/campaign_repository.go
+git commit -m "fix: Remove duplicate return statement in campaign_repository.go
 
-echo.
-echo Adding changes...
-git add src/repository/sequence_repository.go
+- Fixed syntax error caused by duplicate return statement
+- Cleaned up file structure"
 
-echo.
-echo Committing fix...
-git commit -m "fix: Add missing closing brace in GetSequenceStats function"
-
-echo.
-echo Pushing to GitHub...
 git push origin main
 
 echo.
-echo ✅ Syntax error fix pushed successfully!
+echo === Fix pushed! ===
 pause

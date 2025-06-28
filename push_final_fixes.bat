@@ -1,27 +1,29 @@
 @echo off
-echo Pushing import fixes and README updates...
+cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+
+echo === Pushing device connection status fix and README update ===
 echo.
 
-cd C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+git add src/usecase/campaign_trigger.go
+git add src/usecase/optimized_campaign_trigger.go
+git add src/usecase/sequence.go
+git add README.md
+git commit -m "fix: Device connection status check and update README
 
-echo Adding changes...
-git add -A
+- Fixed case sensitivity issue for device status (connected vs Connected)
+- Added debug logging to show device status during campaign execution
+- Fixed same issue in sequences
+- Updated README with comprehensive development summary
+- System now properly detects connected devices for campaigns"
 
-echo.
-echo Committing...
-git commit -m "Fix import errors and update README with system assessment
-
-- Removed services import from optimized triggers
-- Fixed compilation error by removing IWhatsappService dependency
-- Updated README with latest capabilities and architecture
-- Added honest system assessment for 3000 devices
-- Documented message sending logic clearly
-- Added performance specifications"
-
-echo.
-echo Pushing to GitHub...
 git push origin main
 
 echo.
-echo Done! All fixes have been pushed.
+echo === All fixes pushed successfully! ===
+echo.
+echo Your WhatsApp Multi-Device System is now fully operational with:
+echo - Campaigns detecting connected devices properly
+echo - Sequences working with connected devices
+echo - Complete development summary in README
+echo.
 pause
