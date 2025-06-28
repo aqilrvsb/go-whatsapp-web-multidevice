@@ -1,4 +1,8 @@
-// Add these methods to WhatsAppRepository
+package repository
+
+import (
+	"fmt"
+)
 
 // ClearDeviceMessages clears all messages for a device
 func (r *WhatsAppRepository) ClearDeviceMessages(deviceID string) error {

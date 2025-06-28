@@ -1129,50 +1129,9 @@ func (handler *App) DeleteCampaign(c *fiber.Ctx) error {
 }
 // DeleteDevice deletes a device
 func (handler *App) DeleteDevice(c *fiber.Ctx) error {
-	deviceId := c.Params("id")
-	
-	// Get session from cookie instead of relying on Locals
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-	
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-	
-	user, err := userRepo.GetUserByID(session.UserID)
-	if err != nil {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "USER_NOT_FOUND",
-			Message: "User not found",
-		})
-	}
-	
-	// Check if device exists and get its details
-	device, err := userRepo.GetDeviceByID(deviceId)
-	if err != nil {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not found",
-		})
-	}
-	
-	// Verify device belongs to user
-	if device.UserID != user.ID {
-		return c.Status(403).JSON(utils.ResponseData{
+	// Use the fixed version
+	return handler.DeleteDeviceFixed(c)
+}
 			Status:  403,
 			Code:    "FORBIDDEN",
 			Message: "You don't have permission to delete this device",
@@ -1208,32 +1167,9 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 
 // LogoutDevice logs out from WhatsApp
 func (handler *App) LogoutDevice(c *fiber.Ctx) error {
-	deviceId := c.Query("deviceId")
-	
-	// Get session from cookie
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-	
-	// Verify device ownership
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-	
-	user, err := userRepo.GetUserByID(session.UserID)
-	if err != nil {
-		return c.Status(404).JSON(utils.ResponseData{
+	// Use the fixed version
+	return handler.LogoutDeviceFixed(c)
+}
 			Status:  404,
 			Code:    "USER_NOT_FOUND",
 			Message: "User not found",
