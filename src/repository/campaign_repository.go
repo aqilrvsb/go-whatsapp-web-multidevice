@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"whatsapp-go/src/models"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 )
 
 type CampaignRepository interface {
