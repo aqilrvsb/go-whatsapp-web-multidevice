@@ -19,6 +19,7 @@ import (
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
 type serviceApp struct {
@@ -34,29 +35,25 @@ func NewAppService(waCli *whatsmeow.Client, db *sqlstore.Container) domainApp.IA
 }
 
 func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResponse, err error) {
-	if service.WaCli == nil {
-		return response, pkgError.ErrWaCLI
+	// For multi-device support, we need to create a new client for this login attempt
+	// Don't use the global client
+	
+	if service.db == nil {
+		return response, fmt.Errorf("database not initialized")
 	}
-
-	// Check if already logged in before disconnecting
-	if service.WaCli.IsLoggedIn() {
-		logrus.Info("Already logged in, checking connection...")
-		if service.WaCli.IsConnected() {
-			return response, pkgError.ErrAlreadyLoggedIn
-		}
-		// If logged in but not connected, just reconnect
-		err = service.WaCli.Connect()
-		if err == nil {
-			return response, pkgError.ErrAlreadyLoggedIn
-		}
-	}
-
-	// Disconnect for reconnecting
-	service.WaCli.Disconnect()
-	time.Sleep(500 * time.Millisecond) // Give it time to disconnect
-
-	// First connect to WhatsApp
-	logrus.Info("Connecting to WhatsApp...")
+	
+	// Create a new device in the store
+	logrus.Info("Creating new WhatsApp device for login...")
+	device := service.db.NewDevice()
+	
+	// Create a new WhatsApp client for this device
+	newClient := whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
+	
+	// Use this new client for login
+	service.WaCli = newClient
+	
+	// Now proceed with login using the new client
+	logrus.Info("Connecting new WhatsApp client...")
 	err = service.WaCli.Connect()
 	if err != nil {
 		logrus.Error("Error when connect to whatsapp: ", err)
@@ -150,16 +147,31 @@ func (service serviceApp) monitorLogin() {
 		if service.WaCli.IsLoggedIn() {
 			logrus.Info("Login successful! Registering device...")
 			
-			// Get device info from current session
+			// Get connection session to find device ID
 			allSessions := whatsapp.GetAllConnectionSessions()
+			
 			for userID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
-					logrus.Infof("Registering device %s for user %s", session.DeviceID, userID)
+					logrus.Infof("Found session for user %s, device %s", userID, session.DeviceID)
+					
+					// Register the client with the actual device ID from database
 					cm := whatsapp.GetClientManager()
 					cm.AddClient(session.DeviceID, service.WaCli)
+					logrus.Infof("Registered WhatsApp client for device ID: %s", session.DeviceID)
+					
+					// Clear the session
+					whatsapp.ClearConnectionSession(userID)
 					break
 				}
 			}
+			
+			// Fallback if no session found
+			if service.WaCli.Store.ID != nil {
+				jid := service.WaCli.Store.ID.String()
+				phoneNumber := service.WaCli.Store.ID.User
+				logrus.Warnf("No session found, device logged in with JID: %s, Phone: %s", jid, phoneNumber)
+			}
+			
 			return
 		}
 		if i%5 == 0 {

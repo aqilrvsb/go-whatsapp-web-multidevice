@@ -153,9 +153,12 @@ func (handler *App) Login(c *fiber.Ctx) error {
 	log.Printf("Login request - UserID: %v, DeviceID: %s", userID, deviceId)
 	
 	if userID != nil && deviceId != "" {
-		// Start tracking this connection session
-		whatsapp.StartConnectionSession(userID.(string), deviceId, "")
-		log.Printf("Started connection session for user %s, device %s", userID, deviceId)
+		// Store connection session for this device
+		logrus.Infof("Storing connection session for user %s, device %s", userID, deviceId)
+		whatsapp.StoreConnectionSession(userID.(string), &whatsapp.ConnectionSession{
+			UserID:   userID.(string),
+			DeviceID: deviceId,
+		})
 	}
 	
 	response, err := handler.Service.Login(c.UserContext())
@@ -407,7 +410,11 @@ func (handler *App) GetQRCode(c *fiber.Ctx) error {
 	deviceID := c.Query("device_id")
 	
 	if userID != nil && deviceID != "" {
-		// Store in a map or context for later use
+		// Store connection session
+		whatsapp.StoreConnectionSession(userID.(string), &whatsapp.ConnectionSession{
+			UserID:   userID.(string),
+			DeviceID: deviceID,
+		})
 		logrus.Infof("Connection request for user %s, device %s", userID, deviceID)
 	}
 	
