@@ -17,7 +17,6 @@ import (
 	fiberUtils "github.com/gofiber/fiber/v2/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
-	"go.mau.fi/libsignal/logger"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 )
@@ -42,15 +41,19 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 	// Disconnect for reconnecting
 	service.WaCli.Disconnect()
 
-	chImage := make(chan string)
-	var loginComplete chan bool
+	// First connect to WhatsApp
+	err = service.WaCli.Connect()
+	if err != nil {
+		logrus.Error("Error when connect to whatsapp: ", err)
+		return response, pkgError.ErrReconnect
+	}
 
+	// Then get QR channel after connection
 	ch, err := service.WaCli.GetQRChannel(context.Background())
 	if err != nil {
-		logrus.Error(err.Error())
+		logrus.Error("Error getting QR channel: ", err.Error())
 		// This error means that we're already logged in, so ignore it.
 		if errors.Is(err, whatsmeow.ErrQRStoreContainsID) {
-			_ = service.WaCli.Connect() // just connect to websocket
 			if service.WaCli.IsLoggedIn() {
 				return response, pkgError.ErrAlreadyLoggedIn
 			}
@@ -58,81 +61,87 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 		} else {
 			return response, pkgError.ErrQrChannel
 		}
-	} else {
-		loginComplete := make(chan bool, 1)
-		
-		go func() {
-			for evt := range ch {
-				logrus.Infof("QR Code received, timeout: %v seconds", evt.Timeout/time.Second)
-				response.Code = evt.Code
-				response.Duration = evt.Timeout / time.Second / 2
-				if evt.Code != "" {
-					qrPath := fmt.Sprintf("%s/scan-qr-%s.png", config.PathQrCode, fiberUtils.UUIDv4())
-					err = qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
-					if err != nil {
-						logrus.Error("Error when write qr code to file: ", err)
-					}
-					go func() {
-						time.Sleep(response.Duration * time.Second)
-						err := os.Remove(qrPath)
-						if err != nil {
-							logrus.Error("error when remove qrImage file", err.Error())
-						}
-					}()
-					chImage <- qrPath
-				}
-			}
-			logrus.Info("QR channel closed - login might be complete")
-			loginComplete <- true
-		}()
 	}
 
-	err = service.WaCli.Connect()
-	if err != nil {
-		logger.Error("Error when connect to whatsapp", err)
-		return response, pkgError.ErrReconnect
-	}
-	
-	response.ImagePath = <-chImage
-	
-	// Wait for login completion with better monitoring
-	go func() {
-		logrus.Info("Starting login monitor...")
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
+	// Wait for first QR code
+	select {
+	case evt := <-ch:
+		logrus.Infof("Got first QR code, timeout: %v seconds", evt.Timeout/time.Second)
+		response.Code = evt.Code
+		response.Duration = evt.Timeout / time.Second / 2
 		
-		for i := 0; i < 60; i++ { // 60 second timeout
-			<-ticker.C
-			if service.WaCli.IsLoggedIn() {
-				logrus.Info("Login detected! Registering device...")
-				
-				// Get device info from current session
-				allSessions := whatsapp.GetAllConnectionSessions()
-				for userID, session := range allSessions {
-					if session != nil && session.DeviceID != "" {
-						logrus.Infof("Registering device %s for user %s", session.DeviceID, userID)
-						cm := whatsapp.GetClientManager()
-						cm.AddClient(session.DeviceID, service.WaCli)
-						break
-					}
+		if evt.Code != "" {
+			// Ensure QR code directory exists
+			qrDir := config.PathQrCode
+			if err := os.MkdirAll(qrDir, 0755); err != nil {
+				logrus.Errorf("Failed to create QR directory: %v", err)
+			}
+			
+			qrPath := fmt.Sprintf("%s/scan-qr-%s.png", qrDir, fiberUtils.UUIDv4())
+			err = qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
+			if err != nil {
+				logrus.Error("Error when write qr code to file: ", err)
+				return response, err
+			}
+			
+			// Clean up QR image after timeout
+			go func() {
+				time.Sleep(response.Duration * time.Second)
+				err := os.Remove(qrPath)
+				if err != nil {
+					logrus.Error("error when remove qrImage file", err.Error())
 				}
-				
-				loginComplete <- true
-				return
-			}
-			if i%5 == 0 {
-				logrus.Infof("Still waiting for login... (%d seconds)", i)
-			}
+			}()
+			
+			response.ImagePath = qrPath
+			
+			// Continue processing QR updates in background
+			go func() {
+				for evt := range ch {
+					logrus.Infof("QR update received, code length: %d", len(evt.Code))
+				}
+				logrus.Info("QR channel closed")
+			}()
+			
+			// Monitor login in background
+			go service.monitorLogin()
 		}
-		logrus.Warn("Login monitor timeout")
-		loginComplete <- false
-	}()
-	
-	// Wait for completion
-	<-loginComplete
-	logrus.Info("Login process completed")
+		
+	case <-time.After(10 * time.Second):
+		logrus.Error("Timeout waiting for QR code")
+		return response, fmt.Errorf("timeout waiting for QR code")
+	}
 
 	return response, nil
+}
+
+func (service serviceApp) monitorLogin() {
+	logrus.Info("Starting login monitor...")
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	
+	for i := 0; i < 30; i++ { // 60 second timeout
+		<-ticker.C
+		if service.WaCli.IsLoggedIn() {
+			logrus.Info("Login successful! Registering device...")
+			
+			// Get device info from current session
+			allSessions := whatsapp.GetAllConnectionSessions()
+			for userID, session := range allSessions {
+				if session != nil && session.DeviceID != "" {
+					logrus.Infof("Registering device %s for user %s", session.DeviceID, userID)
+					cm := whatsapp.GetClientManager()
+					cm.AddClient(session.DeviceID, service.WaCli)
+					break
+				}
+			}
+			return
+		}
+		if i%5 == 0 {
+			logrus.Infof("Still waiting for login... (%d seconds)", i*2)
+		}
+	}
+	logrus.Warn("Login monitor timeout after 60 seconds")
 }
 
 func (service serviceApp) LoginWithCode(ctx context.Context, phoneNumber string) (loginCode string, err error) {
