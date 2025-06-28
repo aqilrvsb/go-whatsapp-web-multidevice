@@ -7,14 +7,12 @@ import (
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
-	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"context"
-	"encoding/json"
 )
 
 const (
@@ -142,8 +140,6 @@ func (p *OptimizedBroadcastProcessor) processNewMessages() {
 }
 
 func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
-	ctx := context.Background()
-	
 	// Check device status
 	device, err := p.userRepo.GetDeviceByID(deviceID)
 	if err != nil {
@@ -172,86 +168,34 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 		return
 	}
 	
-	// Create Redis queue key for this device
-	queueKey := fmt.Sprintf("broadcast:queue:%s", deviceID)
-	processingKey := fmt.Sprintf("broadcast:processing:%s", deviceID)
-	
-	// Move messages from database to Redis queue (if not already there)
+	// Get pending messages from database
 	messages, err := p.broadcastRepo.GetPendingMessages(deviceID, MESSAGE_BATCH_SIZE)
 	if err != nil {
 		logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 		return
 	}
 	
-	// Add messages to Redis queue
-	for _, msg := range messages {
-		msgJSON, err := json.Marshal(msg)
-		if err != nil {
-			logrus.Errorf("Failed to marshal message: %v", err)
-			continue
-		}
-		
-		// Add to Redis queue with score as timestamp for ordering
-		score := float64(msg.ScheduledAt.Unix())
-		p.redisClient.ZAdd(ctx, queueKey, &redis.Z{
-			Score:  score,
-			Member: string(msgJSON),
-		})
-		
-		// Update status in database
-		p.broadcastRepo.UpdateMessageStatus(msg.ID, "queued", "")
+	if len(messages) == 0 {
+		return
 	}
 	
-	// Process messages from Redis queue
-	for {
-		// Get next message from queue
-		results, err := p.redisClient.ZPopMin(ctx, queueKey, 1).Result()
-		if err != nil || len(results) == 0 {
-			break // No more messages
-		}
-		
-		// Parse message
-		var msg domainBroadcast.BroadcastMessage
-		if err := json.Unmarshal([]byte(results[0].Member.(string)), &msg); err != nil {
-			logrus.Errorf("Failed to unmarshal message: %v", err)
-			continue
-		}
-		
-		// Move to processing set
-		p.redisClient.SAdd(ctx, processingKey, results[0].Member)
-		
-		// Send message
-		startTime := time.Now()
-		err = p.manager.SendMessage(msg)
-		sendDuration := time.Since(startTime)
-		
+	logrus.Infof("Found %d pending messages for device %s, sending to broadcast manager", len(messages), deviceID)
+	
+	// Send each message to the broadcast manager
+	// The UltraScaleRedisManager will:
+	// 1. Add to Redis queue
+	// 2. Create/ensure worker exists
+	// 3. Worker will process and send
+	for _, msg := range messages {
+		// Send to broadcast manager
+		err := p.manager.SendMessage(msg)
 		if err != nil {
-			logrus.Errorf("Failed to send message %s: %v (took %v)", msg.ID, err, sendDuration)
+			logrus.Errorf("Failed to queue message %s: %v", msg.ID, err)
 			p.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
-			
-			// Remove from processing
-			p.redisClient.SRem(ctx, processingKey, results[0].Member)
-			
-			// Retry logic - add back to queue with delay
-			retryScore := float64(time.Now().Add(1 * time.Minute).Unix())
-			p.redisClient.ZAdd(ctx, queueKey, &redis.Z{
-				Score:  retryScore,
-				Member: results[0].Member,
-			})
 		} else {
-			logrus.Infof("Sent message %s to %s in %v", msg.ID, msg.RecipientPhone, sendDuration)
-			p.broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
-			
-			// Remove from processing
-			p.redisClient.SRem(ctx, processingKey, results[0].Member)
-			
-			// Update metrics
-			p.updateMetrics(deviceID, true, sendDuration)
+			// Mark as queued - the broadcast manager will handle updating to sent/failed
+			p.broadcastRepo.UpdateMessageStatus(msg.ID, "queued", "")
 		}
-		
-		// Apply delay between messages
-		delay := p.calculateDelay(msg.MinDelay, msg.MaxDelay)
-		time.Sleep(delay)
 	}
 }
 

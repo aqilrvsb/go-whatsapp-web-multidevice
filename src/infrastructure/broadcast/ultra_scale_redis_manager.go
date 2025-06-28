@@ -367,12 +367,17 @@ func (um *UltraScaleRedisManager) processMessage(worker *DeviceWorker, msg *Ultr
 	duration := time.Since(start)
 	um.updateProcessingTime(msg.Message.DeviceID, duration)
 	
+	// Update database status
+	broadcastRepo := repository.GetBroadcastRepository()
 	if err != nil {
 		um.incrementMetricBatch("messages_failed")
+		broadcastRepo.UpdateMessageStatus(msg.Message.ID, "failed", err.Error())
 		return err
 	}
 	
 	um.incrementMetricBatch("messages_sent")
+	broadcastRepo.UpdateMessageStatus(msg.Message.ID, "sent", "")
+	logrus.Infof("Message %s sent successfully to %s", msg.Message.ID, msg.Message.RecipientPhone)
 	return nil
 }
 
