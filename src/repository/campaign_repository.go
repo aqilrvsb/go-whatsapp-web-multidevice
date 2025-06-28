@@ -187,8 +187,6 @@ func (r *campaignRepository) UpdateCampaignStatus(id int, status string) error {
 
 // GetPendingCampaigns gets all campaigns with pending status
 func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
-	log.Println("📋 [Campaign Repository] Getting pending campaigns...")
-	
 	// OPTIMIZED: Let PostgreSQL handle timezone conversions
 	query := `
 		SELECT 
@@ -229,11 +227,8 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 			continue
 		}
 		campaigns = append(campaigns, c)
-		log.Printf("✅ [Campaign Repository] Found pending campaign: %s (Date: %s, Time: %s)", 
-			c.Title, c.CampaignDate, c.TimeSchedule)
 	}
 	
-	log.Printf("📊 [Campaign Repository] Total pending campaigns found: %d", len(campaigns))
 	return campaigns, nil
 }
 

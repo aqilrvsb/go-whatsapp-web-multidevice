@@ -10,6 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	timezoneWarningLogged = false
+)
+
 // CampaignTriggerService handles campaign and sequence triggers
 type CampaignTriggerService struct {
 	broadcastManager broadcast.BroadcastManagerInterface
@@ -24,8 +28,7 @@ func NewCampaignTriggerService() *CampaignTriggerService {
 
 // ProcessCampaignTriggers processes campaigns scheduled for today
 func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
-	logrus.Info("Processing campaign triggers...")
-	
+	// Only log when there are campaigns to process
 	campaignRepo := repository.GetCampaignRepository()
 	
 	// Get pending campaigns that are ready to send
@@ -35,7 +38,9 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 		return err
 	}
 	
-	logrus.Infof("Found %d campaigns ready to process", len(campaigns))
+	if len(campaigns) > 0 {
+		logrus.Infof("Found %d campaigns ready to process", len(campaigns))
+	}
 	
 	for _, campaign := range campaigns {
 		logrus.Infof("Checking campaign: %s (ID: %d, Status: %s, Date: %s, Time: %s)", 
@@ -82,7 +87,6 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	// Filter only connected devices
 	connectedDevices := make([]*models.UserDevice, 0)
 	for _, device := range devices {
-		logrus.Infof("Device %s (ID: %s) has status: %s", device.DeviceName, device.ID, device.Status)
 		// Check for connected, Connected, online, or Online status
 		if device.Status == "connected" || device.Status == "Connected" || 
 		   device.Status == "online" || device.Status == "Online" {
@@ -144,17 +148,19 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
-	logrus.Info("Processing sequence triggers for new leads...")
+	// Only log when there's actual work to do
 	
 	// Load Malaysia timezone for consistent processing
 	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	if err != nil {
-		logrus.Warnf("Failed to load Malaysia timezone for sequences, using UTC: %v", err)
+		if !timezoneWarningLogged {
+			logrus.Warnf("Failed to load Malaysia timezone for sequences, using UTC: %v", err)
+			timezoneWarningLogged = true
+		}
 		loc = time.UTC
 	}
 	
 	nowMalaysia := time.Now().In(loc)
-	logrus.Infof("Processing sequences at Malaysia time: %s", nowMalaysia.Format("2006-01-02 15:04:05"))
 	
 	sequenceRepo := repository.GetSequenceRepository()
 	leadRepo := repository.GetLeadRepository()
@@ -204,7 +210,7 @@ func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 
 // ProcessDailySequenceMessages processes sequence messages for contacts
 func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
-	logrus.Info("Processing daily sequence messages...")
+	// Only log when processing actual messages
 	
 	sequenceRepo := repository.GetSequenceRepository()
 	broadcastRepo := repository.GetBroadcastRepository()

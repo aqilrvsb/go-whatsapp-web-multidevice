@@ -434,9 +434,11 @@ func (um *UltraScaleRedisManager) performHealthCheck() {
 	}
 	um.workersMutex.RUnlock()
 	
-	// Log statistics
-	logrus.Infof("Health check: %d active workers out of %d max", 
-		workerCount, maxConcurrentWorkers)
+	// Log statistics only if there are active workers or every 10th check
+	if workerCount > 0 {
+		logrus.Infof("Health check: %d active workers out of %d max", 
+			workerCount, maxConcurrentWorkers)
+	}
 	
 	// Check and extend locks
 	for _, deviceID := range deviceIDs {
