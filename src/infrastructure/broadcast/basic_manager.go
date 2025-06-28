@@ -31,6 +31,8 @@ func NewBasicBroadcastManager() *BasicBroadcastManager {
 		maxWorkers: 100, // Limit concurrent workers
 	}
 	
+	logrus.Info("BasicBroadcastManager: Starting manager and queue processor")
+	
 	// Start manager
 	go bm.Run()
 	
@@ -82,12 +84,19 @@ func (bm *BasicBroadcastManager) processQueueBatch() {
 		return
 	}
 	
+	if len(messages) > 0 {
+		logrus.Infof("BasicBroadcastManager: Processing %d pending messages", len(messages))
+	}
+	
 	// Process each message
 	for _, msg := range messages {
+		logrus.Infof("Processing message %s for device %s to %s", msg.ID, msg.DeviceID, msg.RecipientPhone)
+		
 		// Get or create worker for the device
 		worker := bm.GetOrCreateWorker(msg.DeviceID)
 		if worker != nil {
 			worker.SendMessage(msg)
+			logrus.Infof("Message %s queued to worker for device %s", msg.ID, msg.DeviceID)
 		} else {
 			logrus.Warnf("Could not create worker for device %s", msg.DeviceID)
 		}
