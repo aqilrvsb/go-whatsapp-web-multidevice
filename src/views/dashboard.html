@@ -1313,6 +1313,7 @@
         let devices = [];
         let currentDeviceFilter = 'all';
         let refreshInterval;
+        let currentScanningDeviceId = null; // Track which device is being scanned
         let isAutoRefreshEnabled = false;  // Default to disabled
 
         // Initialize
@@ -1904,6 +1905,7 @@
 
         // Scan QR Code
         function scanQR(deviceId) {
+            currentScanningDeviceId = deviceId; // Track which device is being scanned
             const modal = new bootstrap.Modal(document.getElementById('qrModal'));
             modal.show();
             
@@ -2305,8 +2307,55 @@
                             }
                             // Show success message
                             alert('WhatsApp connected successfully!');
-                            // Reload devices to show updated status
-                            loadDevices();
+                            
+                            // Extract phone and JID from the message
+                            const deviceInfo = data.results || {};
+                            const phone = deviceInfo.phone || '';
+                            const jid = deviceInfo.jid || '';
+                            
+                            // Update the device card immediately - simple approach
+                            const deviceCards = document.querySelectorAll('.device-card');
+                            deviceCards.forEach(card => {
+                                // Check if this card has "Disconnected" status
+                                const statusText = card.querySelector('.text-muted.small');
+                                if (statusText && statusText.textContent === 'Disconnected') {
+                                    // Update to Connected
+                                    statusText.textContent = 'Connected';
+                                    
+                                    // Update card styling
+                                    card.classList.add('connected');
+                                    
+                                    // Update device icon color
+                                    const deviceIcon = card.querySelector('.bi-phone-fill');
+                                    if (deviceIcon) {
+                                        deviceIcon.style.color = 'var(--success)';
+                                    }
+                                    
+                                    // Update phone number if we have it
+                                    if (phone) {
+                                        const phoneSection = Array.from(card.querySelectorAll('div')).find(div => 
+                                            div.textContent.includes('Not linked')
+                                        );
+                                        if (phoneSection) {
+                                            phoneSection.textContent = phone;
+                                        }
+                                    }
+                                    
+                                    // Update the devices array
+                                    devices.forEach(device => {
+                                        if (device.id === currentScanningDeviceId || device.status === 'offline') {
+                                            device.status = 'online';
+                                            device.phone = phone;
+                                            device.jid = jid;
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            // Still reload devices after a delay to get server data
+                            setTimeout(() => {
+                                loadDevices();
+                            }, 3000);
                             break;
                         case 'DEVICE_STATUS':
                             updateDeviceStatus(data.deviceId, data.status);
