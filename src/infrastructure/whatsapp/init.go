@@ -273,7 +273,8 @@ func handleConnectionEvents(_ context.Context) {
 		if phoneNumber != "" && jid != "" {
 			// Simple approach: Update the most recently created offline device
 			// This handles the case where session doesn't have the device ID
-			if db, err := database.GetConnection(); err == nil {
+			db := database.GetDB()
+			if db != nil {
 				query := `
 					UPDATE user_devices 
 					SET status = 'online', 
