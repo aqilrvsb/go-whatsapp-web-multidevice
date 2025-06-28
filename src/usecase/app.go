@@ -34,142 +34,99 @@ func NewAppService(waCli *whatsmeow.Client, db *sqlstore.Container) domainApp.IA
 }
 
 func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
-	// CRITICAL FIX: Always use a fresh database container for multi-device support
+	// For multi-device support, we need to create a new client for this login attempt
 	if service.db == nil {
 		return response, fmt.Errorf("database not initialized")
 	}
 	
-	// FIX 1: Create a new device store for each login attempt
+	// Create a new device in the store
 	logrus.Info("Creating new WhatsApp device for login...")
-	
-	// Get a fresh device from the store
 	device := service.db.NewDevice()
 	
-	// Create a fresh WhatsApp client for this device
+	// Create a new WhatsApp client for this device
 	newClient := whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
 	
-	// IMPORTANT: Don't override the service client, use local client
-	// This allows multiple devices to connect simultaneously
-	
-	// FIX 2: Add event handler to properly register device after successful login
+	// Add event handler to properly register device after successful login
 	newClient.AddEventHandler(func(evt interface{}) {
 		switch v := evt.(type) {
 		case *events.PairSuccess:
 			logrus.Infof("Pair success event: %s", v.ID.String())
-			// Device is paired but not fully connected yet
 		case *events.Connected:
 			logrus.Info("Connected event received - device fully connected!")
-			// Now register the device with ClientManager
 			service.registerDeviceAfterConnection(newClient)
 		case *events.LoggedOut:
 			logrus.Warn("Device logged out")
 		}
 	})
 	
-	// Connect the new client
-	logrus.Info("Connecting new WhatsApp client...")
-	err = newClient.Connect()
-	if err != nil {
-		logrus.Error("Error when connect to whatsapp: ", err)
-		return response, pkgError.ErrReconnect
-	}
-
-	// Check if this device is already logged in
-	if newClient.IsLoggedIn() {
-		logrus.Info("Device already logged in")
-		// Register it immediately
-		service.registerDeviceAfterConnection(newClient)
-		return response, pkgError.ErrAlreadyLoggedIn
-	}
-
-	// Get QR channel
+	// IMPORTANT: Get QR channel BEFORE connecting (like the working version)
 	logrus.Info("Getting QR channel...")
 	ch, err := newClient.GetQRChannel(ctx)
 	if err != nil {
 		logrus.Error("Error getting QR channel: ", err.Error())
 		
 		if errors.Is(err, whatsmeow.ErrQRStoreContainsID) {
-			// This device is already registered, try to delete and recreate
-			logrus.Warn("Device already has ID, deleting and recreating...")
-			device.Delete(ctx)
-			
-			// Create a completely new device
-			device = service.db.NewDevice()
-			newClient = whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
-			
-			// Try connecting again
+			// Already logged in, just connect
 			err = newClient.Connect()
 			if err != nil {
-				return response, fmt.Errorf("failed to reconnect after device reset: %w", err)
+				return response, fmt.Errorf("failed to connect: %w", err)
 			}
-			
-			// Try getting QR channel again
-			ch, err = newClient.GetQRChannel(ctx)
-			if err != nil {
-				return response, fmt.Errorf("failed to get QR channel after reset: %w", err)
+			if newClient.IsLoggedIn() {
+				service.registerDeviceAfterConnection(newClient)
+				return response, pkgError.ErrAlreadyLoggedIn
 			}
+			return response, pkgError.ErrSessionSaved
 		} else {
 			return response, pkgError.ErrQrChannel
 		}
 	}
-
-	logrus.Info("Waiting for QR code...")
 	
-	// Process QR codes in a separate goroutine
+	// Setup QR processing like the working version
+	chImage := make(chan string)
+	
 	go func() {
 		for evt := range ch {
+			response.Code = evt.Code
+			response.Duration = evt.Timeout / time.Second / 2
 			if evt.Event == "code" {
-				logrus.Infof("QR code update: timeout=%v", evt.Timeout/time.Second)
-				
-				// Only process the first QR code for the response
-				if response.Code == "" {
-					response.Code = evt.Code
-					response.Duration = evt.Timeout / time.Second / 2
-					
-					// Generate QR image
-					qrDir := config.PathQrCode
-					if err := os.MkdirAll(qrDir, 0755); err != nil {
-						logrus.Errorf("Failed to create QR directory: %v", err)
-						continue
-					}
-					
-					qrPath := fmt.Sprintf("%s/scan-qr-%s.png", qrDir, fiberUtils.UUIDv4())
-					err := qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
-					if err != nil {
-						logrus.Error("Error writing QR code: ", err)
-						continue
-					}
-					
-					response.ImagePath = qrPath
-					
-					// Cleanup after timeout
-					go func(path string, timeout time.Duration) {
-						time.Sleep(timeout)
-						os.Remove(path)
-					}(qrPath, response.Duration*time.Second)
+				qrPath := fmt.Sprintf("%s/scan-qr-%s.png", config.PathQrCode, fiberUtils.UUIDv4())
+				err := qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
+				if err != nil {
+					logrus.Error("Error when write qr code to file: ", err)
+					continue
 				}
+				
+				// Cleanup after timeout
+				go func() {
+					time.Sleep(response.Duration * time.Second)
+					os.Remove(qrPath)
+				}()
+				
+				chImage <- qrPath
+			} else {
+				logrus.Errorf("QR event: %s", evt.Event)
 			}
 		}
-		logrus.Info("QR channel closed")
 	}()
 	
-	// Wait for first QR code with timeout
-	timeout := time.After(10 * time.Second)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-timeout:
-			return response, fmt.Errorf("timeout waiting for QR code")
-		case <-ticker.C:
-			if response.Code != "" {
-				// Start monitoring for successful login
-				go service.monitorLoginForClient(newClient)
-				return response, nil
-			}
-		}
+	// NOW connect AFTER setting up QR channel (like the working version)
+	logrus.Info("Connecting WhatsApp client...")
+	err = newClient.Connect()
+	if err != nil {
+		logrus.Error("Error when connect to whatsapp: ", err)
+		return response, pkgError.ErrReconnect
 	}
+	
+	// Wait for QR image path
+	select {
+	case imagePath := <-chImage:
+		response.ImagePath = imagePath
+		logrus.Infof("QR code generated: %s", imagePath)
+	case <-time.After(60 * time.Second):
+		return response, fmt.Errorf("timeout waiting for QR code")
+	}
+	
+	return response, nil
 }
 
 // FIX: Separate monitor function for each client
