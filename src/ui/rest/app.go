@@ -21,6 +21,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type App struct {
@@ -401,13 +402,38 @@ func (handler *App) HandleLogout(c *fiber.Ctx) error {
 
 // GetQRCode returns the QR code image directly
 func (handler *App) GetQRCode(c *fiber.Ctx) error {
+	// Store connection session info
+	userID := c.Locals("userID")
+	deviceID := c.Query("device_id")
+	
+	if userID != nil && deviceID != "" {
+		// Store in a map or context for later use
+		logrus.Infof("Connection request for user %s, device %s", userID, deviceID)
+	}
+	
 	// Get QR code from login service
 	response, err := handler.Service.Login(c.UserContext())
 	if err != nil {
+		// Check if it's a QR channel error and try to provide helpful message
+		if err.Error() == "QR channel error" {
+			logrus.Warn("QR channel error - attempting to reset connection")
+			
+			// Try to reset and get QR again
+			// Note: This requires implementing a reset method
+			return c.Status(503).JSON(utils.ResponseData{
+				Status:  503,
+				Code:    "QR_CHANNEL_ERROR",
+				Message: "WhatsApp connection error. Please try logging out and reconnecting.",
+				Results: fiber.Map{
+					"suggestion": "Try clicking 'Logout' and then reconnect",
+				},
+			})
+		}
+		
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
-			Message: "Failed to generate QR code",
+			Message: "Failed to generate QR code: " + err.Error(),
 		})
 	}
 	

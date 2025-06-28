@@ -38,17 +38,39 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 		return response, pkgError.ErrWaCLI
 	}
 
+	// Check if already logged in before disconnecting
+	if service.WaCli.IsLoggedIn() {
+		logrus.Info("Already logged in, checking connection...")
+		if service.WaCli.IsConnected() {
+			return response, pkgError.ErrAlreadyLoggedIn
+		}
+		// If logged in but not connected, just reconnect
+		err = service.WaCli.Connect()
+		if err == nil {
+			return response, pkgError.ErrAlreadyLoggedIn
+		}
+	}
+
 	// Disconnect for reconnecting
 	service.WaCli.Disconnect()
+	time.Sleep(500 * time.Millisecond) // Give it time to disconnect
 
 	// First connect to WhatsApp
+	logrus.Info("Connecting to WhatsApp...")
 	err = service.WaCli.Connect()
 	if err != nil {
 		logrus.Error("Error when connect to whatsapp: ", err)
 		return response, pkgError.ErrReconnect
 	}
 
+	// Check again if logged in after connect
+	if service.WaCli.IsLoggedIn() {
+		logrus.Info("Already logged in after connect")
+		return response, pkgError.ErrAlreadyLoggedIn
+	}
+
 	// Then get QR channel after connection
+	logrus.Info("Getting QR channel...")
 	ch, err := service.WaCli.GetQRChannel(context.Background())
 	if err != nil {
 		logrus.Error("Error getting QR channel: ", err.Error())
@@ -59,10 +81,13 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 			}
 			return response, pkgError.ErrSessionSaved
 		} else {
+			// Try to provide more context about the error
+			logrus.Errorf("QR Channel error details: %v", err)
 			return response, pkgError.ErrQrChannel
 		}
 	}
 
+	logrus.Info("Waiting for QR code...")
 	// Wait for first QR code
 	select {
 	case evt := <-ch:
@@ -170,6 +195,29 @@ func (service serviceApp) LoginWithCode(ctx context.Context, phoneNumber string)
 }
 
 func (service serviceApp) Logout(ctx context.Context) (err error) {
+	logrus.Info("Starting logout process...")
+	
+	// First logout from WhatsApp
+	if service.WaCli != nil {
+		err = service.WaCli.Logout(ctx)
+		if err != nil {
+			logrus.Warnf("Error during WhatsApp logout: %v", err)
+		}
+		service.WaCli.Disconnect()
+	}
+	
+	// Clear device from store
+	if service.db != nil {
+		device, err := service.db.GetFirstDevice(ctx)
+		if err == nil && device != nil {
+			logrus.Info("Clearing device from store...")
+			err = device.Delete(ctx)
+			if err != nil {
+				logrus.Errorf("Failed to delete device from store: %v", err)
+			}
+		}
+	}
+	
 	// delete history
 	files, err := filepath.Glob(fmt.Sprintf("./%s/history-*", config.PathStorages))
 	if err != nil {
