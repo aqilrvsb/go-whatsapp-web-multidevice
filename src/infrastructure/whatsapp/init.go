@@ -307,8 +307,6 @@ func handleConnectionEvents(_ context.Context) {
 				"jid":   jid,
 			},
 		}
-			},
-		}
 	}
 	
 	if len(cli.Store.PushName) == 0 {
