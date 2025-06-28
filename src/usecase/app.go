@@ -54,6 +54,18 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		case *events.Connected:
 			logrus.Info("Connected event received - device fully connected!")
 			service.registerDeviceAfterConnection(newClient)
+			// Keep the client alive by adding keepalive monitoring
+			go func(client *whatsmeow.Client) {
+				ticker := time.NewTicker(30 * time.Second)
+				defer ticker.Stop()
+				
+				for range ticker.C {
+					if !client.IsConnected() {
+						logrus.Warn("Client disconnected, attempting reconnect...")
+						client.Connect()
+					}
+				}
+			}(newClient)
 		case *events.LoggedOut:
 			logrus.Warn("Device logged out")
 		}
@@ -208,6 +220,9 @@ func (service serviceApp) registerDeviceAfterConnection(client *whatsmeow.Client
 			cm := whatsapp.GetClientManager()
 			cm.AddClient(session.DeviceID, client)
 			logrus.Infof("Successfully registered device %s with ClientManager", session.DeviceID)
+			
+			// IMPORTANT: Keep a reference to prevent garbage collection
+			// The ClientManager should maintain this reference
 			
 			// Update device status in database
 			// This is handled in the Connected event handler in init.go
