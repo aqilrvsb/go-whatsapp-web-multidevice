@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -267,6 +268,36 @@ func handleConnectionEvents(_ context.Context) {
 			}
 		}
 		
+		// Update device status when we send DEVICE_CONNECTED
+		// This ensures the device is marked as online when connection is confirmed
+		if phoneNumber != "" && jid != "" {
+			// Simple approach: Update the most recently created offline device
+			// This handles the case where session doesn't have the device ID
+			if db, err := database.GetConnection(); err == nil {
+				query := `
+					UPDATE user_devices 
+					SET status = 'online', 
+					    phone = $1, 
+					    jid = $2, 
+					    last_seen = CURRENT_TIMESTAMP
+					WHERE status = 'offline' OR status = 'disconnected'
+					ORDER BY created_at DESC
+					LIMIT 1
+				`
+				
+				result, err := db.Exec(query, phoneNumber, jid)
+				if err != nil {
+					log.Errorf("Failed to update device status on DEVICE_CONNECTED: %v", err)
+				} else {
+					if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
+						log.Infof("Successfully updated device to online status for phone %s", phoneNumber)
+					} else {
+						log.Warnf("No offline device found to update for phone %s", phoneNumber)
+					}
+				}
+			}
+		}
+		
 		// Send connection success message
 		websocket.Broadcast <- websocket.BroadcastMessage{
 			Code:    "DEVICE_CONNECTED",
@@ -274,6 +305,8 @@ func handleConnectionEvents(_ context.Context) {
 			Result: map[string]interface{}{
 				"phone": phoneNumber,
 				"jid":   jid,
+			},
+		}
 			},
 		}
 	}
