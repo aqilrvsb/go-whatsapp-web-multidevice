@@ -148,13 +148,17 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 	device, err := p.userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		logrus.Errorf("Failed to get device %s: %v", deviceID, err)
+		// Skip messages for non-existent device
+		p.skipDeviceMessages(deviceID, "Device not found")
 		return
 	}
 	
 	// Check if device is online
 	if device.Status != "online" && device.Status != "Online" && 
 	   device.Status != "connected" && device.Status != "Connected" {
-		logrus.Debugf("Device %s is not online (status: %s)", deviceID, device.Status)
+		logrus.Warnf("Device %s is not online (status: %s), skipping messages", deviceID, device.Status)
+		// Skip messages for offline device
+		p.skipDeviceMessages(deviceID, "Device offline")
 		return
 	}
 	
@@ -162,54 +166,10 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 	clientManager := whatsapp.GetClientManager()
 	_, err = clientManager.GetClient(deviceID)
 	if err != nil {
-		logrus.Warnf("WhatsApp client not found for device %s, trying to find alternative device", deviceID)
-		
-		// Try to find an alternative connected device for the same user
-		devices, _ := p.userRepo.GetUserDevices(device.UserID)
-		var alternativeDeviceID string
-		
-		for _, altDevice := range devices {
-			if altDevice.ID != deviceID && 
-			   (altDevice.Status == "online" || altDevice.Status == "Online" || 
-			    altDevice.Status == "connected" || altDevice.Status == "Connected") {
-				// Check if this device has a WhatsApp client
-				if _, err := clientManager.GetClient(altDevice.ID); err == nil {
-					alternativeDeviceID = altDevice.ID
-					logrus.Infof("Found alternative device %s for user", alternativeDeviceID)
-					break
-				}
-			}
-		}
-		
-		if alternativeDeviceID == "" {
-			logrus.Errorf("No alternative devices found for user, skipping messages for device %s", deviceID)
-			// Mark messages as failed
-			messages, _ := p.broadcastRepo.GetPendingMessages(deviceID, 1000)
-			for _, msg := range messages {
-				p.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", "Device not connected")
-			}
-			return
-		}
-		
-		// Update all pending messages to use the alternative device
-		query := `
-			UPDATE broadcast_messages 
-			SET device_id = $1 
-			WHERE device_id = $2 AND status = 'pending'
-		`
-		db := database.GetDB()
-		result, err := db.Exec(query, alternativeDeviceID, deviceID)
-		if err != nil {
-			logrus.Errorf("Failed to update messages to alternative device: %v", err)
-			return
-		}
-		
-		rowsAffected, _ := result.RowsAffected()
-		logrus.Infof("Updated %d messages from device %s to %s", rowsAffected, deviceID, alternativeDeviceID)
-		
-		// Process the alternative device instead
-		deviceID = alternativeDeviceID
-		device.ID = alternativeDeviceID
+		logrus.Warnf("WhatsApp client not found for device %s, skipping messages", deviceID)
+		// Skip messages for device without WhatsApp client
+		p.skipDeviceMessages(deviceID, "WhatsApp client not available")
+		return
 	}
 	
 	// Create Redis queue key for this device
@@ -401,5 +361,27 @@ func (p *OptimizedBroadcastProcessor) checkWorkerHealth() {
 				}
 			}
 		}
+	}
+}
+
+
+// skipDeviceMessages marks all pending messages for a device as skipped
+func (p *OptimizedBroadcastProcessor) skipDeviceMessages(deviceID string, reason string) {
+	query := `
+		UPDATE broadcast_messages 
+		SET status = 'skipped', error_message = $1 
+		WHERE device_id = $2 AND status = 'pending'
+	`
+	
+	db := database.GetDB()
+	result, err := db.Exec(query, reason, deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to skip messages for device %s: %v", deviceID, err)
+		return
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		logrus.Infof("Skipped %d messages for device %s (reason: %s)", rowsAffected, deviceID, reason)
 	}
 }
