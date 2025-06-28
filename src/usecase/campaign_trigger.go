@@ -39,7 +39,7 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 	
 	for _, campaign := range campaigns {
 		logrus.Infof("Checking campaign: %s (ID: %d, Status: %s, Date: %s, Time: %s)", 
-			campaign.Title, campaign.ID, campaign.Status, campaign.CampaignDate, campaign.ScheduledTime)
+			campaign.Title, campaign.ID, campaign.Status, campaign.CampaignDate, campaign.TimeSchedule)
 		
 		// Execute campaign
 		go cts.executeCampaign(&campaign)
@@ -131,8 +131,10 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	// Update campaign status
 	campaignRepo := repository.GetCampaignRepository()
-	campaign.Status = "sent"
-	campaignRepo.UpdateCampaign(campaign)
+	err := campaignRepo.UpdateCampaignStatus(campaign.ID, "sent")
+	if err != nil {
+		logrus.Errorf("Failed to update campaign status: %v", err)
+	}
 	
 	logrus.Infof("Campaign %s completed: %d messages queued across %d devices, %d failed", 
 		campaign.Title, successful, len(connectedDevices), failed)

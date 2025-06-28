@@ -32,6 +32,11 @@ type CampaignRepository interface {
 	GetPendingCampaigns() ([]models.Campaign, error)
 	// Add new methods for lead status targeting
 	GetPendingCampaignsByStatus(userID string, targetStatus string) ([]models.Campaign, error)
+	// Additional methods needed by the app
+	GetCampaigns(userID string) ([]models.Campaign, error)
+	UpdateCampaign(campaign *models.Campaign) error
+	DeleteCampaign(id int) error
+	GetCampaignsByUser(userID string) ([]models.Campaign, error)
 }
 
 type campaignRepository struct {
@@ -274,4 +279,73 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 	}
 	
 	return campaigns, nil
+}
+	
+	return campaigns, nil
+}
+
+// GetCampaigns is an alias for GetAllCampaigns
+func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
+	return r.GetAllCampaigns(userID)
+}
+
+// GetCampaignsByUser is an alias for GetAllCampaigns
+func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
+	return r.GetAllCampaigns(userID)
+}
+
+// UpdateCampaign updates an existing campaign
+func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
+	query := `
+		UPDATE campaigns 
+		SET title = $1, niche = $2, target_status = $3, message = $4, 
+		    image_url = $5, campaign_date = $6, time_schedule = $7,
+		    min_delay_seconds = $8, max_delay_seconds = $9, 
+		    status = $10, updated_at = $11
+		WHERE id = $12 AND user_id = $13
+	`
+	
+	campaign.UpdatedAt = time.Now()
+	
+	result, err := r.db.Exec(query, 
+		campaign.Title, campaign.Niche, campaign.TargetStatus, campaign.Message,
+		campaign.ImageURL, campaign.CampaignDate, campaign.TimeSchedule,
+		campaign.MinDelaySeconds, campaign.MaxDelaySeconds,
+		campaign.Status, campaign.UpdatedAt, campaign.ID, campaign.UserID)
+	
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	
+	return nil
+}
+
+// DeleteCampaign deletes a campaign by ID
+func (r *campaignRepository) DeleteCampaign(id int) error {
+	query := `DELETE FROM campaigns WHERE id = $1`
+	
+	result, err := r.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	
+	return nil
 }
