@@ -16,7 +16,7 @@ type Campaign struct {
 	ImageURL        string    `json:"image_url" db:"image_url"`
 	CampaignDate    string    `json:"campaign_date" db:"campaign_date"`
 	ScheduledDate   string    `json:"scheduled_date" db:"scheduled_date"`
-	ScheduledTime   string    `json:"scheduled_time" db:"scheduled_time"`
+	TimeSchedule    string    `json:"time_schedule" db:"time_schedule"`
 	MinDelaySeconds int       `json:"min_delay_seconds" db:"min_delay_seconds"`
 	MaxDelaySeconds int       `json:"max_delay_seconds" db:"max_delay_seconds"`
 	Status          string    `json:"status" db:"status"` // pending, sent, failed

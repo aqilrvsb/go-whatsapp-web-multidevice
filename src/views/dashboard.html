@@ -2662,7 +2662,7 @@
                                 <div style="color: #666; font-size: 8px; margin-top: 1px;">
                                     <i class="bi bi-tag-fill" style="font-size: 8px;"></i> ${campaign.niche || 'General'} 
                                     ${campaign.target_status ? `<i class="bi bi-people-fill" style="font-size: 8px;" title="Target: ${campaign.target_status}"></i> ${campaign.target_status}` : ''}
-                                    ${campaign.scheduled_time ? `<i class="bi bi-clock" style="font-size: 8px;"></i> ${campaign.scheduled_time.slice(0,5)}` : ''}
+                                    ${campaign.time_schedule ? `<i class="bi bi-clock" style="font-size: 8px;"></i> ${campaign.time_schedule.slice(0,5)}` : ''}
                                     ${campaign.image_url ? '<i class="bi bi-image" title="Has image" style="font-size: 8px;"></i>' : ''}
                                 </div>
                             </div>
@@ -2738,7 +2738,7 @@
                             if (date.includes('T')) {
                                 date = date.split('T')[0];
                             }
-                            console.log('Processing campaign:', campaign.title, 'Date:', date, 'Time:', campaign.scheduled_time);
+                            console.log('Processing campaign:', campaign.title, 'Date:', date, 'Time:', campaign.time_schedule);
                             if (!campaigns[date]) {
                                 campaigns[date] = [];
                             }
@@ -2819,7 +2819,7 @@
                 target_status: document.getElementById('campaignTargetStatus').value || 'prospect',
                 message: document.getElementById('campaignMessage').value || '',
                 image_url: document.getElementById('campaignImageUrl').value || '',
-                scheduled_time: scheduledTime,
+                time_schedule: scheduledTime,
                 min_delay_seconds: parseInt(document.getElementById('campaignMinDelay').value) || 10,
                 max_delay_seconds: parseInt(document.getElementById('campaignMaxDelay').value) || 30
             };
@@ -2952,7 +2952,7 @@
             document.getElementById('campaignNiche').value = campaign.niche || '';
             document.getElementById('campaignTargetStatus').value = campaign.target_status || 'prospect';
             document.getElementById('campaignMessage').value = campaign.message || '';
-            document.getElementById('campaignTime').value = campaign.scheduled_time || '';
+            document.getElementById('campaignTime').value = campaign.time_schedule || '';
             document.getElementById('campaignMinDelay').value = campaign.min_delay_seconds || 10;
             document.getElementById('campaignMaxDelay').value = campaign.max_delay_seconds || 30;
             document.getElementById('campaignImageUrl').value = campaign.image_url || '';
@@ -3340,7 +3340,7 @@
                                                     <tr>
                                                         <td>${campaign.title}</td>
                                                         <td>${campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-'}</td>
-                                                        <td>${campaign.scheduled_time || '-'}</td>
+                                                        <td>${campaign.time_schedule || '-'}</td>
                                                         <td>${campaign.niche || '-'}</td>
                                                         <td>
                                                             <span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">
@@ -3691,7 +3691,7 @@
             document.getElementById('previewNiche').textContent = campaign.niche || '-';
             document.getElementById('previewTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || 'all'}</span>`;
             document.getElementById('previewDate').textContent = campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-';
-            document.getElementById('previewTime').textContent = campaign.scheduled_time || '-';
+            document.getElementById('previewTime').textContent = campaign.time_schedule || '-';
             
             // Show image if exists
             const imageDiv = document.getElementById('previewImage');
@@ -3937,7 +3937,7 @@
             document.getElementById('reportNiche').textContent = campaign.niche || '-';
             document.getElementById('reportTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || '-'}</span>`;
             document.getElementById('reportDate').textContent = campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-';
-            document.getElementById('reportTime').textContent = campaign.scheduled_time || '-';
+            document.getElementById('reportTime').textContent = campaign.time_schedule || '-';
             document.getElementById('reportStatus').innerHTML = `<span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span>`;
             
             // Fetch device report data

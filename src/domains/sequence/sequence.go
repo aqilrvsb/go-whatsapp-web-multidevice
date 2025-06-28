@@ -32,7 +32,7 @@ type CreateSequenceRequest struct {
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
 	IsActive        bool                        `json:"is_active"`
-	ScheduleTime    string                      `json:"schedule_time"`
+	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
 	MaxDelaySeconds int                         `json:"max_delay_seconds"`
 	Steps           []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
@@ -44,7 +44,7 @@ type CreateSequenceStepRequest struct {
 	DayNumber       int    `json:"day_number" validate:"required,min=1"`
 	MessageType     string `json:"message_type"`
 	SendTime        string `json:"send_time"`
-	ScheduleTime    string `json:"schedule_time"`
+	TimeSchedule    string `json:"time_schedule"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
 	MediaURL        string `json:"media_url"`
@@ -60,7 +60,7 @@ type UpdateSequenceRequest struct {
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
 	IsActive        bool                        `json:"is_active"`
-	ScheduleTime    string                      `json:"schedule_time"`
+	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
 	MaxDelaySeconds int                         `json:"max_delay_seconds"`
 	Steps           []CreateSequenceStepRequest `json:"steps"`
@@ -97,7 +97,7 @@ type SequenceStepResponse struct {
 	DayNumber       int    `json:"day_number"`
 	MessageType     string `json:"message_type"`
 	SendTime        string `json:"send_time"`
-	ScheduleTime    string `json:"schedule_time"`
+	TimeSchedule    string `json:"time_schedule"`
 	Content         string `json:"content"`
 	ImageURL        string `json:"image_url"`
 	MediaURL        string `json:"media_url"`

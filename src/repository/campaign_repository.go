@@ -6,43 +6,44 @@ import (
 	"log"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"whatsapp-go/src/models"
 )
+
+type CampaignRepository interface {
+	CreateCampaign(campaign *models.Campaign) error
+	GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error)
+	GetAllCampaigns(userID string) ([]models.Campaign, error)
+	GetCampaignByID(id int) (*models.Campaign, error)
+	UpdateCampaignStatus(id int, status string) error
+	GetPendingCampaigns() ([]models.Campaign, error)
+	// Add new methods for lead status targeting
+	GetPendingCampaignsByStatus(userID string, targetStatus string) ([]models.Campaign, error)
+}
 
 type campaignRepository struct {
 	db *sql.DB
 }
 
-var campaignRepo *campaignRepository
-
-// GetCampaignRepository returns campaign repository instance
-func GetCampaignRepository() *campaignRepository {
-	if campaignRepo == nil {
-		campaignRepo = &campaignRepository{
-			db: database.GetDB(),
-		}
-	}
-	return campaignRepo
+func NewCampaignRepository(db *sql.DB) CampaignRepository {
+	return &campaignRepository{db: db}
 }
 
 // CreateCampaign creates a new campaign
 func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
-	campaign.CreatedAt = time.Now()
-	campaign.UpdatedAt = time.Now()
-	
-	// Set default delay values if not provided
+	// Set defaults
 	if campaign.MinDelaySeconds == 0 {
 		campaign.MinDelaySeconds = 10
 	}
 	if campaign.MaxDelaySeconds == 0 {
 		campaign.MaxDelaySeconds = 30
 	}
+	campaign.CreatedAt = time.Now()
+	campaign.UpdatedAt = time.Now()
 	
 	query := `
 		INSERT INTO campaigns 
 		(user_id, campaign_date, title, niche, target_status, message, image_url, 
-		 scheduled_time, min_delay_seconds, max_delay_seconds, status, created_at, updated_at)
+		 time_schedule, min_delay_seconds, max_delay_seconds, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id
 	`
@@ -55,7 +56,7 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	
 	err := r.db.QueryRow(query, campaign.UserID, campaign.CampaignDate,
 		campaign.Title, campaign.Niche, targetStatus, campaign.Message, campaign.ImageURL,
-		campaign.ScheduledTime, campaign.MinDelaySeconds, campaign.MaxDelaySeconds, 
+		campaign.TimeSchedule, campaign.MinDelaySeconds, campaign.MaxDelaySeconds, 
 		campaign.Status, campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
 		
 	return err
@@ -65,11 +66,11 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
 	query := `
 		SELECT id, user_id, title, niche, message, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
+		       campaign_date, COALESCE(time_schedule, '09:00:00') as time_schedule, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
-		WHERE campaign_date = $1 AND niche = $2 AND status != 'sent'
+		WHERE campaign_date = $1 AND niche = $2
 	`
 	
 	rows, err := r.db.Query(query, scheduledDate, niche)
@@ -80,250 +81,183 @@ func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche stri
 	
 	var campaigns []models.Campaign
 	for rows.Next() {
-		var campaign models.Campaign
-		
-		err := rows.Scan(&campaign.ID, &campaign.UserID,
-			&campaign.Title, &campaign.Niche, &campaign.Message, &campaign.ImageURL,
-			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds, 
-			&campaign.MaxDelaySeconds, &campaign.Status,
-			&campaign.CreatedAt, &campaign.UpdatedAt)
-		if err != nil {
-			continue
+		var c models.Campaign
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+			&c.Message, &c.ImageURL, &c.CampaignDate, &c.TimeSchedule, 
+			&c.MinDelaySeconds, &c.MaxDelaySeconds,
+			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
 		}
-		
-		campaigns = append(campaigns, campaign)
+		campaigns = append(campaigns, c)
 	}
 	
 	return campaigns, nil
 }
 
-// UpdateCampaign updates a campaign
-func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
-	campaign.UpdatedAt = time.Now()
-	
+// GetAllCampaigns gets all campaigns for a user
+func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, error) {
 	query := `
-		UPDATE campaigns 
-		SET title = $1, niche = $2, target_status = $3, message = $4, image_url = $5,
-		    campaign_date = $6, scheduled_time = $7, min_delay_seconds = $8, 
-		    max_delay_seconds = $9, status = $10, updated_at = $11
-		WHERE id = $12
+		SELECT 
+			id, user_id, title, niche, 
+			COALESCE(target_status, 'all') as target_status,
+			message, image_url, campaign_date, 
+			COALESCE(time_schedule, '') as time_schedule,
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			status, created_at, updated_at
+		FROM campaigns
+		WHERE user_id = $1
+		ORDER BY campaign_date DESC, time_schedule DESC
 	`
 	
-	// Default target_status to 'all' if not set
-	targetStatus := campaign.TargetStatus
-	if targetStatus == "" {
-		targetStatus = "all"
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var c models.Campaign
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
+			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
+			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		campaigns = append(campaigns, c)
 	}
 	
-	_, err := r.db.Exec(query, campaign.Title, campaign.Niche, targetStatus, campaign.Message,
-		campaign.ImageURL, campaign.CampaignDate, campaign.ScheduledTime,
-		campaign.MinDelaySeconds, campaign.MaxDelaySeconds,
-		campaign.Status, campaign.UpdatedAt, campaign.ID)
-		
+	return campaigns, nil
+}
+
+// GetCampaignByID gets a campaign by ID
+func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
+	query := `
+		SELECT 
+			id, user_id, title, niche, 
+			COALESCE(target_status, 'all') as target_status,
+			message, image_url, campaign_date, 
+			COALESCE(time_schedule, '') as time_schedule,
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			status, created_at, updated_at
+		FROM campaigns
+		WHERE id = $1
+	`
+	
+	var c models.Campaign
+	err := r.db.QueryRow(query, id).Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+		&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
+		&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
+		&c.Status, &c.CreatedAt, &c.UpdatedAt)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &c, nil
+}
+
+// UpdateCampaignStatus updates campaign status
+func (r *campaignRepository) UpdateCampaignStatus(id int, status string) error {
+	query := `UPDATE campaigns SET status = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.db.Exec(query, status, time.Now(), id)
 	return err
 }
 
-// GetCampaigns gets all campaigns for a user
-func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
-	query := `
-		SELECT id, user_id, title, message, niche, 
-		       COALESCE(target_status, 'all') as target_status, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
-		       min_delay_seconds, max_delay_seconds, 
-		       status, created_at, updated_at
-		FROM campaigns
-		WHERE user_id = $1
-		ORDER BY campaign_date DESC, scheduled_time DESC
-	`
-	
-	rows, err := r.db.Query(query, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	var campaigns []models.Campaign
-	for rows.Next() {
-		var campaign models.Campaign
-		
-		err := rows.Scan(
-			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
-			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
-			&campaign.MaxDelaySeconds, &campaign.Status,
-			&campaign.CreatedAt, &campaign.UpdatedAt,
-		)
-		if err != nil {
-			continue
-		}
-		
-		campaigns = append(campaigns, campaign)
-	}
-	
-	return campaigns, nil
-}
-
-// DeleteCampaign deletes a campaign
-func (r *campaignRepository) DeleteCampaign(campaignID int) error {
-	query := `DELETE FROM campaigns WHERE id = $1`
-	
-	result, err := r.db.Exec(query, campaignID)
-	if err != nil {
-		return err
-	}
-	
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("campaign not found")
-	}
-	
-	return nil
-}
-
-// GetCampaignsByDate gets all campaigns scheduled for a specific date
-func (r *campaignRepository) GetCampaignsByDate(scheduledDate string) ([]models.Campaign, error) {
-	query := `
-		SELECT id, user_id, title, message, niche, target_status, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
-		       min_delay_seconds, max_delay_seconds, 
-		       status, created_at, updated_at
-		FROM campaigns
-		WHERE campaign_date = $1 AND status != 'sent'
-		ORDER BY scheduled_time ASC
-	`
-	
-	rows, err := r.db.Query(query, scheduledDate)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	var campaigns []models.Campaign
-	for rows.Next() {
-		var campaign models.Campaign
-		
-		err := rows.Scan(
-			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
-			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
-			&campaign.MaxDelaySeconds, &campaign.Status,
-			&campaign.CreatedAt, &campaign.UpdatedAt,
-		)
-		if err != nil {
-			continue
-		}
-		
-		campaigns = append(campaigns, campaign)
-	}
-	
-	return campaigns, nil
-}
-
-// GetCampaignsByUser gets all campaigns for a user
-func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaign, error) {
-	query := `
-		SELECT id, user_id, title, message, niche, target_status, image_url, 
-		       campaign_date, COALESCE(scheduled_time::text, '09:00:00') as scheduled_time, 
-		       min_delay_seconds, max_delay_seconds, 
-		       status, created_at, updated_at
-		FROM campaigns
-		WHERE user_id = $1
-		ORDER BY created_at DESC
-	`
-	
-	rows, err := r.db.Query(query, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	var campaigns []models.Campaign
-	for rows.Next() {
-		var campaign models.Campaign
-		
-		err := rows.Scan(
-			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
-			&campaign.CampaignDate, &campaign.ScheduledTime, &campaign.MinDelaySeconds,
-			&campaign.MaxDelaySeconds, &campaign.Status,
-			&campaign.CreatedAt, &campaign.UpdatedAt,
-		)
-		if err != nil {
-			continue
-		}
-		
-		campaigns = append(campaigns, campaign)
-	}
-	
-	return campaigns, nil
-}
-
-// GetPendingCampaigns gets campaigns ready to be sent
+// GetPendingCampaigns gets all campaigns with pending status
 func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
+	log.Println("📋 [Campaign Repository] Getting pending campaigns...")
+	
+	// OPTIMIZED: Let PostgreSQL handle timezone conversions
 	query := `
-		SELECT id, user_id, title, message, niche, 
-		       COALESCE(target_status, 'all') as target_status, image_url, 
-		       campaign_date, 
-		       CASE 
-		           WHEN scheduled_time IS NULL THEN NULL
-		           WHEN scheduled_time = '' THEN NULL
-		           ELSE scheduled_time::text
-		       END as scheduled_time, 
-		       min_delay_seconds, max_delay_seconds, 
-		       status, created_at, updated_at
+		SELECT 
+			id, user_id, title, niche, 
+			COALESCE(target_status, 'all') as target_status,
+			message, image_url, campaign_date, 
+			COALESCE(time_schedule, '') as time_schedule,
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			status, created_at, updated_at
 		FROM campaigns
 		WHERE status = 'pending'
-		  AND (
-		    -- If scheduled_time is NULL or empty, run immediately
-		    scheduled_time IS NULL 
-		    OR scheduled_time = ''
-		    OR scheduled_time = '00:00:00'
-		    OR 
-		    -- Otherwise check if scheduled time has passed (using Malaysia timezone)
-		    (campaign_date || ' ' || COALESCE(NULLIF(scheduled_time::text, ''), '00:00:00'))::timestamp AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
-		  )
-		ORDER BY campaign_date, scheduled_time
+		AND (
+			-- Immediate execution (no time set)
+			time_schedule IS NULL 
+			OR time_schedule = ''
+			-- Or scheduled time has passed (PostgreSQL handles timezone)
+			OR (campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+		)
+		ORDER BY campaign_date, time_schedule
 	`
 	
 	rows, err := r.db.Query(query)
 	if err != nil {
+		log.Printf("❌ [Campaign Repository] Error querying pending campaigns: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
 	
 	var campaigns []models.Campaign
 	for rows.Next() {
-		var campaign models.Campaign
-		var scheduledTime sql.NullString
-		
-		err := rows.Scan(
-			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
-			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
-			&campaign.CampaignDate, &scheduledTime, &campaign.MinDelaySeconds,
-			&campaign.MaxDelaySeconds, &campaign.Status,
-			&campaign.CreatedAt, &campaign.UpdatedAt,
-		)
-		if err != nil {
-			log.Printf("Error scanning campaign: %v", err)
+		var c models.Campaign
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
+			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
+			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			log.Printf("❌ [Campaign Repository] Error scanning campaign: %v", err)
 			continue
 		}
-		
-		// Handle NULL scheduled_time
-		if scheduledTime.Valid {
-			campaign.ScheduledTime = scheduledTime.String
-		} else {
-			campaign.ScheduledTime = ""
-		}
-		
-		campaigns = append(campaigns, campaign)
+		campaigns = append(campaigns, c)
+		log.Printf("✅ [Campaign Repository] Found pending campaign: %s (Date: %s, Time: %s)", 
+			c.Title, c.CampaignDate, c.TimeSchedule)
 	}
 	
+	log.Printf("📊 [Campaign Repository] Total pending campaigns found: %d", len(campaigns))
 	return campaigns, nil
 }
 
-// UpdateCampaignStatus updates campaign status
-func (r *campaignRepository) UpdateCampaignStatus(campaignID int, status string) error {
-	query := `UPDATE campaigns SET status = $1, updated_at = $2 WHERE id = $3`
-	_, err := r.db.Exec(query, status, time.Now(), campaignID)
-	return err
+// GetPendingCampaignsByStatus gets pending campaigns filtered by target status
+func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetStatus string) ([]models.Campaign, error) {
+	query := `
+		SELECT 
+			id, user_id, title, niche, 
+			COALESCE(target_status, 'all') as target_status,
+			message, image_url, campaign_date, 
+			COALESCE(time_schedule, '') as time_schedule,
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			status, created_at, updated_at
+		FROM campaigns
+		WHERE user_id = $1 
+		AND status = 'pending'
+		AND (target_status = $2 OR target_status = 'all')
+		AND (
+			time_schedule IS NULL 
+			OR time_schedule = ''
+			OR (campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+		)
+		ORDER BY campaign_date, time_schedule
+	`
+	
+	rows, err := r.db.Query(query, userID, targetStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var c models.Campaign
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
+			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
+			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		campaigns = append(campaigns, c)
+	}
+	
+	return campaigns, nil
 }

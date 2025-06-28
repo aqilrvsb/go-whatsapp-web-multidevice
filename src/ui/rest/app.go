@@ -863,7 +863,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		TargetStatus    string `json:"target_status"`
 		Message         string `json:"message"`
 		ImageURL        string `json:"image_url"`
-		ScheduledTime   string `json:"scheduled_time"`
+		TimeSchedule    string `json:"time_schedule"`
 		MinDelaySeconds int    `json:"min_delay_seconds"`
 		MaxDelaySeconds int    `json:"max_delay_seconds"`
 	}
@@ -886,12 +886,12 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	// Parse scheduled time if provided
-	var scheduledTime string
-	if request.ScheduledTime != "" {
-		scheduledTime = request.ScheduledTime
+	var timeSchedule string
+	if request.TimeSchedule != "" {
+		timeSchedule = request.TimeSchedule
 	} else {
 		// Default to current time if not provided
-		scheduledTime = time.Now().Format("15:04")
+		timeSchedule = time.Now().Format("15:04")
 	}
 	
 	// Validate and set target_status
@@ -913,7 +913,7 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		TargetStatus:    targetStatus,
 		ImageURL:        request.ImageURL,
 		CampaignDate:    request.CampaignDate,
-		ScheduledTime:   scheduledTime,
+		TimeSchedule:    timeSchedule,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
 		Status:          "pending",
@@ -981,7 +981,7 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 		Niche           string `json:"niche"`
 		Message         string `json:"message"`
 		ImageURL        string `json:"image_url"`
-		ScheduledTime   string `json:"scheduled_time"`
+		TimeSchedule    string `json:"time_schedule"`
 		CampaignDate    string `json:"campaign_date"`
 		MinDelaySeconds int    `json:"min_delay_seconds"`
 		MaxDelaySeconds int    `json:"max_delay_seconds"`
@@ -997,9 +997,9 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 	}
 	
 	// Parse scheduled time if provided
-	var scheduledTime string
-	if request.ScheduledTime != "" {
-		scheduledTime = request.ScheduledTime
+	var timeSchedule string
+	if request.TimeSchedule != "" {
+		timeSchedule = request.TimeSchedule
 	}
 	
 	campaignRepo := repository.GetCampaignRepository()
@@ -1011,7 +1011,7 @@ func (handler *App) UpdateCampaign(c *fiber.Ctx) error {
 		Niche:           request.Niche,
 		ImageURL:        request.ImageURL,
 		CampaignDate:    request.CampaignDate,
-		ScheduledTime:   scheduledTime,
+		TimeSchedule:    timeSchedule,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
 		Status:          request.Status,

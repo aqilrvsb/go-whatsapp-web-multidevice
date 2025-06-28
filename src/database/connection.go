@@ -128,7 +128,7 @@ func InitializeSchema() error {
 		niche VARCHAR(255),
 		message TEXT NOT NULL,
 		image_url TEXT,
-		scheduled_time VARCHAR(10),
+		time_schedule TEXT,
 		min_delay_seconds INTEGER DEFAULT 10,
 		max_delay_seconds INTEGER DEFAULT 30,
 		status VARCHAR(50) DEFAULT 'scheduled',
@@ -144,7 +144,7 @@ func InitializeSchema() error {
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS image_url TEXT;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'all';
-	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_time VARCHAR(10);
+	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS time_schedule TEXT;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled';
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
 	ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
@@ -195,7 +195,7 @@ func InitializeSchema() error {
 		name VARCHAR(255) NOT NULL,
 		description TEXT,
 		niche VARCHAR(255),
-		schedule_time VARCHAR(10),
+		time_schedule TEXT,
 		min_delay_seconds INTEGER DEFAULT 10,
 		max_delay_seconds INTEGER DEFAULT 30,
 		status VARCHAR(50) DEFAULT 'draft',
@@ -210,7 +210,7 @@ func InitializeSchema() error {
 		day_number INTEGER NOT NULL,
 		content TEXT,
 		image_url TEXT,
-		schedule_time VARCHAR(10),
+		time_schedule TEXT,
 		min_delay_seconds INTEGER DEFAULT 5,
 		max_delay_seconds INTEGER DEFAULT 15,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -287,7 +287,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS device_id UUID;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 0;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(10);
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS time_schedule TEXT;
 	
 	-- Add missing columns to broadcast_messages if they don't exist
 	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -304,7 +304,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS media_url TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(10);
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS time_schedule TEXT;
 
 	-- Add missing columns to sequence_contacts table  
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;

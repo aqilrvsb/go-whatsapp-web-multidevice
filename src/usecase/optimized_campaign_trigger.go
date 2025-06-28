@@ -36,7 +36,7 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 			c.id, c.user_id, c.title, c.message, c.niche, 
 			COALESCE(c.target_status, 'all') as target_status, 
 			c.image_url, c.min_delay_seconds, c.max_delay_seconds,
-			c.campaign_date, c.scheduled_time
+			c.campaign_date, c.time_schedule
 		FROM campaigns c
 		WHERE c.status = 'pending'
 		AND (
@@ -45,9 +45,9 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 			OR
 			-- Fallback to old columns
 			(c.scheduled_at IS NULL AND 
-			 (c.campaign_date || ' ' || COALESCE(c.scheduled_time, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP)
+			 (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP)
 		)
-		ORDER BY COALESCE(c.scheduled_at, (c.campaign_date || ' ' || COALESCE(c.scheduled_time, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')
+		ORDER BY COALESCE(c.scheduled_at, (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')
 	`
 	
 	rows, err := oct.db.Query(query)
@@ -63,7 +63,7 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
 			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
 			&campaign.MinDelaySeconds, &campaign.MaxDelaySeconds,
-			&campaign.CampaignDate, &campaign.ScheduledTime,
+			&campaign.CampaignDate, &campaign.TimeSchedule,
 		)
 		if err != nil {
 			logrus.Errorf("Failed to scan campaign: %v", err)
