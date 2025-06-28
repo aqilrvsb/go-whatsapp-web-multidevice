@@ -362,6 +362,103 @@ func InitializeSchema() error {
 		log.Printf("Created default admin user: admin@whatsapp.com / changeme123 (encoded: %s)\n", encodedPassword)
 	}
 	
+	// Run auto-migrations for time_schedule and other updates
+	log.Println("Running database migrations...")
+	migrations := []struct {
+		name string
+		sql  string
+	}{
+		{
+			name: "Add target_status columns",
+			sql: `
+				ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'all';
+				ALTER TABLE sequences ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'all';
+				UPDATE campaigns SET target_status = 'all' WHERE target_status IS NULL;
+				UPDATE sequences SET target_status = 'all' WHERE target_status IS NULL;
+			`,
+		},
+		{
+			name: "Add time_schedule columns",
+			sql: `
+				-- Add time_schedule to campaigns
+				ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS time_schedule TEXT;
+				UPDATE campaigns SET time_schedule = scheduled_time WHERE time_schedule IS NULL AND scheduled_time IS NOT NULL;
+				
+				-- Add time_schedule to sequences
+				ALTER TABLE sequences ADD COLUMN IF NOT EXISTS time_schedule TEXT;
+				UPDATE sequences SET time_schedule = schedule_time WHERE time_schedule IS NULL AND schedule_time IS NOT NULL;
+				
+				-- Add time_schedule to sequence_steps
+				ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS time_schedule TEXT;
+				UPDATE sequence_steps SET time_schedule = schedule_time WHERE time_schedule IS NULL AND schedule_time IS NOT NULL;
+			`,
+		},
+		{
+			name: "Add scheduled_at for timezone support",
+			sql: `
+				-- Add TIMESTAMPTZ column for proper timezone support
+				ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+				
+				-- Migrate existing data to TIMESTAMPTZ (assuming Malaysia timezone)
+				UPDATE campaigns 
+				SET scheduled_at = 
+					CASE 
+						WHEN time_schedule IS NULL OR time_schedule = '' THEN 
+							campaign_date::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur'
+						ELSE 
+							(campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur'
+					END
+				WHERE scheduled_at IS NULL;
+				
+				-- Create optimized indexes
+				CREATE INDEX IF NOT EXISTS idx_campaigns_scheduled_at ON campaigns(scheduled_at) WHERE status = 'pending';
+				CREATE INDEX IF NOT EXISTS idx_campaigns_scheduled_at_status ON campaigns(scheduled_at, status);
+			`,
+		},
+		{
+			name: "Add updated_at to broadcast_messages",
+			sql: `
+				ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+			`,
+		},
+		{
+			name: "Create time validation function",
+			sql: `
+				CREATE OR REPLACE FUNCTION is_valid_time_schedule(time_str TEXT) 
+				RETURNS BOOLEAN AS $$
+				BEGIN
+					IF time_str IS NULL OR time_str = '' THEN
+						RETURN TRUE;
+					END IF;
+					
+					IF time_str ~ '^\d{2}:\d{2}(:\d{2})?$' THEN
+						BEGIN
+							PERFORM time_str::TIME;
+							RETURN TRUE;
+						EXCEPTION WHEN OTHERS THEN
+							RETURN FALSE;
+						END;
+					END IF;
+					
+					RETURN FALSE;
+				END;
+				$$ LANGUAGE plpgsql;
+			`,
+		},
+	}
+	
+	for _, migration := range migrations {
+		log.Printf("Running migration: %s", migration.name)
+		_, err := db.Exec(migration.sql)
+		if err != nil {
+			log.Printf("Warning: Migration '%s' failed (may already exist): %v", migration.name, err)
+		} else {
+			log.Printf("✓ Migration '%s' completed successfully", migration.name)
+		}
+	}
+	
+	log.Println("All migrations completed")
+	
 	// Run cleanup for expired sessions
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)

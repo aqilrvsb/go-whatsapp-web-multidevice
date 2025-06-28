@@ -89,6 +89,22 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
+### Latest Updates (June 28, 2025 - 10:00 AM)
+
+#### 🔄 Unified Time Schedule Migration
+- **Standardized Field Names**: Changed `scheduled_time`/`schedule_time` to `time_schedule` across all tables
+- **Automatic Migration**: Database migrations run automatically on Railway deployment
+- **Zero Downtime**: All existing data preserved and migrated seamlessly
+- **Improved Consistency**: Single field name across campaigns, sequences, and steps
+- **Text Type Support**: Changed from VARCHAR(10) to TEXT for future flexibility
+
+#### 🎯 What Changed:
+1. **Campaigns Table**: `scheduled_time` → `time_schedule`
+2. **Sequences Table**: `schedule_time` → `time_schedule`
+3. **Sequence Steps**: `schedule_time` → `time_schedule`
+4. **Auto-Migration**: All changes apply automatically on deployment
+5. **API Updates**: Frontend and backend now use consistent field names
+
 ### Latest Updates (June 28, 2025 - 8:00 AM)
 
 #### 🌍 Complete Timezone & Campaign Execution Fix
@@ -126,10 +142,13 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ Date parsing errors with mixed formats
 
 #### 📊 Database Migrations:
-Run these migrations in order:
+**Note: Migrations now run automatically on Railway deployment!**
+
+Manual migration files (if needed):
 1. `database/001_add_timestamptz_to_campaigns.sql` - Adds timezone support
 2. `database/002_comprehensive_timezone_migration.sql` - Complete migration
 3. `database/003_fix_scheduled_time_validation.sql` - Time format validation
+4. `database/004_change_to_time_schedule.sql` - Unified time_schedule field
 
 ### Latest Updates (June 28, 2025 - 12:50 AM)
 
