@@ -89,14 +89,15 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
-### Latest Updates (June 28, 2025 - 10:00 AM)
+### Latest Updates (June 28, 2025 - 10:30 AM)
 
-#### 🔄 Unified Time Schedule Migration
+#### 🔄 Unified Time Schedule Migration with Auto-Migration
 - **Standardized Field Names**: Changed `scheduled_time`/`schedule_time` to `time_schedule` across all tables
 - **Automatic Migration**: Database migrations run automatically on Railway deployment
 - **Zero Downtime**: All existing data preserved and migrated seamlessly
 - **Improved Consistency**: Single field name across campaigns, sequences, and steps
 - **Text Type Support**: Changed from VARCHAR(10) to TEXT for future flexibility
+- **Import Path Fixed**: Corrected module imports for successful Railway builds
 
 #### 🎯 What Changed:
 1. **Campaigns Table**: `scheduled_time` → `time_schedule`
@@ -104,6 +105,16 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 3. **Sequence Steps**: `schedule_time` → `time_schedule`
 4. **Auto-Migration**: All changes apply automatically on deployment
 5. **API Updates**: Frontend and backend now use consistent field names
+
+#### 🚀 Auto-Migration on Railway:
+The system now automatically runs all database migrations when deployed to Railway:
+- Target status columns for campaigns and sequences
+- Time schedule field standardization
+- Timezone support with scheduled_at
+- Time validation functions
+- All indexes and constraints
+
+No manual intervention required - just deploy and the system handles everything!
 
 ### Latest Updates (June 28, 2025 - 8:00 AM)
 
