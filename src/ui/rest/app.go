@@ -1648,6 +1648,10 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 
 // GetWorkerStatus gets the status of all device workers
 func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
+	// Get filter parameters
+	filterType := c.Query("filter", "all") // all, campaign, sequence
+	filterID := c.Query("id", "")
+	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {
@@ -1709,9 +1713,35 @@ func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
 			workerInfo["processed"] = status.ProcessedCount
 			workerInfo["failed"] = status.FailedCount
 			workerInfo["last_activity"] = status.LastActivity
+			
+			// Add campaign/sequence info if worker is processing
+			if status.CurrentCampaignID > 0 {
+				workerInfo["current_campaign_id"] = status.CurrentCampaignID
+			}
+			if status.CurrentSequenceID != "" {
+				workerInfo["current_sequence_id"] = status.CurrentSequenceID
+			}
 		}
 		
-		deviceWorkers = append(deviceWorkers, workerInfo)
+		// Apply filter if specified
+		if filterType == "campaign" && filterID != "" {
+			// Only include if worker is processing this campaign
+			if campaignID, ok := workerInfo["current_campaign_id"]; ok {
+				if fmt.Sprintf("%v", campaignID) == filterID {
+					deviceWorkers = append(deviceWorkers, workerInfo)
+				}
+			}
+		} else if filterType == "sequence" && filterID != "" {
+			// Only include if worker is processing this sequence
+			if sequenceID, ok := workerInfo["current_sequence_id"]; ok {
+				if sequenceID == filterID {
+					deviceWorkers = append(deviceWorkers, workerInfo)
+				}
+			}
+		} else {
+			// No filter, include all
+			deviceWorkers = append(deviceWorkers, workerInfo)
+		}
 	}
 	
 	response := map[string]interface{}{
@@ -1719,6 +1749,10 @@ func (handler *App) GetWorkerStatus(c *fiber.Ctx) error {
 		"user_devices": len(devices),
 		"connected_devices": countConnectedDevices(devices),
 		"device_workers": deviceWorkers,
+		"filter": map[string]interface{}{
+			"type": filterType,
+			"id": filterID,
+		},
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -1746,7 +1780,8 @@ func max(a, b int) int {
 func countConnectedDevices(devices []*models.UserDevice) int {
 	count := 0
 	for _, device := range devices {
-		if device.Status == "connected" {
+		if device.Status == "connected" || device.Status == "Connected" || 
+		   device.Status == "online" || device.Status == "Online" {
 			count++
 		}
 	}

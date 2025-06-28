@@ -898,6 +898,29 @@
                     </div>
                 </div>
                 
+                <!-- Filter Options -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="workerFilter" id="filterAll" value="all" checked>
+                            <label class="btn btn-outline-primary" for="filterAll">All Workers</label>
+                            
+                            <input type="radio" class="btn-check" name="workerFilter" id="filterCampaign" value="campaign">
+                            <label class="btn btn-outline-primary" for="filterCampaign">By Campaign</label>
+                            
+                            <input type="radio" class="btn-check" name="workerFilter" id="filterSequence" value="sequence">
+                            <label class="btn btn-outline-primary" for="filterSequence">By Sequence</label>
+                        </div>
+                        
+                        <!-- Campaign/Sequence Selector -->
+                        <div class="d-inline-block ms-3" id="filterSelector" style="display: none;">
+                            <select class="form-select form-select-sm" id="filterItemId" onchange="loadWorkerStatus()">
+                                <option value="">Select...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="workerStatusContent">
                     <div class="text-center py-5">
                         <div class="spinner-border text-primary" role="status">
@@ -3181,6 +3204,48 @@
                     loadSequences();
                 });
             }
+            
+            // Worker filter handlers
+            document.querySelectorAll('input[name="workerFilter"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const filterSelector = document.getElementById('filterSelector');
+                    const filterItemId = document.getElementById('filterItemId');
+                    
+                    if (this.value === 'all') {
+                        filterSelector.style.display = 'none';
+                        loadWorkerStatus();
+                    } else {
+                        filterSelector.style.display = 'inline-block';
+                        filterItemId.innerHTML = '<option value="">Loading...</option>';
+                        
+                        if (this.value === 'campaign') {
+                            // Load campaigns
+                            fetch('/api/campaigns')
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.code === 'SUCCESS') {
+                                        filterItemId.innerHTML = '<option value="">Select Campaign</option>';
+                                        data.results.forEach(campaign => {
+                                            filterItemId.innerHTML += `<option value="${campaign.id}">${campaign.title}</option>`;
+                                        });
+                                    }
+                                });
+                        } else if (this.value === 'sequence') {
+                            // Load sequences
+                            fetch('/api/sequences')
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.code === 'SUCCESS') {
+                                        filterItemId.innerHTML = '<option value="">Select Sequence</option>';
+                                        data.results.forEach(sequence => {
+                                            filterItemId.innerHTML += `<option value="${sequence.id}">${sequence.name}</option>`;
+                                        });
+                                    }
+                                });
+                        }
+                    }
+                });
+            });
         });
         
         // Campaign Summary Functions
@@ -3511,7 +3576,16 @@
         let workerRefreshInterval;
         
         function loadWorkerStatus() {
-            fetch('/api/workers/status')
+            // Get filter parameters
+            const filterType = document.querySelector('input[name="workerFilter"]:checked').value;
+            const filterItemId = document.getElementById('filterItemId').value;
+            
+            let url = '/api/workers/status';
+            if (filterType !== 'all' && filterItemId) {
+                url += `?filter=${filterType}&id=${filterItemId}`;
+            }
+            
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
@@ -3626,7 +3700,7 @@
                                                 <tr>
                                                     <td>${worker.device_name}</td>
                                                     <td>
-                                                        <span class="badge bg-${worker.device_status === 'connected' ? 'success' : 'secondary'}">
+                                                        <span class="badge bg-${worker.device_status === 'connected' || worker.device_status === 'online' ? 'success' : 'secondary'}">
                                                             ${worker.device_status}
                                                         </span>
                                                     </td>
@@ -3634,6 +3708,8 @@
                                                         <span class="badge bg-${getWorkerStatusColor(worker.worker_status)}">
                                                             ${worker.worker_status}
                                                         </span>
+                                                        ${worker.current_campaign_id ? `<br><small class="text-muted">Campaign: ${worker.current_campaign_id}</small>` : ''}
+                                                        ${worker.current_sequence_id ? `<br><small class="text-muted">Sequence: ${worker.current_sequence_id}</small>` : ''}
                                                     </td>
                                                     <td>${worker.queue_size}</td>
                                                     <td class="text-success">${worker.processed}</td>
