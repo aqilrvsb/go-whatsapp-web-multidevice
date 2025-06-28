@@ -93,6 +93,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestGroup(app, groupUsecase)
 	rest.InitRestNewsletter(app, newsletterUsecase)
 	rest.InitRestSequence(app, sequenceUsecase)
+	rest.InitRestMonitoring(app) // Add monitoring endpoints
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{

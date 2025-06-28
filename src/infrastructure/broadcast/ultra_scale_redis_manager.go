@@ -97,10 +97,22 @@ func NewUltraScaleRedisManager() *UltraScaleRedisManager {
 	
 	redisClient := redis.NewClient(opt)
 	
-	// Test connection
+	// Test connection with retry logic
 	ctx := context.Background()
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		logrus.Fatalf("Failed to connect to Redis: %v", err)
+	var connectErr error
+	for retries := 0; retries < 5; retries++ {
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			connectErr = err
+			logrus.Warnf("Failed to connect to Redis (attempt %d/5): %v", retries+1, err)
+			time.Sleep(time.Duration(retries+1) * time.Second) // Exponential backoff
+			continue
+		}
+		connectErr = nil
+		break
+	}
+	
+	if connectErr != nil {
+		logrus.Fatalf("Failed to connect to Redis after 5 attempts: %v", connectErr)
 	}
 	
 	logrus.Info("Successfully connected to Redis (Ultra Scale Mode)")
@@ -125,11 +137,12 @@ func NewUltraScaleRedisManager() *UltraScaleRedisManager {
 	}
 	
 	// Start manager routines
-	manager.wg.Add(4)
+	manager.wg.Add(5)
 	go manager.processQueues()
 	go manager.monitorWorkers()
 	go manager.cleanupDeadLetters()
 	go manager.flushMetrics()
+	go manager.cleanupOldMessages() // Add cleanup routine
 	
 	logrus.Infof("Ultra Scale Redis Manager started - Ready for %d devices", maxConcurrentWorkers)
 	return manager
@@ -722,4 +735,94 @@ func (um *UltraScaleRedisManager) skipOfflineDeviceMessages(deviceID string) {
 	
 	rowsAffected, _ := result.RowsAffected()
 	logrus.Infof("Skipped %d messages for offline device %s", rowsAffected, deviceID)
+}
+// cleanupOldMessages removes messages older than 24 hours
+func (um *UltraScaleRedisManager) cleanupOldMessages() {
+	defer um.wg.Done()
+	
+	ticker := time.NewTicker(1 * time.Hour) // Run every hour
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-um.ctx.Done():
+			return
+		case <-ticker.C:
+			um.performMessageCleanup()
+		}
+	}
+}
+
+// performMessageCleanup does the actual cleanup
+func (um *UltraScaleRedisManager) performMessageCleanup() {
+	// Clean up old messages from database
+	broadcastRepo := repository.GetBroadcastRepository()
+	
+	// Mark messages older than 24 hours as expired
+	query := `
+		UPDATE broadcast_messages 
+		SET status = 'expired', 
+		    error_message = 'Message expired (older than 24 hours)' 
+		WHERE status IN ('pending', 'queued') 
+		AND created_at < NOW() - INTERVAL '24 hours'
+	`
+	
+	db := database.GetDB()
+	result, err := db.Exec(query)
+	if err != nil {
+		logrus.Errorf("Failed to expire old messages: %v", err)
+		return
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		logrus.Infof("Expired %d old messages (>24 hours)", rowsAffected)
+	}
+	
+	// Clean up old Redis queues
+	pattern := fmt.Sprintf("%s*", ultraCampaignQueuePrefix)
+	keys, err := um.redisClient.Keys(um.ctx, pattern).Result()
+	if err != nil {
+		return
+	}
+	
+	// Also check sequence queues
+	pattern2 := fmt.Sprintf("%s*", ultraSequenceQueuePrefix)
+	keys2, err := um.redisClient.Keys(um.ctx, pattern2).Result()
+	if err == nil {
+		keys = append(keys, keys2...)
+	}
+	
+	// Check each queue
+	for _, key := range keys {
+		// Get all messages from queue
+		messages, err := um.redisClient.LRange(um.ctx, key, 0, -1).Result()
+		if err != nil {
+			continue
+		}
+		
+		var toRemove []string
+		for _, msgData := range messages {
+			var msg UltraRedisMessage
+			if err := json.Unmarshal([]byte(msgData), &msg); err != nil {
+				continue
+			}
+			
+			// Check if message is older than 24 hours
+			if time.Since(msg.Timestamp) > 24*time.Hour {
+				toRemove = append(toRemove, msgData)
+				// Update database status
+				broadcastRepo.UpdateMessageStatus(msg.Message.ID, "expired", "Message expired in queue")
+			}
+		}
+		
+		// Remove expired messages from Redis
+		for _, msgData := range toRemove {
+			um.redisClient.LRem(um.ctx, key, 1, msgData)
+		}
+		
+		if len(toRemove) > 0 {
+			logrus.Infof("Removed %d expired messages from queue %s", len(toRemove), key)
+		}
+	}
 }
