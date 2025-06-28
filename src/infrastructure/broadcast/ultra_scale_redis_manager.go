@@ -219,37 +219,28 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 
 // createDeviceWorker creates a new device worker
 func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWorker {
+	// First check if device is online
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to get device info for %s: %v", deviceID, err)
+		return nil
+	}
+	
+	// Skip if device is not online
+	if device.Status != "online" && device.Status != "Online" && 
+	   device.Status != "connected" && device.Status != "Connected" {
+		logrus.Warnf("Device %s is not online (status: %s), skipping worker creation", deviceID, device.Status)
+		// Mark all pending messages for this device as skipped
+		go um.skipOfflineDeviceMessages(deviceID)
+		return nil
+	}
+	
 	// Get WhatsApp client
 	clientManager := whatsapp.GetClientManager()
 	client, err := clientManager.GetClient(deviceID)
 	if err != nil || client == nil {
 		logrus.Errorf("Failed to get WhatsApp client for device %s: %v", deviceID, err)
-		
-		// Try to find an alternative connected device for the same user
-		// This helps when device IDs change but messages are queued for old device
-		userRepo := repository.GetUserRepository()
-		broadcastRepo := repository.GetBroadcastRepository()
-		
-		// Get a pending message to find the user ID
-		messages, _ := broadcastRepo.GetPendingMessages(deviceID, 1)
-		if len(messages) > 0 && messages[0].UserID != "" {
-			// Get user's connected devices
-			devices, _ := userRepo.GetUserDevices(messages[0].UserID)
-			for _, device := range devices {
-				if device.Status == "online" || device.Status == "Online" || 
-				   device.Status == "connected" || device.Status == "Connected" {
-					// Try to get client for this device
-					altClient, altErr := clientManager.GetClient(device.ID)
-					if altErr == nil && altClient != nil {
-						logrus.Warnf("Using alternative device %s instead of %s", device.ID, deviceID)
-						// Update the messages to use the new device ID
-						go um.updateMessagesToNewDevice(deviceID, device.ID)
-						return NewDeviceWorker(device.ID, altClient, 10, 30)
-					}
-				}
-			}
-		}
-		
 		return nil
 	}
 	
@@ -707,4 +698,23 @@ func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDevi
 	
 	rowsAffected, _ := result.RowsAffected()
 	logrus.Infof("Updated %d messages from device %s to %s", rowsAffected, oldDeviceID, newDeviceID)
+}
+
+// skipOfflineDeviceMessages marks messages as skipped for offline devices
+func (um *UltraScaleRedisManager) skipOfflineDeviceMessages(deviceID string) {
+	query := `
+		UPDATE broadcast_messages 
+		SET status = 'skipped', error_message = 'Device offline' 
+		WHERE device_id = $1 AND status = 'pending'
+	`
+	
+	db := database.GetDB()
+	result, err := db.Exec(query, deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to skip messages for offline device: %v", err)
+		return
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	logrus.Infof("Skipped %d messages for offline device %s", rowsAffected, deviceID)
 }

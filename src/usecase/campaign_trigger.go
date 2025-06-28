@@ -110,7 +110,8 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 			continue
 		}
 		
-		logrus.Infof("Found %d leads for device %s matching criteria", len(leads), device.ID)
+		logrus.Infof("Found %d leads for device %s (status: %s) matching criteria", 
+			len(leads), device.ID, device.Status)
 		
 		// Queue messages for this device's leads
 		for _, lead := range leads {
