@@ -1,18 +1,27 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 28, 2025 - 7:00 PM**  
+**Last Updated: June 28, 2025 - 7:20 PM**  
 **Status: ✅ Production-ready with OPTIMIZED 3000+ device support**
 **Architecture: ✅ Redis-optimized parallel processing with auto-scaling workers**
 **Deploy**: ✅ Auto-deployment triggered via Railway
 
-## 🚨 LATEST UPDATE: Device Status UI Fix (June 28, 2025 - 6:55 PM)
+## 🚨 LATEST UPDATE: Device Status Auto-Update Fixed (June 28, 2025 - 7:20 PM)
 
-### Device Connection Display Fix
-- **Issue**: Device shows "Disconnected" in UI even after successful QR scan
-- **Solution**: Just refresh browser (F5) after QR scan - device IS connected!
-- **Fix Added**: WebSocket handler for auto-UI updates in `fixes/device-status-refresh/`
-- **Note**: Backend works perfectly, just a UI refresh issue
+### ✅ Device Connection Status Now Auto-Updates!
+- **Issue Fixed**: Device showing "Disconnected" after successful QR scan
+- **Solution**: Backend now auto-updates device to "online" when DEVICE_CONNECTED is triggered
+- **No Manual DB Updates**: Previously required manual PostgreSQL updates - now fully automatic
+- **How it Works**:
+  1. Scan QR code → WhatsApp connects
+  2. DEVICE_CONNECTED message triggered
+  3. Database automatically updates status to "online"
+  4. UI shows "Connected" (may need page refresh)
 
-## 📍 Previous Update: Complete System Overhaul (June 28, 2025 - 1:50 PM)
+### Frontend Improvements
+- UI immediately shows "Connected" when success alert appears
+- No need to wait for database sync
+- Automatic retry after 3 seconds if needed
+
+## 📍 Previous Update: Device Status UI Fix (June 28, 2025 - 6:55 PM)
 
 ### What's New
 - **✅ MESSAGES NOW SEND AUTOMATICALLY!** Fixed critical startup issue
@@ -850,6 +859,14 @@ Example: A lead with niche "EXSTART,ITADRESS" and status "prospect" will receive
 - `leads` - Contact management with niche and status
 
 ## 🔍 Troubleshooting
+
+### Device Shows "Disconnected" After QR Scan? ✅ FIXED!
+**This issue has been fixed in the latest update!** Devices now auto-update to "online" status.
+
+If you still experience issues:
+1. **Quick Fix**: Refresh browser (F5) after seeing "WhatsApp connected successfully!" alert
+2. **Check Logs**: Look for "Successfully updated device to online status for phone XXX"
+3. **Verify**: The DEVICE_CONNECTED message should trigger automatic status update
 
 ### Messages Not Sending After Campaign Creation?
 1. **Check Device Status**: Ensure devices show as "online" in dashboard
