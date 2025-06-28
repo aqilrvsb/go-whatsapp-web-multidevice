@@ -1174,7 +1174,7 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 	
 	// Disconnect WhatsApp client if connected
 	cm := whatsapp.GetClientManager()
-	if client := cm.GetClient(deviceId); client != nil {
+	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
 		logrus.Info("Disconnecting WhatsApp client...")
 		
 		// Logout from WhatsApp
@@ -1226,33 +1226,6 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 			"device_id": deviceId,
 			"device_name": device.DeviceName,
 		},
-	})
-}
-
-// Clean up WhatsApp client if exists
-	cm := whatsapp.GetClientManager()
-	client, err := cm.GetClient(device.ID)
-	if err == nil && client != nil {
-		// Try to logout first
-		client.Logout(c.UserContext())
-		// Remove from client manager
-		cm.RemoveClient(device.ID)
-	}
-	
-	// Delete device from database
-	err = userRepo.DeleteDevice(device.ID)
-	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "INTERNAL_ERROR",
-			Message: fmt.Sprintf("Failed to delete device: %v", err),
-		})
-	}
-	
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: "Device deleted successfully",
 	})
 }
 
@@ -1310,7 +1283,7 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 	
 	// Disconnect WhatsApp client
 	cm := whatsapp.GetClientManager()
-	if client := cm.GetClient(deviceId); client != nil {
+	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
 		// Logout from WhatsApp
 		if client.IsConnected() {
 			err = client.Logout(c.UserContext())

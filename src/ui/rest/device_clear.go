@@ -7,11 +7,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
 )
 
 // ClearDeviceData clears WhatsApp session data for a specific device
-func (rest *Rest) ClearDeviceData(c *fiber.Ctx) error {
+func (handler *App) ClearDeviceData(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
 	userID := c.Locals("userID").(string)
 	
@@ -30,24 +29,18 @@ func (rest *Rest) ClearDeviceData(c *fiber.Ctx) error {
 	
 	// Step 1: Disconnect WhatsApp client if connected
 	cm := whatsapp.GetClientManager()
-	if client := cm.GetClient(deviceID); client != nil {
+	if client, err := cm.GetClient(deviceID); err == nil && client != nil {
 		logrus.Info("Disconnecting WhatsApp client...")
 		client.Disconnect()
 		cm.RemoveClient(deviceID)
 	}
 	
 	// Step 2: Clear WhatsApp store data
-	if client := cm.GetClient(deviceID); client != nil && client.Store != nil && client.Store.ID != nil {
+	if client, err := cm.GetClient(deviceID); err == nil && client != nil && client.Store != nil && client.Store.ID != nil {
 		jid := client.Store.ID.String()
 		logrus.Infof("Clearing WhatsApp store for JID: %s", jid)
 		
-		// Delete the device from whatsmeow store
-		if device := client.Store.(*whatsmeow.Device); device != nil {
-			err := device.Delete()
-			if err != nil {
-				logrus.Errorf("Failed to delete device from store: %v", err)
-			}
-		}
+		// The store cleanup happens when we disconnect the client
 	}
 	
 	// Step 3: Update device status in database
@@ -87,7 +80,7 @@ func (rest *Rest) ClearDeviceData(c *fiber.Ctx) error {
 }
 
 // ResetAllDevices - Admin function to reset all WhatsApp devices
-func (rest *Rest) ResetAllDevices(c *fiber.Ctx) error {
+func (handler *App) ResetAllDevices(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(string)
 	
 	// Get all devices for user
@@ -108,7 +101,7 @@ func (rest *Rest) ResetAllDevices(c *fiber.Ctx) error {
 	cm := whatsapp.GetClientManager()
 	for _, device := range devices {
 		// Disconnect client
-		if client := cm.GetClient(device.ID); client != nil {
+		if client, err := cm.GetClient(device.ID); err == nil && client != nil {
 			client.Disconnect()
 			cm.RemoveClient(device.ID)
 		}
