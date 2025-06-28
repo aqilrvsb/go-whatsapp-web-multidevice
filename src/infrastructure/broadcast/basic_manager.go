@@ -75,27 +75,21 @@ func (bm *BasicBroadcastManager) ProcessQueue() {
 func (bm *BasicBroadcastManager) processQueueBatch() {
 	repo := repository.GetBroadcastRepository()
 	
-	// Process messages for each active worker
-	bm.mu.RLock()
-	deviceIDs := make([]string, 0, len(bm.workers))
-	for deviceID := range bm.workers {
-		deviceIDs = append(deviceIDs, deviceID)
+	// Get ALL pending messages, not just for active workers
+	messages, err := repo.GetAllPendingMessages(50)
+	if err != nil {
+		logrus.Errorf("Failed to get pending messages: %v", err)
+		return
 	}
-	bm.mu.RUnlock()
 	
-	for _, deviceID := range deviceIDs {
-		messages, err := repo.GetPendingMessages(deviceID, 50)
-		if err != nil {
-			logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
-			continue
-		}
-		
-		for _, msg := range messages {
-			// Get worker for device
-			worker := bm.GetOrCreateWorker(msg.DeviceID)
-			if worker != nil {
-				worker.SendMessage(msg)
-			}
+	// Process each message
+	for _, msg := range messages {
+		// Get or create worker for the device
+		worker := bm.GetOrCreateWorker(msg.DeviceID)
+		if worker != nil {
+			worker.SendMessage(msg)
+		} else {
+			logrus.Warnf("Could not create worker for device %s", msg.DeviceID)
 		}
 	}
 }

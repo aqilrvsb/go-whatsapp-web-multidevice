@@ -233,3 +233,62 @@ func max(a, b int) int {
 	}
 	return b
 }
+
+// GetAllPendingMessages gets all pending messages across all devices
+func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
+	query := `
+		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
+		       message_type, content, media_url, status, scheduled_at, created_at,
+		       group_id, group_order
+		FROM broadcast_messages
+		WHERE status = 'pending' 
+		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
+		ORDER BY created_at ASC
+		LIMIT $1
+	`
+	
+	rows, err := r.db.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var messages []domainBroadcast.BroadcastMessage
+	for rows.Next() {
+		var msg domainBroadcast.BroadcastMessage
+		var campaignID sql.NullInt64
+		var sequenceID sql.NullString
+		var scheduledAt sql.NullTime
+		var groupID sql.NullString
+		var groupOrder sql.NullInt64
+		
+		err := rows.Scan(&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
+			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &msg.Status,
+			&scheduledAt, &msg.CreatedAt, &groupID, &groupOrder)
+		if err != nil {
+			continue
+		}
+		
+		if campaignID.Valid {
+			campaignIDInt := int(campaignID.Int64)
+			msg.CampaignID = &campaignIDInt
+		}
+		if sequenceID.Valid {
+			msg.SequenceID = &sequenceID.String
+		}
+		if groupID.Valid {
+			msg.GroupID = &groupID.String
+		}
+		if groupOrder.Valid {
+			groupOrderInt := int(groupOrder.Int64)
+			msg.GroupOrder = &groupOrderInt
+		}
+		if scheduledAt.Valid {
+			msg.ScheduledAt = scheduledAt.Time
+		}
+		
+		messages = append(messages, msg)
+	}
+	
+	return messages, nil
+}
