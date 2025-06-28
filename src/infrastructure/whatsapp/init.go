@@ -232,9 +232,11 @@ func handleConnectionEvents(_ context.Context) {
 			allSessions := GetAllConnectionSessions()
 			log.Infof("Found %d active connection sessions", len(allSessions))
 			
+			var connectedDeviceID string
 			for userID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
 					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
+					connectedDeviceID = session.DeviceID // Store device ID for the message
 					
 					// Update device status to online
 					err := userRepo.UpdateDeviceStatus(session.DeviceID, "online", phoneNumber, jid)
@@ -267,13 +269,14 @@ func handleConnectionEvents(_ context.Context) {
 			}
 		}
 		
-		// Send connection success message
+		// Send connection success message with device ID
 		websocket.Broadcast <- websocket.BroadcastMessage{
 			Code:    "DEVICE_CONNECTED",
 			Message: "WhatsApp fully connected and logged in",
 			Result: map[string]interface{}{
-				"phone": phoneNumber,
-				"jid":   jid,
+				"phone":    phoneNumber,
+				"jid":      jid,
+				"deviceId": connectedDeviceID,
 			},
 		}
 	}

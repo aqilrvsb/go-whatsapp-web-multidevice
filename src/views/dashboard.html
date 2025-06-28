@@ -2302,10 +2302,11 @@
                             // Device fully connected and logged in
                             console.log('Device fully connected:', data.message);
                             
-                            // Extract phone and JID from the message
+                            // Extract phone, JID, and device ID from the message
                             const deviceInfo = data.results || {};
                             const phone = deviceInfo.phone || '';
                             const jid = deviceInfo.jid || '';
+                            const deviceId = deviceInfo.deviceId || '';
                             
                             // Close QR modal if open
                             const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
@@ -2320,6 +2321,7 @@
                                 title: 'WhatsApp Connected!',
                                 html: `
                                     <p>Device connected with phone: <strong>${phone}</strong></p>
+                                    ${deviceId ? `<p>Device ID: <small>${deviceId}</small></p>` : ''}
                                     <p>Updating device status...</p>
                                     <p>Page will reload in <b></b> seconds.</p>
                                 `,
@@ -2333,11 +2335,11 @@
                                         b.textContent = Math.ceil(Swal.getTimerLeft() / 1000);
                                     }, 100);
                                     
-                                    // Find the offline device and update it
-                                    const offlineDevice = devices.find(d => d.status === 'offline' || d.status === 'disconnected');
-                                    if (offlineDevice) {
+                                    // Update the specific device using the device ID from the message
+                                    if (deviceId) {
+                                        console.log('Updating device:', deviceId, 'to online status');
                                         // Call API to update device status
-                                        fetch(`/api/devices/${offlineDevice.id}/status`, {
+                                        fetch(`/api/devices/${deviceId}/status`, {
                                             method: 'PUT',
                                             headers: {
                                                 'Content-Type': 'application/json',
@@ -2360,6 +2362,39 @@
                                         .catch(error => {
                                             console.error('Error updating device status:', error);
                                         });
+                                    } else {
+                                        // Fallback: Find the offline device and update it
+                                        const offlineDevice = devices.find(d => d.status === 'offline' || d.status === 'disconnected');
+                                        
+                                        if (offlineDevice) {
+                                            console.log('No device ID in message, updating first offline device:', offlineDevice.id);
+                                            // Call API to update device status
+                                            fetch(`/api/devices/${offlineDevice.id}/status`, {
+                                                method: 'PUT',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                },
+                                                credentials: 'include',
+                                                body: JSON.stringify({
+                                                    status: 'online',
+                                                    phone: phone,
+                                                    jid: jid
+                                                })
+                                            })
+                                            .then(response => response.json())
+                                            .then(result => {
+                                                if (result.code === 'SUCCESS') {
+                                                    console.log('Device status updated successfully');
+                                                } else {
+                                                    console.error('Failed to update device status:', result.message);
+                                                }
+                                            })
+                                            .catch(error => {
+                                                console.error('Error updating device status:', error);
+                                            });
+                                        } else {
+                                            console.error('No offline device found to update');
+                                        }
                                     }
                                 },
                                 willClose: () => {
