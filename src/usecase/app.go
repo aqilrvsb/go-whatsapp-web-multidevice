@@ -33,7 +33,7 @@ func NewAppService(waCli *whatsmeow.Client, db *sqlstore.Container) domainApp.IA
 	}
 }
 
-func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResponse, err error) {
+func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
 	// CRITICAL FIX: Always use a fresh database container for multi-device support
 	if service.db == nil {
 		return response, fmt.Errorf("database not initialized")
