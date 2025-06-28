@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
@@ -19,6 +17,7 @@ import (
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
@@ -55,14 +54,14 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 	// FIX 2: Add event handler to properly register device after successful login
 	newClient.AddEventHandler(func(evt interface{}) {
 		switch v := evt.(type) {
-		case *whatsmeow.events.PairSuccess:
+		case *events.PairSuccess:
 			logrus.Infof("Pair success event: %s", v.ID.String())
 			// Device is paired but not fully connected yet
-		case *whatsmeow.events.Connected:
+		case *events.Connected:
 			logrus.Info("Connected event received - device fully connected!")
 			// Now register the device with ClientManager
 			service.registerDeviceAfterConnection(newClient)
-		case *whatsmeow.events.LoggedOut:
+		case *events.LoggedOut:
 			logrus.Warn("Device logged out")
 		}
 	})
@@ -263,10 +262,80 @@ func (service serviceApp) LoginWithCode(ctx context.Context, phoneNumber string)
 	// Add event handler for this client too
 	newClient.AddEventHandler(func(evt interface{}) {
 		switch evt.(type) {
-		case *whatsmeow.events.Connected:
+		case *events.Connected:
 			service.registerDeviceAfterConnection(newClient)
 		}
 	})
 
 	return loginCode, nil
+}
+
+func (service serviceApp) Logout(ctx context.Context) (err error) {
+	if service.WaCli == nil || !service.WaCli.IsConnected() {
+		return pkgError.ErrNotConnected
+	}
+
+	err = service.WaCli.Logout()
+	if err != nil {
+		return err
+	}
+
+	service.WaCli.Disconnect()
+	return nil
+}
+
+func (service serviceApp) Reconnect(ctx context.Context) (err error) {
+	if service.WaCli == nil {
+		return fmt.Errorf("whatsapp client is not initialized")
+	}
+	
+	service.WaCli.Disconnect()
+	
+	// Wait a bit before reconnecting
+	time.Sleep(2 * time.Second)
+	
+	return service.WaCli.Connect()
+}
+
+func (service serviceApp) FirstDevice(ctx context.Context) (response domainApp.DevicesResponse, err error) {
+	if service.db == nil {
+		return response, fmt.Errorf("database not initialized")
+	}
+	
+	device, err := service.db.GetFirstDevice(ctx)
+	if err != nil {
+		return response, err
+	}
+	
+	if device == nil {
+		return response, fmt.Errorf("no device found")
+	}
+	
+	response = domainApp.DevicesResponse{
+		Name:   device.PushName,
+		Device: device.ID.String(),
+	}
+	
+	return response, nil
+}
+
+func (service serviceApp) FetchDevices(ctx context.Context) (response []domainApp.DevicesResponse, err error) {
+	if service.db == nil {
+		return response, fmt.Errorf("database not initialized")
+	}
+	
+	devices, err := service.db.GetAllDevices(ctx)
+	if err != nil {
+		return response, err
+	}
+	
+	response = make([]domainApp.DevicesResponse, 0, len(devices))
+	for _, device := range devices {
+		response = append(response, domainApp.DevicesResponse{
+			Name:   device.PushName,
+			Device: device.ID.String(),
+		})
+	}
+	
+	return response, nil
 }
