@@ -131,8 +131,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	// Update campaign status
 	campaignRepo := repository.GetCampaignRepository()
-	err := campaignRepo.UpdateCampaignStatus(campaign.ID, "sent")
-	if err != nil {
+	if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "sent"); err != nil {
 		logrus.Errorf("Failed to update campaign status: %v", err)
 	}
 	
