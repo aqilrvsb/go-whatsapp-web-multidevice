@@ -160,8 +160,6 @@ func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
 		loc = time.UTC
 	}
 	
-	nowMalaysia := time.Now().In(loc)
-	
 	sequenceRepo := repository.GetSequenceRepository()
 	leadRepo := repository.GetLeadRepository()
 	
