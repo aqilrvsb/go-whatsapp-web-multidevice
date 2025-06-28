@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -71,7 +72,8 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	// - As middle item: niche = 'OTHER,ITADRESS,MORE'
 	// - As last item: niche = 'OTHER,ITADRESS'
 	query := `
-		SELECT id, user_id, name, phone, email, niche, source, status, COALESCE(target_status, 'customer') as target_status, notes, created_at, updated_at
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
+		       COALESCE(target_status, 'prospect') as target_status, created_at, updated_at
 		FROM leads
 		WHERE niche = $1 
 		   OR niche LIKE $2 
@@ -95,11 +97,17 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	var leads []models.Lead
 	for rows.Next() {
 		var lead models.Lead
-		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.TargetStatus, &lead.Notes,
+		var journey sql.NullString
+		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Niche, &journey, &lead.Status, &lead.TargetStatus,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
+			log.Printf("Error scanning lead in GetLeadsByNiche: %v", err)
 			continue
+		}
+		// Map journey to Notes field
+		if journey.Valid {
+			lead.Notes = journey.String
 		}
 		leads = append(leads, lead)
 	}
@@ -134,8 +142,8 @@ func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) (
 // GetNewLeadsForSequence gets new leads matching niche that aren't in sequence
 func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]models.Lead, error) {
 	query := `
-		SELECT l.id, l.user_id, l.name, l.phone, l.email, l.niche, 
-		       l.source, l.status, l.notes, l.created_at, l.updated_at
+		SELECT l.id, l.user_id, l.name, l.phone, l.niche, 
+		       l.journey, l.status, l.created_at, l.updated_at
 		FROM leads l
 		WHERE l.niche = $1
 		AND NOT EXISTS (
@@ -155,11 +163,17 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 	var leads []models.Lead
 	for rows.Next() {
 		var lead models.Lead
+		var journey sql.NullString
 		err := rows.Scan(&lead.ID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Email, &lead.Niche, &lead.Source, &lead.Status, &lead.TargetStatus, &lead.Notes,
+			&lead.Niche, &journey, &lead.Status,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
+			log.Printf("Error scanning lead in GetNewLeadsForSequence: %v", err)
 			continue
+		}
+		// Map journey to Notes field
+		if journey.Valid {
+			lead.Notes = journey.String
 		}
 		leads = append(leads, lead)
 	}

@@ -445,6 +445,14 @@ func InitializeSchema() error {
 				$$ LANGUAGE plpgsql;
 			`,
 		},
+		{
+			name: "Fix leads table columns",
+			sql: `
+				-- Ensure target_status exists in leads table
+				ALTER TABLE leads ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'prospect';
+				UPDATE leads SET target_status = 'prospect' WHERE target_status IS NULL;
+			`,
+		},
 	}
 	
 	for _, migration := range migrations {
