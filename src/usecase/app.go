@@ -46,6 +46,9 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	// Create a new WhatsApp client for this device
 	newClient := whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
 	
+	// Channel to signal successful connection
+	connectedChan := make(chan bool, 1)
+	
 	// Add event handler to properly register device after successful login
 	newClient.AddEventHandler(func(evt interface{}) {
 		switch v := evt.(type) {
@@ -54,6 +57,11 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		case *events.Connected:
 			logrus.Info("Connected event received - device fully connected!")
 			service.registerDeviceAfterConnection(newClient)
+			// Signal successful connection
+			select {
+			case connectedChan <- true:
+			default:
+			}
 			// Keep the client alive by adding keepalive monitoring
 			go func(client *whatsmeow.Client) {
 				ticker := time.NewTicker(30 * time.Second)
@@ -123,7 +131,13 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 					default:
 					}
 				} else {
-					logrus.Infof("QR event: %s", evt.Event)
+					logrus.Infof("QR event - Event: %s, Code length: %d, Timeout: %v", evt.Event, len(evt.Code), evt.Timeout)
+					// Handle success event
+					if evt.Event == "success" {
+						logrus.Info("QR authentication successful!")
+						close(stopQR)
+						return
+					}
 				}
 			case <-stopQR:
 				logrus.Info("Stopping QR generation - device connected")
@@ -152,25 +166,15 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	
 	// Monitor for successful connection in background
 	go func() {
-		// Check periodically if device is connected
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-		
-		timeout := time.After(5 * time.Minute)
-		
-		for {
-			select {
-			case <-ticker.C:
-				if newClient.IsLoggedIn() {
-					logrus.Info("Device successfully logged in!")
-					close(stopQR) // Stop QR generation
-					return
-				}
-			case <-timeout:
-				logrus.Warn("Connection monitoring timeout")
-				close(stopQR)
-				return
-			}
+		select {
+		case <-connectedChan:
+			logrus.Info("Device successfully connected and authenticated!")
+			close(stopQR) // Stop QR generation
+			// Ensure device is registered
+			time.Sleep(2 * time.Second) // Wait for registration to complete
+		case <-time.After(5 * time.Minute):
+			logrus.Warn("Connection monitoring timeout")
+			close(stopQR)
 		}
 	}()
 	
