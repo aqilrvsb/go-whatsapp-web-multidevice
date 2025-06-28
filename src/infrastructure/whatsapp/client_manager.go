@@ -9,6 +9,7 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -39,12 +40,19 @@ func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 	cm.clients[deviceID] = client
+	logrus.Infof("Added WhatsApp client for device: %s (total clients: %d)", deviceID, len(cm.clients))
 }
 
 // GetClient retrieves a WhatsApp client for a device
 func (cm *ClientManager) GetClient(deviceID string) (*whatsmeow.Client, error) {
 	cm.mutex.RLock()
 	defer cm.mutex.RUnlock()
+	
+	// Log all registered clients for debugging
+	logrus.Debugf("Looking for device %s, registered clients: %d", deviceID, len(cm.clients))
+	for id := range cm.clients {
+		logrus.Debugf("Registered client: %s", id)
+	}
 	
 	client, exists := cm.clients[deviceID]
 	if !exists {
@@ -63,6 +71,20 @@ func (cm *ClientManager) RemoveClient(deviceID string) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 	delete(cm.clients, deviceID)
+	logrus.Infof("Removed WhatsApp client for device: %s", deviceID)
+}
+
+// GetAllClients returns all registered clients (for debugging)
+func (cm *ClientManager) GetAllClients() map[string]*whatsmeow.Client {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	
+	// Make a copy to avoid race conditions
+	clientsCopy := make(map[string]*whatsmeow.Client)
+	for k, v := range cm.clients {
+		clientsCopy[k] = v
+	}
+	return clientsCopy
 }
 
 // GetChatsForDevice fetches and saves chats for a specific device (personal chats only)
@@ -100,10 +122,6 @@ func GetChatsForDevice(deviceID string) ([]repository.WhatsAppChat, error) {
 	if err != nil {
 		fmt.Printf("Failed to get contacts: %v\n", err)
 	}
-	
-	// Get recent conversations from chat store
-	// Note: ChatSettings doesn't exist, we need to use a different approach
-	// We'll get chats from the contacts we have
 	
 	// Create a map for quick updates
 	chatMap := make(map[string]*repository.WhatsAppChat)
@@ -155,9 +173,6 @@ func GetChatsForDevice(deviceID string) ([]repository.WhatsAppChat, error) {
 			fmt.Printf("Error saving chat %s: %v\n", chatJID, err)
 		}
 	}
-	
-	// Note: We already processed all contacts above, so this section is redundant
-	// but kept for clarity of the original intent
 	
 	// Convert map back to slice
 	var updatedChats []repository.WhatsAppChat
@@ -273,9 +288,6 @@ func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 		}
 	}
 	
-	// Note: ChatSettings API is not available in current whatsmeow version
-	// We'll rely on contacts list and message events for chat discovery
-	
 	// Save all to database and build result slice
 	repo := repository.GetWhatsAppRepository()
 	for _, chat := range chatMap {
@@ -304,18 +316,4 @@ func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 	fmt.Printf("Total personal chats found: %d\n", len(allPersonalChats))
 	
 	return allPersonalChats, nil
-}
-
-
-// GetAllClients returns a copy of all clients (for debugging)
-func (cm *ClientManager) GetAllClients() map[string]*whatsmeow.Client {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
-	
-	// Create a copy to avoid concurrent access issues
-	clientsCopy := make(map[string]*whatsmeow.Client)
-	for k, v := range cm.clients {
-		clientsCopy[k] = v
-	}
-	return clientsCopy
 }

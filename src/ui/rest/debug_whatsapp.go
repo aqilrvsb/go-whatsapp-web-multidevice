@@ -16,8 +16,8 @@ func DebugWhatsAppClients(c *fiber.Ctx) error {
 	for deviceID, client := range clients {
 		info := map[string]interface{}{
 			"device_id": deviceID,
-			"connected": client.IsConnected(),
-			"logged_in": client.IsLoggedIn(),
+			"connected": client != nil && client.IsConnected(),
+			"logged_in": client != nil && client.IsLoggedIn(),
 		}
 		clientInfo = append(clientInfo, info)
 	}
