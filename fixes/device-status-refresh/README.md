@@ -55,3 +55,23 @@ To verify device is actually connected:
 3. Check database directly: `SELECT status FROM user_devices WHERE id = 'your-device-id'`
 
 The device IS connected and working - it's just a display issue in the UI!
+# UPDATE: WebSocket DEVICE_CONNECTED Message Handler
+
+## The Issue
+Your log shows:
+```
+2025/06/28 10:52:55 message received: {DEVICE_CONNECTED WhatsApp fully connected and logged in map[jid:60146674397:51@s.whatsapp.net phone:60146674397]}
+```
+
+But the UI still shows "Disconnected" because the frontend doesn't handle the `DEVICE_CONNECTED` WebSocket message.
+
+## Quick Fix
+**Just refresh your browser (F5)** - Your device IS connected!
+
+## Permanent Fix
+Add the WebSocket handler from `websocket-handler-fix.js` to make the UI auto-update when receiving DEVICE_CONNECTED messages.
+
+This will:
+1. Listen for DEVICE_CONNECTED WebSocket messages
+2. Automatically reload the device list when a device connects
+3. Update the UI to show "Connected" status with phone number
