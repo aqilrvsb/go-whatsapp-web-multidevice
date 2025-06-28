@@ -84,7 +84,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 
 	// Get QR channel
 	logrus.Info("Getting QR channel...")
-	ch, err := newClient.GetQRChannel(context.Background())
+	ch, err := newClient.GetQRChannel(ctx)
 	if err != nil {
 		logrus.Error("Error getting QR channel: ", err.Error())
 		
@@ -104,7 +104,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			}
 			
 			// Try getting QR channel again
-			ch, err = newClient.GetQRChannel(context.Background())
+			ch, err = newClient.GetQRChannel(ctx)
 			if err != nil {
 				return response, fmt.Errorf("failed to get QR channel after reset: %w", err)
 			}
