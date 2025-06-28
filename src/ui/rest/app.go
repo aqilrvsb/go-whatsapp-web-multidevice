@@ -1179,7 +1179,10 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 		
 		// Logout from WhatsApp
 		if client.IsConnected() {
-			client.Logout()
+			err := client.Logout(c.UserContext())
+			if err != nil {
+				logrus.Errorf("Error logging out: %v", err)
+			}
 		}
 		client.Disconnect()
 		
@@ -1315,7 +1318,7 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 	if client := cm.GetClient(deviceId); client != nil {
 		// Logout from WhatsApp
 		if client.IsConnected() {
-			err = client.Logout()
+			err = client.Logout(c.UserContext())
 			if err != nil {
 				logrus.Errorf("Error logging out: %v", err)
 			}

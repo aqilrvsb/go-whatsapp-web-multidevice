@@ -91,7 +91,7 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 		if errors.Is(err, whatsmeow.ErrQRStoreContainsID) {
 			// This device is already registered, try to delete and recreate
 			logrus.Warn("Device already has ID, deleting and recreating...")
-			device.Delete()
+			device.Delete(ctx)
 			
 			// Create a completely new device
 			device = service.db.NewDevice()
@@ -275,7 +275,7 @@ func (service serviceApp) Logout(ctx context.Context) (err error) {
 		return pkgError.ErrNotConnected
 	}
 
-	err = service.WaCli.Logout()
+	err = service.WaCli.Logout(ctx)
 	if err != nil {
 		return err
 	}
