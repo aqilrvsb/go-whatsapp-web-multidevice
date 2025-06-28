@@ -118,19 +118,34 @@ A powerful WhatsApp Multi-Device broadcast system designed for:
 - ✅ **Lead Import/Export** - CSV import/export with target_status support
 - ✅ **Device Analytics** - Detailed campaign performance per device
 
-### Latest Updates (June 28, 2025 - 4:50 PM)
+### Latest Updates (June 28, 2025 - 5:00 PM)
 
-#### 🔧 Fixed Device Connection Status Check
-- **Issue**: Campaigns and sequences were failing with "No connected devices found" even when devices were connected
-- **Root Cause**: Case sensitivity mismatch - database stores "Connected" but code was checking for "connected"
-- **Solution**: Updated all connection checks to handle both "connected" and "Connected" status
+#### 🔧 Fixed Device Status Detection - Now Supports "online" Status
+- **Issue**: Campaigns were still failing because devices store status as "online" not "connected"
+- **Root Cause**: Database stores device status as "online"/"offline" not "connected"/"disconnected"
+- **Solution**: Updated all status checks to accept: "connected", "Connected", "online", "Online"
+- **Result**: Campaigns and sequences now properly detect online devices
 - **Files Fixed**:
   - `src/usecase/campaign_trigger.go`
   - `src/usecase/optimized_campaign_trigger.go`
   - `src/usecase/sequence.go`
-- **Added Debug Logging**: Device status is now logged for troubleshooting
 
-### Latest Updates (June 28, 2025 - 10:30 AM)
+### Latest Updates (June 28, 2025 - 5:00 PM)
+
+#### 🔧 Fixed Device Connection Status Check - ONLINE Status
+- **Issue**: Campaigns and sequences were failing with "No connected devices found" even when devices were connected
+- **Root Cause**: Database stores device status as "online"/"offline", not "connected"
+- **Solution**: Updated all connection checks to handle "online", "Online", "connected", and "Connected" status
+- **Files Fixed**:
+  - `src/usecase/campaign_trigger.go`
+  - `src/usecase/optimized_campaign_trigger.go`
+  - `src/usecase/sequence.go`
+- **Device Status Values**: The system now recognizes:
+  - ✅ "online" or "Online" - Device is connected and ready
+  - ✅ "connected" or "Connected" - Alternative connected state
+  - ❌ "offline" - Device is not available
+
+### Latest Updates (June 28, 2025 - 4:50 PM)
 
 #### 🔄 Unified Time Schedule Migration with Auto-Migration
 - **Standardized Field Names**: Changed `scheduled_time`/`schedule_time` to `time_schedule` across all tables
