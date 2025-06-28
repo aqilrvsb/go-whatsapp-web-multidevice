@@ -280,9 +280,6 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 	
 	return campaigns, nil
 }
-	
-	return campaigns, nil
-}
 
 // GetCampaigns is an alias for GetAllCampaigns
 func (r *campaignRepository) GetCampaigns(userID string) ([]models.Campaign, error) {
