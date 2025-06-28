@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
@@ -197,15 +199,19 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 		um.workersMutex.Lock()
 		if _, exists := um.workers[deviceID]; !exists {
 			worker := um.createDeviceWorker(deviceID)
-			um.workers[deviceID] = worker
-			atomic.AddInt32(&um.activeWorkers, 1)
-			
-			// Start worker
-			um.wg.Add(1)
-			go um.runWorker(deviceID, worker)
-			
-			logrus.Infof("Started worker for device %s (total: %d)", 
-				deviceID, atomic.LoadInt32(&um.activeWorkers))
+			if worker != nil {
+				um.workers[deviceID] = worker
+				atomic.AddInt32(&um.activeWorkers, 1)
+				
+				// Start worker
+				um.wg.Add(1)
+				go um.runWorker(deviceID, worker)
+				
+				logrus.Infof("Started worker for device %s (total: %d)", 
+					deviceID, atomic.LoadInt32(&um.activeWorkers))
+			} else {
+				logrus.Warnf("Could not create worker for device %s - WhatsApp client not available", deviceID)
+			}
 		}
 		um.workersMutex.Unlock()
 	}
@@ -218,6 +224,32 @@ func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWor
 	client, err := clientManager.GetClient(deviceID)
 	if err != nil || client == nil {
 		logrus.Errorf("Failed to get WhatsApp client for device %s: %v", deviceID, err)
+		
+		// Try to find an alternative connected device for the same user
+		// This helps when device IDs change but messages are queued for old device
+		userRepo := repository.GetUserRepository()
+		broadcastRepo := repository.GetBroadcastRepository()
+		
+		// Get a pending message to find the user ID
+		messages, _ := broadcastRepo.GetPendingMessages(deviceID, 1)
+		if len(messages) > 0 && messages[0].UserID != "" {
+			// Get user's connected devices
+			devices, _ := userRepo.GetUserDevices(messages[0].UserID)
+			for _, device := range devices {
+				if device.Status == "online" || device.Status == "Online" || 
+				   device.Status == "connected" || device.Status == "Connected" {
+					// Try to get client for this device
+					altClient, altErr := clientManager.GetClient(device.ID)
+					if altErr == nil && altClient != nil {
+						logrus.Warnf("Using alternative device %s instead of %s", device.ID, deviceID)
+						// Update the messages to use the new device ID
+						go um.updateMessagesToNewDevice(deviceID, device.ID)
+						return NewDeviceWorker(device.ID, altClient, 10, 30)
+					}
+				}
+			}
+		}
+		
 		return nil
 	}
 	
@@ -225,12 +257,28 @@ func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWor
 	// Pass default delays that will be overridden by message-specific delays
 	worker := NewDeviceWorker(deviceID, client, 10, 30)
 	
+	if worker == nil {
+		logrus.Errorf("Failed to create worker for device %s", deviceID)
+		return nil
+	}
+	
 	return worker
 }
 
 // runWorker runs a device worker with optimizations
 func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorker) {
 	defer um.wg.Done()
+	
+	// Safety check
+	if worker == nil {
+		logrus.Errorf("Cannot run nil worker for device %s", deviceID)
+		atomic.AddInt32(&um.activeWorkers, -1)
+		um.workersMutex.Lock()
+		delete(um.workers, deviceID)
+		um.workersMutex.Unlock()
+		return
+	}
+	
 	defer func() {
 		atomic.AddInt32(&um.activeWorkers, -1)
 		um.workersMutex.Lock()
@@ -640,3 +688,23 @@ func getPriority(msg domainBroadcast.BroadcastMessage) int {
 
 // Interface compliance check
 var _ BroadcastManagerInterface = (*UltraScaleRedisManager)(nil)
+
+
+// updateMessagesToNewDevice updates pending messages to use a new device ID
+func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDeviceID string) {
+	query := `
+		UPDATE broadcast_messages 
+		SET device_id = $1 
+		WHERE device_id = $2 AND status = 'pending'
+	`
+	
+	db := database.GetDB()
+	result, err := db.Exec(query, newDeviceID, oldDeviceID)
+	if err != nil {
+		logrus.Errorf("Failed to update messages to new device: %v", err)
+		return
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	logrus.Infof("Updated %d messages from device %s to %s", rowsAffected, oldDeviceID, newDeviceID)
+}
