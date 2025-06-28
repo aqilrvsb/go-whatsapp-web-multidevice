@@ -92,8 +92,10 @@ func InitWaCLI(ctx context.Context, storeContainer *sqlstore.Container) *whatsme
 	}
 
 	if device == nil {
-		log.Errorf("No device found")
-		panic("No device found")
+		log.Info("No device found - devices will be created when users add them")
+		// For multi-device support, return nil instead of panicking
+		// Devices will be created dynamically when users add them
+		return nil
 	}
 
 	// Configure device properties
