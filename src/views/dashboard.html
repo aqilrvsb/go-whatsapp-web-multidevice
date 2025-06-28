@@ -1773,6 +1773,9 @@
                                         
                                     ` : ''}
                                     <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-warning" href="#" onclick="clearDeviceData('${device.id}')">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Clear Device Data
+                                    </a></li>
                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteDevice('${device.id}')">
                                         <i class="bi bi-trash me-2"></i>Delete
                                     </a></li>
@@ -2014,6 +2017,40 @@
                 .catch(error => {
                     console.error('Error logging out device:', error);
                     showAlert('danger', 'Error logging out device');
+                    hideLoading();
+                });
+            }
+        }
+
+        // Clear Device Data
+        function clearDeviceData(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (!device) return;
+            
+            if (confirm(`Are you sure you want to clear all WhatsApp data for device "${device.device_name}"? This will disconnect the device and remove all stored data.`)) {
+                showLoading();
+                
+                fetch(`/api/devices/${deviceId}/clear`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        // Update device status
+                        device.status = 'disconnected';
+                        device.phone = '';
+                        device.jid = '';
+                        renderDevices();
+                        showAlert('success', `Device "${device.device_name}" data cleared successfully. You can now scan a new QR code.`);
+                    } else {
+                        showAlert('danger', data.message || 'Failed to clear device data');
+                    }
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error clearing device data:', error);
+                    showAlert('danger', 'Error clearing device data');
                     hideLoading();
                 });
             }
