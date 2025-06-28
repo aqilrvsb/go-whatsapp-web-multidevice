@@ -83,28 +83,39 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	
 	// Setup QR processing like the working version
 	chImage := make(chan string)
+	stopQR := make(chan bool, 1)
 	
 	go func() {
-		for evt := range ch {
-			response.Code = evt.Code
-			response.Duration = evt.Timeout / time.Second / 2
-			if evt.Event == "code" {
-				qrPath := fmt.Sprintf("%s/scan-qr-%s.png", config.PathQrCode, fiberUtils.UUIDv4())
-				err := qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
-				if err != nil {
-					logrus.Error("Error when write qr code to file: ", err)
-					continue
+		for {
+			select {
+			case evt := <-ch:
+				response.Code = evt.Code
+				response.Duration = evt.Timeout / time.Second / 2
+				if evt.Event == "code" {
+					qrPath := fmt.Sprintf("%s/scan-qr-%s.png", config.PathQrCode, fiberUtils.UUIDv4())
+					err := qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
+					if err != nil {
+						logrus.Error("Error when write qr code to file: ", err)
+						continue
+					}
+					
+					// Cleanup after timeout
+					go func() {
+						time.Sleep(response.Duration * time.Second)
+						os.Remove(qrPath)
+					}()
+					
+					// Only send first QR image
+					select {
+					case chImage <- qrPath:
+					default:
+					}
+				} else {
+					logrus.Infof("QR event: %s", evt.Event)
 				}
-				
-				// Cleanup after timeout
-				go func() {
-					time.Sleep(response.Duration * time.Second)
-					os.Remove(qrPath)
-				}()
-				
-				chImage <- qrPath
-			} else {
-				logrus.Errorf("QR event: %s", evt.Event)
+			case <-stopQR:
+				logrus.Info("Stopping QR generation - device connected")
+				return
 			}
 		}
 	}()
@@ -123,8 +134,33 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		response.ImagePath = imagePath
 		logrus.Infof("QR code generated: %s", imagePath)
 	case <-time.After(60 * time.Second):
+		close(stopQR)
 		return response, fmt.Errorf("timeout waiting for QR code")
 	}
+	
+	// Monitor for successful connection in background
+	go func() {
+		// Check periodically if device is connected
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		
+		timeout := time.After(5 * time.Minute)
+		
+		for {
+			select {
+			case <-ticker.C:
+				if newClient.IsLoggedIn() {
+					logrus.Info("Device successfully logged in!")
+					close(stopQR) // Stop QR generation
+					return
+				}
+			case <-timeout:
+				logrus.Warn("Connection monitoring timeout")
+				close(stopQR)
+				return
+			}
+		}
+	}()
 	
 	return response, nil
 }
