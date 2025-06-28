@@ -12,6 +12,10 @@ func InitRestMonitoring(app *fiber.App) {
 	app.Delete("/api/monitoring/queue/:queue", ClearQueue)
 	app.Post("/api/monitoring/expire-messages", ExpireOldMessages)
 	
+	// Debug endpoints
+	app.Get("/api/debug/whatsapp-clients", DebugWhatsAppClients)
+	app.Get("/api/debug/device-client/:deviceId", TestDeviceClient)
+	
 	// Dashboard page for Redis monitoring
 	app.Get("/monitoring/redis", func(c *fiber.Ctx) error {
 		return c.Render("views/monitoring/redis", fiber.Map{

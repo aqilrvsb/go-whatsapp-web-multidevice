@@ -115,6 +115,24 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Real-time Status -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3><i class="fas fa-info-circle"></i> Real-time Status</h3>
+                <div id="realtimeStatus" class="mt-3">
+                    <div class="alert alert-info">
+                        <strong>Last Update:</strong> <span id="lastUpdate">-</span><br>
+                        <strong>WhatsApp Clients:</strong> <span id="whatsappClients">Checking...</span><br>
+                        <strong>Active Workers:</strong> <span id="activeWorkers">0</span><br>
+                        <strong>Queue Processing:</strong> <span id="queueStatus">Checking...</span>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="debugWhatsApp()">
+                        <i class="fas fa-bug"></i> Debug WhatsApp Clients
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Expire Messages Modal -->
@@ -163,6 +181,7 @@
                     }
                     
                     updateMetrics(data.data);
+                    updateRealtimeStatus();
                     document.getElementById('refreshIndicator').style.display = 'none';
                 })
                 .catch(error => {
@@ -323,6 +342,50 @@
             const connAlert = document.getElementById('connectionAlert');
             connAlert.className = 'alert alert-danger';
             connAlert.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+        }
+        
+        function updateRealtimeStatus() {
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            // Check WhatsApp clients
+            fetch('/api/debug/whatsapp-clients')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('whatsappClients').textContent = 
+                        `${data.total_clients} registered`;
+                })
+                .catch(() => {
+                    document.getElementById('whatsappClients').textContent = 'Error checking';
+                });
+                
+            // Update queue status
+            const totalMessages = parseInt(document.getElementById('totalMessages').textContent) || 0;
+            const queueStatus = totalMessages > 0 ? 
+                `${totalMessages} messages waiting` : 
+                'No messages in queue';
+            document.getElementById('queueStatus').textContent = queueStatus;
+        }
+        
+        function debugWhatsApp() {
+            fetch('/api/debug/whatsapp-clients')
+                .then(response => response.json())
+                .then(data => {
+                    let message = `Total Clients: ${data.total_clients}\n\n`;
+                    if (data.clients && data.clients.length > 0) {
+                        data.clients.forEach(client => {
+                            message += `Device: ${client.device_id}\n`;
+                            message += `Connected: ${client.connected}\n`;
+                            message += `Logged In: ${client.logged_in}\n\n`;
+                        });
+                    } else {
+                        message += 'No WhatsApp clients registered!';
+                    }
+                    alert(message);
+                })
+                .catch(error => {
+                    alert('Failed to debug: ' + error);
+                });
         }
 
         // Auto-refresh every 5 seconds
