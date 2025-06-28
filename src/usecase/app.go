@@ -11,6 +11,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	fiberUtils "github.com/gofiber/fiber/v2/utils"
@@ -42,6 +43,7 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 	service.WaCli.Disconnect()
 
 	chImage := make(chan string)
+	var loginComplete chan bool
 
 	ch, err := service.WaCli.GetQRChannel(context.Background())
 	if err != nil {
@@ -57,11 +59,14 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 			return response, pkgError.ErrQrChannel
 		}
 	} else {
+		loginComplete := make(chan bool, 1)
+		
 		go func() {
 			for evt := range ch {
+				logrus.Infof("QR Code received, timeout: %v seconds", evt.Timeout/time.Second)
 				response.Code = evt.Code
 				response.Duration = evt.Timeout / time.Second / 2
-				if evt.Event == "code" {
+				if evt.Code != "" {
 					qrPath := fmt.Sprintf("%s/scan-qr-%s.png", config.PathQrCode, fiberUtils.UUIDv4())
 					err = qrcode.WriteFile(evt.Code, qrcode.Medium, 512, qrPath)
 					if err != nil {
@@ -75,10 +80,10 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 						}
 					}()
 					chImage <- qrPath
-				} else {
-					logrus.Error("error when get qrCode", evt.Event)
 				}
 			}
+			logrus.Info("QR channel closed - login might be complete")
+			loginComplete <- true
 		}()
 	}
 
@@ -87,7 +92,45 @@ func (service serviceApp) Login(_ context.Context) (response domainApp.LoginResp
 		logger.Error("Error when connect to whatsapp", err)
 		return response, pkgError.ErrReconnect
 	}
+	
 	response.ImagePath = <-chImage
+	
+	// Wait for login completion with better monitoring
+	go func() {
+		logrus.Info("Starting login monitor...")
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		
+		for i := 0; i < 60; i++ { // 60 second timeout
+			<-ticker.C
+			if service.WaCli.IsLoggedIn() {
+				logrus.Info("Login detected! Registering device...")
+				
+				// Get device info from current session
+				allSessions := whatsapp.GetAllConnectionSessions()
+				for userID, session := range allSessions {
+					if session != nil && session.DeviceID != "" {
+						logrus.Infof("Registering device %s for user %s", session.DeviceID, userID)
+						cm := whatsapp.GetClientManager()
+						cm.AddClient(session.DeviceID, service.WaCli)
+						break
+					}
+				}
+				
+				loginComplete <- true
+				return
+			}
+			if i%5 == 0 {
+				logrus.Infof("Still waiting for login... (%d seconds)", i)
+			}
+		}
+		logrus.Warn("Login monitor timeout")
+		loginComplete <- false
+	}()
+	
+	// Wait for completion
+	<-loginComplete
+	logrus.Info("Login process completed")
 
 	return response, nil
 }

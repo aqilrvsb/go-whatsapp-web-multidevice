@@ -241,9 +241,10 @@ func handleConnectionEvents(_ context.Context) {
 					} else {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
 						
-						// Register device with client manager for real-time chat access
-						RegisterDeviceClient(session.DeviceID, cli)
-						log.Infof("Registered device %s with client manager", session.DeviceID)
+						// Register device with client manager using the device ID from database
+						cm := GetClientManager()
+						cm.AddClient(session.DeviceID, cli)
+						log.Infof("Registered device %s with client manager for broadcast system", session.DeviceID)
 						
 						// Trigger initial chat sync
 						go func() {
