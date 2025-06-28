@@ -1,9 +1,17 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 28, 2025 - 1:50 PM**  
+**Last Updated: June 28, 2025 - 6:55 PM**  
 **Status: ✅ Production-ready with OPTIMIZED 3000+ device support**
 **Architecture: ✅ Redis-optimized parallel processing with auto-scaling workers**
 
-## 🚨 LATEST UPDATE: Complete System Overhaul (June 28, 2025 - 1:50 PM)
+## 🚨 LATEST UPDATE: Device Status UI Fix (June 28, 2025 - 6:55 PM)
+
+### Device Connection Display Fix
+- **Issue**: Device shows "Disconnected" in UI even after successful QR scan
+- **Solution**: Just refresh browser (F5) after QR scan - device IS connected!
+- **Fix Added**: WebSocket handler for auto-UI updates in `fixes/device-status-refresh/`
+- **Note**: Backend works perfectly, just a UI refresh issue
+
+## 📍 Previous Update: Complete System Overhaul (June 28, 2025 - 1:50 PM)
 
 ### What's New
 - **✅ MESSAGES NOW SEND AUTOMATICALLY!** Fixed critical startup issue
