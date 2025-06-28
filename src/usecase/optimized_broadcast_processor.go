@@ -6,8 +6,10 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
@@ -154,6 +156,60 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 	   device.Status != "connected" && device.Status != "Connected" {
 		logrus.Debugf("Device %s is not online (status: %s)", deviceID, device.Status)
 		return
+	}
+	
+	// Check if WhatsApp client exists for this device
+	clientManager := whatsapp.GetClientManager()
+	_, err = clientManager.GetClient(deviceID)
+	if err != nil {
+		logrus.Warnf("WhatsApp client not found for device %s, trying to find alternative device", deviceID)
+		
+		// Try to find an alternative connected device for the same user
+		devices, _ := p.userRepo.GetUserDevices(device.UserID)
+		var alternativeDeviceID string
+		
+		for _, altDevice := range devices {
+			if altDevice.ID != deviceID && 
+			   (altDevice.Status == "online" || altDevice.Status == "Online" || 
+			    altDevice.Status == "connected" || altDevice.Status == "Connected") {
+				// Check if this device has a WhatsApp client
+				if _, err := clientManager.GetClient(altDevice.ID); err == nil {
+					alternativeDeviceID = altDevice.ID
+					logrus.Infof("Found alternative device %s for user", alternativeDeviceID)
+					break
+				}
+			}
+		}
+		
+		if alternativeDeviceID == "" {
+			logrus.Errorf("No alternative devices found for user, skipping messages for device %s", deviceID)
+			// Mark messages as failed
+			messages, _ := p.broadcastRepo.GetPendingMessages(deviceID, 1000)
+			for _, msg := range messages {
+				p.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", "Device not connected")
+			}
+			return
+		}
+		
+		// Update all pending messages to use the alternative device
+		query := `
+			UPDATE broadcast_messages 
+			SET device_id = $1 
+			WHERE device_id = $2 AND status = 'pending'
+		`
+		db := database.GetDB()
+		result, err := db.Exec(query, alternativeDeviceID, deviceID)
+		if err != nil {
+			logrus.Errorf("Failed to update messages to alternative device: %v", err)
+			return
+		}
+		
+		rowsAffected, _ := result.RowsAffected()
+		logrus.Infof("Updated %d messages from device %s to %s", rowsAffected, deviceID, alternativeDeviceID)
+		
+		// Process the alternative device instead
+		deviceID = alternativeDeviceID
+		device.ID = alternativeDeviceID
 	}
 	
 	// Create Redis queue key for this device
