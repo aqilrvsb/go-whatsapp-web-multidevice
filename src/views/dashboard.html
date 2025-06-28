@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
             --primary: #128c7e;
@@ -2300,62 +2301,75 @@
                         case 'DEVICE_CONNECTED':
                             // Device fully connected and logged in
                             console.log('Device fully connected:', data.message);
-                            // Close QR modal if open
-                            const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
-                            if (qrModal) {
-                                qrModal.hide();
-                            }
-                            // Show success message
-                            alert('WhatsApp connected successfully!');
                             
                             // Extract phone and JID from the message
                             const deviceInfo = data.results || {};
                             const phone = deviceInfo.phone || '';
                             const jid = deviceInfo.jid || '';
                             
-                            // Update the device card immediately - simple approach
-                            const deviceCards = document.querySelectorAll('.device-card');
-                            deviceCards.forEach(card => {
-                                // Check if this card has "Disconnected" status
-                                const statusText = card.querySelector('.text-muted.small');
-                                if (statusText && statusText.textContent === 'Disconnected') {
-                                    // Update to Connected
-                                    statusText.textContent = 'Connected';
+                            // Close QR modal if open
+                            const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
+                            if (qrModal) {
+                                qrModal.hide();
+                            }
+                            
+                            // Show interactive SweetAlert with countdown
+                            let timerInterval;
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'WhatsApp Connected!',
+                                html: `
+                                    <p>Device connected with phone: <strong>${phone}</strong></p>
+                                    <p>Updating device status...</p>
+                                    <p>Page will reload in <b></b> seconds.</p>
+                                `,
+                                timer: 5000,
+                                timerProgressBar: true,
+                                showConfirmButton: false,
+                                allowOutsideClick: false,
+                                didOpen: () => {
+                                    const b = Swal.getHtmlContainer().querySelector('b');
+                                    timerInterval = setInterval(() => {
+                                        b.textContent = Math.ceil(Swal.getTimerLeft() / 1000);
+                                    }, 100);
                                     
-                                    // Update card styling
-                                    card.classList.add('connected');
-                                    
-                                    // Update device icon color
-                                    const deviceIcon = card.querySelector('.bi-phone-fill');
-                                    if (deviceIcon) {
-                                        deviceIcon.style.color = 'var(--success)';
+                                    // Find the offline device and update it
+                                    const offlineDevice = devices.find(d => d.status === 'offline' || d.status === 'disconnected');
+                                    if (offlineDevice) {
+                                        // Call API to update device status
+                                        fetch(`/api/devices/${offlineDevice.id}/status`, {
+                                            method: 'PUT',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                            },
+                                            credentials: 'include',
+                                            body: JSON.stringify({
+                                                status: 'online',
+                                                phone: phone,
+                                                jid: jid
+                                            })
+                                        })
+                                        .then(response => response.json())
+                                        .then(result => {
+                                            if (result.code === 'SUCCESS') {
+                                                console.log('Device status updated successfully');
+                                            } else {
+                                                console.error('Failed to update device status:', result.message);
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error('Error updating device status:', error);
+                                        });
                                     }
-                                    
-                                    // Update phone number if we have it
-                                    if (phone) {
-                                        const phoneSection = Array.from(card.querySelectorAll('div')).find(div => 
-                                            div.textContent.includes('Not linked')
-                                        );
-                                        if (phoneSection) {
-                                            phoneSection.textContent = phone;
-                                        }
-                                    }
-                                    
-                                    // Update the devices array
-                                    devices.forEach(device => {
-                                        if (device.id === currentScanningDeviceId || device.status === 'offline') {
-                                            device.status = 'online';
-                                            device.phone = phone;
-                                            device.jid = jid;
-                                        }
-                                    });
+                                },
+                                willClose: () => {
+                                    clearInterval(timerInterval);
                                 }
+                            }).then(() => {
+                                // Reload the page after timer ends
+                                location.reload();
                             });
                             
-                            // Still reload devices after a delay to get server data
-                            setTimeout(() => {
-                                loadDevices();
-                            }, 3000);
                             break;
                         case 'DEVICE_STATUS':
                             updateDeviceStatus(data.deviceId, data.status);
