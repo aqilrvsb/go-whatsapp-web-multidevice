@@ -120,6 +120,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	_ = broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
 	
+	// Start broadcast worker processor
+	go usecase.StartBroadcastWorkerProcessor()
+	logrus.Info("Broadcast worker processor started")
+	
 	// Start campaign/sequence trigger processor
 	go usecase.StartTriggerProcessor()
 	logrus.Info("Campaign trigger processor started")

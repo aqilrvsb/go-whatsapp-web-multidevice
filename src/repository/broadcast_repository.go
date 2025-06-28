@@ -292,3 +292,32 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 	
 	return messages, nil
 }
+
+
+// GetDevicesWithPendingMessages gets all device IDs that have pending messages
+func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) {
+	query := `
+		SELECT DISTINCT device_id 
+		FROM broadcast_messages 
+		WHERE status = 'pending' 
+		AND scheduled_at <= NOW()
+		ORDER BY device_id
+	`
+	
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var devices []string
+	for rows.Next() {
+		var deviceID string
+		if err := rows.Scan(&deviceID); err != nil {
+			return nil, err
+		}
+		devices = append(devices, deviceID)
+	}
+	
+	return devices, rows.Err()
+}
