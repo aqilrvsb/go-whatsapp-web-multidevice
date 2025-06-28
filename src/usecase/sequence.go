@@ -409,7 +409,9 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 	// Filter only connected devices
 	connectedDevices := make([]*models.UserDevice, 0)
 	for _, device := range devices {
-		if device.Status == "connected" {
+		logrus.Infof("Device %s (ID: %s) has status: %s", device.DeviceName, device.ID, device.Status)
+		// Check for both lowercase and capitalized versions
+		if device.Status == "connected" || device.Status == "Connected" {
 			connectedDevices = append(connectedDevices, device)
 		}
 	}
