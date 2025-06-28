@@ -3,10 +3,25 @@ package repository
 import (
 	"database/sql"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 )
+
+var (
+	campaignRepo     CampaignRepository
+	campaignRepoOnce sync.Once
+)
+
+// GetCampaignRepository returns singleton instance of CampaignRepository
+func GetCampaignRepository() CampaignRepository {
+	campaignRepoOnce.Do(func() {
+		campaignRepo = NewCampaignRepository(database.GetDB())
+	})
+	return campaignRepo
+}
 
 type CampaignRepository interface {
 	CreateCampaign(campaign *models.Campaign) error
