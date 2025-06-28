@@ -120,9 +120,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	_ = broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
 	
-	// Start optimized broadcast worker processor (for 3000+ devices)
-	go usecase.StartOptimizedBroadcastProcessor()
-	logrus.Info("Optimized broadcast processor started for 3000+ devices")
+	// NOTE: The broadcast manager already has its own queue processor
+	// We don't need an additional worker processor
+	// Messages are processed by the BasicBroadcastManager's ProcessQueue()
 	
 	// Start campaign/sequence trigger processor
 	go usecase.StartTriggerProcessor()

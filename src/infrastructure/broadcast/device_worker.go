@@ -120,12 +120,17 @@ func (dw *DeviceWorker) processMessages() {
 			if err != nil {
 				dw.failedCount++
 				logrus.Errorf("Failed to send message: %v", err)
-				// Update broadcast status
-				dw.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
+				// Update broadcast status to failed
+				if msg.ID != "" {
+					dw.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
+				}
 			} else {
 				dw.processedCount++
-				// Update broadcast status
-				dw.broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
+				// Update broadcast status to sent
+				if msg.ID != "" {
+					dw.broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
+					logrus.Infof("Message %s sent successfully to %s", msg.ID, msg.RecipientPhone)
+				}
 			}
 			dw.status = "idle"
 			dw.mu.Unlock()

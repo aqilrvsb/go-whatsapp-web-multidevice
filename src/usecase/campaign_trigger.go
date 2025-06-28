@@ -57,26 +57,7 @@ func (cts *CampaignTriggerService) ProcessCampaignTriggers() error {
 func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	logrus.Infof("Executing campaign: %s", campaign.Title)
 	
-	// Get leads matching the campaign niche AND status
-	leadRepo := repository.GetLeadRepository()
-	var leads []models.Lead
-	var err error
-	
-	// Check if campaign has target_status field
-	targetStatus := campaign.TargetStatus
-	if targetStatus == "" {
-		targetStatus = "prospect" // Default to prospect if not set
-	}
-	
-	leads, err = leadRepo.GetLeadsByNicheAndStatus(campaign.Niche, targetStatus)
-	if err != nil {
-		logrus.Errorf("Failed to get leads for campaign %s: %v", campaign.ID, err)
-		return
-	}
-	
-	logrus.Infof("Found %d leads matching niche: %s and status: %s", len(leads), campaign.Niche, targetStatus)
-	
-	// Get ALL connected devices for the user
+	// Get ALL connected devices for the user FIRST
 	userRepo := repository.GetUserRepository()
 	devices, err := userRepo.GetUserDevices(campaign.UserID)
 	if err != nil {
@@ -101,38 +82,66 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	logrus.Infof("Using %d connected devices for campaign distribution", len(connectedDevices))
 	
+	// Check if campaign has target_status field
+	targetStatus := campaign.TargetStatus
+	if targetStatus == "" {
+		targetStatus = "prospect" // Default to prospect if not set
+	}
+	
 	// Get broadcast repository
 	broadcastRepo := repository.GetBroadcastRepository()
+	leadRepo := repository.GetLeadRepository()
 	
-	// Queue messages for each lead, distributing across devices
 	successful := 0
 	failed := 0
-	deviceIndex := 0
 	
-	for _, lead := range leads {
-		// Round-robin device selection
-		device := connectedDevices[deviceIndex%len(connectedDevices)]
-		deviceIndex++
-		
-		msg := domainBroadcast.BroadcastMessage{
-			UserID:         campaign.UserID,
-			DeviceID:       device.ID,
-			CampaignID:     &campaign.ID,
-			RecipientPhone: lead.Phone,
-			Type:           "text",
-			Content:        campaign.Message,
-			MediaURL:       campaign.ImageURL,
-			ScheduledAt:    time.Now(),
-			MinDelay:       campaign.MinDelaySeconds,
-			MaxDelay:       campaign.MaxDelaySeconds,
+	// Process leads for EACH device separately
+	for _, device := range connectedDevices {
+		// Get leads for THIS SPECIFIC DEVICE matching the campaign criteria
+		leads, err := leadRepo.GetLeadsByDeviceNicheAndStatus(device.ID, campaign.Niche, targetStatus)
+		if err != nil {
+			logrus.Errorf("Failed to get leads for device %s: %v", device.ID, err)
+			continue
 		}
 		
-		err := broadcastRepo.QueueMessage(msg)
-		if err != nil {
-			logrus.Errorf("Failed to queue message for %s: %v", lead.Phone, err)
-			failed++
-		} else {
-			successful++
+		if len(leads) == 0 {
+			logrus.Debugf("No leads found for device %s matching niche: %s and status: %s", 
+				device.ID, campaign.Niche, targetStatus)
+			continue
+		}
+		
+		logrus.Infof("Found %d leads for device %s matching criteria", len(leads), device.ID)
+		
+		// Queue messages for this device's leads
+		for _, lead := range leads {
+			// Create broadcast message
+			msg := domainBroadcast.BroadcastMessage{
+				UserID:         campaign.UserID,
+				DeviceID:       device.ID, // Use the specific device that owns this lead
+				CampaignID:     &campaign.ID,
+				RecipientPhone: lead.Phone,
+				Type:           "text", // Default to text, or determine from ImageURL
+				Content:        campaign.Message,
+				MediaURL:       campaign.ImageURL,
+				ScheduledAt:    time.Now(),
+				Status:         "pending",
+				MinDelay:       campaign.MinDelaySeconds,
+				MaxDelay:       campaign.MaxDelaySeconds,
+			}
+			
+			// If image URL is provided, set type to image
+			if campaign.ImageURL != "" {
+				msg.Type = "image"
+			}
+			
+			// Queue the message
+			err := broadcastRepo.QueueMessage(msg)
+			if err != nil {
+				logrus.Errorf("Failed to queue message for %s: %v", lead.Phone, err)
+				failed++
+			} else {
+				successful++
+			}
 		}
 	}
 	

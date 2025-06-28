@@ -280,3 +280,45 @@ func (r *leadRepository) DeleteLead(id string) error {
 	
 	return nil
 }
+
+// GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
+func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
+	query := `
+		SELECT id, device_id, user_id, name, phone, niche, 
+		       status, target_status, journey, created_at, updated_at
+		FROM leads
+		WHERE device_id = $1 
+		AND ($2 = '' OR niche LIKE '%' || $2 || '%')
+		AND ($3 = '' OR target_status = $3)
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, deviceID, niche, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var leads []models.Lead
+	for rows.Next() {
+		var lead models.Lead
+		var journey sql.NullString
+		
+		err := rows.Scan(
+			&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Niche, &lead.Status, &lead.TargetStatus, &journey, 
+			&lead.CreatedAt, &lead.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Map journey to Notes field
+		if journey.Valid {
+			lead.Notes = journey.String
+		}
+		leads = append(leads, lead)
+	}
+	
+	return leads, nil
+}
