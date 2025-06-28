@@ -68,7 +68,6 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
-	app.Put("/api/devices/:id/status", rest.UpdateDeviceStatus)
 	app.Get("/app/logout", rest.LogoutDevice)
 	app.Get("/app/reconnect", rest.ReconnectDevice)
 	app.Get("/app/devices", rest.GetDevices)
@@ -1226,77 +1225,6 @@ func (handler *App) DeleteDevice(c *fiber.Ctx) error {
 		Results: fiber.Map{
 			"device_id": deviceId,
 			"device_name": device.DeviceName,
-		},
-	})
-}
-
-// UpdateDeviceStatus updates device status (for fixing connection status)
-func (handler *App) UpdateDeviceStatus(c *fiber.Ctx) error {
-	deviceId := c.Params("id")
-	
-	// Parse request body
-	var req struct {
-		Status string `json:"status"`
-		Phone  string `json:"phone"`
-		JID    string `json:"jid"`
-	}
-	
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "BAD_REQUEST",
-			Message: "Invalid request body",
-		})
-	}
-	
-	// Get user from session
-	sessionToken := c.Cookies("session_token")
-	if sessionToken == "" {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "No session token",
-		})
-	}
-	
-	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
-	if err != nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Invalid session",
-		})
-	}
-	
-	// Verify device belongs to user
-	device, err := userRepo.GetDeviceByID(deviceId)
-	if err != nil || device.UserID != session.UserID {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not found",
-		})
-	}
-	
-	// Update device status
-	err = userRepo.UpdateDeviceStatus(deviceId, req.Status, req.Phone, req.JID)
-	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "ERROR",
-			Message: "Failed to update device status",
-		})
-	}
-	
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: "Device status updated",
-		Results: fiber.Map{
-			"device_id": deviceId,
-			"status":    req.Status,
-			"phone":     req.Phone,
 		},
 	})
 }
