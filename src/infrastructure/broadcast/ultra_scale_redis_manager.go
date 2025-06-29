@@ -399,6 +399,8 @@ func (um *UltraScaleRedisManager) popMessage(queueKey string) *UltraRedisMessage
 		return nil
 	}
 	
+	logrus.Debugf("Popped message from queue %s", queueKey)
+	
 	var msg UltraRedisMessage
 	if err := json.Unmarshal([]byte(result), &msg); err != nil {
 		logrus.Errorf("Failed to unmarshal message: %v", err)
@@ -412,24 +414,24 @@ func (um *UltraScaleRedisManager) popMessage(queueKey string) *UltraRedisMessage
 func (um *UltraScaleRedisManager) processMessage(worker *DeviceWorker, msg *UltraRedisMessage) error {
 	start := time.Now()
 	
-	// Send the message
-	err := worker.SendMessage(msg.Message)
-	
-	// Update metrics
-	duration := time.Since(start)
-	um.updateProcessingTime(msg.Message.DeviceID, duration)
-	
-	// Update database status
-	broadcastRepo := repository.GetBroadcastRepository()
+	// Queue the message to the worker's internal queue
+	err := worker.QueueMessage(msg.Message)
 	if err != nil {
+		logrus.Errorf("Failed to queue message to worker: %v", err)
 		um.incrementMetricBatch("messages_failed")
+		
+		// Update database status
+		broadcastRepo := repository.GetBroadcastRepository()
 		broadcastRepo.UpdateMessageStatus(msg.Message.ID, "failed", err.Error())
 		return err
 	}
 	
-	um.incrementMetricBatch("messages_sent")
-	broadcastRepo.UpdateMessageStatus(msg.Message.ID, "sent", "")
-	logrus.Infof("Message %s sent successfully to %s", msg.Message.ID, msg.Message.RecipientPhone)
+	// Message queued successfully - the worker will handle status updates
+	duration := time.Since(start)
+	um.updateProcessingTime(msg.Message.DeviceID, duration)
+	um.incrementMetricBatch("messages_queued_to_worker")
+	
+	logrus.Infof("Message %s queued to worker for %s", msg.Message.ID, msg.Message.RecipientPhone)
 	return nil
 }
 
