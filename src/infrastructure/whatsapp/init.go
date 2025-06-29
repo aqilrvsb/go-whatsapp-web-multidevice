@@ -232,7 +232,7 @@ func handleConnectionEvents(_ context.Context) {
 			allSessions := GetAllConnectionSessions()
 			log.Infof("Found %d active connection sessions", len(allSessions))
 			
-			var connectedDeviceID string
+			var connectedDeviceID string // Declare variable outside the loop
 			for userID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
 					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
