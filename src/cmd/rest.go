@@ -10,7 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"`n`t"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/dustin/go-humanize"
 	"github.com/gofiber/fiber/v2"
@@ -94,6 +94,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestNewsletter(app, newsletterUsecase)
 	rest.InitRestSequence(app, sequenceUsecase)
 	rest.InitRestMonitoring(app) // Add monitoring endpoints
+`trest.InitWorkerControlAPI(app) // Add worker control endpoints
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
@@ -120,6 +121,11 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start broadcast manager
 	_ = broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
+`t
+`t// Start device health monitor
+`thealthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
+`thealthMonitor.Start()
+`tlogrus.Info(`Device health monitor started`)
 	
 	// Start the optimized broadcast processor - THIS IS CRITICAL!
 	// This processor polls the database for pending messages and creates workers

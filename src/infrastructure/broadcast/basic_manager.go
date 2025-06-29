@@ -235,3 +235,26 @@ func (bm *BasicBroadcastManager) ResumeFailedWorkers() error {
 	bm.CheckWorkerHealth()
 	return nil
 }
+// StopWorker stops a specific worker
+func (bm *BasicBroadcastManager) StopWorker(deviceID string) error {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	
+	worker, exists := bm.workers[deviceID]
+	if !exists {
+		return fmt.Errorf("worker not found for device %s", deviceID)
+	}
+	
+	if worker != nil {
+		worker.Stop()
+		delete(bm.workers, deviceID)
+		logrus.Infof("Worker for device %s stopped", deviceID)
+	}
+	
+	return nil
+}
+
+// GetBroadcastManager returns the singleton broadcast manager instance
+func GetBroadcastManager() IBroadcastManager {
+	return GetUnifiedBroadcastManager()
+}

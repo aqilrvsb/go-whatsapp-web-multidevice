@@ -317,3 +317,100 @@ func GetAllPersonalChats(deviceID string) ([]repository.WhatsAppChat, error) {
 	
 	return allPersonalChats, nil
 }
+// Enhanced ClientManager methods for better device registration
+
+// RegisterDeviceOnConnection ensures proper device registration when connecting
+func (cm *ClientManager) RegisterDeviceOnConnection(deviceID string, client *whatsmeow.Client) error {
+	if deviceID == "" {
+		return fmt.Errorf("deviceID cannot be empty")
+	}
+	
+	if client == nil {
+		return fmt.Errorf("client cannot be nil")
+	}
+	
+	// Verify client is connected
+	if !client.IsConnected() {
+		return fmt.Errorf("client is not connected")
+	}
+	
+	// Add to manager
+	cm.AddClient(deviceID, client)
+	
+	// Update device status in database
+	userRepo := repository.GetUserRepository()
+	if client.Store.ID != nil {
+		phoneNumber := client.Store.ID.User
+		jid := client.Store.ID.String()
+		
+		err := userRepo.UpdateDeviceStatus(deviceID, "online", phoneNumber, jid)
+		if err != nil {
+			logrus.Errorf("Failed to update device status: %v", err)
+		} else {
+			logrus.Infof("Device %s registered successfully - Phone: %s, JID: %s", deviceID, phoneNumber, jid)
+		}
+	}
+	
+	// Start syncing chats in background
+	go func() {
+		time.Sleep(2 * time.Second)
+		_, err := GetChatsForDevice(deviceID)
+		if err != nil {
+			logrus.Errorf("Error syncing chats for device %s: %v", deviceID, err)
+		}
+	}()
+	
+	return nil
+}
+
+// GetConnectedDeviceCount returns number of connected devices
+func (cm *ClientManager) GetConnectedDeviceCount() int {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	
+	count := 0
+	for _, client := range cm.clients {
+		if client != nil && client.IsConnected() {
+			count++
+		}
+	}
+	return count
+}
+
+// GetDeviceStatus returns detailed status of a device
+func (cm *ClientManager) GetDeviceStatus(deviceID string) (status string, connected bool) {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	
+	client, exists := cm.clients[deviceID]
+	if !exists || client == nil {
+		return "not_registered", false
+	}
+	
+	if !client.IsConnected() {
+		return "disconnected", false
+	}
+	
+	if !client.IsLoggedIn() {
+		return "not_logged_in", false
+	}
+	
+	return "online", true
+}
+
+// CleanupDisconnectedClients removes disconnected clients from manager
+func (cm *ClientManager) CleanupDisconnectedClients() int {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+	
+	removed := 0
+	for deviceID, client := range cm.clients {
+		if client == nil || !client.IsConnected() {
+			delete(cm.clients, deviceID)
+			removed++
+			logrus.Infof("Removed disconnected client for device %s", deviceID)
+		}
+	}
+	
+	return removed
+}
