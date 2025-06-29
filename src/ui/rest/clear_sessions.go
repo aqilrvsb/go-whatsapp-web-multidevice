@@ -35,7 +35,7 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
-	// List of WhatsApp session tables to drop
+	// List of WhatsApp session tables to clear (DELETE data, not DROP)
 	tables := []string{
 		"whatsmeow_app_state_mutation_macs",
 		"whatsmeow_app_state_sync_keys",
@@ -62,15 +62,16 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback()
 	
-	// Drop each table if it exists
+	// Clear data from each table (DELETE instead of DROP)
 	for _, table := range tables {
-		query := "DROP TABLE IF EXISTS " + table + " CASCADE"
-		_, err := tx.Exec(query)
+		query := "DELETE FROM " + table
+		result, err := tx.Exec(query)
 		if err != nil {
-			logrus.Warnf("Failed to drop table %s: %v", table, err)
+			logrus.Warnf("Failed to clear table %s: %v", table, err)
 			// Continue with other tables even if one fails
 		} else {
-			logrus.Infof("Dropped table: %s", table)
+			rowsAffected, _ := result.RowsAffected()
+			logrus.Infof("Cleared table %s: %d rows deleted", table, rowsAffected)
 		}
 	}
 	
@@ -114,17 +115,17 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	// This would clear connection sessions for all users - be careful!
 	// For now, we'll just log that sessions were cleared
 	if userIDStr != "" {
-		logrus.Infof("WhatsApp sessions cleared for user %s", userIDStr)
+		logrus.Infof("WhatsApp session data cleared for user %s", userIDStr)
 	} else {
-		logrus.Infof("WhatsApp sessions cleared for all users (admin action)")
+		logrus.Infof("WhatsApp session data cleared for all users (admin action)")
 	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "All WhatsApp sessions have been cleared",
+		Message: "All WhatsApp session data has been cleared",
 		Results: map[string]interface{}{
-			"tablesDropped": len(tables),
+			"tablesCleared": len(tables),
 			"devicesUpdated": true,
 		},
 	})

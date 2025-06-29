@@ -453,6 +453,34 @@ func InitializeSchema() error {
 				UPDATE leads SET target_status = 'prospect' WHERE target_status IS NULL;
 			`,
 		},
+		{
+			name: "Fix whatsmeow_message_secrets table",
+			sql: `
+				-- Create whatsmeow_message_secrets table if not exists
+				CREATE TABLE IF NOT EXISTS whatsmeow_message_secrets (
+					our_jid text,
+					chat_jid text,
+					sender_jid text,
+					message_id text,
+					key bytea,
+					PRIMARY KEY (our_jid, chat_jid, sender_jid, message_id)
+				);
+				
+				-- Add key column if missing
+				DO $$ 
+				BEGIN
+					IF NOT EXISTS (
+						SELECT 1 
+						FROM information_schema.columns 
+						WHERE table_name = 'whatsmeow_message_secrets' 
+						AND column_name = 'key'
+					) THEN
+						ALTER TABLE whatsmeow_message_secrets 
+						ADD COLUMN key bytea;
+					END IF;
+				END $$;
+			`,
+		},
 	}
 	
 	for _, migration := range migrations {
