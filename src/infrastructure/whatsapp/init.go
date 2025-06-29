@@ -220,6 +220,8 @@ func handleConnectionEvents(_ context.Context) {
 		
 		// Get device info for database update
 		var phoneNumber, jid string
+		var connectedDeviceID string // Declare here for broader scope
+		
 		if cli.Store.ID != nil {
 			jid = cli.Store.ID.String()
 			phoneNumber = cli.Store.ID.User
@@ -231,8 +233,6 @@ func handleConnectionEvents(_ context.Context) {
 			// Look for any active connection session
 			allSessions := GetAllConnectionSessions()
 			log.Infof("Found %d active connection sessions", len(allSessions))
-			
-			var connectedDeviceID string // Declare variable outside the loop
 			for userID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
 					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
