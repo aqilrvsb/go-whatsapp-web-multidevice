@@ -294,6 +294,46 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 	for rows.Next() {
 		device := &models.UserDevice{}
 		var phone, jid sql.NullString
+		err := rows.Scan(&device.ID, &device.UserID, &device.DeviceName, 
+			&phone, &jid, &device.Status, &device.LastSeen, &device.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan device: %w", err)
+		}
+		device.Phone = phone.String
+		device.JID = jid.String
+		devices = append(devices, device)
+	}
+	
+	return devices, nil
+}
+
+// GetUserDevice gets a specific device for a user
+func (r *UserRepository) GetUserDevice(userID, deviceID string) (*models.UserDevice, error) {
+	query := `
+		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at
+		FROM user_devices 
+		WHERE user_id = $1 AND id = $2
+	`
+	device := &models.UserDevice{}
+	var phone, jid sql.NullString
+	
+	err := r.db.QueryRow(query, userID, deviceID).Scan(
+		&device.ID, &device.UserID, &device.DeviceName, 
+		&phone, &jid, &device.Status, &device.LastSeen, &device.CreatedAt)
+	
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device: %w", err)
+	}
+	
+	device.Phone = phone.String
+	device.JID = jid.String
+	
+	return device, nil
+}
+		var phone, jid sql.NullString
 		
 		err := rows.Scan(
 			&device.ID, &device.UserID, &device.DeviceName, 

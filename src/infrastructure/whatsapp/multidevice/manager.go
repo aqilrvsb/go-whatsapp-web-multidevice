@@ -1,0 +1,253 @@
+package multidevice
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"database/sql"
+	
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	waLog "go.mau.fi/whatsmeow/util/log"
+	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/log"
+)
+
+// DeviceManager manages multiple WhatsApp device connections
+type DeviceManager struct {
+	mu             sync.RWMutex
+	devices        map[string]*DeviceConnection // deviceID -> connection
+	storeContainer *sqlstore.Container
+	dbLog          waLog.Logger
+}
+
+// DeviceConnection represents a single device's WhatsApp connection
+type DeviceConnection struct {
+	DeviceID     string
+	UserID       string
+	Phone        string
+	Client       *whatsmeow.Client
+	Store        *sqlstore.Device
+	Connected    bool
+	ConnectedAt  int64
+}
+
+var (
+	manager     *DeviceManager
+	managerOnce sync.Once
+)
+
+// GetDeviceManager returns singleton instance of DeviceManager
+func GetDeviceManager() *DeviceManager {
+	managerOnce.Do(func() {
+		ctx := context.Background()
+		dbLog := waLog.Stdout("Database", config.WhatsappLogLevel, true)
+		
+		// Initialize the store container
+		storeContainer, err := initDatabase(ctx, dbLog)
+		if err != nil {
+			log.Errorf("Failed to initialize device manager database: %v", err)
+			panic(err)
+		}
+		
+		manager = &DeviceManager{
+			devices:        make(map[string]*DeviceConnection),
+			storeContainer: storeContainer,
+			dbLog:          dbLog,
+		}
+		
+		log.Infof("Device Manager initialized for multi-device support")
+	})
+	return manager
+}
+
+// initDatabase creates the WhatsApp store
+func initDatabase(ctx context.Context, dbLog waLog.Logger) (*sqlstore.Container, error) {
+	// Use a separate database for WhatsApp sessions
+	dbURI := "file:storages/whatsapp_multidevice.db?_foreign_keys=on"
+	
+	return sqlstore.New(ctx, "sqlite3", dbURI, dbLog)
+}
+
+// CreateDeviceSession creates a new WhatsApp session for a device
+func (dm *DeviceManager) CreateDeviceSession(deviceID, userID, phone string) (*DeviceConnection, error) {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	
+	// Check if device already exists
+	if conn, exists := dm.devices[deviceID]; exists {
+		return conn, fmt.Errorf("device session already exists for device %s", deviceID)
+	}
+	
+	ctx := context.Background()
+	
+	// Create a new device in the WhatsApp store
+	// Use deviceID as the device identifier
+	device := dm.storeContainer.NewDevice()
+	
+	// Store device metadata
+	err := dm.storeDeviceMapping(deviceID, userID, phone, device.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to store device mapping: %w", err)
+	}
+	
+	// Create WhatsApp client
+	client := whatsmeow.NewClient(device, dm.dbLog)
+	client.EnableAutoReconnect = true
+	client.AutoTrustIdentity = true
+	
+	// Create device connection
+	conn := &DeviceConnection{
+		DeviceID:  deviceID,
+		UserID:    userID,
+		Phone:     phone,
+		Client:    client,
+		Store:     device,
+		Connected: false,
+	}
+	
+	dm.devices[deviceID] = conn
+	
+	log.Infof("Created new device session for device %s (user: %s, phone: %s)", deviceID, userID, phone)
+	
+	return conn, nil
+}
+
+// GetDeviceConnection gets an existing device connection
+func (dm *DeviceManager) GetDeviceConnection(deviceID string) (*DeviceConnection, error) {
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+	
+	conn, exists := dm.devices[deviceID]
+	if !exists {
+		return nil, fmt.Errorf("no device connection found for device %s", deviceID)
+	}
+	
+	return conn, nil
+}
+
+// GetOrCreateDeviceConnection gets existing or creates new device connection
+func (dm *DeviceManager) GetOrCreateDeviceConnection(deviceID, userID, phone string) (*DeviceConnection, error) {
+	// Try to get existing first
+	conn, err := dm.GetDeviceConnection(deviceID)
+	if err == nil {
+		return conn, nil
+	}
+	
+	// Check if we have a stored session
+	storedDevice, err := dm.getStoredDevice(deviceID)
+	if err == nil && storedDevice != nil {
+		// Restore from stored session
+		client := whatsmeow.NewClient(storedDevice, dm.dbLog)
+		client.EnableAutoReconnect = true
+		client.AutoTrustIdentity = true
+		
+		conn := &DeviceConnection{
+			DeviceID:  deviceID,
+			UserID:    userID,
+			Phone:     phone,
+			Client:    client,
+			Store:     storedDevice,
+			Connected: false,
+		}
+		
+		dm.mu.Lock()
+		dm.devices[deviceID] = conn
+		dm.mu.Unlock()
+		
+		log.Infof("Restored device session for device %s", deviceID)
+		return conn, nil
+	}
+	
+	// Create new session
+	return dm.CreateDeviceSession(deviceID, userID, phone)
+}
+
+// RemoveDeviceSession removes a device session
+func (dm *DeviceManager) RemoveDeviceSession(deviceID string) error {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	
+	conn, exists := dm.devices[deviceID]
+	if !exists {
+		return fmt.Errorf("no device session found for device %s", deviceID)
+	}
+	
+	// Disconnect if connected
+	if conn.Client != nil && conn.Client.IsConnected() {
+		conn.Client.Disconnect()
+	}
+	
+	// Delete from WhatsApp store
+	if conn.Store != nil {
+		err := conn.Store.Delete()
+		if err != nil {
+			log.Errorf("Failed to delete device from store: %v", err)
+		}
+	}
+	
+	// Remove device mapping
+	err := dm.removeDeviceMapping(deviceID)
+	if err != nil {
+		log.Errorf("Failed to remove device mapping: %v", err)
+	}
+	
+	// Remove from active connections
+	delete(dm.devices, deviceID)
+	
+	log.Infof("Removed device session for device %s", deviceID)
+	
+	return nil
+}
+
+// Device mapping functions to link database device IDs with WhatsApp device IDs
+
+func (dm *DeviceManager) storeDeviceMapping(deviceID, userID, phone, waDeviceID string) error {
+	// Store mapping in a separate table or file
+	// For now, we'll use a simple approach with the device ID as the identifier
+	return nil
+}
+
+func (dm *DeviceManager) getStoredDevice(deviceID string) (*sqlstore.Device, error) {
+	// Try to find device by matching JID pattern or stored mapping
+	// For now, return nil to force new device creation
+	return nil, fmt.Errorf("no stored device found")
+}
+
+func (dm *DeviceManager) removeDeviceMapping(deviceID string) error {
+	// Remove mapping from storage
+	return nil
+}
+
+// GetAllDeviceConnections returns all active device connections
+func (dm *DeviceManager) GetAllDeviceConnections() map[string]*DeviceConnection {
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+	
+	// Return a copy to avoid race conditions
+	devices := make(map[string]*DeviceConnection)
+	for k, v := range dm.devices {
+		devices[k] = v
+	}
+	
+	return devices
+}
+
+// UpdateDeviceStatus updates the connection status of a device
+func (dm *DeviceManager) UpdateDeviceStatus(deviceID string, connected bool, phone string) error {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	
+	conn, exists := dm.devices[deviceID]
+	if !exists {
+		return fmt.Errorf("no device connection found for device %s", deviceID)
+	}
+	
+	conn.Connected = connected
+	if connected {
+		conn.Phone = phone
+	}
+	
+	return nil
+}

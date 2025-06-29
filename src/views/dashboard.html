@@ -1775,8 +1775,8 @@
                                         
                                     ` : ''}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-warning" href="#" onclick="clearDeviceData('${device.id}')">
-                                        <i class="bi bi-arrow-clockwise me-2"></i>Clear Device Data
+                                    <li><a class="dropdown-item text-warning" href="#" onclick="resetDevice('${device.id}')">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reset WhatsApp Session
                                     </a></li>
                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteDevice('${device.id}')">
                                         <i class="bi bi-trash me-2"></i>Delete
@@ -2162,6 +2162,70 @@
                     hideLoading();
                 });
             }
+        }
+        
+        // Reset Device WhatsApp Session
+        function resetDevice(deviceId) {
+            Swal.fire({
+                title: 'Reset WhatsApp Session?',
+                html: `
+                    <div class="text-start">
+                        <p>This will completely reset the WhatsApp connection for this device.</p>
+                        <p class="text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i>You will need to scan the QR code again to reconnect.</p>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Reset',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc3545'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showLoading();
+                    
+                    fetch(`/api/devices/${deviceId}/reset`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            // Update device status locally
+                            const device = devices.find(d => d.id === deviceId);
+                            if (device) {
+                                device.status = 'offline';
+                                device.phone = '';
+                                device.jid = '';
+                            }
+                            renderDevices();
+                            
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Device Reset!',
+                                text: 'The WhatsApp session has been reset. You can now connect with a different phone number.',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Reset Failed',
+                                text: data.message || 'Failed to reset device'
+                            });
+                        }
+                        hideLoading();
+                    })
+                    .catch(error => {
+                        console.error('Error resetting device:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to reset device. Please try again.'
+                        });
+                        hideLoading();
+                    });
+                }
+            });
         }
 
         // Link Phone Number to Device

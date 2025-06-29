@@ -273,6 +273,24 @@ func handleConnectionEvents(_ context.Context) {
 			if connectedDeviceID == "" {
 				log.Infof("No device ID found in session, attempting to find device by phone: %s", phoneNumber)
 				
+				// Log all devices for debugging
+				var debugQuery = `SELECT id, COALESCE(phone, ''), device_name FROM user_devices WHERE status != 'deleted'`
+				rows, _ := userRepo.DB().Query(debugQuery)
+				if rows != nil {
+					defer rows.Close()
+					log.Infof("=== All devices in database ===")
+					for rows.Next() {
+						var id, phone, name string
+						if err := rows.Scan(&id, &phone, &name); err != nil {
+							log.Errorf("Error scanning row: %v", err)
+							continue
+						}
+						log.Infof("Device: %s, Phone: '%s', Name: %s", id, phone, name)
+					}
+					log.Infof("=== End of devices ===")
+					log.Infof("Looking for phone: '%s'", phoneNumber)
+				}
+				
 				// Try to find the device by phone number
 				query := `SELECT id FROM user_devices WHERE phone = $1 AND status != 'deleted' LIMIT 1`
 				err := userRepo.DB().QueryRow(query, phoneNumber).Scan(&connectedDeviceID)
@@ -294,7 +312,8 @@ func handleConnectionEvents(_ context.Context) {
 					}
 				} else {
 					log.Warnf("Could not find device by phone %s: %v", phoneNumber, err)
-					log.Infof("Devices with this phone number should be pre-registered with the phone number")
+					log.Infof("Devices should be pre-registered with the exact phone number that WhatsApp returns")
+					log.Infof("WhatsApp returned phone: %s, but no matching device found", phoneNumber)
 				}
 			}
 		}
