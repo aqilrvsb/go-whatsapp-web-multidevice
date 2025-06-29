@@ -96,6 +96,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestSequence(app, sequenceUsecase)
 	rest.InitRestMonitoring(app) // Add monitoring endpoints
 	rest.InitWorkerControlAPI(app) // Add worker control endpoints
+	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
@@ -105,6 +106,11 @@ func restServer(_ *cobra.Command, _ []string) {
 			"MaxFileSize":    humanize.Bytes(uint64(config.WhatsappSettingMaxFileSize)),
 			"MaxVideoSize":   humanize.Bytes(uint64(config.WhatsappSettingMaxVideoSize)),
 		})
+	})
+	
+	// Redis cleanup page
+	app.Get("/redis-cleanup", middleware.BasicAuth(), func(c *fiber.Ctx) error {
+		return c.Render("views/redis_cleanup", fiber.Map{})
 	})
 
 	websocket.RegisterRoutes(app, appUsecase)

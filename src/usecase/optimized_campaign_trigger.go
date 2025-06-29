@@ -101,6 +101,18 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	
 	logrus.Infof("Found %d leads matching niche: %s and status: %s", len(leads), campaign.Niche, targetStatus)
 	
+	// Debug: Log first few leads if any
+	if len(leads) > 0 {
+		for i, lead := range leads {
+			if i < 3 { // Log first 3 leads
+				logrus.Debugf("Lead %d: Name=%s, Phone=%s, Niche=%s, Status=%s", 
+					i+1, lead.Name, lead.Phone, lead.Niche, lead.TargetStatus)
+			}
+		}
+	} else {
+		logrus.Warnf("No leads found for niche '%s' with status '%s'", campaign.Niche, targetStatus)
+	}
+	
 	// Get ALL connected devices for the user
 	userRepo := repository.GetUserRepository()
 	devices, err := userRepo.GetUserDevices(campaign.UserID)
