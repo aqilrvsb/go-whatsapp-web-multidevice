@@ -333,28 +333,6 @@ func (r *UserRepository) GetUserDevice(userID, deviceID string) (*models.UserDev
 	
 	return device, nil
 }
-		var phone, jid sql.NullString
-		
-		err := rows.Scan(
-			&device.ID, &device.UserID, &device.DeviceName, 
-			&phone, &jid, &device.Status, &device.LastSeen, &device.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan device: %w", err)
-		}
-		
-		if phone.Valid {
-			device.Phone = phone.String
-		}
-		if jid.Valid {
-			device.JID = jid.String
-		}
-		
-		devices = append(devices, device)
-	}
-	
-	return devices, nil
-}
 
 // GetDeviceByID gets a device by ID
 func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {

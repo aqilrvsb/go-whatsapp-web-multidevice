@@ -7,6 +7,7 @@ import (
 	"strings"
 	
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	
@@ -28,7 +29,7 @@ type DeviceConnection struct {
 	UserID       string
 	Phone        string
 	Client       *whatsmeow.Client
-	Store        *sqlstore.Device
+	Store        *store.Device
 	Connected    bool
 	ConnectedAt  int64
 }
@@ -91,8 +92,6 @@ func (dm *DeviceManager) CreateDeviceSession(deviceID, userID, phone string) (*D
 	if conn, exists := dm.devices[deviceID]; exists {
 		return conn, fmt.Errorf("device session already exists for device %s", deviceID)
 	}
-	
-	ctx := context.Background()
 	
 	// Create a new device in the WhatsApp store
 	// Use deviceID as the device identifier
@@ -221,7 +220,7 @@ func (dm *DeviceManager) storeDeviceMapping(deviceID, userID, phone, waDeviceID 
 	return nil
 }
 
-func (dm *DeviceManager) getStoredDevice(deviceID string) (*sqlstore.Device, error) {
+func (dm *DeviceManager) getStoredDevice(deviceID string) (*store.Device, error) {
 	// Try to find device by matching JID pattern or stored mapping
 	// For now, return nil to force new device creation
 	return nil, fmt.Errorf("no stored device found")
