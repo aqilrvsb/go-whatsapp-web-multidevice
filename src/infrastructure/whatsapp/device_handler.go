@@ -6,60 +6,17 @@ import (
 	"sync"
 	"time"
 	
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	websocket "github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
-// ConnectionSession stores information about ongoing connections
-type ConnectionSession struct {
-	DeviceID string
-	UserID   string
-	Phone    string
-}
-
 var (
-	connectionSessions = make(map[string]*ConnectionSession) // userID -> session
-	sessionMutex       sync.RWMutex
-	
 	deviceQRChannels   = make(map[string]<-chan string) // deviceID -> QR channel
 	qrMutex            sync.RWMutex
 )
-
-// SetConnectionSession stores a connection session
-func SetConnectionSession(userID string, session *ConnectionSession) {
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	connectionSessions[userID] = session
-}
-
-// GetConnectionSession gets a connection session
-func GetConnectionSession(userID string) *ConnectionSession {
-	sessionMutex.RLock()
-	defer sessionMutex.RUnlock()
-	return connectionSessions[userID]
-}
-
-// ClearConnectionSession removes a connection session
-func ClearConnectionSession(userID string) {
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	delete(connectionSessions, userID)
-}
-
-// GetAllConnectionSessions returns all active sessions
-func GetAllConnectionSessions() map[string]*ConnectionSession {
-	sessionMutex.RLock()
-	defer sessionMutex.RUnlock()
-	
-	sessions := make(map[string]*ConnectionSession)
-	for k, v := range connectionSessions {
-		sessions[k] = v
-	}
-	return sessions
-}
 
 // SetDeviceQRChannel stores QR channel for a device
 func SetDeviceQRChannel(deviceID string, qrChan <-chan string) {
@@ -133,13 +90,13 @@ func HandleDeviceEvent(ctx context.Context, deviceID string, rawEvt interface{})
 
 // handleDevicePairSuccess handles successful QR pairing for a device
 func handleDevicePairSuccess(ctx context.Context, deviceID string, evt *events.PairSuccess) {
-	log.Infof("Device %s paired successfully with %s", deviceID, evt.ID.String())
+	logrus.Infof("Device %s paired successfully with %s", deviceID, evt.ID.String())
 	
 	// Get device connection
 	dm := multidevice.GetDeviceManager()
 	conn, err := dm.GetDeviceConnection(deviceID)
 	if err != nil {
-		log.Errorf("Failed to get device connection: %v", err)
+		logrus.Errorf("Failed to get device connection: %v", err)
 		return
 	}
 	
@@ -159,18 +116,18 @@ func handleDevicePairSuccess(ctx context.Context, deviceID string, evt *events.P
 
 // handleDeviceConnected handles full connection for a device
 func handleDeviceConnected(ctx context.Context, deviceID string) {
-	log.Infof("Device %s fully connected", deviceID)
+	logrus.Infof("Device %s fully connected", deviceID)
 	
 	// Get device connection
 	dm := multidevice.GetDeviceManager()
 	conn, err := dm.GetDeviceConnection(deviceID)
 	if err != nil {
-		log.Errorf("Failed to get device connection: %v", err)
+		logrus.Errorf("Failed to get device connection: %v", err)
 		return
 	}
 	
 	if conn.Client == nil || !conn.Client.IsLoggedIn() {
-		log.Warnf("Device %s connected event but client not logged in", deviceID)
+		logrus.Warnf("Device %s connected event but client not logged in", deviceID)
 		return
 	}
 	
@@ -179,16 +136,16 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 	if conn.Client.Store.ID != nil {
 		jid = conn.Client.Store.ID.String()
 		phoneNumber = conn.Client.Store.ID.User
-		log.Infof("Device %s connected as: %s (Phone: %s)", deviceID, jid, phoneNumber)
+		logrus.Infof("Device %s connected as: %s (Phone: %s)", deviceID, jid, phoneNumber)
 	}
 	
 	// Update device in database
 	userRepo := repository.GetUserRepository()
 	err = userRepo.UpdateDeviceStatus(deviceID, "online", phoneNumber, jid)
 	if err != nil {
-		log.Errorf("Failed to update device status: %v", err)
+		logrus.Errorf("Failed to update device status: %v", err)
 	} else {
-		log.Infof("Successfully updated device %s to online status", deviceID)
+		logrus.Infof("Successfully updated device %s to online status", deviceID)
 	}
 	
 	// Update device manager
@@ -197,7 +154,7 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 	// Register with client manager for broadcasts
 	cm := GetClientManager()
 	cm.AddClient(deviceID, conn.Client)
-	log.Infof("Registered device %s with client manager", deviceID)
+	logrus.Infof("Registered device %s with client manager", deviceID)
 	
 	// Clear QR channel
 	ClearDeviceQRChannel(deviceID)
@@ -218,22 +175,22 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 		time.Sleep(3 * time.Second)
 		chats, err := GetChatsForDevice(deviceID)
 		if err != nil {
-			log.Errorf("Failed to sync chats for device %s: %v", deviceID, err)
+			logrus.Errorf("Failed to sync chats for device %s: %v", deviceID, err)
 		} else {
-			log.Infof("Successfully synced %d chats for device %s", len(chats), deviceID)
+			logrus.Infof("Successfully synced %d chats for device %s", len(chats), deviceID)
 		}
 	}()
 }
 
 // handleDeviceLoggedOut handles device logout
 func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
-	log.Infof("Device %s logged out", deviceID)
+	logrus.Infof("Device %s logged out", deviceID)
 	
 	// Update device status
 	userRepo := repository.GetUserRepository()
 	err := userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
 	if err != nil {
-		log.Errorf("Failed to update device status: %v", err)
+		logrus.Errorf("Failed to update device status: %v", err)
 	}
 	
 	// Update device manager
