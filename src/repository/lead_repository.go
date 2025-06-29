@@ -8,6 +8,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/sirupsen/logrus"
 )
 
 type leadRepository struct {
@@ -115,28 +116,54 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	return leads, nil
 }
 
-// GetLeadsByNicheAndStatus gets all leads matching a niche AND status
+// GetLeadsByNicheAndStatus gets all leads matching a niche AND status for a specific user
 func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) ([]models.Lead, error) {
-	// First, get all leads matching the niche
-	leads, err := r.GetLeadsByNiche(niche)
+	// This needs to be updated to accept deviceID parameter
+	// For now, return empty to prevent cross-device data leakage
+	logrus.Warnf("GetLeadsByNicheAndStatus called without device filtering - this is a security issue!")
+	return []models.Lead{}, nil
+}
+
+// GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
+func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
+	query := `
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, created_at, updated_at
+		FROM leads
+		WHERE device_id = $1
+		AND ($2 = '' OR niche LIKE '%' || $2 || '%')
+		AND ($3 = '' OR target_status = $3)
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, deviceID, niche, status)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	
-	// If no status specified, return all leads matching the niche
-	if status == "" {
-		return leads, nil
-	}
-	
-	// Filter by target_status
-	var filteredLeads []models.Lead
-	for _, lead := range leads {
-		if lead.TargetStatus == status {
-			filteredLeads = append(filteredLeads, lead)
+	var leads []models.Lead
+	for rows.Next() {
+		var lead models.Lead
+		var journey sql.NullString
+		var targetStatus sql.NullString
+		
+		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Niche, &journey, &lead.Status, &targetStatus,
+			&lead.CreatedAt, &lead.UpdatedAt)
+		if err != nil {
+			continue
 		}
+		
+		// Journey field is stored in DB but not in model, skip it
+		
+		if targetStatus.Valid {
+			lead.TargetStatus = targetStatus.String
+		}
+		
+		leads = append(leads, lead)
 	}
 	
-	return filteredLeads, nil
+	return leads, nil
 }
 
 // GetNewLeadsForSequence gets new leads matching niche that aren't in sequence
@@ -186,11 +213,11 @@ func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lea
 	query := `
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, created_at, updated_at
 		FROM leads
-		WHERE user_id = $1
+		WHERE user_id = $1 AND device_id = $2
 		ORDER BY created_at DESC
 	`
 	
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, deviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -279,46 +306,4 @@ func (r *leadRepository) DeleteLead(id string) error {
 	}
 	
 	return nil
-}
-
-// GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
-func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
-	query := `
-		SELECT id, device_id, user_id, name, phone, niche, 
-		       status, target_status, journey, created_at, updated_at
-		FROM leads
-		WHERE device_id = $1 
-		AND ($2 = '' OR niche LIKE '%' || $2 || '%')
-		AND ($3 = '' OR target_status = $3)
-		ORDER BY created_at DESC
-	`
-	
-	rows, err := r.db.Query(query, deviceID, niche, status)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	
-	var leads []models.Lead
-	for rows.Next() {
-		var lead models.Lead
-		var journey sql.NullString
-		
-		err := rows.Scan(
-			&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Niche, &lead.Status, &lead.TargetStatus, &journey, 
-			&lead.CreatedAt, &lead.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		
-		// Map journey to Notes field
-		if journey.Valid {
-			lead.Notes = journey.String
-		}
-		leads = append(leads, lead)
-	}
-	
-	return leads, nil
 }

@@ -93,26 +93,6 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 		targetStatus = "prospect"
 	}
 	
-	leads, err := leadRepo.GetLeadsByNicheAndStatus(campaign.Niche, targetStatus)
-	if err != nil {
-		logrus.Errorf("Failed to get leads for campaign %d: %v", campaign.ID, err)
-		return
-	}
-	
-	logrus.Infof("Found %d leads matching niche: %s and status: %s", len(leads), campaign.Niche, targetStatus)
-	
-	// Debug: Log first few leads if any
-	if len(leads) > 0 {
-		for i, lead := range leads {
-			if i < 3 { // Log first 3 leads
-				logrus.Debugf("Lead %d: Name=%s, Phone=%s, Niche=%s, Status=%s", 
-					i+1, lead.Name, lead.Phone, lead.Niche, lead.TargetStatus)
-			}
-		}
-	} else {
-		logrus.Warnf("No leads found for niche '%s' with status '%s'", campaign.Niche, targetStatus)
-	}
-	
 	// Get ALL connected devices for the user
 	userRepo := repository.GetUserRepository()
 	devices, err := userRepo.GetUserDevices(campaign.UserID)
@@ -138,20 +118,35 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	
 	logrus.Infof("Using %d connected devices for campaign distribution", len(connectedDevices))
 	
+	// Get leads from ALL connected devices
+	allLeads := []models.Lead{}
+	for _, device := range connectedDevices {
+		deviceLeads, err := leadRepo.GetLeadsByDeviceNicheAndStatus(device.ID, campaign.Niche, targetStatus)
+		if err != nil {
+			logrus.Errorf("Failed to get leads for device %s: %v", device.ID, err)
+			continue
+		}
+		if len(deviceLeads) > 0 {
+			logrus.Infof("Found %d leads for device %s", len(deviceLeads), device.ID)
+			allLeads = append(allLeads, deviceLeads...)
+		}
+	}
+	
+	leads := allLeads
+	
+	logrus.Infof("Total: Found %d leads matching niche: %s and status: %s across all devices", 
+		len(leads), campaign.Niche, targetStatus)
+	
 	// Queue messages for each lead
 	broadcastRepo := repository.GetBroadcastRepository()
 	successful := 0
 	failed := 0
-	deviceIndex := 0
 	
 	for _, lead := range leads {
-		// Round-robin device selection
-		device := connectedDevices[deviceIndex%len(connectedDevices)]
-		deviceIndex++
-		
+		// Use the device that owns this lead
 		msg := domainBroadcast.BroadcastMessage{
 			UserID:         campaign.UserID,
-			DeviceID:       device.ID,
+			DeviceID:       lead.DeviceID, // Use the lead's device ID
 			CampaignID:     &campaign.ID,
 			RecipientPhone: lead.Phone,
 			Type:           "text",
