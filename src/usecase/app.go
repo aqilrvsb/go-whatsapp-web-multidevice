@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
@@ -104,6 +105,14 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	// Setup QR processing like the working version
 	chImage := make(chan string)
 	stopQR := make(chan bool, 1)
+	stopQROnce := &sync.Once{} // Ensure channel is closed only once
+	
+	// Helper function to safely close stopQR
+	closeStopQR := func() {
+		stopQROnce.Do(func() {
+			close(stopQR)
+		})
+	}
 	
 	go func() {
 		for {
@@ -135,7 +144,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 					// Handle success event
 					if evt.Event == "success" {
 						logrus.Info("QR authentication successful!")
-						close(stopQR)
+						closeStopQR()
 						return
 					}
 				}
@@ -160,7 +169,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		response.ImagePath = imagePath
 		logrus.Infof("QR code generated: %s", imagePath)
 	case <-time.After(60 * time.Second):
-		close(stopQR)
+		closeStopQR()
 		return response, fmt.Errorf("timeout waiting for QR code")
 	}
 	
@@ -169,12 +178,12 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		select {
 		case <-connectedChan:
 			logrus.Info("Device successfully connected and authenticated!")
-			close(stopQR) // Stop QR generation
+			closeStopQR() // Stop QR generation
 			// Ensure device is registered
 			time.Sleep(2 * time.Second) // Wait for registration to complete
 		case <-time.After(5 * time.Minute):
 			logrus.Warn("Connection monitoring timeout")
-			close(stopQR)
+			closeStopQR()
 		}
 	}()
 	
