@@ -10,30 +10,32 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	websocket "github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
+	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
 var (
-	deviceQRChannels   = make(map[string]<-chan string) // deviceID -> QR channel
+	deviceQRChannels   = make(map[string]<-chan whatsmeow.QRChannelItem) // deviceID -> QR channel
 	qrMutex            sync.RWMutex
 )
 
 // SetDeviceQRChannel stores QR channel for a device
-func SetDeviceQRChannel(deviceID string, qrChan <-chan string) {
+func SetDeviceQRChannel(deviceID string, qrChan <-chan whatsmeow.QRChannelItem) {
 	qrMutex.Lock()
 	defer qrMutex.Unlock()
 	deviceQRChannels[deviceID] = qrChan
 	
 	// Start goroutine to handle QR updates
 	go func() {
-		for qr := range qrChan {
+		for qrItem := range qrChan {
 			// Broadcast QR update via websocket
 			websocket.Broadcast <- websocket.BroadcastMessage{
 				Code:    "QR_UPDATE",
 				Message: "QR code updated",
 				Result: map[string]interface{}{
 					"deviceId": deviceID,
-					"qr":       qr,
+					"qr":       qrItem.Code,
+					"timeout":  qrItem.Timeout,
 				},
 			}
 		}
@@ -54,11 +56,11 @@ func GetDeviceQR(deviceID string) (string, error) {
 	
 	// Try to get QR with timeout
 	select {
-	case qr, ok := <-qrChan:
+	case qrItem, ok := <-qrChan:
 		if !ok {
 			return "", fmt.Errorf("QR channel closed")
 		}
-		return qr, nil
+		return qrItem.Code, nil
 	case <-time.After(1 * time.Second):
 		return "", fmt.Errorf("no QR available")
 	}
