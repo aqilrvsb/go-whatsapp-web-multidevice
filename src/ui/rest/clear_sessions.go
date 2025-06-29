@@ -9,15 +9,27 @@ import (
 
 // ClearAllSessions clears all WhatsApp session data
 func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
-	// Get user from context to ensure authentication
+	// The authentication is already handled by the middleware
+	// We just need to get the user ID if available
 	userID := c.Locals("userID")
-	if userID == nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Authentication required",
-		})
+	var userIDStr string
+	
+	if userID != nil {
+		userIDStr = userID.(string)
+	} else {
+		// Try to get from session cookie as fallback
+		token := c.Cookies("session_token")
+		if token != "" {
+			userRepo := repository.GetUserRepository()
+			session, err := userRepo.GetSession(token)
+			if err == nil && session != nil {
+				userIDStr = session.UserID
+			}
+		}
 	}
+	
+	// Log the action
+	logrus.Infof("Clearing all WhatsApp sessions requested by user: %s", userIDStr)
 	
 	// Get database connection
 	userRepo := repository.GetUserRepository()
@@ -62,15 +74,29 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Update all devices to offline status for this user
-	updateQuery := `
-		UPDATE user_devices 
-		SET status = 'offline', 
-		    jid = NULL,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE user_id = $1 AND status != 'deleted'
-	`
-	_, err = tx.Exec(updateQuery, userID.(string))
+	// Update all devices to offline status
+	// If we have a user ID, only update that user's devices
+	var updateQuery string
+	if userIDStr != "" {
+		updateQuery = `
+			UPDATE user_devices 
+			SET status = 'offline', 
+			    jid = NULL,
+			    updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = $1 AND status != 'deleted'
+		`
+		_, err = tx.Exec(updateQuery, userIDStr)
+	} else {
+		// If no user ID, update all devices (admin action)
+		updateQuery = `
+			UPDATE user_devices 
+			SET status = 'offline', 
+			    jid = NULL,
+			    updated_at = CURRENT_TIMESTAMP
+			WHERE status != 'deleted'
+		`
+		_, err = tx.Exec(updateQuery)
+	}
 	if err != nil {
 		logrus.Errorf("Failed to update device status: %v", err)
 	}
@@ -87,7 +113,11 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	// Clear any in-memory sessions as well
 	// This would clear connection sessions for all users - be careful!
 	// For now, we'll just log that sessions were cleared
-	logrus.Infof("WhatsApp sessions cleared for user %s", userID.(string))
+	if userIDStr != "" {
+		logrus.Infof("WhatsApp sessions cleared for user %s", userIDStr)
+	} else {
+		logrus.Infof("WhatsApp sessions cleared for all users (admin action)")
+	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
