@@ -319,7 +319,7 @@ func (service serviceSend) SendFile(ctx context.Context, request domainSend.File
 	if request.Caption != "" {
 		caption = "📄 " + request.Caption
 	}
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, caption)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, caption)
 	if err != nil {
 		return response, err
 	}
@@ -439,7 +439,7 @@ func (service serviceSend) SendVideo(ctx context.Context, request domainSend.Vid
 	if request.Caption != "" {
 		caption = "🎥 " + request.Caption
 	}
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, caption)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, caption)
 	go func() {
 		errDelete := utils.RemoveFile(1, deletedItems...)
 		if errDelete != nil {
@@ -481,7 +481,7 @@ func (service serviceSend) SendContact(ctx context.Context, request domainSend.C
 
 	content := "👤 " + request.ContactName
 
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, content)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, content)
 	if err != nil {
 		return response, err
 	}
@@ -549,7 +549,7 @@ func (service serviceSend) SendLink(ctx context.Context, request domainSend.Link
 	if request.Caption != "" {
 		content = "🔗 " + request.Caption
 	}
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, content)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, content)
 	if err != nil {
 		return response, err
 	}
@@ -587,7 +587,7 @@ func (service serviceSend) SendLocation(ctx context.Context, request domainSend.
 	content := "📍 " + request.Latitude + ", " + request.Longitude
 
 	// Send WhatsApp Message Proto
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, content)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, content)
 	if err != nil {
 		return response, err
 	}
@@ -637,7 +637,7 @@ func (service serviceSend) SendAudio(ctx context.Context, request domainSend.Aud
 
 	content := "🎵 Audio"
 
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, content)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, content)
 	if err != nil {
 		return response, err
 	}
@@ -661,7 +661,7 @@ func (service serviceSend) SendPoll(ctx context.Context, request domainSend.Poll
 
 	msg := service.WaCli.BuildPollCreation(request.Question, request.Options, request.MaxAnswer)
 
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, content)
+	ts, err := service.wrapSendMessage(ctx, service.WaCli, dataWaRecipient, msg, content)
 	if err != nil {
 		return response, err
 	}
