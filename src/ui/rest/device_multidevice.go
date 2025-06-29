@@ -4,9 +4,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/src/infrastructure/whatsapp/multidevice"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/src/infrastructure/whatsapp"
-	"go.mau.fi/whatsmeow"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"context"
 	"fmt"
 )

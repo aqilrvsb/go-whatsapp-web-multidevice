@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/src/infrastructure/whatsapp/multidevice"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/src/ui/websocket"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
+	websocket "github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"go.mau.fi/whatsmeow/types/events"
 )
 

@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"database/sql"
+	"strings"
 	
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // DeviceManager manages multiple WhatsApp device connections
@@ -64,10 +64,22 @@ func GetDeviceManager() *DeviceManager {
 
 // initDatabase creates the WhatsApp store
 func initDatabase(ctx context.Context, dbLog waLog.Logger) (*sqlstore.Container, error) {
-	// Use a separate database for WhatsApp sessions
-	dbURI := "file:storages/whatsapp_multidevice.db?_foreign_keys=on"
+	// Use PostgreSQL for WhatsApp sessions
+	// Check if we have a configured DB URI
+	dbURI := config.DBURI
 	
-	return sqlstore.New(ctx, "sqlite3", dbURI, dbLog)
+	// If the main DB is PostgreSQL, create a separate schema for WhatsApp
+	if strings.HasPrefix(dbURI, "postgres:") || strings.HasPrefix(dbURI, "postgresql:") {
+		// For production, you might want to use a separate database
+		// For now, we'll use the same database with a whatsapp_ prefix for tables
+		if strings.HasPrefix(dbURI, "postgresql://") {
+			dbURI = strings.Replace(dbURI, "postgresql://", "postgres://", 1)
+		}
+		return sqlstore.New(ctx, "postgres", dbURI, dbLog)
+	}
+	
+	// Fallback to file-based SQLite if not using PostgreSQL
+	return sqlstore.New(ctx, "sqlite3", "file:storages/whatsapp_multidevice.db?_foreign_keys=on", dbLog)
 }
 
 // CreateDeviceSession creates a new WhatsApp session for a device

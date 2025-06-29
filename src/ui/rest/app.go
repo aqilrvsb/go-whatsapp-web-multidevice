@@ -68,6 +68,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
+	app.Post("/api/devices/:deviceId/connect", rest.DeviceConnect)
+	app.Get("/api/devices/:deviceId/qr", rest.GetDeviceQR)
+	app.Post("/api/devices/:deviceId/disconnect", rest.DisconnectDevice)
+	app.Post("/api/devices/:deviceId/reset", rest.ResetDevice)
 	app.Get("/app/logout", rest.LogoutDevice)
 	app.Get("/app/reconnect", rest.ReconnectDevice)
 	app.Get("/app/devices", rest.GetDevices)
