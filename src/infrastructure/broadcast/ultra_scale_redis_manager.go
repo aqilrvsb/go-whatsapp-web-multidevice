@@ -192,11 +192,14 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 	um.workersMutex.RUnlock()
 	
 	if !exists {
+		logrus.Infof("Worker doesn't exist for device %s, attempting to create...", deviceID)
+		
 		// Try to acquire lock for this device
 		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		locked, err := um.redisClient.SetNX(um.ctx, lockKey, "1", lockTTL).Result()
 		if err != nil || !locked {
 			// Another server is handling this device
+			logrus.Warnf("Could not acquire lock for device %s: %v (locked: %v)", deviceID, err, locked)
 			return
 		}
 		
@@ -251,11 +254,26 @@ func (um *UltraScaleRedisManager) createDeviceWorker(deviceID string) *DeviceWor
 	
 	// Get WhatsApp client
 	clientManager := whatsapp.GetClientManager()
+	logrus.Infof("Getting WhatsApp client for device %s from ClientManager", deviceID)
+	
 	client, err := clientManager.GetClient(deviceID)
 	if err != nil || client == nil {
 		logrus.Errorf("Failed to get WhatsApp client for device %s: %v", deviceID, err)
+		
+		// Debug: Check if any clients are registered
+		clientCount := clientManager.GetClientCount()
+		logrus.Warnf("Total registered clients in ClientManager: %d", clientCount)
+		
+		// Debug: List all registered device IDs
+		allClients := clientManager.GetAllClients()
+		for id := range allClients {
+			logrus.Warnf("Registered device ID: %s", id)
+		}
+		
 		return nil
 	}
+	
+	logrus.Infof("Successfully got WhatsApp client for device %s", deviceID)
 	
 	// Create worker using the existing constructor
 	// Pass default delays that will be overridden by message-specific delays
@@ -424,7 +442,7 @@ func (um *UltraScaleRedisManager) handleFailedMessage(msg *UltraRedisMessage, de
 func (um *UltraScaleRedisManager) processQueues() {
 	defer um.wg.Done()
 	
-	ticker := time.NewTicker(metricsInterval)
+	ticker := time.NewTicker(queueCheckInterval) // Changed from metricsInterval to queueCheckInterval
 	defer ticker.Stop()
 	
 	for {
@@ -446,6 +464,10 @@ func (um *UltraScaleRedisManager) checkPendingQueues() {
 	
 	allQueues := append(campaignQueues, sequenceQueues...)
 	
+	if len(allQueues) > 0 {
+		logrus.Debugf("Checking %d queues for pending messages", len(allQueues))
+	}
+	
 	for _, queueKey := range allQueues {
 		// Extract device ID from queue key
 		var deviceID string
@@ -458,6 +480,7 @@ func (um *UltraScaleRedisManager) checkPendingQueues() {
 		// Check if queue has messages
 		count, _ := um.redisClient.LLen(um.ctx, queueKey).Result()
 		if count > 0 {
+			logrus.Debugf("Queue %s has %d messages, ensuring worker for device %s", queueKey, count, deviceID)
 			// Ensure worker exists
 			um.ensureWorker(deviceID)
 		}

@@ -120,8 +120,11 @@ func restServer(_ *cobra.Command, _ []string) {
 	}
 	
 	// Start broadcast manager
-	_ = broadcast.GetBroadcastManager()
+	bm := broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
+	
+	// Optimize system for 3000 devices
+	broadcast.OptimizeFor3000Devices()
 	
 	// Start device health monitor
 	healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)

@@ -184,7 +184,10 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 					default:
 					}
 				} else {
-					logrus.Infof("QR event - Event: %s, Code length: %d, Timeout: %v", evt.Event, len(evt.Code), evt.Timeout)
+					// Only log non-empty events
+					if evt.Event != "" {
+						logrus.Infof("QR event - Event: %s, Code length: %d, Timeout: %v", evt.Event, len(evt.Code), evt.Timeout)
+					}
 					// Handle success event
 					if evt.Event == "success" {
 						logrus.Info("QR authentication successful!")
