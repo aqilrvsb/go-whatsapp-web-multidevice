@@ -2463,6 +2463,14 @@
                                 qrModal.hide();
                             }
                             
+                            // Update device status immediately in UI by phone number
+                            if (phone) {
+                                updateDeviceStatusByPhone(phone, 'online');
+                            } else if (deviceId) {
+                                // Fallback to deviceId if phone not available
+                                updateDeviceStatus(deviceId, 'online');
+                            }
+                            
                             // Show interactive SweetAlert with device info and save option
                             let timerInterval;
                             Swal.fire({
@@ -2558,6 +2566,21 @@
                 device.status = status;
                 device.lastSeen = status === 'online' ? 'Active now' : 'Just now';
                 renderDevices();
+            }
+        }
+        
+        // Update Device Status by Phone Number
+        function updateDeviceStatusByPhone(phone, status) {
+            const device = devices.find(d => d.phone === phone);
+            if (device) {
+                device.status = status;
+                device.lastSeen = status === 'online' ? 'Active now' : 'Just now';
+                renderDevices();
+                console.log(`Updated device with phone ${phone} to status: ${status}`);
+            } else {
+                console.log(`No device found with phone ${phone}`);
+                // Log all devices for debugging
+                console.log('Current devices:', devices.map(d => ({ id: d.id, phone: d.phone, name: d.name })));
             }
         }
 
