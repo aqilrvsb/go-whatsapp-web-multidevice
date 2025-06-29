@@ -66,39 +66,37 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				jid := newClient.Store.ID.String()
 				logrus.Infof("Device connected - Phone: %s, JID: %s", phoneNumber, jid)
 				
-				// Find and update the correct device
-				allSessions := whatsapp.GetAllConnectionSessions()
-				for deviceID, session := range allSessions {
-					if session != nil && session.DeviceID == deviceID {
-						logrus.Infof("Updating device %s with phone %s", deviceID, phoneNumber)
-						
-						// Update device in database
-						userRepo := repository.GetUserRepository()
-						err := userRepo.UpdateDeviceStatus(deviceID, "online", phoneNumber, jid)
-						if err != nil {
-							logrus.Errorf("Failed to update device status: %v", err)
-						} else {
-							logrus.Infof("Successfully updated device %s to online status", deviceID)
-						}
-						
-						// Register with client manager
-						cm := whatsapp.GetClientManager()
-						cm.AddClient(deviceID, newClient)
-						
-						// Send WebSocket notification
-						websocket.Broadcast <- websocket.BroadcastMessage{
-							Code:    "DEVICE_CONNECTED",
-							Message: "WhatsApp fully connected and logged in",
-							Result: map[string]interface{}{
-								"phone":    phoneNumber,
-								"jid":      jid,
-								"deviceId": deviceID,
-							},
-						}
-						
-						// Clear session
-						whatsapp.ClearConnectionSession(deviceID)
-						break
+				// Update device by phone number - simple and direct
+				userRepo := repository.GetUserRepository()
+				
+				// Update any device with this phone number to online status
+				query := `UPDATE user_devices SET status = 'online', jid = $1, last_seen = CURRENT_TIMESTAMP WHERE phone = $2`
+				result, err := userRepo.DB().Exec(query, jid, phoneNumber)
+				if err != nil {
+					logrus.Errorf("Failed to update device by phone: %v", err)
+				} else {
+					rowsAffected, _ := result.RowsAffected()
+					logrus.Infof("Updated %d device(s) with phone %s to online status", rowsAffected, phoneNumber)
+				}
+				
+				// Find the device ID by phone for client manager registration
+				var deviceID string
+				err = userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
+				if err == nil && deviceID != "" {
+					// Register with client manager
+					cm := whatsapp.GetClientManager()
+					cm.AddClient(deviceID, newClient)
+					logrus.Infof("Registered device %s with client manager", deviceID)
+					
+					// Send WebSocket notification
+					websocket.Broadcast <- websocket.BroadcastMessage{
+						Code:    "DEVICE_CONNECTED",
+						Message: "WhatsApp fully connected and logged in",
+						Result: map[string]interface{}{
+							"phone":    phoneNumber,
+							"jid":      jid,
+							"deviceId": deviceID,
+						},
 					}
 				}
 			}
