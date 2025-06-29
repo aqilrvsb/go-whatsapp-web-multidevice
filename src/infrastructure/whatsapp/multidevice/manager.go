@@ -192,7 +192,8 @@ func (dm *DeviceManager) RemoveDeviceSession(deviceID string) error {
 	
 	// Delete from WhatsApp store
 	if conn.Store != nil {
-		err := conn.Store.Delete()
+		ctx := context.Background()
+		err := conn.Store.Delete(ctx)
 		if err != nil {
 			log.Errorf("Failed to delete device from store: %v", err)
 		}
