@@ -1320,6 +1320,7 @@
         let currentDeviceFilter = 'all';
         let refreshInterval;
         let currentScanningDeviceId = null; // Track which device is being scanned
+        let qrRefreshInterval = null; // Track QR refresh interval globally
         let isAutoRefreshEnabled = false;  // Default to disabled
 
         // Initialize
@@ -2028,7 +2029,7 @@
                         `;
                         
                         // Set up auto-refresh every 20 seconds
-                        const refreshInterval = setInterval(() => {
+                        qrRefreshInterval = setInterval(() => {
                             fetch(`/app/login?deviceId=${deviceId}`, {
                                 credentials: 'include'
                             })
@@ -2045,7 +2046,10 @@
                         
                         // Clear interval when modal is closed
                         document.getElementById('qrModal').addEventListener('hidden.bs.modal', function () {
-                            clearInterval(refreshInterval);
+                            if (qrRefreshInterval) {
+                                clearInterval(qrRefreshInterval);
+                                qrRefreshInterval = null;
+                            }
                         }, { once: true });
                     } else {
                         qrContainer.innerHTML = `
@@ -2461,6 +2465,13 @@
                             const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
                             if (qrModal) {
                                 qrModal.hide();
+                            }
+                            
+                            // Clear QR refresh interval to stop generating new QR codes
+                            if (qrRefreshInterval) {
+                                clearInterval(qrRefreshInterval);
+                                qrRefreshInterval = null;
+                                console.log('Cleared QR refresh interval');
                             }
                             
                             // Update device status immediately in UI by phone number

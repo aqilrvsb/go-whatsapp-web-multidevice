@@ -12,6 +12,8 @@ import (
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	fiberUtils "github.com/gofiber/fiber/v2/utils"
 	"github.com/sirupsen/logrus"
@@ -55,8 +57,52 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		switch v := evt.(type) {
 		case *events.PairSuccess:
 			logrus.Infof("Pair success event: %s", v.ID.String())
-		case *events.Connected:
+		case *events.Connected, *events.PushNameSetting:
 			logrus.Info("Connected event received - device fully connected!")
+			
+			// Handle the connection with this specific client
+			if newClient.IsLoggedIn() && newClient.Store.ID != nil {
+				phoneNumber := newClient.Store.ID.User
+				jid := newClient.Store.ID.String()
+				logrus.Infof("Device connected - Phone: %s, JID: %s", phoneNumber, jid)
+				
+				// Find and update the correct device
+				allSessions := whatsapp.GetAllConnectionSessions()
+				for deviceID, session := range allSessions {
+					if session != nil && session.DeviceID == deviceID {
+						logrus.Infof("Updating device %s with phone %s", deviceID, phoneNumber)
+						
+						// Update device in database
+						userRepo := repository.GetUserRepository()
+						err := userRepo.UpdateDeviceStatus(deviceID, "online", phoneNumber, jid)
+						if err != nil {
+							logrus.Errorf("Failed to update device status: %v", err)
+						} else {
+							logrus.Infof("Successfully updated device %s to online status", deviceID)
+						}
+						
+						// Register with client manager
+						cm := whatsapp.GetClientManager()
+						cm.AddClient(deviceID, newClient)
+						
+						// Send WebSocket notification
+						websocket.Broadcast <- websocket.BroadcastMessage{
+							Code:    "DEVICE_CONNECTED",
+							Message: "WhatsApp fully connected and logged in",
+							Result: map[string]interface{}{
+								"phone":    phoneNumber,
+								"jid":      jid,
+								"deviceId": deviceID,
+							},
+						}
+						
+						// Clear session
+						whatsapp.ClearConnectionSession(deviceID)
+						break
+					}
+				}
+			}
+			
 			service.registerDeviceAfterConnection(newClient)
 			// Signal successful connection
 			select {

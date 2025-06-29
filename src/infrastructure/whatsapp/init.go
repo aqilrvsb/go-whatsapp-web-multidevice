@@ -210,10 +210,10 @@ func handleLoggedOut(_ context.Context) {
 func handleConnectionEvents(_ context.Context) {
 	log.Infof("WhatsApp connection event received")
 	
-	if !cli.IsConnected() {
-		log.Warnf("Connection event received but client not connected")
-		return
-	}
+	// DISABLED: Global client handler causes multi-device issues
+	// Each device should handle its own connection events through device-specific handlers
+	// See app.go Login() function for device-specific handling
+	return
 	
 	if cli.IsLoggedIn() {
 		log.Infof("WhatsApp client is logged in and connected!")
