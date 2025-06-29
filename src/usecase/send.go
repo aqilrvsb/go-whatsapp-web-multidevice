@@ -38,13 +38,13 @@ func NewSendService(waCli *whatsmeow.Client, appService app.IAppUsecase) domainS
 }
 
 // wrapSendMessage wraps the message sending process with message ID saving
-func (service serviceSend) wrapSendMessage(ctx context.Context, recipient types.JID, msg *waE2E.Message, content string) (whatsmeow.SendResponse, error) {
-	ts, err := service.WaCli.SendMessage(ctx, recipient, msg)
+func (service serviceSend) wrapSendMessage(ctx context.Context, waClient *whatsmeow.Client, recipient types.JID, msg *waE2E.Message, content string) (whatsmeow.SendResponse, error) {
+	ts, err := waClient.SendMessage(ctx, recipient, msg)
 	if err != nil {
 		return whatsmeow.SendResponse{}, err
 	}
 
-	utils.RecordMessage(ts.ID, service.WaCli.Store.ID.String(), content)
+	utils.RecordMessage(ts.ID, waClient.Store.ID.String(), content)
 
 	return ts, nil
 }
@@ -54,7 +54,25 @@ func (service serviceSend) SendText(ctx context.Context, request domainSend.Mess
 	if err != nil {
 		return response, err
 	}
-	dataWaRecipient, err := whatsapp.ValidateJidWithLogin(service.WaCli, request.Phone)
+	
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		// Use device-specific client
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return response, fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to global client (for backward compatibility)
+		waClient = service.WaCli
+		if waClient == nil || !waClient.IsConnected() {
+			return response, fmt.Errorf("no WhatsApp client available")
+		}
+	}
+	
+	dataWaRecipient, err := whatsapp.ValidateJidWithLogin(waClient, request.Phone)
 	if err != nil {
 		return response, err
 	}
@@ -101,7 +119,7 @@ func (service serviceSend) SendText(ctx context.Context, request domainSend.Mess
 		}
 	}
 
-	ts, err := service.wrapSendMessage(ctx, dataWaRecipient, msg, request.Message)
+	ts, err := service.wrapSendMessage(ctx, waClient, dataWaRecipient, msg, request.Message)
 	if err != nil {
 		return response, err
 	}
@@ -116,7 +134,25 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 	if err != nil {
 		return response, err
 	}
-	dataWaRecipient, err := whatsapp.ValidateJidWithLogin(service.WaCli, request.Phone)
+	
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		// Use device-specific client
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return response, fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to global client (for backward compatibility)
+		waClient = service.WaCli
+		if waClient == nil || !waClient.IsConnected() {
+			return response, fmt.Errorf("no WhatsApp client available")
+		}
+	}
+	
+	dataWaRecipient, err := whatsapp.ValidateJidWithLogin(waClient, request.Phone)
 	if err != nil {
 		return response, err
 	}

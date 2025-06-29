@@ -3,6 +3,7 @@ package send
 import "mime/multipart"
 
 type ImageRequest struct {
+	DeviceID    string                `json:"device_id" form:"device_id"`
 	Phone       string                `json:"phone" form:"phone"`
 	Caption     string                `json:"caption" form:"caption"`
 	Image       *multipart.FileHeader `json:"image" form:"image"`
