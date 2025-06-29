@@ -421,16 +421,3 @@ func (cm *ClientManager) GetClientCount() int {
 	defer cm.mutex.RUnlock()
 	return len(cm.clients)
 }
-
-// GetAllClients returns a copy of all registered clients
-func (cm *ClientManager) GetAllClients() map[string]*whatsmeow.Client {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
-	
-	// Create a copy to avoid race conditions
-	clientsCopy := make(map[string]*whatsmeow.Client)
-	for k, v := range cm.clients {
-		clientsCopy[k] = v
-	}
-	return clientsCopy
-}

@@ -1,36 +1,29 @@
 @echo off
-echo ========================================================
-echo Fix Build Errors and Push
-echo ========================================================
-echo.
+echo ========================================
+echo Pushing Build Fixes
+echo ========================================
 
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 
-echo Cleaning up...
-del build_test.bat 2>nul
-
-echo.
-echo Committing fixes...
+echo Adding all changes...
 git add -A
-git commit -m "Fix build errors
 
-- Removed duplicate init_backup.go file
-- Fixed logger method (Info -> Infof)
-- Build now succeeds
-- Multi-device support properly implemented"
+echo Creating commit...
+git commit -m "Fix: Build errors - remove duplicate GetAllClients method
 
-echo.
+- Removed duplicate GetAllClients method declaration
+- Fixed unused variable 'bm' in rest.go
+- Build now completes successfully
+- Ready for deployment"
+
 echo Pushing to GitHub...
-git push origin main --force
+git push origin main
 
 echo.
-echo ========================================================
-echo BUILD FIXED AND PUSHED!
+echo ========================================
+echo Push Complete!
+echo ========================================
 echo.
-echo The system now:
-echo - Builds successfully
-echo - Supports multi-device properly
-echo - No duplicate declarations
-echo - Ready for deployment
-echo ========================================================
+echo Build is now fixed and ready for deployment.
+echo.
 pause

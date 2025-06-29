@@ -120,7 +120,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	}
 	
 	// Start broadcast manager
-	bm := broadcast.GetBroadcastManager()
+	_ = broadcast.GetBroadcastManager()
 	logrus.Info("Broadcast manager started")
 	
 	// Optimize system for 3000 devices
