@@ -2301,12 +2301,15 @@
                         case 'DEVICE_CONNECTED':
                             // Device fully connected and logged in
                             console.log('Device fully connected:', data.message);
+                            console.log('Full data received:', data);
                             
-                            // Extract phone, JID, and device ID from the message
-                            const deviceInfo = data.results || {};
+                            // Extract phone, JID, and device ID from the message (note: backend sends 'result' not 'results')
+                            const deviceInfo = data.result || {};
                             const phone = deviceInfo.phone || '';
                             const jid = deviceInfo.jid || '';
                             const deviceId = deviceInfo.deviceId || '';
+                            
+                            console.log('Device info:', { phone, jid, deviceId });
                             
                             // Close QR modal if open
                             const qrModal = bootstrap.Modal.getInstance(document.getElementById('qrModal'));
@@ -2314,19 +2317,40 @@
                                 qrModal.hide();
                             }
                             
-                            // Show interactive SweetAlert with countdown
+                            // Show interactive SweetAlert with device info and save option
                             let timerInterval;
                             Swal.fire({
                                 icon: 'success',
                                 title: 'WhatsApp Connected!',
                                 html: `
-                                    <p>Device connected successfully!</p>
-                                    <p>Phone: <strong>${phone}</strong></p>
-                                    <p>Page will reload in <b></b> seconds.</p>
+                                    <div style="text-align: left;">
+                                        <p><strong>Connection Details:</strong></p>
+                                        <table style="width: 100%; font-size: 14px;">
+                                            <tr>
+                                                <td style="padding: 5px;"><strong>Device ID:</strong></td>
+                                                <td style="padding: 5px; font-family: monospace; font-size: 12px;">${deviceId || 'Not available'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px;"><strong>Phone:</strong></td>
+                                                <td style="padding: 5px;">${phone || 'Not available'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px;"><strong>JID:</strong></td>
+                                                <td style="padding: 5px; font-family: monospace; font-size: 12px;">${jid || 'Not available'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 5px;"><strong>Status:</strong></td>
+                                                <td style="padding: 5px; color: green;">Online</td>
+                                            </tr>
+                                        </table>
+                                        <hr>
+                                        <p style="text-align: center;">Page will reload in <b></b> seconds.</p>
+                                    </div>
                                 `,
                                 timer: 5000,
                                 timerProgressBar: true,
-                                showConfirmButton: false,
+                                showConfirmButton: true,
+                                confirmButtonText: 'Save & Reload Now',
                                 allowOutsideClick: false,
                                 didOpen: () => {
                                     const b = Swal.getHtmlContainer().querySelector('b');
@@ -2334,13 +2358,26 @@
                                         b.textContent = Math.ceil(Swal.getTimerLeft() / 1000);
                                     }, 100);
                                     
-                                    // Backend already updates the device status
-                                    // We just need to wait and reload
-                                    console.log('Device connected. Backend has updated the status. Waiting to reload...');
+                                    // Store device info in localStorage for later use if needed
+                                    if (deviceId) {
+                                        const deviceData = {
+                                            deviceId: deviceId,
+                                            phone: phone,
+                                            jid: jid,
+                                            status: 'online',
+                                            connectedAt: new Date().toISOString()
+                                        };
+                                        localStorage.setItem(`device_${deviceId}`, JSON.stringify(deviceData));
+                                        console.log('Device info saved:', deviceData);
+                                    }
                                 },
                                 willClose: () => {
                                     clearInterval(timerInterval);
                                 }
+                            }).then((result) => {
+                                // Whether user clicked confirm or timer expired, reload the page
+                                location.reload();
+                            });
                             }).then(() => {
                                 // Reload the page after timer ends
                                 location.reload();
