@@ -192,14 +192,35 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 	um.workersMutex.RUnlock()
 	
 	if !exists {
+		// First check if device exists before attempting to create worker
+		userRepo := repository.GetUserRepository()
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err != nil || device == nil {
+			// Device doesn't exist, clean it up
+			um.CleanupNonExistentDevice(deviceID)
+			return
+		}
+		
+		// Check if device is online
+		if device.Status != "online" && device.Status != "Online" && 
+		   device.Status != "connected" && device.Status != "Connected" {
+			logrus.Debugf("Device %s is not online (status: %s), skipping worker creation", deviceID, device.Status)
+			return
+		}
+		
 		logrus.Infof("Worker doesn't exist for device %s, attempting to create...", deviceID)
 		
 		// Try to acquire lock for this device
 		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		locked, err := um.redisClient.SetNX(um.ctx, lockKey, "1", lockTTL).Result()
-		if err != nil || !locked {
+		if err != nil {
+			logrus.Errorf("Failed to acquire lock for device %s: %v", deviceID, err)
+			return
+		}
+		
+		if !locked {
 			// Another server is handling this device
-			logrus.Warnf("Could not acquire lock for device %s: %v (locked: %v)", deviceID, err, locked)
+			logrus.Debugf("Another server is handling device %s", deviceID)
 			return
 		}
 		
@@ -464,9 +485,14 @@ func (um *UltraScaleRedisManager) checkPendingQueues() {
 	
 	allQueues := append(campaignQueues, sequenceQueues...)
 	
-	if len(allQueues) > 0 {
-		logrus.Debugf("Checking %d queues for pending messages", len(allQueues))
+	// No spam logging unless there are queues
+	if len(allQueues) == 0 {
+		return
 	}
+	
+	// Get all valid devices once to avoid repeated DB queries
+	userRepo := repository.GetUserRepository()
+	validDevices := make(map[string]bool)
 	
 	for _, queueKey := range allQueues {
 		// Extract device ID from queue key
@@ -477,10 +503,31 @@ func (um *UltraScaleRedisManager) checkPendingQueues() {
 			deviceID = strings.TrimPrefix(queueKey, ultraSequenceQueuePrefix)
 		}
 		
+		// Check if we already validated this device
+		if validated, exists := validDevices[deviceID]; exists {
+			if !validated {
+				// Device doesn't exist, clean it up
+				um.CleanupNonExistentDevice(deviceID)
+				continue
+			}
+		} else {
+			// Validate device exists
+			device, err := userRepo.GetDeviceByID(deviceID)
+			if err != nil || device == nil {
+				validDevices[deviceID] = false
+				um.CleanupNonExistentDevice(deviceID)
+				continue
+			}
+			validDevices[deviceID] = true
+		}
+		
 		// Check if queue has messages
 		count, _ := um.redisClient.LLen(um.ctx, queueKey).Result()
 		if count > 0 {
-			logrus.Debugf("Queue %s has %d messages, ensuring worker for device %s", queueKey, count, deviceID)
+			// Only log if there are many messages
+			if count > 10 {
+				logrus.Debugf("Queue %s has %d messages, ensuring worker for device %s", queueKey, count, deviceID)
+			}
 			// Ensure worker exists
 			um.ensureWorker(deviceID)
 		}
