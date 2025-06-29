@@ -1,24 +1,23 @@
 @echo off
-cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
-
-echo Committing and pushing current fixes...
+echo Building and pushing build fixes...
+cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main\src
+set CGO_ENABLED=0
+go build -o ..\whatsapp.exe .
+if %ERRORLEVEL% NEQ 0 (
+    echo Build failed!
+    pause
+    exit /b 1
+)
+cd ..
+echo Build successful!
 git add -A
-git commit -m "Fix: Resolved duplicate functions and build errors in app.go
+git commit -m "Fix build errors in whatsapp_sender.go
 
-- Removed duplicate GetSequenceSummary, GetWorkerStatus, min, max, countConnectedDevices functions
-- Fixed unused device variable in loops
-- Added missing StopAllWorkers function
-- Fixed corrupted file ending
-- Changed device.Name to device.DeviceName"
+- Fixed field names: Url -> URL, FileEncSha256 -> FileEncSHA256, etc
+- Added DownloadMedia and GetRandomDelay helper functions
+- Removed unused repository import
+- Fixed all compilation errors"
 
-git push origin main --force
-
-echo.
-echo ==========================================
-echo Pushed to GitHub!
-echo ==========================================
-echo.
-echo The build should now work properly with all
-echo duplicate functions removed and syntax fixed.
-echo.
+git push origin main
+echo Push complete!
 pause

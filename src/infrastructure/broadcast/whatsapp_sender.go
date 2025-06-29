@@ -3,17 +3,47 @@ package broadcast
 import (
 	"context"
 	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
 	"time"
 	
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 )
+
+// DownloadMedia downloads media from URL
+func DownloadMedia(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status: %s", resp.Status)
+	}
+	
+	return io.ReadAll(resp.Body)
+}
+
+// GetRandomDelay returns a random delay between min and max seconds
+func GetRandomDelay(minDelay, maxDelay int) time.Duration {
+	if minDelay <= 0 {
+		minDelay = 5
+	}
+	if maxDelay <= 0 || maxDelay < minDelay {
+		maxDelay = minDelay + 10
+	}
+	
+	delay := rand.Intn(maxDelay-minDelay) + minDelay
+	return time.Duration(delay) * time.Second
+}
 
 // SendWhatsAppMessage sends a message using the WhatsApp client
 func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.BroadcastMessage) error {
@@ -36,7 +66,7 @@ func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.Broadcast
 			// Image with caption
 			logrus.Infof("Sending image with caption to %s", recipient.String())
 			
-			imageBytes, err := whatsapp.DownloadMedia(msg.MediaURL)
+			imageBytes, err := DownloadMedia(msg.MediaURL)
 			if err != nil {
 				logrus.Errorf("Failed to download image: %v", err)
 				return err
@@ -50,12 +80,12 @@ func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.Broadcast
 			
 			imageMsg := &waProto.ImageMessage{
 				Caption:       proto.String(msg.Content),
-				Url:           proto.String(uploadResp.URL),
+				URL:           proto.String(uploadResp.URL),
 				DirectPath:    proto.String(uploadResp.DirectPath),
 				MediaKey:      uploadResp.MediaKey,
 				Mimetype:      proto.String("image/jpeg"),
-				FileEncSha256: uploadResp.FileEncSHA256,
-				FileSha256:    uploadResp.FileSHA256,
+				FileEncSHA256: uploadResp.FileEncSHA256,
+				FileSHA256:    uploadResp.FileSHA256,
 				FileLength:    proto.Uint64(uint64(len(imageBytes))),
 			}
 			
@@ -89,7 +119,7 @@ func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.Broadcast
 		// Image only (no caption)
 		logrus.Infof("Sending image to %s", recipient.String())
 		
-		imageBytes, err := whatsapp.DownloadMedia(msg.MediaURL)
+		imageBytes, err := DownloadMedia(msg.MediaURL)
 		if err != nil {
 			logrus.Errorf("Failed to download image: %v", err)
 			return err
@@ -102,12 +132,12 @@ func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.Broadcast
 		}
 		
 		imageMsg := &waProto.ImageMessage{
-			Url:           proto.String(uploadResp.URL),
+			URL:           proto.String(uploadResp.URL),
 			DirectPath:    proto.String(uploadResp.DirectPath),
 			MediaKey:      uploadResp.MediaKey,
 			Mimetype:      proto.String("image/jpeg"),
-			FileEncSha256: uploadResp.FileEncSHA256,
-			FileSha256:    uploadResp.FileSHA256,
+			FileEncSHA256: uploadResp.FileEncSHA256,
+			FileSHA256:    uploadResp.FileSHA256,
 			FileLength:    proto.Uint64(uint64(len(imageBytes))),
 		}
 		
@@ -128,7 +158,7 @@ func SendWhatsAppMessage(client *whatsmeow.Client, msg domainBroadcast.Broadcast
 	}
 	
 	// Wait for the delay
-	delay := whatsapp.GetRandomDelay(msg.MinDelay, msg.MaxDelay)
+	delay := GetRandomDelay(msg.MinDelay, msg.MaxDelay)
 	logrus.Infof("Waiting %v before next message", delay)
 	time.Sleep(delay)
 	
