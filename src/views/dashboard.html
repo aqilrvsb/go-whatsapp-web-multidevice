@@ -1778,8 +1778,11 @@
                                     <li><a class="dropdown-item text-warning" href="#" onclick="resetDevice('${device.id}')">
                                         <i class="bi bi-arrow-counterclockwise me-2"></i>Reset WhatsApp Session
                                     </a></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="clearAllSessions('${device.id}')">
+                                        <i class="bi bi-x-circle me-2"></i>Clear ALL Sessions
+                                    </a></li>
                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteDevice('${device.id}')">
-                                        <i class="bi bi-trash me-2"></i>Delete
+                                        <i class="bi bi-trash me-2"></i>Delete Device
                                     </a></li>
                                 </ul>
                             </div>
@@ -4550,6 +4553,79 @@
         
         function checkAllWorkers() {
             window.open('/status/all-workers', 'AllWorkersStatus', 'width=1200,height=800');
+        }
+        
+        // Clear ALL WhatsApp Sessions
+        function clearAllSessions(deviceId) {
+            Swal.fire({
+                title: 'Clear ALL WhatsApp Sessions?',
+                html: `
+                    <div class="text-start">
+                        <p class="text-danger"><strong>⚠️ WARNING: This will clear ALL WhatsApp session data!</strong></p>
+                        <p>This action will:</p>
+                        <ul class="text-start">
+                            <li>Remove ALL stored WhatsApp sessions from the database</li>
+                            <li>Log out ALL connected devices (not just this one)</li>
+                            <li>Clear any cached session data</li>
+                        </ul>
+                        <p class="text-warning mt-3">Use this only if you're experiencing issues with wrong phone numbers or corrupted sessions.</p>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Clear ALL Sessions',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc3545',
+                focusCancel: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showLoading();
+                    
+                    fetch('/api/devices/clear-all-sessions', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deviceId: deviceId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            // Update all devices to offline
+                            devices.forEach(device => {
+                                device.status = 'offline';
+                                device.jid = '';
+                            });
+                            renderDevices();
+                            
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sessions Cleared!',
+                                html: `
+                                    <p>All WhatsApp sessions have been cleared.</p>
+                                    <p class="text-info">You can now connect with your correct WhatsApp number.</p>
+                                `,
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Failed to Clear Sessions',
+                                text: data.message || 'An error occurred while clearing sessions.'
+                            });
+                        }
+                        hideLoading();
+                    })
+                    .catch(error => {
+                        console.error('Error clearing sessions:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to clear sessions. Please try again.'
+                        });
+                        hideLoading();
+                    });
+                }
+            });
         }
     </script>
 </body>
