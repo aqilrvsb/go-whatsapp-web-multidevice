@@ -164,7 +164,7 @@ func (handler *App) Login(c *fiber.Ctx) error {
 	if userID != nil && deviceId != "" {
 		// Store connection session for this device
 		logrus.Infof("Storing connection session for user %s, device %s", userID, deviceId)
-		whatsapp.StoreConnectionSession(userID.(string), &whatsapp.ConnectionSession{
+		whatsapp.StoreConnectionSession(deviceId, &whatsapp.ConnectionSession{
 			UserID:   userID.(string),
 			DeviceID: deviceId,
 		})
@@ -419,8 +419,8 @@ func (handler *App) GetQRCode(c *fiber.Ctx) error {
 	deviceID := c.Query("device_id")
 	
 	if userID != nil && deviceID != "" {
-		// Store connection session
-		whatsapp.StoreConnectionSession(userID.(string), &whatsapp.ConnectionSession{
+		// Store connection session BY DEVICE ID to support multiple devices
+		whatsapp.StoreConnectionSession(deviceID, &whatsapp.ConnectionSession{
 			UserID:   userID.(string),
 			DeviceID: deviceID,
 		})

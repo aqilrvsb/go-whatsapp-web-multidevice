@@ -233,9 +233,12 @@ func handleConnectionEvents(_ context.Context) {
 			// Look for any active connection session
 			allSessions := GetAllConnectionSessions()
 			log.Infof("Found %d active connection sessions", len(allSessions))
-			for userID, session := range allSessions {
+			
+			// First, try to find a session that matches this connection
+			// We need to match based on some criteria since we don't have phone yet
+			for deviceID, session := range allSessions {
 				if session != nil && session.DeviceID != "" {
-					log.Infof("Updating device status for user %s, device %s", userID, session.DeviceID)
+					log.Infof("Found session for device %s, user %s", deviceID, session.UserID)
 					connectedDeviceID = session.DeviceID // Store device ID for the message
 					
 					// Update device status to online
@@ -244,7 +247,7 @@ func handleConnectionEvents(_ context.Context) {
 						log.Errorf("Failed to update device status: %v", err)
 					} else {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
-						log.Infof("Also updating with phone: %s", phoneNumber)
+						log.Infof("Device %s connected with phone: %s", session.DeviceID, phoneNumber)
 						
 						// Register device with client manager using the device ID from database
 						cm := GetClientManager()
@@ -264,14 +267,17 @@ func handleConnectionEvents(_ context.Context) {
 					}
 					
 					// Clear the session after successful update
-					ClearConnectionSession(userID)
+					ClearConnectionSession(deviceID)
 					break
 				}
 			}
 			
-			// If we didn't find device ID from session, try to find it by phone/JID
+			// If we didn't find device ID from session, DON'T try to find by phone
+			// This prevents wrong device assignment in multi-device scenarios
 			if connectedDeviceID == "" {
-				log.Infof("No device ID found in session, attempting to find device by phone: %s", phoneNumber)
+				log.Warnf("No device ID found in session for phone %s", phoneNumber)
+				log.Infof("Device must be connected through proper QR scan flow with device_id parameter")
+				log.Infof("WhatsApp returned phone: %s, but no matching session found", phoneNumber)
 				
 				// Log all devices for debugging
 				var debugQuery = `SELECT id, COALESCE(phone, ''), device_name FROM user_devices WHERE status != 'deleted'`
@@ -288,32 +294,6 @@ func handleConnectionEvents(_ context.Context) {
 						log.Infof("Device: %s, Phone: '%s', Name: %s", id, phone, name)
 					}
 					log.Infof("=== End of devices ===")
-					log.Infof("Looking for phone: '%s'", phoneNumber)
-				}
-				
-				// Try to find the device by phone number
-				query := `SELECT id FROM user_devices WHERE phone = $1 AND status != 'deleted' LIMIT 1`
-				err := userRepo.DB().QueryRow(query, phoneNumber).Scan(&connectedDeviceID)
-				
-				if err == nil && connectedDeviceID != "" {
-					log.Infof("Found device ID from database by phone: %s", connectedDeviceID)
-					
-					// Update device status to online and update JID
-					err = userRepo.UpdateDeviceStatus(connectedDeviceID, "online", phoneNumber, jid)
-					if err != nil {
-						log.Errorf("Failed to update device status: %v", err)
-					} else {
-						log.Infof("Successfully updated device %s to online status (found by phone)", connectedDeviceID)
-						
-						// Register device with client manager
-						cm := GetClientManager()
-						cm.AddClient(connectedDeviceID, cli)
-						log.Infof("Registered device %s with client manager for broadcast system", connectedDeviceID)
-					}
-				} else {
-					log.Warnf("Could not find device by phone %s: %v", phoneNumber, err)
-					log.Infof("Devices should be pre-registered with the exact phone number that WhatsApp returns")
-					log.Infof("WhatsApp returned phone: %s, but no matching device found", phoneNumber)
 				}
 			}
 		}

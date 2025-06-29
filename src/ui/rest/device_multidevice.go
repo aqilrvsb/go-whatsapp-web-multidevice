@@ -67,8 +67,8 @@ func (handler *App) DeviceConnect(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Store connection session for tracking
-	whatsapp.StoreConnectionSession(userID.(string), &whatsapp.ConnectionSession{
+	// Store connection session for tracking BY DEVICE ID
+	whatsapp.StoreConnectionSession(deviceID, &whatsapp.ConnectionSession{
 		DeviceID: deviceID,
 		UserID:   userID.(string),
 	})

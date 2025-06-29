@@ -216,9 +216,9 @@ func (service serviceApp) registerDeviceAfterConnection(client *whatsmeow.Client
 	// Check all connection sessions to find the matching device
 	allSessions := whatsapp.GetAllConnectionSessions()
 	
-	for userID, session := range allSessions {
+	for deviceID, session := range allSessions {
 		if session != nil && session.DeviceID != "" {
-			logrus.Infof("Found session for user %s, device %s", userID, session.DeviceID)
+			logrus.Infof("Found session for device %s, user %s", deviceID, session.UserID)
 			
 			// Register the client with ClientManager
 			cm := whatsapp.GetClientManager()
@@ -232,7 +232,7 @@ func (service serviceApp) registerDeviceAfterConnection(client *whatsmeow.Client
 			// This is handled in the Connected event handler in init.go
 			
 			// Clear the session
-			whatsapp.ClearConnectionSession(userID)
+			whatsapp.ClearConnectionSession(deviceID)
 			break
 		}
 	}
