@@ -479,3 +479,43 @@ func (r *UserRepository) UpdateDevicePhone(userID, deviceID, phone string) error
 	
 	return nil
 }
+
+// GetAllDevices retrieves all devices from the database
+func (r *UserRepository) GetAllDevices() ([]*models.UserDevice, error) {
+	query := `
+		SELECT id, user_id, device_name, phone, status, last_seen, created_at, updated_at 
+		FROM user_devices 
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all devices: %w", err)
+	}
+	defer rows.Close()
+	
+	var devices []*models.UserDevice
+	for rows.Next() {
+		device := &models.UserDevice{}
+		err := rows.Scan(
+			&device.ID,
+			&device.UserID,
+			&device.DeviceName,
+			&device.Phone,
+			&device.Status,
+			&device.LastSeen,
+			&device.CreatedAt,
+			&device.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan device row: %w", err)
+		}
+		devices = append(devices, device)
+	}
+	
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating device rows: %w", err)
+	}
+	
+	return devices, nil
+}

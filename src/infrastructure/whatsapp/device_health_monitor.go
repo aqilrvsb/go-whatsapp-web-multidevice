@@ -7,7 +7,6 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -90,7 +89,7 @@ func (dhm *DeviceHealthMonitor) checkAllDevices() {
 }
 
 // checkDeviceHealth checks health of a single device
-func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whatsmeow.Client, userRepo repository.IUserRepository) {
+func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whatsmeow.Client, userRepo *repository.UserRepository) {
 	if client == nil {
 		logrus.Warnf("Device %s has nil client, removing from manager", deviceID)
 		cm := GetClientManager()

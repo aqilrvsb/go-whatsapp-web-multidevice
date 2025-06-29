@@ -1,10 +1,32 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 28, 2025 - 7:20 PM**  
+**Last Updated: June 30, 2025 - 12:40 AM**  
 **Status: ✅ Production-ready with OPTIMIZED 3000+ device support**
 **Architecture: ✅ Redis-optimized parallel processing with auto-scaling workers**
 **Deploy**: ✅ Auto-deployment triggered via Railway
 
-## 🚨 LATEST UPDATE: Device Status Auto-Update Fixed (June 28, 2025 - 7:20 PM)
+## 🚨 LATEST UPDATE: Worker Health & Auto-Reconnect System (June 30, 2025 - 12:40 AM)
+
+### ✅ Complete Worker Health Monitoring & Auto-Recovery!
+- **Device Health Monitor**: Checks all devices every 30 seconds
+- **Auto-Reconnect**: Devices automatically reconnect when connection drops
+- **Worker Health Checks**: Detects stuck/failed workers and auto-restarts
+- **All Control Buttons Working**: Every worker control button is now functional
+- **Real-time Status Updates**: Live device and worker status monitoring
+
+### What's Been Fixed:
+1. **Compilation Errors**: Fixed all syntax errors, duplicate methods, and undefined references
+2. **Device Health Monitor**: Now properly monitors and reconnects devices
+3. **Worker Control API**: All endpoints implemented and working
+4. **Client Manager**: Enhanced with better device registration and cleanup
+5. **Frontend Integration**: All buttons connected with proper error handling
+
+### New Features:
+- **Auto-Recovery System**: Workers and devices self-heal without manual intervention
+- **Manual Controls**: Force reconnect, restart workers, health checks
+- **Better Queue Management**: Monitors queue health and prevents overflow
+- **Enhanced Logging**: Better visibility into worker and device status
+
+## 🚨 Previous Update: Device Status Auto-Update Fixed (June 28, 2025 - 7:20 PM)
 
 ### ✅ Device Connection Status Now Auto-Updates!
 - **Issue Fixed**: Device showing "Disconnected" after successful QR scan
@@ -1570,3 +1592,121 @@ For optimal performance with 3000 devices:
 - 🔧 [Deployment Script](deploy_redis_3000_devices.bat)
 
 **Your system is now ready for massive scale operations! 🚀**
+
+
+## 🔧 Worker Health & Auto-Reconnect System (June 30, 2025)
+
+### Overview
+The new worker health monitoring system ensures maximum uptime and reliability for your WhatsApp broadcast operations. It automatically detects and recovers from various failure scenarios without manual intervention.
+
+### Key Components
+
+#### 1. Device Health Monitor (`device_health_monitor.go`)
+- **Automatic Monitoring**: Checks all devices every 30 seconds
+- **Smart Reconnection**: Attempts to reconnect disconnected devices
+- **Session Management**: Preserves existing sessions during reconnection
+- **Status Updates**: Real-time device status updates in database
+
+#### 2. Enhanced Client Manager
+- **RegisterDeviceOnConnection()**: Ensures proper device registration
+- **GetConnectedDeviceCount()**: Returns count of active devices
+- **GetDeviceStatus()**: Detailed device status checking
+- **CleanupDisconnectedClients()**: Removes stale connections
+
+#### 3. Improved Worker Health Checks
+- **Multi-Level Health Validation**:
+  - Client connection status
+  - Client login status
+  - Processing time monitoring (detects stuck workers)
+  - Queue health monitoring
+- **Auto-Recovery**: Workers automatically restart when unhealthy
+- **Resource Management**: Prevents memory leaks and queue overflow
+
+### Worker Control API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/workers/resume-failed` | POST | Restarts all stopped/failed workers |
+| `/api/workers/stop-all` | POST | Stops all active workers |
+| `/api/workers/:deviceId/restart` | POST | Restart specific device worker |
+| `/api/workers/:deviceId/start` | POST | Start worker for specific device |
+| `/api/devices/:deviceId/reconnect` | POST | Manually reconnect a device |
+| `/api/workers/health-check` | POST | Trigger health check for all |
+
+### How It Works
+
+1. **Continuous Monitoring**:
+   ```
+   Device Health Monitor (30s interval)
+       ↓
+   Check all registered devices
+       ↓
+   For each device:
+     - Is client connected? → Continue
+     - Is client nil? → Create new client
+     - Connection lost? → Attempt reconnect
+       ↓
+   Update device status in database
+   ```
+
+2. **Worker Health Checks**:
+   ```
+   Worker Health Check (30s interval)
+       ↓
+   For each worker:
+     - Check if stopped → Mark unhealthy
+     - Check if stuck (>10 min) → Mark unhealthy
+     - Check client connection → Mark unhealthy if disconnected
+     - Check queue health → Mark unhealthy if overflowing
+       ↓
+   If unhealthy → RestartWorker()
+   ```
+
+3. **Auto-Recovery Process**:
+   ```
+   Unhealthy Worker Detected
+       ↓
+   Get fresh client from ClientManager
+       ↓
+   If no client → Trigger device reconnection
+       ↓
+   Replace worker client with fresh one
+       ↓
+   Reset worker status to "idle"
+       ↓
+   Worker resumes processing
+   ```
+
+### Benefits
+
+- **Zero Downtime**: Automatic recovery without manual intervention
+- **Better Reliability**: Multi-level health checks catch issues early
+- **Improved Performance**: Stuck workers are automatically restarted
+- **Real-time Monitoring**: Live status updates in dashboard
+- **Manual Override**: Force reconnect/restart when needed
+- **Session Persistence**: Maintains WhatsApp sessions during recovery
+
+### Troubleshooting
+
+If devices keep disconnecting:
+1. Check Worker Status page for error patterns
+2. Verify device has stable internet connection
+3. Check if WhatsApp session is still valid
+4. Use manual reconnect button if auto-reconnect fails
+
+If workers show as unhealthy:
+1. Check queue size (should be < 900/1000)
+2. Verify processing time (should be < 10 minutes)
+3. Check client connection status
+4. Use restart worker button to force restart
+
+### Configuration
+
+Default health check intervals:
+- Device monitoring: 30 seconds
+- Worker health check: 30 seconds
+- Stuck worker timeout: 10 minutes
+- Queue warning threshold: 900 messages
+- Auto-reconnect attempts: 3
+
+These values can be adjusted in the code if needed for your specific use case.

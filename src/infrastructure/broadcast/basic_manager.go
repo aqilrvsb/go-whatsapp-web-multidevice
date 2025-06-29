@@ -253,8 +253,3 @@ func (bm *BasicBroadcastManager) StopWorker(deviceID string) error {
 	
 	return nil
 }
-
-// GetBroadcastManager returns the singleton broadcast manager instance
-func GetBroadcastManager() IBroadcastManager {
-	return GetUnifiedBroadcastManager()
-}

@@ -284,18 +284,24 @@ func (dw *DeviceWorker) IsHealthy() bool {
 	dw.mu.RLock()
 	defer dw.mu.RUnlock()
 	
-	// Check if stuck processing
-	if dw.status == "processing" && time.Since(dw.lastActivity) > 10*time.Minute {
-		return false
-	}
-	
 	// Check if stopped
 	if dw.status == "stopped" {
 		return false
 	}
 	
+	// Check if stuck processing
+	if dw.status == "processing" && time.Since(dw.lastActivity) > 10*time.Minute {
+		return false
+	}
+	
 	// Check if client is still connected
 	if dw.client == nil || !dw.client.IsConnected() {
+		return false
+	}
+	
+	// Check queue health - if queue is full for too long
+	if len(dw.messageQueue) > 900 && time.Since(dw.lastActivity) > 1*time.Minute {
+		logrus.Warnf("Worker %s queue is nearly full (%d/1000) and inactive", dw.deviceID, len(dw.messageQueue))
 		return false
 	}
 	
@@ -331,47 +337,6 @@ func getRandomDelayBetween(minDelay, maxDelay int) time.Duration {
 	delay := rand.Intn(maxDelay-minDelay) + minDelay
 	return time.Duration(delay) * time.Second
 }
-// Enhanced health check for device workers
-func (dw *DeviceWorker) IsHealthy() bool {
-	dw.mu.RLock()
-	defer dw.mu.RUnlock()
-	
-	// Check if worker is stopped
-	if dw.status == "stopped" {
-		return false
-	}
-	
-	// Check if stuck processing for too long
-	if dw.status == "processing" && time.Since(dw.lastActivity) > 5*time.Minute {
-		logrus.Warnf("Worker %s stuck processing for %v", dw.deviceID, time.Since(dw.lastActivity))
-		return false
-	}
-	
-	// Check if client is nil
-	if dw.client == nil {
-		logrus.Warnf("Worker %s has nil client", dw.deviceID)
-		return false
-	}
-	
-	// Check if client is connected and logged in
-	if !dw.client.IsConnected() {
-		logrus.Warnf("Worker %s client is disconnected", dw.deviceID)
-		return false
-	}
-	
-	if !dw.client.IsLoggedIn() {
-		logrus.Warnf("Worker %s client is not logged in", dw.deviceID)
-		return false
-	}
-	
-	// Check queue health - if queue is full for too long
-	if len(dw.messageQueue) > 900 && time.Since(dw.lastActivity) > 1*time.Minute {
-		logrus.Warnf("Worker %s queue is nearly full (%d/1000) and inactive", dw.deviceID, len(dw.messageQueue))
-		return false
-	}
-	
-	return true
-}
 
 // RestartWorker restarts a worker with a new client
 func (dw *DeviceWorker) RestartWorker() error {
@@ -381,11 +346,11 @@ func (dw *DeviceWorker) RestartWorker() error {
 	logrus.Infof("Restarting worker for device %s", dw.deviceID)
 	
 	// Get fresh client from ClientManager
-	cm := GetClientManager()
+	cm := whatsapp.GetClientManager()
 	newClient, err := cm.GetClient(dw.deviceID)
 	if err != nil {
 		// Try to reconnect the device
-		dhm := GetDeviceHealthMonitor(nil)
+		dhm := whatsapp.GetDeviceHealthMonitor(nil)
 		if err := dhm.ManualReconnectDevice(dw.deviceID); err != nil {
 			return fmt.Errorf("failed to reconnect device: %v", err)
 		}
@@ -404,27 +369,4 @@ func (dw *DeviceWorker) RestartWorker() error {
 	
 	logrus.Infof("Worker for device %s restarted successfully", dw.deviceID)
 	return nil
-}
-
-// Enhanced health check routine
-func (dw *DeviceWorker) healthCheck() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	
-	for {
-		select {
-		case <-dw.ctx.Done():
-			return
-		case <-ticker.C:
-			if !dw.IsHealthy() {
-				logrus.Warnf("Worker %s is unhealthy, attempting restart", dw.deviceID)
-				if err := dw.RestartWorker(); err != nil {
-					logrus.Errorf("Failed to restart worker %s: %v", dw.deviceID, err)
-					dw.mu.Lock()
-					dw.status = "error"
-					dw.mu.Unlock()
-				}
-			}
-		}
-	}
 }
