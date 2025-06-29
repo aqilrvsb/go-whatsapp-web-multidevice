@@ -1861,47 +1861,124 @@
 
         // Add New Device
         function addNewDevice() {
-            const deviceName = prompt('Enter device name:');
-            if (deviceName) {
-                // Create device object
-                const newDevice = {
-                    id: 'device_' + Date.now(),
-                    name: deviceName,
-                    phone: 'Not connected',
-                    status: 'offline',
-                    lastSeen: 'Never connected'
-                };
-                
-                // Add to devices array
-                devices.push(newDevice);
-                
-                // Save to backend (optional - can be done after successful connection)
-                fetch('/api/devices', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: deviceName })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.device) {
-                        // Update with real ID from backend
-                        const index = devices.findIndex(d => d.id === newDevice.id);
-                        if (index !== -1) {
-                            devices[index].id = data.device.id;
-                        }
+            // Use SweetAlert for better input handling
+            Swal.fire({
+                title: 'Add New WhatsApp Device',
+                html: `
+                    <div class="text-start">
+                        <div class="mb-3">
+                            <label for="deviceName" class="form-label">Device Name</label>
+                            <input type="text" id="deviceName" class="form-control" placeholder="e.g., My Phone, Office WhatsApp">
+                        </div>
+                        <div class="mb-3">
+                            <label for="devicePhone" class="form-label">WhatsApp Phone Number</label>
+                            <input type="text" id="devicePhone" class="form-control" placeholder="60123456789" maxlength="15">
+                            <small class="text-muted">Enter number with country code (without + sign). Must start with 60 for Malaysia.</small>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Add Device',
+                cancelButtonText: 'Cancel',
+                focusConfirm: false,
+                preConfirm: () => {
+                    const deviceName = document.getElementById('deviceName').value;
+                    const devicePhone = document.getElementById('devicePhone').value;
+                    
+                    if (!deviceName) {
+                        Swal.showValidationMessage('Please enter a device name');
+                        return false;
                     }
-                })
-                .catch(error => {
-                    console.error('Error saving device:', error);
-                });
-                
-                // Render devices to show the new device card
-                renderDevices();
-                
-                // Don't auto-open QR - let user choose QR or Phone Code
-                // The device card now shows both options
-            }
+                    
+                    if (!devicePhone) {
+                        Swal.showValidationMessage('Please enter a phone number');
+                        return false;
+                    }
+                    
+                    // Validate phone number format (must start with 60 and be 10-12 digits)
+                    if (!devicePhone.startsWith('60')) {
+                        Swal.showValidationMessage('Phone number must start with 60 (Malaysia country code)');
+                        return false;
+                    }
+                    
+                    if (devicePhone.length < 10 || devicePhone.length > 12) {
+                        Swal.showValidationMessage('Phone number must be 10-12 digits');
+                        return false;
+                    }
+                    
+                    if (!/^\d+$/.test(devicePhone)) {
+                        Swal.showValidationMessage('Phone number must contain only digits');
+                        return false;
+                    }
+                    
+                    return { deviceName, devicePhone };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { deviceName, devicePhone } = result.value;
+                    
+                    // Create device object
+                    const newDevice = {
+                        id: 'device_' + Date.now(),
+                        name: deviceName,
+                        phone: devicePhone,
+                        status: 'offline',
+                        lastSeen: 'Never connected'
+                    };
+                    
+                    // Add to devices array
+                    devices.push(newDevice);
+                    
+                    // Save to backend with phone number
+                    fetch('/api/devices', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            name: deviceName,
+                            phone: devicePhone 
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS' && data.results && data.results.device) {
+                            // Update with real ID from backend
+                            const index = devices.findIndex(d => d.id === newDevice.id);
+                            if (index !== -1) {
+                                devices[index] = {
+                                    id: data.results.device.id,
+                                    name: data.results.device.name,
+                                    phone: data.results.device.phone,
+                                    status: data.results.device.status,
+                                    lastSeen: data.results.device.lastSeen
+                                };
+                            }
+                            
+                            // Store phone number mapping for connection
+                            localStorage.setItem(`device_phone_${devicePhone}`, data.results.device.id);
+                            
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Device Added!',
+                                text: `Device "${deviceName}" has been added. You can now connect it by scanning QR code.`,
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error saving device:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to save device. Please try again.'
+                        });
+                    });
+                    
+                    // Render devices to show the new device card
+                    renderDevices();
+                }
+            });
         }
 
         // Scan QR Code

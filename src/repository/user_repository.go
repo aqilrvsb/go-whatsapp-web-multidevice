@@ -39,6 +39,11 @@ func GetUserRepository() *UserRepository {
 	return userRepo
 }
 
+// DB returns the database connection
+func (r *UserRepository) DB() *sql.DB {
+	return r.db
+}
+
 // CreateUser creates a new user in the database
 func (r *UserRepository) CreateUser(email, fullName, password string) (*models.User, error) {
 	// Check if user exists
@@ -240,6 +245,32 @@ func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserD
 		device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add device: %w", err)
+	}
+	
+	return device, nil
+}
+
+// AddUserDeviceWithPhone adds a device for a user with phone number
+func (r *UserRepository) AddUserDeviceWithPhone(userID, deviceName, phone string) (*models.UserDevice, error) {
+	device := &models.UserDevice{
+		ID:         uuid.New().String(),
+		UserID:     userID,
+		DeviceName: deviceName,
+		Phone:      phone,
+		Status:     "offline",
+		CreatedAt:  time.Now(),
+		LastSeen:   time.Now(),
+	}
+	
+	query := `
+		INSERT INTO user_devices (id, user_id, device_name, phone, status, last_seen, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING created_at, last_seen
+	`
+	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
+		device.Phone, device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add device with phone: %w", err)
 	}
 	
 	return device, nil

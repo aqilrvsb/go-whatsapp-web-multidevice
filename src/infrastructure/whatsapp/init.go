@@ -244,6 +244,7 @@ func handleConnectionEvents(_ context.Context) {
 						log.Errorf("Failed to update device status: %v", err)
 					} else {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
+						log.Infof("Also updating with phone: %s", phoneNumber)
 						
 						// Register device with client manager using the device ID from database
 						cm := GetClientManager()
@@ -265,6 +266,35 @@ func handleConnectionEvents(_ context.Context) {
 					// Clear the session after successful update
 					ClearConnectionSession(userID)
 					break
+				}
+			}
+			
+			// If we didn't find device ID from session, try to find it by phone/JID
+			if connectedDeviceID == "" {
+				log.Infof("No device ID found in session, attempting to find device by phone: %s", phoneNumber)
+				
+				// Try to find the device by phone number
+				query := `SELECT id FROM user_devices WHERE phone = $1 AND status != 'deleted' LIMIT 1`
+				err := userRepo.DB().QueryRow(query, phoneNumber).Scan(&connectedDeviceID)
+				
+				if err == nil && connectedDeviceID != "" {
+					log.Infof("Found device ID from database by phone: %s", connectedDeviceID)
+					
+					// Update device status to online and update JID
+					err = userRepo.UpdateDeviceStatus(connectedDeviceID, "online", phoneNumber, jid)
+					if err != nil {
+						log.Errorf("Failed to update device status: %v", err)
+					} else {
+						log.Infof("Successfully updated device %s to online status (found by phone)", connectedDeviceID)
+						
+						// Register device with client manager
+						cm := GetClientManager()
+						cm.AddClient(connectedDeviceID, cli)
+						log.Infof("Registered device %s with client manager for broadcast system", connectedDeviceID)
+					}
+				} else {
+					log.Warnf("Could not find device by phone %s: %v", phoneNumber, err)
+					log.Infof("Devices with this phone number should be pre-registered with the phone number")
 				}
 			}
 		}

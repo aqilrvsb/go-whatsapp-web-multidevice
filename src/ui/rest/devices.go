@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 )
 
 // CreateDevice creates a new device for the user
@@ -35,7 +36,8 @@ func (handler *App) CreateDevice(c *fiber.Ctx) error {
 	
 	// Parse request body
 	var req struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Phone string `json:"phone"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(utils.ResponseData{
@@ -56,7 +58,15 @@ func (handler *App) CreateDevice(c *fiber.Ctx) error {
 	// Create device in database
 	userRepo := repository.GetUserRepository()
 	
-	device, err := userRepo.AddUserDevice(userID.(string), req.Name)
+	var device *models.UserDevice
+	var err error
+	
+	if req.Phone != "" {
+		device, err = userRepo.AddUserDeviceWithPhone(userID.(string), req.Name, req.Phone)
+	} else {
+		device, err = userRepo.AddUserDevice(userID.(string), req.Name)
+	}
+	
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
