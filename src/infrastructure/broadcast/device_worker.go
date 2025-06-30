@@ -2,10 +2,12 @@ package broadcast
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -308,8 +310,26 @@ func (dw *DeviceWorker) IsHealthy() bool {
 	return true
 }
 
-// downloadMedia downloads media from URL
+// downloadMedia downloads media from URL or data URL
 func downloadMedia(url string) ([]byte, error) {
+	// Check if it's a data URL
+	if strings.HasPrefix(url, "data:") {
+		// Parse data URL
+		parts := strings.SplitN(url, ",", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid data URL format")
+		}
+		
+		// Decode base64
+		data, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode base64: %v", err)
+		}
+		
+		return data, nil
+	}
+	
+	// Regular HTTP/HTTPS URL
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
