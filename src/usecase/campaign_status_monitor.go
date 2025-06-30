@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"database/sql"
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/sirupsen/logrus"
@@ -24,14 +25,20 @@ func StartCampaignStatusMonitor() {
 func updateCampaignStatuses() {
 	db := database.GetDB()
 	
-	// Find campaigns that are triggered or processing
+	// Find ALL campaigns that need status check
 	rows, err := db.Query(`
 		SELECT DISTINCT c.id, c.title, c.status
 		FROM campaigns c
-		WHERE c.status IN ('triggered', 'processing')
-		AND EXISTS (
-			SELECT 1 FROM broadcast_messages bm 
-			WHERE bm.campaign_id = c.id
+		WHERE c.status IN ('pending', 'triggered', 'processing')
+		AND (
+			-- Has messages
+			EXISTS (
+				SELECT 1 FROM broadcast_messages bm 
+				WHERE bm.campaign_id = c.id
+			)
+			OR 
+			-- Should have been triggered by now
+			(c.status = 'pending' AND c.scheduled_at <= CURRENT_TIMESTAMP)
 		)
 	`)
 	if err != nil {
@@ -49,6 +56,8 @@ func updateCampaignStatuses() {
 		
 		// Get message statistics
 		var total, pending, queued, sent, failed, skipped int
+		var oldestQueuedMinutes sql.NullInt64
+		
 		err := db.QueryRow(`
 			SELECT 
 				COUNT(*) as total,
@@ -56,14 +65,21 @@ func updateCampaignStatuses() {
 				COUNT(CASE WHEN status = 'queued' THEN 1 END) as queued,
 				COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped
+				COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped,
+				EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(CASE WHEN status = 'queued' THEN updated_at END)))/60 as oldest_queued
 			FROM broadcast_messages
 			WHERE campaign_id = $1
-		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped)
+		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped, &oldestQueuedMinutes)
 		
 		if err != nil {
 			logrus.Errorf("Failed to get message stats for campaign %d: %v", campaignID, err)
 			continue
+		}
+		
+		// Check for stuck queued messages
+		if queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Int64 > 5 {
+			logrus.Warnf("Campaign %d has %d messages stuck in queued state for %d minutes", 
+				campaignID, queued, oldestQueuedMinutes.Int64)
 		}
 		
 		// Get device count for this campaign
@@ -81,14 +97,24 @@ func updateCampaignStatuses() {
 		// Determine new status
 		var newStatus string
 		
-		if total == 0 {
+		if total == 0 && currentStatus == "pending" {
+			// No messages created yet but should have been triggered
+			var scheduledAt time.Time
+			err = db.QueryRow(`SELECT scheduled_at FROM campaigns WHERE id = $1`, campaignID).Scan(&scheduledAt)
+			if err == nil && scheduledAt.Before(time.Now()) {
+				// Campaign should have been triggered but wasn't - mark as failed
+				newStatus = "failed"
+				logrus.Errorf("Campaign %d should have been triggered at %v but has no messages", 
+					campaignID, scheduledAt)
+			}
+		} else if total == 0 {
 			// No messages, keep current status
 			continue
 		} else if currentStatus == "triggered" && (sent > 0 || failed > 0) {
-			// First worker has started processing (at least one message sent/failed)
+			// First worker has started processing
 			newStatus = "processing"
 		} else if pending == 0 && queued == 0 {
-			// All messages have been processed (no more pending or queued)
+			// All messages have been processed
 			if sent > 0 {
 				newStatus = "finished"
 			} else if failed == total || skipped == total {
@@ -96,9 +122,10 @@ func updateCampaignStatuses() {
 			} else {
 				newStatus = "finished"
 			}
-		} else {
-			// Still in progress, no status change needed
-			continue
+		} else if currentStatus == "processing" && queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Int64 > 10 {
+			// Messages stuck in queue for too long - might indicate a problem
+			logrus.Warnf("Campaign %d might be stuck - %d messages queued for over 10 minutes", 
+				campaignID, queued)
 		}
 		
 		// Update status if changed

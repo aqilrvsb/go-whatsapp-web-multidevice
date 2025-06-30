@@ -149,6 +149,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start campaign status monitor
 	go usecase.StartCampaignStatusMonitor()
 	logrus.Info("Campaign status monitor started")
+	
+	// Start queued message cleaner
+	go usecase.StartQueuedMessageCleaner()
+	logrus.Info("Queued message cleaner started")
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		log.Fatalln("Failed to start: ", err.Error())
