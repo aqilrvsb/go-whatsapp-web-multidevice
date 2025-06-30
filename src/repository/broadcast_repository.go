@@ -89,7 +89,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 	query := `
 		SELECT 
 			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
-			bm.recipient_phone, bm.message_type, bm.content, bm.media_url, 
+			bm.recipient_phone, bm.message_type, bm.content as message, bm.media_url as image_url, 
 			bm.scheduled_at, bm.group_id, bm.group_order,
 			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) as min_delay,
 			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) as max_delay

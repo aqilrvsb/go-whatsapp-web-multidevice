@@ -40,7 +40,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	rows, err := db.Query(`
 		SELECT 
 			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
-			bm.recipient_phone, bm.message, bm.image_url,
+			bm.recipient_phone, bm.content as message, bm.media_url as image_url,
 			COALESCE(c.min_delay_seconds, 5) as min_delay,
 			COALESCE(c.max_delay_seconds, 15) as max_delay,
 			d.status as device_status
