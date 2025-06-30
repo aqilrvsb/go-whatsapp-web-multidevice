@@ -3016,20 +3016,21 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log('Campaign API response:', data);
-                    if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
+                    if (data.code === 'SUCCESS' && data.results !== null) {
                         campaigns = {};
-                        console.log('Processing campaigns:', data.results.length);
+                        const campaignArray = Array.isArray(data.results) ? data.results : [];
+                        console.log('Processing campaigns:', campaignArray.length);
                         
                         // Hide debug info - uncomment for debugging
                         // const debugDiv = document.getElementById('campaignDebug');
                         // const debugInfo = document.getElementById('debugInfo');
                         // if (debugDiv && debugInfo) {
                         //     debugDiv.style.display = 'block';
-                        //     debugInfo.textContent = `Found ${data.results.length} campaigns. `;
+                        //     debugInfo.textContent = `Found ${campaignArray.length} campaigns. `;
                         // }
                         
                         // Group campaigns by date
-                        data.results.forEach(campaign => {
+                        campaignArray.forEach(campaign => {
                             // Ensure date is in YYYY-MM-DD format
                             let date = campaign.campaign_date;
                             if (date.includes('T')) {
@@ -3669,7 +3670,7 @@
                             
                             filteredResults = {
                                 ...data.results,
-                                recent_campaigns: data.results.recent_campaigns.filter(campaign => {
+                                recent_campaigns: (data.results.recent_campaigns || []).filter(campaign => {
                                     if (!campaign.campaign_date) return false;
                                     const campaignDate = campaign.campaign_date.split('T')[0];
                                     return campaignDate === todayStr || campaignDate === tomorrowStr;

@@ -858,6 +858,11 @@ func (handler *App) GetCampaigns(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Ensure campaigns is not nil
+	if campaigns == nil {
+		campaigns = []models.Campaign{}
+	}
+	
 	// Return campaigns as array for frontend
 	return c.JSON(utils.ResponseData{
 		Status:  200,
@@ -1608,6 +1613,8 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 	// Calculate statistics
 	totalCampaigns := len(campaigns)
 	pendingCampaigns := 0
+	triggeredCampaigns := 0
+	processingCampaigns := 0
 	sentCampaigns := 0
 	failedCampaigns := 0
 	
@@ -1615,7 +1622,11 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		switch campaign.Status {
 		case "scheduled", "pending":
 			pendingCampaigns++
-		case "sent":
+		case "triggered":
+			triggeredCampaigns++
+		case "processing":
+			processingCampaigns++
+		case "sent", "finished":
 			sentCampaigns++
 		case "failed":
 			failedCampaigns++
@@ -1634,15 +1645,24 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		}
 	}
 	
+	// Get recent campaigns (up to 5)
+	recentCampaigns := []models.Campaign{}
+	if len(campaigns) > 0 {
+		limit := min(5, len(campaigns))
+		recentCampaigns = campaigns[:limit]
+	}
+	
 	summary := map[string]interface{}{
 		"campaigns": map[string]interface{}{
 			"total": totalCampaigns,
 			"pending": pendingCampaigns,
+			"triggered": triggeredCampaigns,
+			"processing": processingCampaigns,
 			"sent": sentCampaigns,
 			"failed": failedCampaigns,
 		},
 		"messages": broadcastStats,
-		"recent_campaigns": campaigns[:min(5, len(campaigns))],
+		"recent_campaigns": recentCampaigns,
 	}
 	
 	return c.JSON(utils.ResponseData{
