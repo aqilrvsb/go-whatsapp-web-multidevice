@@ -149,6 +149,17 @@ func updateCampaignStatuses() {
 				
 				logrus.Infof("Campaign '%s' (ID: %d) status: %s → %s | Progress: %d%% (%d/%d) | Devices: %d | Sent: %d, Failed: %d, Skipped: %d", 
 					title, campaignID, currentStatus, newStatus, progress, processed, total, deviceCount, sent, failed, skipped)
+				
+				// If campaign finished or failed, unlock broadcast
+				if newStatus == "finished" || newStatus == "failed" {
+					coordinator := NewBroadcastCoordinator()
+					var userID string
+					err = db.QueryRow(`SELECT user_id FROM campaigns WHERE id = $1`, campaignID).Scan(&userID)
+					if err == nil {
+						coordinator.UnlockBroadcast(userID)
+						logrus.Infof("Broadcast lock released for user %s after campaign %d %s", userID, campaignID, newStatus)
+					}
+				}
 			}
 		}
 	}

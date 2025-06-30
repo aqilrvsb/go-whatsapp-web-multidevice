@@ -143,6 +143,19 @@ func (dw *DeviceWorker) processMessages() {
 						logrus.Errorf("Failed to update message status to sent: %v", updateErr)
 					}
 					logrus.Infof("Message %s sent successfully to %s", msg.ID, msg.RecipientPhone)
+					
+					// Update campaign processing timestamp if this is a campaign message
+					if msg.CampaignID != nil {
+						_, updateErr = db.Exec(`
+							UPDATE campaigns 
+							SET last_processed_at = NOW(),
+							    first_processed_at = COALESCE(first_processed_at, NOW())
+							WHERE id = $1
+						`, *msg.CampaignID)
+						if updateErr != nil {
+							logrus.Errorf("Failed to update campaign processing time: %v", updateErr)
+						}
+					}
 				}
 			}
 			dw.status = "idle"

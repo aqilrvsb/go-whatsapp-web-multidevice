@@ -153,6 +153,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start queued message cleaner
 	go usecase.StartQueuedMessageCleaner()
 	logrus.Info("Queued message cleaner started")
+	
+	// Start broadcast coordinator
+	go usecase.StartBroadcastCoordinator()
+	logrus.Info("Broadcast coordinator started")
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		log.Fatalln("Failed to start: ", err.Error())
