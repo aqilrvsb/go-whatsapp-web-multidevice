@@ -145,6 +145,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start campaign/sequence trigger processor
 	go usecase.StartTriggerProcessor()
 	logrus.Info("Campaign trigger processor started")
+	
+	// Start campaign status monitor
+	go usecase.StartCampaignStatusMonitor()
+	logrus.Info("Campaign status monitor started")
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		log.Fatalln("Failed to start: ", err.Error())

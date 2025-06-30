@@ -3681,7 +3681,9 @@
                             filteredResults.campaigns = {
                                 total: filteredCampaigns.length,
                                 pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
-                                sent: filteredCampaigns.filter(c => c.status === 'sent').length,
+                                triggered: filteredCampaigns.filter(c => c.status === 'triggered').length,
+                                processing: filteredCampaigns.filter(c => c.status === 'processing').length,
+                                finished: filteredCampaigns.filter(c => c.status === 'finished' || c.status === 'sent').length,
                                 failed: filteredCampaigns.filter(c => c.status === 'failed').length
                             };
                         }
@@ -4114,15 +4116,21 @@
         
         function getStatusColor(status) {
             switch(status) {
+                case 'finished':
                 case 'active':
                 case 'sent':
                     return 'success';
                 case 'pending':
                 case 'scheduled':
-                case 'paused':
-                    return 'warning';
+                    return 'secondary';
+                case 'triggered':
+                    return 'info';
+                case 'processing':
+                    return 'primary';
                 case 'failed':
                     return 'danger';
+                case 'paused':
+                    return 'warning';
                 case 'draft':
                     return 'secondary';
                 default:
