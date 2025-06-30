@@ -102,12 +102,13 @@
 
         .device-card {
             background: white;
-            border-radius: 12px;
-            padding: 24px;
+            border-radius: 8px;
+            padding: 12px;
             box-shadow: var(--card-shadow);
             border: 1px solid #e9ecef;
             transition: all 0.3s;
             height: 100%;
+            position: relative;
         }
 
         .device-card.connected {
@@ -116,15 +117,15 @@
         }
 
         .device-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .device-icon {
-            width: 48px;
-            height: 48px;
+            width: 36px;
+            height: 36px;
             background: #f0f9f7;
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1750,25 +1751,23 @@
             const phoneDisplay = device.phone && device.phone !== 'Not connected' ? device.phone : null;
             
             return `
-                <div class="col-lg-6">
+                <div class="col-lg-2 col-md-4 col-sm-6">
                     <div class="device-card ${isConnected ? 'connected' : ''}">
                         <!-- Card Header -->
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div class="d-flex align-items-center">
-                                <div class="device-icon me-3">
-                                    <i class="bi bi-phone-fill" style="font-size: 24px; color: ${isConnected ? 'var(--success)' : '#6c757d'};"></i>
-                                </div>
-                                <div>
-                                    <h5 class="mb-1">${device.name}</h5>
-                                    <div class="d-flex align-items-center">
-                                        <span class="device-status ${device.status}"></span>
-                                        <span class="text-muted small">${isConnected ? 'Connected' : 'Disconnected'}</span>
-                                    </div>
+                        <div class="d-flex flex-column align-items-center text-center mb-3">
+                            <div class="device-icon mb-2">
+                                <i class="bi bi-phone-fill" style="font-size: 24px; color: ${isConnected ? 'var(--success)' : '#6c757d'};"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">${device.name}</h6>
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <span class="device-status ${device.status}"></span>
+                                    <span class="text-muted small">${isConnected ? 'Connected' : 'Disconnected'}</span>
                                 </div>
                             </div>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
-                                    <i class="bi bi-three-dots-vertical"></i>
+                            <div class="dropdown position-absolute top-0 end-0 m-2">
+                                <button class="btn btn-sm btn-light p-1" type="button" data-bs-toggle="dropdown" style="width: 24px; height: 24px;">
+                                    <i class="bi bi-three-dots-vertical" style="font-size: 12px;"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><a class="dropdown-item" href="#" onclick="editDevice('${device.id}')">
@@ -1792,74 +1791,35 @@
                         </div>
 
                         <!-- Phone Number Section -->
-                        <div class="device-info mb-3 p-3 bg-light rounded">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <small class="text-muted">Phone Number</small>
-                                    <p class="mb-0 fw-medium">
-                                        ${phoneDisplay || 
-                                            `<span class="text-muted">Not linked</span>
-                                            <button class="btn btn-link btn-sm p-0 ms-2" onclick="linkPhoneNumber('${device.id}')">
-                                                <i class="bi bi-plus-circle"></i> Add
-                                            </button>`
-                                        }
-                                    </p>
-                                </div>
-                                ${phoneDisplay ? `
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="linkPhoneNumber('${device.id}')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                ` : ''}
+                        ${phoneDisplay ? `
+                            <div class="mb-2 text-center">
+                                <small class="text-muted d-block" style="font-size: 11px;">${phoneDisplay}</small>
                             </div>
-                        </div>
+                        ` : ''}
 
-                        <!-- Last Seen -->
-                        <div class="mb-3">
-                            <small class="text-muted">Last active</small>
-                            <p class="mb-0">${device.lastSeen || 'Never'}</p>
-                        </div>
-                        
                         <!-- Action Buttons -->
-                        <div class="d-grid gap-2">
+                        <div class="d-grid gap-1">
                             ${!isConnected ? `
-                                <div class="btn-group mb-2" role="group">
-                                    <button class="btn btn-primary" onclick="scanQR('${device.id}')">
-                                        <i class="bi bi-qr-code me-2"></i>QR Code
-                                    </button>
-                                    <button class="btn btn-outline-primary" onclick="usePhoneCode('${device.id}')">
-                                        <i class="bi bi-hash me-2"></i>Phone Code
-                                    </button>
-                                </div>
-                                <button class="btn btn-info w-100" onclick="deviceLeads('${device.id}')">
-                                    <i class="bi bi-people me-2"></i>Lead Management
+                                <button class="btn btn-primary btn-sm" onclick="scanQR('${device.id}')">
+                                    <i class="bi bi-qr-code"></i> QR
+                                </button>
+                                <button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
+                                    <i class="bi bi-people"></i> Leads
                                 </button>
                             ` : `
-                                <div class="row g-2">
-                                    <div class="col-12">
-                                        <button class="btn btn-success w-100" onclick="openWhatsAppWeb('${device.id}')">
-                                            <i class="bi bi-whatsapp me-2"></i>WhatsApp Web
-                                        </button>
-                                    </div>
-                                    <div class="col-6">
-                                        <button class="btn btn-primary w-100" onclick="deviceActions('${device.id}')">
-                                            <i class="bi bi-play-circle me-2"></i>Actions
-                                        </button>
-                                    </div>
-                                    <div class="col-6">
-                                        <button class="btn btn-info w-100" onclick="deviceLeads('${device.id}')">
-                                            <i class="bi bi-people me-2"></i>Leads
-                                        </button>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="btn-group w-100" role="group">
-                                            <button class="btn btn-outline-success" onclick="viewDeviceStats('${device.id}')">
-                                                <i class="bi bi-graph-up me-2"></i>Analytics
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="logoutDevice('${device.id}')">
-                                                <i class="bi bi-box-arrow-right me-2"></i>Logout
-                                            </button>
-                                        </div>
-                                    </div>
+                                <button class="btn btn-success btn-sm mb-1" onclick="openWhatsAppWeb('${device.id}')">
+                                    <i class="bi bi-whatsapp"></i> WA
+                                </button>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-primary" onclick="deviceActions('${device.id}')" title="Actions">
+                                        <i class="bi bi-play"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" onclick="deviceLeads('${device.id}')" title="Leads">
+                                        <i class="bi bi-people"></i>
+                                    </button>
+                                    <button class="btn btn-outline-success" onclick="viewDeviceStats('${device.id}')" title="Stats">
+                                        <i class="bi bi-graph-up"></i>
+                                    </button>
                                 </div>
                             `}
                         </div>
