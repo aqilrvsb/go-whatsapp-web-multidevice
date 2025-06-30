@@ -1822,7 +1822,7 @@
                         <!-- Action Buttons -->
                         <div class="d-grid gap-2">
                             ${!isConnected ? `
-                                <div class="btn-group" role="group">
+                                <div class="btn-group mb-2" role="group">
                                     <button class="btn btn-primary" onclick="scanQR('${device.id}')">
                                         <i class="bi bi-qr-code me-2"></i>QR Code
                                     </button>
@@ -1830,6 +1830,9 @@
                                         <i class="bi bi-hash me-2"></i>Phone Code
                                     </button>
                                 </div>
+                                <button class="btn btn-info w-100" onclick="deviceLeads('${device.id}')">
+                                    <i class="bi bi-people me-2"></i>Lead Management
+                                </button>
                             ` : `
                                 <div class="row g-2">
                                     <div class="col-12">
