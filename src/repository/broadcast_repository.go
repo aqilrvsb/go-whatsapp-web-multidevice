@@ -37,8 +37,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-	`
-	
+	`	
 	// Get user_id - use from message if provided, otherwise get from device
 	var userID string
 	if msg.UserID != "" {
@@ -70,8 +69,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		groupID = *msg.GroupID
 	} else {
 		groupID = nil
-	}
-	
+	}	
 	var groupOrder interface{}
 	if msg.GroupOrder != nil {
 		groupOrder = *msg.GroupOrder
@@ -102,8 +100,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= $2)
 		ORDER BY bm.group_id NULLS LAST, bm.group_order NULLS LAST, bm.created_at ASC
 		LIMIT $3
-	`
-	
+	`	
 	rows, err := r.db.Query(query, deviceID, time.Now(), limit)
 	if err != nil {
 		return nil, err
@@ -157,21 +154,23 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
 		UPDATE broadcast_messages 
-		SET status = $1, error_message = $2, sent_at = CASE WHEN $1 = 'sent' THEN $3 ELSE sent_at END, updated_at = $3
-		WHERE id = $4
+		SET status = $1, 
+		    error_message = $2, 
+		    sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END,
+		    updated_at = NOW()
+		WHERE id = $3
 	`
 	
-	result, err := r.db.Exec(query, status, errorMsg, time.Now(), messageID)
+	result, err := r.db.Exec(query, status, errorMsg, messageID)
 	if err != nil {
 		logrus.Errorf("Failed to update message status: %v", err)
 		return err
-	}
-	
+	}	
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		logrus.Warnf("No rows updated for message ID: %s", messageID)
 	} else {
-		logrus.Debugf("Updated message %s status to %s", messageID, status)
+		logrus.Infof("Updated message %s status to %s", messageID, status)
 	}
 	
 	return nil
@@ -210,7 +209,6 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 	return stats, nil
 }
 
-
 // GetUserBroadcastStats gets broadcast statistics for a user
 func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]interface{}, error) {
 	query := `
@@ -230,8 +228,7 @@ func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]i
 	}
 	
 	stats := map[string]interface{}{
-		"total_messages": total,
-		"sent_messages": sent,
+		"total_messages": total,		"sent_messages": sent,
 		"failed_messages": failed,
 		"pending_messages": pending,
 		"success_rate": float64(sent) / float64(max(1, total)) * 100,
@@ -306,14 +303,13 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 	return messages, nil
 }
 
-
 // GetDevicesWithPendingMessages gets all device IDs that have pending messages
 func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) {
 	query := `
 		SELECT DISTINCT device_id 
 		FROM broadcast_messages 
 		WHERE status = 'pending' 
-		AND scheduled_at <= NOW()
+		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
 		ORDER BY device_id
 	`
 	
