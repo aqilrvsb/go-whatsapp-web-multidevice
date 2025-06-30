@@ -1,8 +1,76 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: June 30, 2025 - 10:00 PM**  
+**Last Updated: July 01, 2025 - 12:00 AM**  
 **Status: ✅ Production-ready with OPTIMIZED 3000+ device support**
 **Architecture: ✅ Redis-optimized parallel processing with auto-scaling workers**
 **Deploy**: ✅ Auto-deployment triggered via Railway
+
+## 📦 Database Backup & Restore Guide (NEW!)
+
+### Creating Backups
+The system includes backup scripts for protecting your data:
+
+#### Quick Backup (Recommended)
+```bash
+# Run the backup script
+backup_working_version.bat
+
+# You'll need your Railway DATABASE_URL from:
+# Railway Dashboard > Postgres Service > Connect Tab
+```
+
+#### What Gets Backed Up
+- ✅ All PostgreSQL tables (users, devices, leads, campaigns, etc.)
+- ✅ Database statistics and row counts
+- ✅ Current git commit reference
+- ✅ Environment variables
+- ✅ System configuration
+
+#### Backup Location
+All backups are stored in: `backups/[timestamp]_working_version/`
+
+### Restoring from Backup
+
+#### Prerequisites
+1. Install PostgreSQL client tools:
+   - Download: https://www.postgresql.org/download/windows/
+   - Or use: `choco install postgresql`
+
+2. Have your Railway DATABASE_URL ready
+
+#### Restore Process
+```bash
+# Method 1: Using restore script
+restore_working_version.bat
+
+# Method 2: Manual restore
+psql "DATABASE_URL" < backups/[timestamp]/postgresql_backup.sql
+
+# Method 3: Via Railway CLI
+railway run psql < postgresql_backup.sql
+```
+
+### Important Backup Files
+- **postgresql_backup.sql** - Complete database dump
+- **backup_info.json** - System state and configuration
+- **railway_env_vars.env** - Environment variables
+- **database_stats.txt** - Table row counts
+- **RESTORE_INSTRUCTIONS.txt** - Step-by-step restore guide
+
+### ⚠️ Backup Best Practices
+1. **Before Major Changes**: Always backup before updating code
+2. **Regular Backups**: Weekly backups recommended
+3. **Test Restores**: Verify backups work by testing restore process
+4. **Keep Multiple Versions**: Don't overwrite old backups
+5. **Secure Storage**: Keep backups in safe location
+
+### Emergency Recovery
+If something goes wrong:
+1. Stop the application
+2. Restore from latest working backup
+3. Restart the application
+4. Verify all services are running
+
+---
 
 ## 🚨 LATEST UPDATE: Fixed Duplicate Message Sending & Status Updates (June 30, 2025 - 10:00 PM)
 
@@ -140,3 +208,45 @@ UltraScaleRedisManager
   - Worker sends via WhatsApp
   - Updates status to "sent"
 ```
+
+## 🛠️ Quick Commands Reference
+
+### Backup & Restore
+```bash
+# Create backup
+backup_working_version.bat
+
+# Restore from backup  
+restore_working_version.bat
+
+# Manual PostgreSQL backup
+pg_dump "DATABASE_URL" > backup.sql
+
+# Manual restore
+psql "DATABASE_URL" < backup.sql
+```
+
+### Development
+```bash
+# Build without CGO
+cd src
+set CGO_ENABLED=0
+go build -o ../whatsapp.exe .
+
+# Run locally
+./whatsapp.exe
+
+# Deploy to Railway
+git add -A
+git commit -m "your message"
+git push origin main
+```
+
+### Monitoring
+- Redis Status: `/monitoring/redis`
+- Worker Status: Dashboard > Worker Status tab
+- Campaign Summary: Dashboard > Campaign Summary tab
+- Device Analytics: Click device > View Analytics
+
+---
+*For detailed documentation, check the `/docs` folder*
