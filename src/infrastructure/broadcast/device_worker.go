@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -124,13 +125,23 @@ func (dw *DeviceWorker) processMessages() {
 				logrus.Errorf("Failed to send message: %v", err)
 				// Update broadcast status to failed
 				if msg.ID != "" {
-					dw.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
+					// Direct update like skipped
+					db := database.GetDB()
+					_, updateErr := db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = $1, updated_at = NOW() WHERE id = $2`, err.Error(), msg.ID)
+					if updateErr != nil {
+						logrus.Errorf("Failed to update message status to failed: %v", updateErr)
+					}
 				}
 			} else {
 				dw.processedCount++
 				// Update broadcast status to sent
 				if msg.ID != "" {
-					dw.broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
+					// Direct update like skipped
+					db := database.GetDB()
+					_, updateErr := db.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = $1 AND status IN ('pending', 'queued')`, msg.ID)
+					if updateErr != nil {
+						logrus.Errorf("Failed to update message status to sent: %v", updateErr)
+					}
 					logrus.Infof("Message %s sent successfully to %s", msg.ID, msg.RecipientPhone)
 				}
 			}
