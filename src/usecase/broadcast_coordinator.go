@@ -65,7 +65,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 	var availableDevices int
 	err = db.QueryRow(`
 		SELECT COUNT(*) 
-		FROM devices 
+		FROM user_devices 
 		WHERE user_id = $1 
 		AND status IN ('connected', 'online')
 	`, userID).Scan(&availableDevices)

@@ -2,7 +2,10 @@ package broadcast
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -85,19 +88,58 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 
 // sendImageMessage sends an image message
 func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, recipient types.JID, msg *broadcast.BroadcastMessage) error {
-	// For now, send as text with image URL
-	// TODO: Implement actual image upload and sending
+	var imageData []byte
+	var err error
 	
-	messageText := msg.Message
-	if messageText == "" {
-		messageText = "📷 Image"
+	// Check if it's a data URL or regular URL
+	if strings.HasPrefix(msg.ImageURL, "data:") {
+		// Handle data URL (base64 encoded image)
+		parts := strings.SplitN(msg.ImageURL, ",", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid data URL format")
+		}
+		
+		// Decode base64 data
+		imageData, err = base64.StdEncoding.DecodeString(parts[1])
+		if err != nil {
+			return fmt.Errorf("failed to decode base64 image: %v", err)
+		}
+	} else {
+		// Handle regular URL
+		resp, err := http.Get(msg.ImageURL)
+		if err != nil {
+			return fmt.Errorf("failed to download image: %v", err)
+		}
+		defer resp.Body.Close()
+		
+		imageData, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read image data: %v", err)
+		}
 	}
-	messageText += fmt.Sprintf("\n\n🔗 %s", msg.ImageURL)
 	
+	// Upload to WhatsApp servers
+	uploaded, err := waClient.Upload(context.Background(), imageData, whatsmeow.MediaImage)
+	if err != nil {
+		return fmt.Errorf("failed to upload image: %v", err)
+	}
+	
+	// Create image message
+	caption := msg.Message
 	message := &waE2E.Message{
-		Conversation: proto.String(messageText),
+		ImageMessage: &waE2E.ImageMessage{
+			Caption:       proto.String(caption),
+			URL:           proto.String(uploaded.URL),
+			DirectPath:    proto.String(uploaded.DirectPath),
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(imageData))),
+			Mimetype:      proto.String("image/jpeg"),
+		},
 	}
 	
+	// Send message
 	resp, err := waClient.SendMessage(context.Background(), recipient, message)
 	if err != nil {
 		return fmt.Errorf("failed to send image message: %v", err)

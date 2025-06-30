@@ -46,7 +46,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			d.status as device_status
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
-		LEFT JOIN devices d ON bm.device_id = d.id
+		LEFT JOIN user_devices d ON bm.device_id = d.id
 		WHERE bm.status = 'pending'
 		AND bm.scheduled_at <= NOW()
 		ORDER BY bm.campaign_id NULLS LAST, bm.sequence_id NULLS LAST, bm.created_at
