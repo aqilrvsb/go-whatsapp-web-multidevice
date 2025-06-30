@@ -194,7 +194,10 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 			p.broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
 		} else {
 			// Mark as queued - the broadcast manager will handle updating to sent/failed
-			p.broadcastRepo.UpdateMessageStatus(msg.ID, "queued", "")
+			err := p.broadcastRepo.UpdateMessageStatus(msg.ID, "queued", "")
+			if err != nil {
+				logrus.Errorf("Failed to update message %s to queued status: %v", msg.ID, err)
+			}
 		}
 	}
 }

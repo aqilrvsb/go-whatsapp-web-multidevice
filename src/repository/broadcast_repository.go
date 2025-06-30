@@ -7,6 +7,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type BroadcastRepository struct {
@@ -156,12 +157,24 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
 		UPDATE broadcast_messages 
-		SET status = $1, error_message = $2, sent_at = CASE WHEN $1 = 'sent' THEN $3 ELSE sent_at END
+		SET status = $1, error_message = $2, sent_at = CASE WHEN $1 = 'sent' THEN $3 ELSE sent_at END, updated_at = $3
 		WHERE id = $4
 	`
 	
-	_, err := r.db.Exec(query, status, errorMsg, time.Now(), messageID)
-	return err
+	result, err := r.db.Exec(query, status, errorMsg, time.Now(), messageID)
+	if err != nil {
+		logrus.Errorf("Failed to update message status: %v", err)
+		return err
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		logrus.Warnf("No rows updated for message ID: %s", messageID)
+	} else {
+		logrus.Debugf("Updated message %s status to %s", messageID, status)
+	}
+	
+	return nil
 }
 
 // GetBroadcastStats gets broadcast statistics
