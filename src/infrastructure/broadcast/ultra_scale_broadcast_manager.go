@@ -39,7 +39,8 @@ type BroadcastWorker struct {
 	deviceID      string
 	broadcastID   string
 	broadcastType string
-	whatsappClient interface{} // WhatsApp client
+	messageSender *WhatsAppMessageSender // Real WhatsApp sender
+	pool          *BroadcastWorkerPool   // Reference to parent pool
 	
 	// Message processing
 	messageQueue  chan *domainBroadcast.BroadcastMessage
@@ -214,6 +215,8 @@ func (bwp *BroadcastWorkerPool) getOrCreateWorker(deviceID string) *BroadcastWor
 		deviceID:      deviceID,
 		broadcastID:   bwp.broadcastID,
 		broadcastType: bwp.broadcastType,
+		messageSender: NewWhatsAppMessageSender(), // Use real sender
+		pool:          bwp, // Reference to parent pool
 		messageQueue:  make(chan *domainBroadcast.BroadcastMessage, 1000), // Large buffer
 		status:        "idle",
 		ctx:           ctx,
@@ -221,13 +224,6 @@ func (bwp *BroadcastWorkerPool) getOrCreateWorker(deviceID string) *BroadcastWor
 		lastActivity:  time.Now(),
 	}
 	
-	// Get WhatsApp client
-	// TODO: Get actual WhatsApp client from device manager
-	// For now, just create the worker without client
-	// device, _ := whatsapp.GetDeviceByID(deviceID)
-	// if device != nil {
-	//     worker.whatsappClient = device.Client
-	// }
 	
 	bwp.workers[deviceID] = worker
 	
@@ -260,18 +256,35 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 	bw.lastActivity = time.Now()
 	bw.mu.Unlock()
 	
+	// Log which broadcast this message belongs to
+	broadcastInfo := fmt.Sprintf("Campaign %d", *msg.CampaignID)
+	if msg.SequenceID != nil {
+		broadcastInfo = fmt.Sprintf("Sequence %s", *msg.SequenceID)
+	}
+	
+	logrus.Debugf("Worker %s processing message %s for %s to %s", 
+		bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
+	
 	// Send via WhatsApp
 	err := bw.sendWhatsAppMessage(msg)
 	
 	db := database.GetDB()
 	if err != nil {
 		atomic.AddInt64(&bw.failedCount, 1)
+		// Also increment pool's failed count
+		if bw.pool != nil {
+			atomic.AddInt64(&bw.pool.failedCount, 1)
+		}
 		// Update status to failed
 		db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = $1, updated_at = NOW() WHERE id = $2`, 
 			err.Error(), msg.ID)
 		logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
 	} else {
 		atomic.AddInt64(&bw.processedCount, 1)
+		// Also increment pool's processed count
+		if bw.pool != nil {
+			atomic.AddInt64(&bw.pool.processedCount, 1)
+		}
 		// Update status to sent
 		db.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW() WHERE id = $1`, msg.ID)
 		
@@ -289,13 +302,12 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 
 // sendWhatsAppMessage sends message via WhatsApp
 func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMessage) error {
-	if bw.whatsappClient == nil {
-		return fmt.Errorf("no WhatsApp client for device %s", bw.deviceID)
+	if bw.messageSender == nil {
+		return fmt.Errorf("no message sender for device %s", bw.deviceID)
 	}
 	
-	// Implementation depends on your WhatsApp client
-	// This is a placeholder
-	return nil
+	// Use the real WhatsApp sender
+	return bw.messageSender.SendMessage(bw.deviceID, msg)
 }
 
 // monitor checks pool health and completion
@@ -320,6 +332,13 @@ func (bwp *BroadcastWorkerPool) checkCompletion() {
 	failed := atomic.LoadInt64(&bwp.failedCount)
 	total := atomic.LoadInt64(&bwp.totalMessages)
 	
+	// Log progress every check
+	if total > 0 {
+		progress := ((processed + failed) * 100) / total
+		logrus.Debugf("Broadcast %s:%s progress: %d%% (%d/%d processed, %d failed)",
+			bwp.broadcastType, bwp.broadcastID, progress, processed+failed, total, failed)
+	}
+	
 	if processed+failed >= total && total > 0 {
 		// All messages processed
 		bwp.mu.Lock()
@@ -333,9 +352,28 @@ func (bwp *BroadcastWorkerPool) checkCompletion() {
 			
 			// Update campaign/sequence status
 			db := database.GetDB()
-			if bwp.broadcastType == "campaign" {
-				db.Exec(`UPDATE campaigns SET status = 'finished' WHERE id = $1`, bwp.broadcastID)
+			status := "finished"
+			if failed == total {
+				status = "failed"
 			}
+			
+			if bwp.broadcastType == "campaign" {
+				_, err := db.Exec(`UPDATE campaigns SET status = $1, last_processed_at = NOW() WHERE id = $2`, 
+					status, bwp.broadcastID)
+				if err != nil {
+					logrus.Errorf("Failed to update campaign status: %v", err)
+				}
+			} else if bwp.broadcastType == "sequence" {
+				// For sequences, we might not want to change the status
+				// as sequences can have multiple steps
+				logrus.Infof("Sequence %s broadcast completed", bwp.broadcastID)
+			}
+			
+			// Schedule pool cleanup after 5 minutes
+			go func() {
+				time.Sleep(5 * time.Minute)
+				bwp.cleanup()
+			}()
 		}
 		bwp.mu.Unlock()
 	}
@@ -370,6 +408,22 @@ func (ubm *UltraScaleBroadcastManager) GetPoolStatus(broadcastType, broadcastID 
 		"start_time":    pool.startTime,
 		"duration":      time.Since(pool.startTime).Seconds(),
 	}
+}
+
+// cleanup removes the pool after completion
+func (bwp *BroadcastWorkerPool) cleanup() {
+	bwp.mu.Lock()
+	defer bwp.mu.Unlock()
+	
+	// Cancel all workers
+	for _, worker := range bwp.workers {
+		worker.cancel()
+	}
+	
+	// Cancel pool context
+	bwp.cancel()
+	
+	logrus.Infof("Cleaned up broadcast pool %s:%s", bwp.broadcastType, bwp.broadcastID)
 }
 
 // calculateRandomDelay calculates random delay between min and max
