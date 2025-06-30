@@ -2946,15 +2946,15 @@
                         // Show all campaigns, not just first 3
                         campaignHTML += `
                             <div class="campaign-detail" style="font-size: 10px; margin: 2px 0; padding: 3px 5px; background: ${detailBg}; border-radius: 4px; border: 1px solid ${detailBorder}; position: relative;">
+                                <div style="position: absolute; right: 3px; top: 3px; display: flex; gap: 4px; z-index: 10;">
+                                    <i class="bi bi-files" onclick="cloneCampaign('${campaign.id}', event)" style="color: #0066cc; cursor: pointer; font-size: 12px;" title="Clone campaign"></i>
+                                    <i class="bi bi-x-circle-fill" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer; font-size: 12px;" title="Delete campaign"></i>
+                                </div>
                                 <div style="display: flex; align-items: center; gap: 3px; padding-right: 40px;">
                                     <span class="badge ${statusBg}" style="width: 8px; height: 8px; padding: 0; border-radius: 50%;" title="${campaign.status}"></span>
                                     <span onclick="editCampaign('${campaign.id}', '${dateStr}', event)" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #0066cc; text-decoration: none;" title="Click to edit: ${campaign.title}" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
                                         ${campaign.title}
                                     </span>
-                                    <div style="position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px;">
-                                        <i class="bi bi-files" onclick="cloneCampaign('${campaign.id}', event)" style="color: #0066cc; cursor: pointer; font-size: 12px;" title="Clone campaign"></i>
-                                        <i class="bi bi-x-circle-fill" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer; font-size: 12px;" title="Delete campaign"></i>
-                                    </div>
                                 </div>
                                 <div style="color: #666; font-size: 8px; margin-top: 1px;">
                                     <i class="bi bi-tag-fill" style="font-size: 8px;"></i> ${campaign.niche || 'General'} 
