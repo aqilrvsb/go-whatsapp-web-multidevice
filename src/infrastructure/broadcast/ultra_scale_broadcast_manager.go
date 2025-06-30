@@ -20,6 +20,7 @@ type BroadcastWorkerPool struct {
 	broadcastType string // "campaign" or "sequence"
 	workers       map[string]*BroadcastWorker // key: deviceID
 	maxWorkers    int
+	config        *config.BroadcastConfig
 	mu            sync.RWMutex
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -60,6 +61,7 @@ type UltraScaleBroadcastManager struct {
 	pools         map[string]*BroadcastWorkerPool // key: broadcastType:broadcastID
 	redisClient   *redis.Client
 	mu            sync.RWMutex
+	config        *config.BroadcastConfig
 	
 	// Global limits
 	maxPoolsPerUser      int
@@ -81,11 +83,15 @@ func GetUltraScaleBroadcastManager() *UltraScaleBroadcastManager {
 			DB:       0,
 		})
 		
+		// Get broadcast configuration
+		broadcastConfig := config.GetBroadcastConfig()
+		
 		ultraBroadcastManager = &UltraScaleBroadcastManager{
 			pools:               make(map[string]*BroadcastWorkerPool),
 			redisClient:        redisClient,
-			maxPoolsPerUser:    10,    // 10 simultaneous broadcasts per user
-			maxWorkersPerPool:  3000,  // Support 3000 devices
+			config:             broadcastConfig,
+			maxPoolsPerUser:    broadcastConfig.MaxPoolsPerUser,
+			maxWorkersPerPool:  broadcastConfig.MaxWorkersPerPool,
 			maxDevicesPerWorker: 1,    // 1:1 device to worker for maximum throughput
 		}
 		
@@ -114,6 +120,7 @@ func (ubm *UltraScaleBroadcastManager) StartBroadcastPool(broadcastType string, 
 		broadcastType: broadcastType,
 		workers:       make(map[string]*BroadcastWorker),
 		maxWorkers:    ubm.maxWorkersPerPool,
+		config:        ubm.config,
 		ctx:           ctx,
 		cancel:        cancel,
 		redisClient:   ubm.redisClient,
@@ -288,6 +295,14 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		// Update status to sent
 		db.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW() WHERE id = $1`, msg.ID)
 		
+		// Update sequence progress if this is a sequence message
+		if msg.SequenceID != nil {
+			db.Exec(`UPDATE sequence_contacts SET last_message_at = NOW() WHERE sequence_id = $1 AND contact_phone = $2`,
+				*msg.SequenceID, msg.RecipientPhone)
+			// Call the progress update function
+			db.Exec(`SELECT update_sequence_progress($1)`, *msg.SequenceID)
+		}
+		
 		// Apply delay if configured
 		if msg.MinDelay > 0 && msg.MaxDelay > 0 {
 			delay := calculateRandomDelay(msg.MinDelay, msg.MaxDelay)
@@ -312,7 +327,13 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 
 // monitor checks pool health and completion
 func (bwp *BroadcastWorkerPool) monitor() {
-	ticker := time.NewTicker(10 * time.Second)
+	// Use configurable interval for completion checks
+	checkInterval := 10 * time.Second
+	if bwp.config != nil {
+		checkInterval = bwp.config.CompletionCheckInterval
+	}
+	
+	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 	
 	for {
@@ -369,9 +390,16 @@ func (bwp *BroadcastWorkerPool) checkCompletion() {
 				logrus.Infof("Sequence %s broadcast completed", bwp.broadcastID)
 			}
 			
-			// Schedule pool cleanup after 5 minutes
+			// Schedule pool cleanup after configured duration
+			cleanupDuration := 5 * time.Minute // default
+			if bwp.config != nil {
+				cleanupDuration = bwp.config.PoolCleanupDuration
+			}
+			logrus.Infof("Scheduling pool cleanup for %s:%s after %v", 
+				bwp.broadcastType, bwp.broadcastID, cleanupDuration)
+			
 			go func() {
-				time.Sleep(5 * time.Minute)
+				time.Sleep(cleanupDuration)
 				bwp.cleanup()
 			}()
 		}

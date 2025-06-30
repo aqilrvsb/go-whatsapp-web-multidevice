@@ -20,6 +20,14 @@ type Sequence struct {
 	MinDelaySeconds int            `json:"min_delay_seconds" db:"min_delay_seconds"`
 	MaxDelaySeconds int            `json:"max_delay_seconds" db:"max_delay_seconds"`
 	ContactsCount   int            `json:"contacts_count" db:"contacts_count"`
+	// Progress tracking fields
+	TotalContacts      int            `json:"total_contacts" db:"total_contacts"`
+	ActiveContacts     int            `json:"active_contacts" db:"active_contacts"`
+	CompletedContacts  int            `json:"completed_contacts" db:"completed_contacts"`
+	FailedContacts     int            `json:"failed_contacts" db:"failed_contacts"`
+	ProgressPercentage float64        `json:"progress_percentage" db:"progress_percentage"`
+	LastActivityAt     *time.Time     `json:"last_activity_at" db:"last_activity_at"`
+	EstimatedCompletionAt *time.Time  `json:"estimated_completion_at" db:"estimated_completion_at"`
 	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at" db:"updated_at"`
 	Steps           []SequenceStep `json:"steps,omitempty"`

@@ -132,6 +132,28 @@ func GetMigrations() []Migration {
 				END $$;
 			`,
 		},
+		{
+			Name: "Add sequence progress tracking",
+			SQL: `
+-- Add progress tracking fields to sequences table
+ALTER TABLE sequences 
+ADD COLUMN IF NOT EXISTS total_contacts INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS active_contacts INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS completed_contacts INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS failed_contacts INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS progress_percentage DECIMAL(5,2) DEFAULT 0.00,
+ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP,
+ADD COLUMN IF NOT EXISTS estimated_completion_at TIMESTAMP;
+
+-- Add index for better performance
+CREATE INDEX IF NOT EXISTS idx_sequences_progress ON sequences(progress_percentage);
+CREATE INDEX IF NOT EXISTS idx_sequences_last_activity ON sequences(last_activity_at);
+
+-- Add status column to sequence_contacts if missing
+ALTER TABLE sequence_contacts 
+ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+`,
+		},
 	}
 	
 	// Filter out completed migrations
