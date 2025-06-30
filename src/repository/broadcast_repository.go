@@ -156,16 +156,17 @@ func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg st
 		UPDATE broadcast_messages 
 		SET status = $1, 
 		    error_message = $2, 
-		    sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END,
+		    sent_at = CASE WHEN $3 = 'sent' THEN NOW() ELSE sent_at END,
 		    updated_at = NOW()
-		WHERE id = $3
+		WHERE id = $4
 	`
 	
-	result, err := r.db.Exec(query, status, errorMsg, messageID)
+	result, err := r.db.Exec(query, status, errorMsg, status, messageID)
 	if err != nil {
 		logrus.Errorf("Failed to update message status: %v", err)
 		return err
-	}	
+	}
+	
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		logrus.Warnf("No rows updated for message ID: %s", messageID)
