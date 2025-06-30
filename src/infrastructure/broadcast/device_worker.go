@@ -148,8 +148,7 @@ func (dw *DeviceWorker) processMessages() {
 					if msg.CampaignID != nil {
 						_, updateErr = db.Exec(`
 							UPDATE campaigns 
-							SET last_processed_at = NOW(),
-							    first_processed_at = COALESCE(first_processed_at, NOW())
+							SET updated_at = NOW()
 							WHERE id = $1
 						`, *msg.CampaignID)
 						if updateErr != nil {

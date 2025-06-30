@@ -110,7 +110,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			
 			// Update campaign status to processing
 			db.Exec(`UPDATE campaigns SET status = 'processing', 
-					 first_processed_at = COALESCE(first_processed_at, NOW()) 
+					 updated_at = NOW() 
 					 WHERE id = $1`, *campaignID)
 		}
 		

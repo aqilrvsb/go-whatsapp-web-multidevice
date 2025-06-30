@@ -379,7 +379,7 @@ func (bwp *BroadcastWorkerPool) checkCompletion() {
 			}
 			
 			if bwp.broadcastType == "campaign" {
-				_, err := db.Exec(`UPDATE campaigns SET status = $1, last_processed_at = NOW() WHERE id = $2`, 
+				_, err := db.Exec(`UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2`, 
 					status, bwp.broadcastID)
 				if err != nil {
 					logrus.Errorf("Failed to update campaign status: %v", err)

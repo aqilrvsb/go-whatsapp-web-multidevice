@@ -1774,6 +1774,9 @@
                                         <li><a class="dropdown-item" href="#" onclick="viewDeviceStats('${device.id}')">
                                             <i class="bi bi-graph-up me-2"></i>View Analytics
                                         </a></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="logoutDevice('${device.id}')">
+                                            <i class="bi bi-box-arrow-right me-2"></i>Logout
+                                        </a></li>
                                         
                                     ` : ''}
                                     <li><hr class="dropdown-divider"></li>
@@ -2367,13 +2370,67 @@
         // Edit Device
         function editDevice(deviceId) {
             const device = devices.find(d => d.id === deviceId);
-            if (device) {
-                const newName = prompt('Enter new device name:', device.name);
-                if (newName && newName !== device.name) {
-                    device.name = newName;
-                    renderDevices();
+            if (!device) return;
+            
+            Swal.fire({
+                title: 'Edit Device',
+                html: `
+                    <div class="text-start">
+                        <div class="mb-3">
+                            <label for="editDeviceName" class="form-label">Device Name</label>
+                            <input type="text" class="form-control" id="editDeviceName" value="${device.name || ''}" placeholder="Enter device name">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDevicePhone" class="form-label">Phone Number</label>
+                            <input type="text" class="form-control" id="editDevicePhone" value="${device.phone || ''}" placeholder="Enter phone number">
+                            <small class="text-muted">Note: Changing phone number won't reconnect WhatsApp. Use logout and scan QR again.</small>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Save Changes',
+                cancelButtonText: 'Cancel',
+                preConfirm: () => {
+                    const name = document.getElementById('editDeviceName').value.trim();
+                    const phone = document.getElementById('editDevicePhone').value.trim();
+                    
+                    if (!name) {
+                        Swal.showValidationMessage('Device name is required');
+                        return false;
+                    }
+                    
+                    return { name, phone };
                 }
-            }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { name, phone } = result.value;
+                    
+                    // Update device info via API
+                    fetch(`/api/devices/${deviceId}`, {
+                        method: 'PUT',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, phone })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            // Update local device data
+                            device.name = name;
+                            device.phone = phone;
+                            renderDevices();
+                            
+                            showAlert('success', 'Device updated successfully');
+                        } else {
+                            showAlert('danger', data.message || 'Failed to update device');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating device:', error);
+                        showAlert('danger', 'Error updating device');
+                    });
+                }
+            });
         }
 
         // Logout
@@ -2500,8 +2557,21 @@
                                     clearInterval(timerInterval);
                                 }
                             }).then((result) => {
-                                // Whether user clicked confirm or timer expired, reload the page
-                                location.reload();
+                                // Update device list without reloading
+                                const device = devices.find(d => d.id === deviceId || d.id === currentScanningDeviceId);
+                                if (device) {
+                                    device.status = 'online';
+                                    device.phone = phone;
+                                    device.jid = jid;
+                                    device.lastSeen = new Date().toISOString();
+                                    renderDevices();
+                                }
+                                
+                                // Load devices to get fresh data
+                                loadDevices();
+                                
+                                // Show success message
+                                showAlert('success', 'Device connected successfully! You can now use WhatsApp.');
                             });
                             
                             break;
@@ -3355,6 +3425,14 @@
                             <label class="form-label">Schedule Time</label>
                             <input type="time" class="form-control" id="clone-time" value="${campaignToClone.time_schedule || ''}">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Target Audience</label>
+                            <select class="form-select" id="clone-target-status">
+                                <option value="all" ${campaignToClone.target_status === 'all' ? 'selected' : ''}>All Leads</option>
+                                <option value="prospect" ${campaignToClone.target_status === 'prospect' ? 'selected' : ''}>Prospects Only</option>
+                                <option value="customer" ${campaignToClone.target_status === 'customer' ? 'selected' : ''}>Customers Only</option>
+                            </select>
+                        </div>
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle me-2"></i>
                             The cloned campaign will be created with status: <strong>Pending</strong>
@@ -3381,7 +3459,7 @@
                         time_schedule: document.getElementById('clone-time').value || '',
                         message: campaignToClone.message,
                         niche: campaignToClone.niche,
-                        target_status: campaignToClone.target_status,
+                        target_status: document.getElementById('clone-target-status').value,
                         image_url: campaignToClone.image_url,
                         min_delay_seconds: campaignToClone.min_delay_seconds || 10,
                         max_delay_seconds: campaignToClone.max_delay_seconds || 30
@@ -3705,35 +3783,63 @@
         function displayCampaignSummary(summary) {
             const html = `
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <!-- Total Campaigns -->
+                    <div class="col-md-2">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-primary">${summary.campaigns.total}</h3>
-                                <p class="text-muted mb-0">Total Campaigns</p>
+                                <h3 class="text-primary">${summary.campaigns.total || 0}</h3>
+                                <p class="text-muted mb-0">Total</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    
+                    <!-- Status Flow Cards -->
+                    <div class="col-md-2">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-warning">${summary.campaigns.pending}</h3>
+                                <h3 class="text-warning">${summary.campaigns.pending || 0}</h3>
                                 <p class="text-muted mb-0">Pending</p>
+                                <small class="text-muted">Waiting</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    
+                    <div class="col-md-2">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-success">${summary.campaigns.sent}</h3>
-                                <p class="text-muted mb-0">Sent</p>
+                                <h3 class="text-info">${summary.campaigns.triggered || 0}</h3>
+                                <p class="text-muted mb-0">Triggered</p>
+                                <small class="text-muted">Creating</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    
+                    <div class="col-md-2">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-danger">${summary.campaigns.failed}</h3>
+                                <h3 class="text-primary">${summary.campaigns.processing || 0}</h3>
+                                <p class="text-muted mb-0">Processing</p>
+                                <small class="text-muted">Sending</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.campaigns.finished || summary.campaigns.sent || 0}</h3>
+                                <p class="text-muted mb-0">Finished</p>
+                                <small class="text-muted">Done</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-danger">${summary.campaigns.failed || 0}</h3>
                                 <p class="text-muted mb-0">Failed</p>
+                                <small class="text-muted">Error</small>
                             </div>
                         </div>
                     </div>
