@@ -527,13 +527,13 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="sequences-tab" data-bs-toggle="tab" data-bs-target="#sequences" type="button">
-                    <i class="bi bi-collection"></i> Sequences
+                <button class="nav-link" id="campaign-summary-tab" data-bs-toggle="tab" data-bs-target="#campaign-summary" type="button">
+                    <i class="bi bi-graph-up"></i> Campaign Summary
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="campaign-summary-tab" data-bs-toggle="tab" data-bs-target="#campaign-summary" type="button">
-                    <i class="bi bi-graph-up"></i> Campaign Summary
+                <button class="nav-link" id="sequences-tab" data-bs-toggle="tab" data-bs-target="#sequences" type="button">
+                    <i class="bi bi-collection"></i> Sequences
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -747,9 +747,6 @@
                         <h4 class="mb-1">Campaign Calendar</h4>
                         <p class="text-muted mb-0">Plan and schedule your WhatsApp broadcast campaigns</p>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="loadCampaigns()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh Campaigns
-                    </button>
                 </div>
                 
                 <!-- Calendar Container -->
@@ -2920,21 +2917,50 @@
                                 statusBg = 'bg-secondary';
                         }
                         
+                        // Get status-based styling
+                        let detailBg = '#f8f9fa';
+                        let detailBorder = '#dee2e6';
+                        
+                        switch(campaign.status) {
+                            case 'sent':
+                            case 'completed':
+                            case 'success':
+                                detailBg = '#e8f5e9';
+                                detailBorder = '#4caf50';
+                                break;
+                            case 'failed':
+                            case 'error':
+                                detailBg = '#ffebee';
+                                detailBorder = '#f44336';
+                                break;
+                            case 'processing':
+                            case 'ongoing':
+                                detailBg = '#fff3e0';
+                                detailBorder = '#ff9800';
+                                break;
+                            default: // pending, scheduled
+                                detailBg = '#f5f5f5';
+                                detailBorder = '#9e9e9e';
+                        }
+                        
                         // Show all campaigns, not just first 3
                         campaignHTML += `
-                            <div class="campaign-detail" style="font-size: 10px; margin: 2px 0; padding: 3px 5px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                                <div style="display: flex; align-items: center; gap: 3px;">
+                            <div class="campaign-detail" style="font-size: 10px; margin: 2px 0; padding: 3px 5px; background: ${detailBg}; border-radius: 4px; border: 1px solid ${detailBorder}; position: relative;">
+                                <div style="display: flex; align-items: center; gap: 3px; padding-right: 40px;">
                                     <span class="badge ${statusBg}" style="width: 8px; height: 8px; padding: 0; border-radius: 50%;" title="${campaign.status}"></span>
                                     <span onclick="editCampaign('${campaign.id}', '${dateStr}', event)" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #0066cc; text-decoration: none;" title="Click to edit: ${campaign.title}" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
                                         ${campaign.title}
                                     </span>
-                                    <i class="bi bi-x-circle-fill" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer; font-size: 12px;" title="Delete campaign"></i>
+                                    <div style="position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px;">
+                                        <i class="bi bi-files" onclick="cloneCampaign('${campaign.id}', event)" style="color: #0066cc; cursor: pointer; font-size: 12px;" title="Clone campaign"></i>
+                                        <i class="bi bi-x-circle-fill" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer; font-size: 12px;" title="Delete campaign"></i>
+                                    </div>
                                 </div>
                                 <div style="color: #666; font-size: 8px; margin-top: 1px;">
                                     <i class="bi bi-tag-fill" style="font-size: 8px;"></i> ${campaign.niche || 'General'} 
-                                    ${campaign.target_status ? `<i class="bi bi-people-fill" style="font-size: 8px;" title="Target: ${campaign.target_status}"></i> ${campaign.target_status}` : ''}
-                                    ${campaign.time_schedule ? `<i class="bi bi-clock" style="font-size: 8px;"></i> ${campaign.time_schedule.slice(0,5)}` : ''}
-                                    ${campaign.image_url ? '<i class="bi bi-image" title="Has image" style="font-size: 8px;"></i>' : ''}
+                                    ${campaign.target_status ? `<i class="bi bi-people-fill" style="font-size: 8px; margin-left: 4px;" title="Target: ${campaign.target_status}"></i> ${campaign.target_status}` : ''}
+                                    ${campaign.time_schedule ? `<i class="bi bi-clock" style="font-size: 8px; margin-left: 4px;"></i> ${campaign.time_schedule.slice(0,5)}` : ''}
+                                    ${campaign.image_url ? '<i class="bi bi-image" title="Has image" style="font-size: 8px; margin-left: 4px;"></i>' : ''}
                                 </div>
                             </div>
                         `;
@@ -3266,7 +3292,20 @@
                 hideLoading();
                 if (data.code === 'SUCCESS') {
                     showAlert('success', 'Campaign deleted successfully');
-                    loadCampaigns(); // Reload campaigns
+                    
+                    // Remove from local campaigns object immediately
+                    for (let date in campaigns) {
+                        campaigns[date] = campaigns[date].filter(c => c.id !== campaignId);
+                        if (campaigns[date].length === 0) {
+                            delete campaigns[date];
+                        }
+                    }
+                    
+                    // Render calendar immediately
+                    renderCalendar();
+                    
+                    // Then reload from server
+                    loadCampaigns();
                 } else {
                     showAlert('danger', data.message || 'Failed to delete campaign');
                 }
@@ -3275,6 +3314,103 @@
                 hideLoading();
                 console.error('Error deleting campaign:', error);
                 showAlert('danger', 'Error deleting campaign');
+            });
+        }
+        
+        // Clone campaign function
+        function cloneCampaign(campaignId, event) {
+            event.stopPropagation();
+            
+            // Find the campaign to clone
+            let campaignToClone = null;
+            for (let date in campaigns) {
+                const found = campaigns[date].find(c => c.id == campaignId);
+                if (found) {
+                    campaignToClone = found;
+                    break;
+                }
+            }
+            
+            if (!campaignToClone) {
+                showAlert('danger', 'Campaign not found');
+                return;
+            }
+            
+            // Use SweetAlert for clone dialog
+            Swal.fire({
+                title: 'Clone Campaign',
+                html: `
+                    <div class="text-start">
+                        <p class="text-muted mb-3">Creating a copy of: <strong>${campaignToClone.title}</strong></p>
+                        <div class="mb-3">
+                            <label class="form-label">New Campaign Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="clone-title" value="${campaignToClone.title} (Copy)" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Campaign Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="clone-date" value="${new Date().toISOString().split('T')[0]}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Schedule Time</label>
+                            <input type="time" class="form-control" id="clone-time" value="${campaignToClone.time_schedule || ''}">
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            The cloned campaign will be created with status: <strong>Pending</strong>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Clone Campaign',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#25d366',
+                width: '500px',
+                preConfirm: () => {
+                    const title = document.getElementById('clone-title').value;
+                    const date = document.getElementById('clone-date').value;
+                    
+                    if (!title || !date) {
+                        Swal.showValidationMessage('Title and date are required');
+                        return false;
+                    }
+                    
+                    return {
+                        title: title,
+                        campaign_date: date,
+                        time_schedule: document.getElementById('clone-time').value || '',
+                        message: campaignToClone.message,
+                        niche: campaignToClone.niche,
+                        target_status: campaignToClone.target_status,
+                        image_url: campaignToClone.image_url,
+                        min_delay_seconds: campaignToClone.min_delay_seconds || 10,
+                        max_delay_seconds: campaignToClone.max_delay_seconds || 30
+                    };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Create the cloned campaign
+                    fetch('/api/campaigns', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(result.value)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            showAlert('success', 'Campaign cloned successfully!');
+                            loadCampaigns();
+                        } else {
+                            showAlert('danger', data.message || 'Failed to clone campaign');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error cloning campaign:', error);
+                        showAlert('danger', 'Error cloning campaign');
+                    });
+                }
             });
         }
         
