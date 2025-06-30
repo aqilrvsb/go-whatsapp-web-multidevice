@@ -137,10 +137,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	healthMonitor.Start()
 	logrus.Info("Device health monitor started")
 	
-	// Start the optimized broadcast processor - THIS IS CRITICAL!
-	// This processor polls the database for pending messages and creates workers
-	go usecase.StartOptimizedBroadcastProcessor()
-	logrus.Info("Optimized broadcast processor started")
+	// Start the ultra-optimized broadcast processor for 3000+ devices
+	// This processor creates broadcast-specific worker pools
+	go usecase.StartUltraOptimizedBroadcastProcessor()
+	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
 	
 	// Start campaign/sequence trigger processor
 	go usecase.StartTriggerProcessor()
