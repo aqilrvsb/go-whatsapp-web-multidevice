@@ -2822,18 +2822,14 @@
         
         // Device Actions - Testing Page
         function deviceActions(deviceId) {
-            const device = devices.find(d => d.id === deviceId);
-            if (device) {
-                window.location.href = `/device/${deviceId}/actions`;
-            }
+            // Don't need to check if device exists in array, just navigate
+            window.location.href = `/device/${deviceId}/actions`;
         }
         
         // Device Leads - Lead Management
         function deviceLeads(deviceId) {
-            const device = devices.find(d => d.id === deviceId);
-            if (device) {
-                window.location.href = `/device/${deviceId}/leads`;
-            }
+            // Don't need to check if device exists in array, just navigate
+            window.location.href = `/device/${deviceId}/leads`;
         }
         
         // Campaign Calendar Functions
