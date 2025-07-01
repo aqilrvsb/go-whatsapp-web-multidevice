@@ -1364,6 +1364,7 @@
                                             <th>Success</th>
                                             <th>Failed</th>
                                             <th>Success Rate</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="deviceReportTableBody">
@@ -1959,8 +1960,13 @@
 
         // Load Devices
         function loadDevices(silent = false) {
-            // Fetch real devices from API
-            fetch('/api/devices', { credentials: 'include' })
+            // First check real-time connection status
+            fetch('/api/devices/check-connection', { credentials: 'include' })
+                .then(response => response.json())
+                .then(statusData => {
+                    // Connection status checked, now load devices
+                    return fetch('/api/devices', { credentials: 'include' });
+                })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Failed to fetch devices');
@@ -4835,12 +4841,12 @@
                         currentDeviceReport = data.results; // Store the report globally
                         displayDeviceReport(data.results);
                     } else {
-                        document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load device report</td></tr>';
+                        document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load device report</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading device report:', error);
-                    document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading device report</td></tr>';
+                    document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading device report</td></tr>';
                 });
             
             // Show modal
@@ -4901,11 +4907,6 @@
                                 <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaignId}'); return false;" class="text-danger">
                                     ${device.failedLeads || 0}
                                 </a>
-                                ${device.failedLeads > 0 ? `
-                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="retryFailedMessages('${device.id}', '${campaignId}'); return false;" title="Retry Failed Messages">
-                                        <i class="bi bi-arrow-repeat"></i>
-                                    </button>
-                                ` : ''}
                             </td>
                             <td>
                                 <div class="progress" style="height: 20px;">
@@ -4914,12 +4915,24 @@
                                     </div>
                                 </div>
                             </td>
+                            <td>
+                                ${device.failedLeads > 0 ? `
+                                    <button class="btn btn-sm btn-outline-danger" onclick="retryFailedMessages('${device.id}', '${campaignId}'); return false;" title="Retry Failed Messages">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                ` : ''}
+                                ${(currentCampaignForReport && currentCampaignForReport.ai === 'ai' && device.successLeads > 0 && (device.status === 'online' || device.status === 'connected')) ? `
+                                    <button class="btn btn-sm btn-outline-success ms-1" onclick="transferAILeadsToDevice('${device.id}', '${campaignId}'); return false;" title="Transfer successful AI leads to device">
+                                        <i class="bi bi-arrow-right-square"></i>
+                                    </button>
+                                ` : ''}
+                            </td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No device data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No device data available</td></tr>';
             }
         }
         
@@ -5095,6 +5108,68 @@
             ];
             
             return status === 'all' ? mockLeads : mockLeads.filter(l => l.status === status);
+        }
+        
+        // Transfer AI Leads to Device
+        function transferAILeadsToDevice(deviceId, campaignId) {
+            if (!currentCampaignForReport || currentCampaignForReport.ai !== 'ai') {
+                showToast('This is not an AI campaign', 'error');
+                return;
+            }
+            
+            // Find device info
+            const device = currentDeviceReport.devices.find(d => d.id === deviceId);
+            if (!device) {
+                showToast('Device not found', 'error');
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Transfer AI Leads?',
+                html: `
+                    <p>This will copy <strong>${device.successLeads}</strong> successful AI leads to device <strong>${device.name}</strong>.</p>
+                    <p class="text-info mt-2">The leads will:</p>
+                    <ul class="text-start">
+                        <li>Be added to the device's regular leads table</li>
+                        <li>Remain in the AI leads table as well</li>
+                        <li>Be available for personal campaigns on this device</li>
+                    </ul>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Transfer',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showToast('Transferring AI leads...', 'info');
+                    
+                    // Call API to transfer leads
+                    fetch(`/api/campaigns-ai/${campaignId}/device/${deviceId}/transfer-leads`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Transfer Complete!',
+                                html: `Successfully transferred ${data.results.transferred} leads to device ${device.name}`,
+                                confirmButtonText: 'OK'
+                            });
+                        } else {
+                            showToast(data.message || 'Failed to transfer leads', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error transferring leads:', error);
+                        showToast('Error transferring leads', 'error');
+                    });
+                }
+            });
         }
         
         // Auto-refresh for worker status

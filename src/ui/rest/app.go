@@ -76,6 +76,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/devices/:deviceId/reset", rest.ResetDevice)
 	app.Post("/api/devices/:deviceId/clear-session", rest.ClearDeviceSession)
 	app.Post("/api/devices/clear-all-sessions", rest.ClearAllSessions)
+	app.Get("/api/devices/check-connection", rest.CheckDeviceConnectionStatus)
 	app.Get("/app/logout", rest.LogoutDevice)
 	app.Get("/app/reconnect", rest.ReconnectDevice)
 	app.Get("/app/devices", rest.GetDevices)
@@ -110,6 +111,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	
 	// AI Campaign Trigger Route
 	app.Post("/api/campaigns-ai/:id/trigger", rest.TriggerAICampaign)
+	app.Post("/api/campaigns-ai/:campaignId/device/:deviceId/transfer-leads", rest.TransferAILeadsToDevice)
 	
 	// Sequence summary endpoint
 	app.Get("/api/sequences/summary", rest.GetSequenceSummary)
