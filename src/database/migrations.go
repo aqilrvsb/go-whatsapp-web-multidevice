@@ -48,52 +48,49 @@ func GetMigrations() []Migration {
 			Name: "Add scheduled_at for timezone support",
 			SQL: `
 				-- Add TIMESTAMPTZ column for proper timezone support
-				ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+				ALTER TABLE broadcast_messages 
+				ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
 				
-				-- Migrate existing data to TIMESTAMPTZ (assuming Malaysia timezone)
-				UPDATE campaigns 
-				SET scheduled_at = 
-					CASE 
-						WHEN time_schedule IS NULL OR time_schedule = '' THEN 
-							campaign_date::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur'
-						ELSE 
-							(campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur'
-					END
+				-- Update scheduled_at from created_at for existing records
+				UPDATE broadcast_messages 
+				SET scheduled_at = created_at 
 				WHERE scheduled_at IS NULL;
-				
-				-- Create optimized indexes
-				CREATE INDEX IF NOT EXISTS idx_campaigns_scheduled_at ON campaigns(scheduled_at) WHERE status = 'pending';
-				CREATE INDEX IF NOT EXISTS idx_campaigns_scheduled_at_status ON campaigns(scheduled_at, status);
 			`,
 		},
 		{
 			Name: "Add updated_at to broadcast_messages",
 			SQL: `
-				ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+				ALTER TABLE broadcast_messages 
+				ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+				
+				-- Update existing records
+				UPDATE broadcast_messages 
+				SET updated_at = CURRENT_TIMESTAMP 
+				WHERE updated_at IS NULL;
 			`,
 		},
 		{
 			Name: "Create time validation function",
 			SQL: `
-				CREATE OR REPLACE FUNCTION is_valid_time_schedule(time_str TEXT) 
-				RETURNS BOOLEAN AS $$
-				BEGIN
-					IF time_str IS NULL OR time_str = '' THEN
-						RETURN TRUE;
-					END IF;
-					
-					IF time_str ~ '^\d{2}:\d{2}(:\d{2})?$' THEN
-						BEGIN
-							PERFORM time_str::TIME;
-							RETURN TRUE;
-						EXCEPTION WHEN OTHERS THEN
-							RETURN FALSE;
-						END;
-					END IF;
-					
-					RETURN FALSE;
-				END;
-				$$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION is_valid_time(time_str TEXT) 
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Check basic format HH:MM
+    IF time_str !~ '^[0-2][0-9]:[0-5][0-9]$' THEN
+        RETURN FALSE;
+    END IF;
+    
+    -- Check hour is valid (00-23)
+    IF CAST(SPLIT_PART(time_str, ':', 1) AS INTEGER) > 23 THEN
+        RETURN FALSE;
+    END IF;
+    
+    RETURN TRUE;
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql;
 			`,
 		},
 		{
@@ -152,6 +149,64 @@ CREATE INDEX IF NOT EXISTS idx_sequences_last_activity ON sequences(last_activit
 -- Add status column to sequence_contacts if missing
 ALTER TABLE sequence_contacts 
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+`,
+		},
+		{
+			Name: "Add AI Campaign Feature",
+			SQL: `
+-- AI Campaign Feature Migration
+-- This migration adds support for AI-powered lead management and campaign distribution
+
+-- 1. Create leads_ai table for AI-managed leads
+CREATE TABLE IF NOT EXISTS leads_ai (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    device_id VARCHAR(255), -- Initially NULL, assigned during campaign
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(255),
+    niche VARCHAR(255),
+    source VARCHAR(255) DEFAULT 'ai_manual',
+    status VARCHAR(50) DEFAULT 'pending', -- pending, assigned, sent, failed
+    target_status VARCHAR(50) DEFAULT 'prospect', -- prospect/customer
+    notes TEXT,
+    assigned_at TIMESTAMP, -- When assigned to device
+    sent_at TIMESTAMP, -- When message was sent
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_leads_ai_user_id ON leads_ai(user_id);
+CREATE INDEX IF NOT EXISTS idx_leads_ai_device_id ON leads_ai(device_id);
+CREATE INDEX IF NOT EXISTS idx_leads_ai_status ON leads_ai(status);
+CREATE INDEX IF NOT EXISTS idx_leads_ai_niche ON leads_ai(niche);
+CREATE INDEX IF NOT EXISTS idx_leads_ai_phone ON leads_ai(phone);
+
+-- 2. Add AI columns to campaigns table
+ALTER TABLE campaigns 
+ADD COLUMN IF NOT EXISTS ai VARCHAR(10),
+ADD COLUMN IF NOT EXISTS "limit" INTEGER DEFAULT 0;
+
+-- 3. Create ai_campaign_progress table for tracking device usage
+CREATE TABLE IF NOT EXISTS ai_campaign_progress (
+    id SERIAL PRIMARY KEY,
+    campaign_id INTEGER NOT NULL,
+    device_id VARCHAR(255) NOT NULL,
+    leads_sent INTEGER DEFAULT 0,
+    leads_failed INTEGER DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'active', -- active, limit_reached, failed
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+    UNIQUE(campaign_id, device_id)
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_campaign_id ON ai_campaign_progress(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_device_id ON ai_campaign_progress(device_id);
 `,
 		},
 	}
