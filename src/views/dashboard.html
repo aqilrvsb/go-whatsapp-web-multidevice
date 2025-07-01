@@ -4506,30 +4506,36 @@
         }
         
         // Campaign Device Report Functions
+        let currentCampaignForReport = null;
+        
         function showCampaignDeviceReport(campaign) {
+            // Store campaign for use in other functions
+            currentCampaignForReport = campaign;
+            
             // Populate campaign details
             document.getElementById('reportTitle').textContent = campaign.title || '-';
             document.getElementById('reportNiche').textContent = campaign.niche || '-';
-            document.getElementById('reportTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || '-'}</span>`;
+            document.getElementById('reportTarget').innerHTML = `<span class="badge bg-${campaign.target_status === 'all' ? 'info' : campaign.target_status === 'prospect' ? 'primary' : 'success'}">${campaign.target_status || 'all'}</span>`;
             document.getElementById('reportDate').textContent = campaign.campaign_date ? formatCampaignDate(campaign.campaign_date) : '-';
             document.getElementById('reportTime').textContent = campaign.time_schedule || '-';
             document.getElementById('reportStatus').innerHTML = `<span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span>`;
             
+            // Show loading state
+            document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
+            
             // Fetch device report data
-            fetch(`/api/campaigns/${campaign.id}/device-report`)
+            fetch(`/api/campaigns/${campaign.id}/device-report`, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
                         displayDeviceReport(data.results);
                     } else {
-                        // If API doesn't exist yet, show mock data
-                        displayDeviceReport(generateMockDeviceReport(campaign));
+                        document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load device report</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading device report:', error);
-                    // Show mock data for now
-                    displayDeviceReport(generateMockDeviceReport(campaign));
+                    document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading device report</td></tr>';
                 });
             
             // Show modal
@@ -4551,6 +4557,9 @@
             const tbody = document.getElementById('deviceReportTableBody');
             tbody.innerHTML = '';
             
+            // Get campaign ID from the current campaign
+            const campaignId = currentCampaignForReport ? currentCampaignForReport.id : '';
+            
             if (report.devices && report.devices.length > 0) {
                 report.devices.forEach(device => {
                     const successRate = device.totalLeads > 0 
@@ -4561,31 +4570,31 @@
                         <tr>
                             <td>${device.name || 'Unknown Device'}</td>
                             <td>
-                                <span class="badge bg-${device.status === 'online' ? 'success' : 'danger'}">
-                                    ${device.status === 'online' ? 'Active' : 'Disconnected'}
+                                <span class="badge bg-${device.status === 'online' || device.status === 'connected' ? 'success' : 'danger'}">
+                                    ${device.status === 'online' || device.status === 'connected' ? 'Active' : 'Disconnected'}
                                 </span>
                             </td>
                             <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'all', '${campaign.id}'); return false;">
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'all', '${campaignId}'); return false;">
                                     ${device.totalLeads || 0}
                                 </a>
                             </td>
                             <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'pending', '${campaign.id}'); return false;" class="text-warning">
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'pending', '${campaignId}'); return false;" class="text-warning">
                                     ${device.pendingLeads || 0}
                                 </a>
                             </td>
                             <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'success', '${campaign.id}'); return false;" class="text-success">
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'success', '${campaignId}'); return false;" class="text-success">
                                     ${device.successLeads || 0}
                                 </a>
                             </td>
                             <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaign.id}'); return false;" class="text-danger">
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaignId}'); return false;" class="text-danger">
                                     ${device.failedLeads || 0}
                                 </a>
                                 ${device.failedLeads > 0 ? `
-                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="retryFailedMessages('${device.id}', '${campaign.id}'); return false;" title="Retry Failed Messages">
+                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="retryFailedMessages('${device.id}', '${campaignId}'); return false;" title="Retry Failed Messages">
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 ` : ''}
@@ -4611,21 +4620,22 @@
             let statusText = status.charAt(0).toUpperCase() + status.slice(1);
             document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads`;
             
+            // Show loading state
+            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
+            
             // Fetch lead details
-            fetch(`/api/campaigns/${campaignId}/device/${deviceId}/leads?status=${status}`)
+            fetch(`/api/campaigns/${campaignId}/device/${deviceId}/leads?status=${status}`, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
                         displayLeadDetails(data.results);
                     } else {
-                        // Show mock data for now
-                        displayLeadDetails(generateMockLeadDetails(status));
+                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading lead details:', error);
-                    // Show mock data for now
-                    displayLeadDetails(generateMockLeadDetails(status));
+                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading leads</td></tr>';
                 });
             
             // Show modal
@@ -4663,30 +4673,7 @@
             showAlert('info', 'Export feature coming soon!');
         }
         
-        // Mock data generators (temporary until API is implemented)
-        function generateMockDeviceReport(campaign) {
-            const devices = [
-                { id: '1', name: 'Device 1', status: 'online', totalLeads: 150, pendingLeads: 20, successLeads: 120, failedLeads: 10 },
-                { id: '2', name: 'Device 2', status: 'online', totalLeads: 200, pendingLeads: 30, successLeads: 160, failedLeads: 10 },
-                { id: '3', name: 'Device 3', status: 'offline', totalLeads: 100, pendingLeads: 100, successLeads: 0, failedLeads: 0 }
-            ];
-            
-            const totalLeads = devices.reduce((sum, d) => sum + d.totalLeads, 0);
-            const pendingLeads = devices.reduce((sum, d) => sum + d.pendingLeads, 0);
-            const successLeads = devices.reduce((sum, d) => sum + d.successLeads, 0);
-            const failedLeads = devices.reduce((sum, d) => sum + d.failedLeads, 0);
-            
-            return {
-                totalDevices: devices.length,
-                activeDevices: devices.filter(d => d.status === 'online').length,
-                disconnectedDevices: devices.filter(d => d.status === 'offline').length,
-                totalLeads,
-                pendingLeads,
-                successLeads,
-                failedLeads,
-                devices
-            };
-        }
+        // Note: Mock data generators removed - using real API data now
         
         function retryFailedMessages(deviceId, campaignId) {
             if (!confirm('Are you sure you want to retry all failed messages for this device?')) {
