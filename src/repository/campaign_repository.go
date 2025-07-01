@@ -62,8 +62,8 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	query := `
 		INSERT INTO campaigns 
 		(user_id, campaign_date, title, niche, target_status, message, image_url, 
-		 time_schedule, min_delay_seconds, max_delay_seconds, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, "limit", created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING id
 	`
 	
@@ -76,7 +76,7 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	err := r.db.QueryRow(query, campaign.UserID, campaign.CampaignDate,
 		campaign.Title, campaign.Niche, targetStatus, campaign.Message, campaign.ImageURL,
 		campaign.TimeSchedule, campaign.MinDelaySeconds, campaign.MaxDelaySeconds, 
-		campaign.Status, campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
+		campaign.Status, campaign.AI, campaign.Limit, campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
 		
 	return err
 }
@@ -123,7 +123,7 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
-			status, created_at, updated_at
+			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = $1
 		ORDER BY campaign_date DESC, time_schedule DESC
@@ -141,7 +141,7 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
 			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
 			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
-			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.Status, &c.AI, &c.Limit, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		campaigns = append(campaigns, c)
@@ -160,7 +160,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
-			status, created_at, updated_at
+			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
 		FROM campaigns
 		WHERE id = $1
 	`
@@ -169,7 +169,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 	err := r.db.QueryRow(query, id).Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
 		&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
 		&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
-		&c.Status, &c.CreatedAt, &c.UpdatedAt)
+		&c.Status, &c.AI, &c.Limit, &c.CreatedAt, &c.UpdatedAt)
 	
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
 			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
 			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
-			&c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.Status, &c.AI, &c.Limit, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		campaigns = append(campaigns, c)
@@ -299,8 +299,8 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 		SET title = $1, niche = $2, target_status = $3, message = $4, 
 		    image_url = $5, campaign_date = $6, time_schedule = $7,
 		    min_delay_seconds = $8, max_delay_seconds = $9, 
-		    status = $10, updated_at = $11
-		WHERE id = $12 AND user_id = $13
+		    status = $10, ai = $11, "limit" = $12, updated_at = $13
+		WHERE id = $14 AND user_id = $15
 	`
 	
 	campaign.UpdatedAt = time.Now()
@@ -309,7 +309,7 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 		campaign.Title, campaign.Niche, campaign.TargetStatus, campaign.Message,
 		campaign.ImageURL, campaign.CampaignDate, campaign.TimeSchedule,
 		campaign.MinDelaySeconds, campaign.MaxDelaySeconds,
-		campaign.Status, campaign.UpdatedAt, campaign.ID, campaign.UserID)
+		campaign.Status, campaign.AI, campaign.Limit, campaign.UpdatedAt, campaign.ID, campaign.UserID)
 	
 	if err != nil {
 		return err
