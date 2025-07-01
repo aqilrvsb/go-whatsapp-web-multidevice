@@ -30,3 +30,4 @@ WHATSAPP_AUTO_REPLY = "Thank you for contacting us. We will respond shortly."
 # Performance Settings
 NODE_ENV = "production"
 NODE_TLS_REJECT_UNAUTHORIZED = "0"
+  
