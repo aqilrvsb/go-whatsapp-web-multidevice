@@ -2010,9 +2010,6 @@
                                         
                                     ` : ''}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-warning" href="#" onclick="resetDevice('${device.id}')">
-                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reset WhatsApp Session
-                                    </a></li>
                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteDevice('${device.id}')">
                                         <i class="bi bi-trash me-2"></i>Delete Device
                                     </a></li>
@@ -2266,42 +2263,81 @@
                 });
         }
 
-        // Logout Device
+        // Logout Device (now includes session removal)
         function logoutDevice(deviceId) {
-            if (confirm('Are you sure you want to logout this device from WhatsApp?')) {
-                showLoading();
-                
-                fetch('/app/logout?deviceId=' + deviceId, {
-                    method: 'GET',
-                    credentials: 'include'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.code === 'SUCCESS') {
-                        // Update device status
-                        const device = devices.find(d => d.id === deviceId);
-                        if (device) {
-                            device.status = 'offline';
-                            device.phone = '';
-                            device.jid = '';
-                            device.lastSeen = new Date().toISOString();
+            Swal.fire({
+                title: 'Logout Device?',
+                html: `
+                    <div class="text-start">
+                        <p>This will disconnect the device from WhatsApp and remove the session.</p>
+                        <p class="text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i>You will need to scan the QR code again to reconnect.</p>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Logout',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc3545'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showLoading();
+                    
+                    // First logout the device
+                    fetch('/app/logout?deviceId=' + deviceId, {
+                        method: 'GET',
+                        credentials: 'include'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Then reset the session to ensure complete removal
+                        return fetch(`/api/devices/${deviceId}/reset`, {
+                            method: 'POST',
+                            credentials: 'include'
+                        });
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS') {
+                            // Update device status
+                            const device = devices.find(d => d.id === deviceId);
+                            if (device) {
+                                device.status = 'offline';
+                                device.phone = '';
+                                device.jid = '';
+                                device.lastSeen = new Date().toISOString();
+                            }
                             renderDevices();
+                            
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Device Logged Out!',
+                                text: 'The device has been disconnected and session removed. You can now scan QR code to connect again.',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                            
+                            // Refresh devices after a moment
+                            setTimeout(loadDevices, 2000);
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Logout Failed',
+                                text: data.message || 'Failed to logout device'
+                            });
                         }
-                        showAlert('success', 'Device logged out successfully');
-                        
-                        // Refresh devices after a moment
-                        setTimeout(loadDevices, 2000);
-                    } else {
-                        showAlert('danger', data.message || 'Failed to logout device');
-                    }
-                    hideLoading();
-                })
-                .catch(error => {
-                    console.error('Error logging out device:', error);
-                    showAlert('danger', 'Error logging out device');
-                    hideLoading();
-                });
-            }
+                        hideLoading();
+                    })
+                    .catch(error => {
+                        console.error('Error logging out device:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Connection Error',
+                            text: 'Failed to logout device. Please try again.'
+                        });
+                        hideLoading();
+                    });
+                }
+            });
         }
 
         // Clear Device Data
@@ -2406,70 +2442,6 @@
                 });
         }
         
-        // Reset Device WhatsApp Session
-        function resetDevice(deviceId) {
-            Swal.fire({
-                title: 'Reset WhatsApp Session?',
-                html: `
-                    <div class="text-start">
-                        <p>This will completely reset the WhatsApp connection for this device.</p>
-                        <p class="text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i>You will need to scan the QR code again to reconnect.</p>
-                    </div>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Reset',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#dc3545'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    showLoading();
-                    
-                    fetch(`/api/devices/${deviceId}/reset`, {
-                        method: 'POST',
-                        credentials: 'include'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.code === 'SUCCESS') {
-                            // Update device status locally
-                            const device = devices.find(d => d.id === deviceId);
-                            if (device) {
-                                device.status = 'offline';
-                                device.phone = '';
-                                device.jid = '';
-                            }
-                            renderDevices();
-                            
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Device Reset!',
-                                text: 'The WhatsApp session has been reset. You can now connect with a different phone number.',
-                                timer: 3000,
-                                showConfirmButton: false
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Reset Failed',
-                                text: data.message || 'Failed to reset device'
-                            });
-                        }
-                        hideLoading();
-                    })
-                    .catch(error => {
-                        console.error('Error resetting device:', error);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: 'Failed to reset device. Please try again.'
-                        });
-                        hideLoading();
-                    });
-                }
-            });
-        }
-
         // Link Phone Number to Device
         function linkPhoneNumber(deviceId) {
             const phone = prompt('Enter WhatsApp phone number (with country code, e.g., +1234567890):');
