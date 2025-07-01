@@ -3434,10 +3434,12 @@
             
             // Find the campaign to clone
             let campaignToClone = null;
+            let campaignDate = null;
             for (let date in campaigns) {
                 const found = campaigns[date].find(c => c.id == campaignId);
                 if (found) {
                     campaignToClone = found;
+                    campaignDate = date;
                     break;
                 }
             }
@@ -3447,90 +3449,35 @@
                 return;
             }
             
-            // Use SweetAlert for clone dialog
-            Swal.fire({
-                title: 'Clone Campaign',
-                html: `
-                    <div class="text-start">
-                        <p class="text-muted mb-3">Creating a copy of: <strong>${campaignToClone.title}</strong></p>
-                        <div class="mb-3">
-                            <label class="form-label">New Campaign Title <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="clone-title" value="${campaignToClone.title} (Copy)" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Campaign Date <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="clone-date" value="${new Date().toISOString().split('T')[0]}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Schedule Time</label>
-                            <input type="time" class="form-control" id="clone-time" value="${campaignToClone.time_schedule || ''}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Target Audience</label>
-                            <select class="form-select" id="clone-target-status">
-                                <option value="all" ${campaignToClone.target_status === 'all' ? 'selected' : ''}>All Leads</option>
-                                <option value="prospect" ${campaignToClone.target_status === 'prospect' ? 'selected' : ''}>Prospects Only</option>
-                                <option value="customer" ${campaignToClone.target_status === 'customer' ? 'selected' : ''}>Customers Only</option>
-                            </select>
-                        </div>
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle me-2"></i>
-                            The cloned campaign will be created with status: <strong>Pending</strong>
-                        </div>
-                    </div>
-                `,
-                showCancelButton: true,
-                confirmButtonText: 'Clone Campaign',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#25d366',
-                width: '500px',
-                preConfirm: () => {
-                    const title = document.getElementById('clone-title').value;
-                    const date = document.getElementById('clone-date').value;
-                    
-                    if (!title || !date) {
-                        Swal.showValidationMessage('Title and date are required');
-                        return false;
-                    }
-                    
-                    return {
-                        title: title,
-                        campaign_date: date,
-                        time_schedule: document.getElementById('clone-time').value || '',
-                        message: campaignToClone.message,
-                        niche: campaignToClone.niche,
-                        target_status: document.getElementById('clone-target-status').value,
-                        image_url: campaignToClone.image_url,
-                        min_delay_seconds: campaignToClone.min_delay_seconds || 10,
-                        max_delay_seconds: campaignToClone.max_delay_seconds || 30
-                    };
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Create the cloned campaign
-                    fetch('/api/campaigns', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify(result.value)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.code === 'SUCCESS') {
-                            showAlert('success', 'Campaign cloned successfully!');
-                            loadCampaigns();
-                        } else {
-                            showAlert('danger', data.message || 'Failed to clone campaign');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error cloning campaign:', error);
-                        showAlert('danger', 'Error cloning campaign');
-                    });
-                }
-            });
+            // Clear the form and populate with cloned data
+            document.getElementById('campaignId').value = ''; // Empty ID for new campaign
+            document.getElementById('campaignDate').value = new Date().toISOString().split('T')[0]; // Today's date
+            document.getElementById('campaignTitle').value = campaignToClone.title + ' (Copy)';
+            document.getElementById('campaignNiche').value = campaignToClone.niche || '';
+            document.getElementById('campaignTargetStatus').value = campaignToClone.target_status || 'prospect';
+            document.getElementById('campaignMessage').value = campaignToClone.message || '';
+            document.getElementById('campaignTime').value = campaignToClone.time_schedule || '';
+            document.getElementById('campaignMinDelay').value = campaignToClone.min_delay_seconds || 10;
+            document.getElementById('campaignMaxDelay').value = campaignToClone.max_delay_seconds || 30;
+            document.getElementById('campaignImageUrl').value = campaignToClone.image_url || '';
+            
+            // Show image preview if exists
+            if (campaignToClone.image_url) {
+                document.getElementById('imagePreview').innerHTML = 
+                    `<img src="${campaignToClone.image_url}" class="img-thumbnail" style="max-height: 200px;">`;
+            } else {
+                document.getElementById('imagePreview').innerHTML = '';
+            }
+            
+            // Update modal title
+            const dateObj = new Date();
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            document.getElementById('campaignModalTitle').textContent = `Clone Campaign - ${dayName}, ${formattedDate}`;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('campaignModal'));
+            modal.show();
         }
         
         // Open WhatsApp Web for device
