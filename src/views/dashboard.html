@@ -2270,7 +2270,7 @@
                 });
         }
 
-        // Logout Device (now includes session removal)
+        // Logout Device (properly clears session)
         function logoutDevice(deviceId) {
             Swal.fire({
                 title: 'Logout Device?',
@@ -2292,15 +2292,16 @@
                     // Set a timeout to hide loading in case of any issues
                     const loadingTimeout = setTimeout(() => {
                         hideLoading();
-                        location.reload(); // Reload page if timeout
+                        showToast('Operation is taking longer than expected...', 'warning');
                     }, 15000); // 15 seconds timeout
                     
-                    // Use clear all sessions which properly clears WhatsApp tables
-                    fetch('/api/devices/clear-all-sessions', {
+                    // Use the new clear-session endpoint that properly clears WhatsApp tables
+                    fetch(`/api/devices/${deviceId}/clear-session`, {
                         method: 'POST',
                         credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({})
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
                     })
                     .then(response => response.json())
                     .then(data => {
@@ -2308,18 +2309,20 @@
                         hideLoading();
                         
                         if (data.code === 'SUCCESS') {
-                            // Update all devices to offline
-                            devices.forEach(device => {
+                            // Update device status
+                            const device = devices.find(d => d.id === deviceId);
+                            if (device) {
                                 device.status = 'offline';
                                 device.phone = '';
                                 device.jid = '';
-                            });
+                                device.lastSeen = new Date().toISOString();
+                            }
                             renderDevices();
                             
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Session Cleared!',
-                                text: 'WhatsApp session has been cleared. You can now scan QR code to connect.',
+                                title: 'Device Logged Out!',
+                                text: 'The device has been disconnected and session cleared. You can now scan QR code to connect again.',
                                 timer: 3000,
                                 showConfirmButton: false
                             });
@@ -2337,7 +2340,7 @@
                         Swal.fire({
                             icon: 'error',
                             title: 'Operation Failed',
-                            text: 'Failed to clear session. Please try again or refresh the page.'
+                            text: error.message || 'Failed to logout device. Please try again.'
                         });
                     });
                 }
@@ -5127,6 +5130,13 @@
         
         function checkAllWorkers() {
             window.open('/status/all-workers', 'AllWorkersStatus', 'width=1200,height=800');
+        }
+        
+        // Format date helper function
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         }
         
         // AI Lead Management Functions
