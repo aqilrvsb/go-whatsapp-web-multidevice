@@ -948,6 +948,12 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">AI Lead Management</h5>
                         <div>
+                            <button class="btn btn-outline-primary" onclick="exportAILeads()">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="importAILeads()">
+                                <i class="bi bi-upload"></i> Import
+                            </button>
                             <button class="btn btn-primary" onclick="showAddAILeadModal()">
                                 <i class="bi bi-plus-lg"></i> Add AI Lead
                             </button>
@@ -1401,48 +1407,47 @@
     
     <!-- AI Lead Modal -->
     <div class="modal fade" id="aiLeadModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="aiLeadModalTitle">Add AI Lead</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header" style="background-color: #20a884; color: white;">
+                    <h5 class="modal-title" id="aiLeadModalTitle">Add New Lead</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="aiLeadForm">
                         <input type="hidden" id="aiLeadId">
-                        <div class="mb-3">
-                            <label class="form-label">Name *</label>
-                            <input type="text" class="form-control" id="aiLeadName" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="aiLeadName" placeholder="Enter name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="aiLeadPhone" placeholder="60123456789" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Niche</label>
+                                <input type="text" class="form-control" id="aiLeadNiche" placeholder="EXSTART or EXSTART,ITADRESS">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" id="aiLeadTargetStatus">
+                                    <option value="prospect">Prospect</option>
+                                    <option value="customer">Customer</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Phone *</label>
-                            <input type="text" class="form-control" id="aiLeadPhone" required>
-                            <small class="text-muted">Enter phone number without country code</small>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" id="aiLeadEmail">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Niche</label>
-                            <input type="text" class="form-control" id="aiLeadNiche">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Target Status</label>
-                            <select class="form-select" id="aiLeadTargetStatus">
-                                <option value="prospect">Prospect</option>
-                                <option value="customer">Customer</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control" id="aiLeadNotes" rows="3"></textarea>
+                            <label class="form-label">Additional Note</label>
+                            <textarea class="form-control" id="aiLeadNotes" rows="4" placeholder="Enter additional notes about this lead..."></textarea>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveAILead()">Save</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAILead()">Save Lead</button>
                 </div>
             </div>
         </div>
@@ -5213,11 +5218,124 @@
         }
         
         function showAddAILeadModal() {
-            document.getElementById('aiLeadModalTitle').textContent = 'Add AI Lead';
+            document.getElementById('aiLeadModalTitle').textContent = 'Add New Lead';
             document.getElementById('aiLeadForm').reset();
             document.getElementById('aiLeadId').value = '';
             const modal = new bootstrap.Modal(document.getElementById('aiLeadModal'));
             modal.show();
+        }
+        
+        // Export AI Leads
+        function exportAILeads() {
+            fetch('/api/leads-ai')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        // Convert to CSV
+                        const headers = ['Name', 'Phone', 'Niche', 'Status', 'Notes', 'Created At'];
+                        const csvContent = [
+                            headers.join(','),
+                            ...data.results.map(lead => [
+                                `"${lead.name || ''}"`,
+                                `"${lead.phone || ''}"`,
+                                `"${lead.niche || ''}"`,
+                                `"${lead.target_status || ''}"`,
+                                `"${(lead.notes || '').replace(/"/g, '""')}"`,
+                                `"${lead.created_at || ''}"`
+                            ].join(','))
+                        ].join('\n');
+                        
+                        // Download file
+                        const blob = new Blob([csvContent], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `ai_leads_${new Date().toISOString().split('T')[0]}.csv`;
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        
+                        showToast('AI leads exported successfully', 'success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error exporting AI leads:', error);
+                    showToast('Failed to export AI leads', 'error');
+                });
+        }
+        
+        // Import AI Leads
+        function importAILeads() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.csv';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const csv = event.target.result;
+                    const lines = csv.split('\n');
+                    const headers = lines[0].split(',');
+                    
+                    // Skip header row
+                    const leads = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim()) {
+                            const values = lines[i].match(/(".*?"|[^,]+)/g);
+                            if (values) {
+                                leads.push({
+                                    name: values[0]?.replace(/"/g, '') || '',
+                                    phone: values[1]?.replace(/"/g, '') || '',
+                                    niche: values[2]?.replace(/"/g, '') || '',
+                                    target_status: values[3]?.replace(/"/g, '') || 'prospect',
+                                    notes: values[4]?.replace(/"/g, '') || ''
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Import leads
+                    if (leads.length > 0) {
+                        importAILeadsBatch(leads);
+                    } else {
+                        showToast('No valid leads found in file', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        // Import batch of AI leads
+        function importAILeadsBatch(leads) {
+            let imported = 0;
+            let failed = 0;
+            
+            Promise.all(leads.map(lead => 
+                fetch('/api/leads-ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lead)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        imported++;
+                    } else {
+                        failed++;
+                    }
+                })
+                .catch(() => failed++)
+            ))
+            .then(() => {
+                if (imported > 0) {
+                    showToast(`Successfully imported ${imported} AI leads${failed > 0 ? `, ${failed} failed` : ''}`, 'success');
+                    loadAILeads(); // Refresh the list
+                } else {
+                    showToast('Failed to import AI leads', 'error');
+                }
+            });
         }
         
         function saveAILead() {
@@ -5227,7 +5345,6 @@
             const leadData = {
                 name: document.getElementById('aiLeadName').value,
                 phone: document.getElementById('aiLeadPhone').value,
-                email: document.getElementById('aiLeadEmail').value,
                 niche: document.getElementById('aiLeadNiche').value,
                 target_status: document.getElementById('aiLeadTargetStatus').value,
                 notes: document.getElementById('aiLeadNotes').value
