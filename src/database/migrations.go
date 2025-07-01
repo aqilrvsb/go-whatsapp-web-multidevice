@@ -160,8 +160,8 @@ ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
 -- 1. Create leads_ai table for AI-managed leads
 CREATE TABLE IF NOT EXISTS leads_ai (
     id SERIAL PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    device_id VARCHAR(255), -- Initially NULL, assigned during campaign
+    user_id UUID NOT NULL,
+    device_id UUID, -- Initially NULL, assigned during campaign
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(50) NOT NULL,
     email VARCHAR(255),
@@ -174,7 +174,8 @@ CREATE TABLE IF NOT EXISTS leads_ai (
     sent_at TIMESTAMP, -- When message was sent
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (device_id) REFERENCES user_devices(id) ON DELETE SET NULL
 );
 
 -- Create indexes for performance
@@ -193,7 +194,7 @@ ADD COLUMN IF NOT EXISTS "limit" INTEGER DEFAULT 0;
 CREATE TABLE IF NOT EXISTS ai_campaign_progress (
     id SERIAL PRIMARY KEY,
     campaign_id INTEGER NOT NULL,
-    device_id VARCHAR(255) NOT NULL,
+    device_id UUID NOT NULL,
     leads_sent INTEGER DEFAULT 0,
     leads_failed INTEGER DEFAULT 0,
     status VARCHAR(50) DEFAULT 'active', -- active, limit_reached, failed
@@ -201,6 +202,7 @@ CREATE TABLE IF NOT EXISTS ai_campaign_progress (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+    FOREIGN KEY (device_id) REFERENCES user_devices(id) ON DELETE CASCADE,
     UNIQUE(campaign_id, device_id)
 );
 
