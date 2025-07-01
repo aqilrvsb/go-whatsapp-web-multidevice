@@ -1,0 +1,206 @@
+/* Additional Premium Styling Overrides */
+<style>
+/* Override Bootstrap defaults */
+body {
+    background: #0f0f1e !important;
+    color: #ffffff !important;
+}
+
+/* Glass effect for all cards */
+.card {
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+}
+
+/* Premium gradient for key elements */
+.navbar-brand {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 50%, #673AB7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+    font-size: 1.8rem;
+}
+
+/* All buttons with gradient */
+.btn-primary, .btn-success, .btn-info {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 50%, #673AB7 100%) !important;
+    border: none !important;
+    border-radius: 50px !important;
+    padding: 10px 30px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 15px 0 rgba(233, 30, 99, 0.4) !important;
+}
+
+.btn-primary:hover, .btn-success:hover, .btn-info:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px 0 rgba(233, 30, 99, 0.6) !important;
+}
+
+/* Tab styling */
+.nav-tabs {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.nav-tabs .nav-link {
+    color: rgba(255, 255, 255, 0.7) !important;
+    border: none !important;
+    border-radius: 50px !important;
+    padding: 10px 25px !important;
+    margin-right: 10px !important;
+}
+
+.nav-tabs .nav-link.active {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 50%, #673AB7 100%) !important;
+    color: white !important;
+}
+
+/* Device cards */
+.device-card {
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    transition: all 0.3s ease !important;
+}
+
+.device-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(156, 39, 176, 0.4);
+    border-color: #E91E63;
+}
+
+/* Metric values with gradient */
+.metric-value {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 50%, #673AB7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+/* Table styling */
+.table {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.table thead th {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Modal styling */
+.modal-content {
+    background: #1a1a2e !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+}
+
+.modal-header {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Form controls */
+.form-control, .form-select {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    border-radius: 12px !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: #E91E63 !important;
+    box-shadow: 0 0 0 0.25rem rgba(233, 30, 99, 0.25) !important;
+}
+
+/* Badges */
+.badge {
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+}
+
+.badge.bg-success {
+    background: linear-gradient(135deg, #00E676 0%, #00C853 100%) !important;
+}
+
+.badge.bg-warning {
+    background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%) !important;
+}
+
+.badge.bg-danger {
+    background: linear-gradient(135deg, #FF5252 0%, #F44336 100%) !important;
+}
+
+/* Animated gradient border */
+@keyframes gradient-border {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.gradient-border {
+    position: relative;
+    background: linear-gradient(135deg, #E91E63, #9C27B0, #673AB7, #E91E63);
+    background-size: 300% 300%;
+    animation: gradient-border 3s ease infinite;
+    padding: 2px;
+    border-radius: 20px;
+}
+
+.gradient-border > * {
+    background: #1a1a2e;
+    border-radius: 18px;
+    padding: 20px;
+}
+
+/* Loading spinner */
+.spinner-border {
+    color: #E91E63 !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f0f1e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+    border-radius: 6px;
+}
+
+/* Text selection */
+::selection {
+    background: #E91E63;
+    color: white;
+}
+
+/* Links */
+a {
+    color: #E91E63 !important;
+    text-decoration: none !important;
+}
+
+a:hover {
+    color: #9C27B0 !important;
+}
+
+/* SweetAlert2 */
+.swal2-popup {
+    background: #1a1a2e !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.swal2-title, .swal2-content {
+    color: white !important;
+}
+
+.swal2-confirm {
+    background: linear-gradient(135deg, #E91E63 0%, #9C27B0 50%, #673AB7 100%) !important;
+}
+</style>
