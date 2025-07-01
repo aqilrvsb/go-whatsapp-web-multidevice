@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 	
@@ -379,11 +380,47 @@ func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid 
 
 // DeleteDevice deletes a device
 func (r *UserRepository) DeleteDevice(deviceID string) error {
-	_, err := r.db.Exec("DELETE FROM user_devices WHERE id = $1", deviceID)
+	// Start a transaction to ensure data consistency
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+	
+	// First, delete all leads associated with this device
+	result, err := tx.Exec("DELETE FROM leads WHERE device_id = $1", deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete leads for device: %w", err)
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		log.Printf("Deleted %d leads for device %s", rowsAffected, deviceID)
+	}
+	
+	// Also delete any broadcast messages for this device
+	result, err = tx.Exec("DELETE FROM broadcast_messages WHERE device_id = $1", deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete broadcast messages for device: %w", err)
+	}
+	
+	rowsAffected, _ = result.RowsAffected()
+	if rowsAffected > 0 {
+		log.Printf("Deleted %d broadcast messages for device %s", rowsAffected, deviceID)
+	}
+	
+	// Finally, delete the device itself
+	_, err = tx.Exec("DELETE FROM user_devices WHERE id = $1", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete device: %w", err)
 	}
 	
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	
+	log.Printf("Successfully deleted device %s and all associated data", deviceID)
 	return nil
 }
 
