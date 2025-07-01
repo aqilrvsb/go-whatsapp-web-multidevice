@@ -1,10 +1,10 @@
-package models
+// Update for models/campaign.go - Add these fields to the Campaign struct
 
-import (
-	"time"
-)
+// Add these fields to the existing Campaign struct:
+AI    *string `json:"ai" db:"ai"`              // "ai" for AI campaigns, null for regular
+Limit int     `json:"limit" db:"\"limit\""`     // Device limit for AI campaigns
 
-// Campaign represents a marketing campaign
+// The complete updated Campaign struct should look like:
 type Campaign struct {
 	ID              int       `json:"id" db:"id"`
 	UserID          string    `json:"user_id" db:"user_id"`

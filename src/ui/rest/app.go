@@ -18,8 +18,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -98,6 +100,15 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/campaigns/:id/device-report", rest.GetCampaignDeviceReport)
 	app.Get("/api/campaigns/:id/device/:deviceId/leads", rest.GetCampaignDeviceLeads)
 	app.Post("/api/campaigns/:id/device/:deviceId/retry-failed", rest.RetryCampaignFailedMessages)
+	
+	// AI Lead Management Routes
+	app.Post("/api/leads-ai", rest.CreateLeadAI)
+	app.Get("/api/leads-ai", rest.GetLeadsAI)
+	app.Put("/api/leads-ai/:id", rest.UpdateLeadAI)
+	app.Delete("/api/leads-ai/:id", rest.DeleteLeadAI)
+	
+	// AI Campaign Trigger Route
+	app.Post("/api/campaigns-ai/:id/trigger", rest.TriggerAICampaign)
 	
 	// Sequence summary endpoint
 	app.Get("/api/sequences/summary", rest.GetSequenceSummary)
@@ -904,15 +915,17 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	}
 	
 	var request struct {
-		CampaignDate    string `json:"campaign_date"`
-		Title           string `json:"title"`
-		Niche           string `json:"niche"`
-		TargetStatus    string `json:"target_status"`
-		Message         string `json:"message"`
-		ImageURL        string `json:"image_url"`
-		TimeSchedule    string `json:"time_schedule"`
-		MinDelaySeconds int    `json:"min_delay_seconds"`
-		MaxDelaySeconds int    `json:"max_delay_seconds"`
+		CampaignDate    string  `json:"campaign_date"`
+		Title           string  `json:"title"`
+		Niche           string  `json:"niche"`
+		TargetStatus    string  `json:"target_status"`
+		Message         string  `json:"message"`
+		ImageURL        string  `json:"image_url"`
+		TimeSchedule    string  `json:"time_schedule"`
+		MinDelaySeconds int     `json:"min_delay_seconds"`
+		MaxDelaySeconds int     `json:"max_delay_seconds"`
+		AI              *string `json:"ai"`    // New field for AI campaigns
+		Limit           int     `json:"limit"` // New field for device limit
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -943,11 +956,16 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 	
 	// Validate and set target_status
 	targetStatus := request.TargetStatus
-	if targetStatus != "prospect" && targetStatus != "customer" {
+	if targetStatus != "prospect" && targetStatus != "customer" && targetStatus != "all" {
+		targetStatus = "all" // Default to all if invalid
+	}
+	
+	// For AI campaigns, ensure limit is set
+	if request.AI != nil && *request.AI == "ai" && request.Limit <= 0 {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "BAD_REQUEST",
-			Message: "Target status must be either 'prospect' or 'customer'",
+			Message: "Device limit must be greater than 0 for AI campaigns",
 		})
 	}
 	
@@ -964,6 +982,8 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
 		Status:          "pending",
+		AI:              request.AI,
+		Limit:           request.Limit,
 	}
 	err = campaignRepo.CreateCampaign(campaign)
 	if err != nil {
@@ -2678,5 +2698,377 @@ func (handler *App) GetSystemStatus(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "System status",
 		Results: status,
+	})
+}
+
+
+// AI Lead Management Handlers
+
+// CreateLeadAI creates a new AI lead (without device assignment)
+func (handler *App) CreateLeadAI(c *fiber.Ctx) error {
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	var request struct {
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Email        string `json:"email"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
+		Notes        string `json:"notes"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	// Validate required fields
+	if request.Name == "" || request.Phone == "" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Name and phone are required",
+		})
+	}
+	
+	// Set default target status if not provided
+	if request.TargetStatus == "" {
+		request.TargetStatus = "prospect"
+	}
+	
+	leadAIRepo := repository.GetLeadAIRepository()
+	lead := &models.LeadAI{
+		UserID:       session.UserID,
+		Name:         request.Name,
+		Phone:        request.Phone,
+		Email:        request.Email,
+		Niche:        request.Niche,
+		Source:       "ai_manual",
+		Status:       "pending",
+		TargetStatus: request.TargetStatus,
+		Notes:        request.Notes,
+	}
+	
+	err = leadAIRepo.CreateLeadAI(lead)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "CREATE_FAILED",
+			Message: "Failed to create AI lead",
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "AI lead created successfully",
+		Results: lead,
+	})
+}
+// GetLeadsAI retrieves all AI leads for the user
+func (handler *App) GetLeadsAI(c *fiber.Ctx) error {
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	leadAIRepo := repository.GetLeadAIRepository()
+	leads, err := leadAIRepo.GetLeadAIByUser(session.UserID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "FETCH_FAILED",
+			Message: "Failed to fetch AI leads",
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "AI leads fetched successfully",
+		Results: leads,
+	})
+}
+// UpdateLeadAI updates an existing AI lead
+func (handler *App) UpdateLeadAI(c *fiber.Ctx) error {
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	leadID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid lead ID",
+		})
+	}
+	
+	var request struct {
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Email        string `json:"email"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
+		Notes        string `json:"notes"`
+	}
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	leadAIRepo := repository.GetLeadAIRepository()
+	existingLead, err := leadAIRepo.GetLeadAIByID(leadID)
+	if err != nil || existingLead.UserID != session.UserID {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "AI lead not found",
+		})
+	}
+	
+	lead := &models.LeadAI{
+		Name:         request.Name,
+		Phone:        request.Phone,
+		Email:        request.Email,
+		Niche:        request.Niche,
+		TargetStatus: request.TargetStatus,
+		Notes:        request.Notes,
+	}
+	
+	err = leadAIRepo.UpdateLeadAI(leadID, lead)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "UPDATE_FAILED",
+			Message: "Failed to update AI lead",
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "AI lead updated successfully",
+	})
+}
+// DeleteLeadAI deletes an AI lead
+func (handler *App) DeleteLeadAI(c *fiber.Ctx) error {
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	leadID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid lead ID",
+		})
+	}
+	
+	leadAIRepo := repository.GetLeadAIRepository()
+	existingLead, err := leadAIRepo.GetLeadAIByID(leadID)
+	if err != nil || existingLead.UserID != session.UserID {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "AI lead not found",
+		})
+	}
+	
+	err = leadAIRepo.DeleteLeadAI(leadID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "DELETE_FAILED",
+			Message: "Failed to delete AI lead",
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "AI lead deleted successfully",
+	})
+}
+// TriggerAICampaign - Handler to manually trigger an AI campaign
+func (handler *App) TriggerAICampaign(c *fiber.Ctx) error {
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	campaignID, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid campaign ID",
+		})
+	}
+	
+	campaignRepo := repository.GetCampaignRepository()
+	campaign, err := campaignRepo.GetCampaignByID(campaignID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Campaign not found",
+		})
+	}
+	// Verify campaign belongs to user
+	if campaign.UserID != session.UserID {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "FORBIDDEN",
+			Message: "You don't have permission to trigger this campaign",
+		})
+	}
+	
+	// Verify this is an AI campaign
+	if campaign.AI == nil || *campaign.AI != "ai" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "NOT_AI_CAMPAIGN",
+			Message: "This is not an AI campaign",
+		})
+	}
+	
+	// Check if campaign is already running
+	if campaign.Status != "pending" && campaign.Status != "failed" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "CAMPAIGN_RUNNING",
+			Message: "Campaign is already running or completed",
+		})
+	}
+	
+	// Update campaign status to triggered
+	err = campaignRepo.UpdateCampaignStatus(campaignID, "triggered")
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "UPDATE_FAILED",
+			Message: "Failed to update campaign status",
+		})
+	}
+	// Initialize AI Campaign Processor
+	leadAIRepo := repository.GetLeadAIRepository()
+	broadcastRepo := repository.GetBroadcastRepository()
+	
+	// Initialize Redis client
+	redisURL := config.GetRedisURL()
+	opt, _ := redis.ParseURL(redisURL)
+	redisClient := redis.NewClient(opt)
+	
+	processor := usecase.NewAICampaignProcessor(
+		broadcastRepo,
+		leadAIRepo,
+		userRepo,
+		campaignRepo,
+		redisClient,
+	)
+	
+	// Process campaign in background
+	go func() {
+		ctx := context.Background()
+		err := processor.ProcessAICampaign(ctx, campaignID)
+		if err != nil {
+			logrus.Errorf("Failed to process AI campaign %d: %v", campaignID, err)
+			// Update status to failed if processing fails
+			campaignRepo.UpdateCampaignStatus(campaignID, "failed")
+		}
+	}()
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "AI campaign triggered successfully",
+		Results: map[string]interface{}{
+			"campaign_id": campaignID,
+			"status":      "triggered",
+		},
 	})
 }
