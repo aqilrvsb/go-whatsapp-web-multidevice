@@ -720,9 +720,10 @@
                         <p class="text-muted mb-0">Manage your connected WhatsApp accounts</p>
                     </div>
                     <div>
-                        <button class="btn btn-danger me-2" onclick="clearAllSessions()">
+                        <!-- Clear All Sessions Button - HIDDEN -->
+                        <!-- <button class="btn btn-danger me-2" onclick="clearAllSessions()">
                             <i class="bi bi-x-circle me-2"></i>Clear All Sessions
-                        </button>
+                        </button> -->
                         <button class="btn btn-primary" onclick="addNewDevice()">
                             <i class="bi bi-plus-circle me-2"></i>Add Device
                         </button>
@@ -1495,7 +1496,6 @@
                                 <div class="mb-3">
                                     <label class="form-label">Target Status *</label>
                                     <select class="form-select" id="aiCampaignTargetStatus">
-                                        <option value="all">All</option>
                                         <option value="prospect">Prospect</option>
                                         <option value="customer">Customer</option>
                                     </select>
@@ -1515,8 +1515,9 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Image URL (Optional)</label>
-                            <input type="text" class="form-control" id="aiCampaignImageUrl">
+                            <label class="form-label">Image (Optional)</label>
+                            <input type="file" class="form-control" id="aiCampaignImage" accept="image/*">
+                            <small class="text-muted">Max 350KB. Will be compressed automatically.</small>
                         </div>
                         
                         <div class="row">
@@ -2288,18 +2289,10 @@
                 if (result.isConfirmed) {
                     showLoading();
                     
-                    // First logout the device
+                    // Use the logout endpoint which handles authentication properly
                     fetch('/app/logout?deviceId=' + deviceId, {
                         method: 'GET',
                         credentials: 'include'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        // Then reset the session to ensure complete removal
-                        return fetch(`/api/devices/${deviceId}/reset`, {
-                            method: 'POST',
-                            credentials: 'include'
-                        });
                     })
                     .then(response => response.json())
                     .then(data => {
@@ -2317,7 +2310,7 @@
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Device Logged Out!',
-                                text: 'The device has been disconnected and session removed. You can now scan QR code to connect again.',
+                                text: 'The device has been disconnected and session cleared. You can now scan QR code to connect again.',
                                 timer: 3000,
                                 showConfirmButton: false
                             });
@@ -2325,20 +2318,15 @@
                             // Refresh devices after a moment
                             setTimeout(loadDevices, 2000);
                         } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Logout Failed',
-                                text: data.message || 'Failed to logout device'
-                            });
+                            throw new Error(data.message || 'Failed to logout device');
                         }
-                        hideLoading();
                     })
                     .catch(error => {
                         console.error('Error logging out device:', error);
                         Swal.fire({
                             icon: 'error',
-                            title: 'Connection Error',
-                            text: 'Failed to logout device. Please try again.'
+                            title: 'Logout Failed',
+                            text: error.message || 'Failed to logout device. Please try again.'
                         });
                         hideLoading();
                     });
@@ -5447,65 +5435,84 @@
         }
         
         function saveAICampaign() {
-            const campaignData = {
-                title: document.getElementById('aiCampaignTitle').value,
-                niche: document.getElementById('aiCampaignNiche').value,
-                target_status: document.getElementById('aiCampaignTargetStatus').value,
-                message: document.getElementById('aiCampaignMessage').value,
-                image_url: document.getElementById('aiCampaignImageUrl').value,
-                campaign_date: document.getElementById('aiCampaignDate').value,
-                time_schedule: document.getElementById('aiCampaignTime').value,
-                limit: parseInt(document.getElementById('aiDeviceLimit').value),
-                min_delay_seconds: parseInt(document.getElementById('aiMinDelay').value),
-                max_delay_seconds: parseInt(document.getElementById('aiMaxDelay').value),
-                ai: 'ai'
-            };
+            const imageFile = document.getElementById('aiCampaignImage').files[0];
             
-            if (!campaignData.title || !campaignData.niche || !campaignData.message || 
-                !campaignData.campaign_date || !campaignData.limit) {
-                showToast('Please fill all required fields', 'error');
-                return;
-            }
-            
-            if (campaignData.limit <= 0) {
-                showToast('Device limit must be greater than 0', 'error');
-                return;
-            }
-            
-            fetch('/api/campaigns', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(campaignData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 'SUCCESS') {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('aiCampaignModal'));
-                    modal.hide();
-                    loadCampaigns();
-                    showToast('AI Campaign created successfully', 'success');
-                    
-                    Swal.fire({
-                        title: 'Campaign Created!',
-                        text: 'Do you want to trigger the campaign now?',
-                        icon: 'success',
-                        showCancelButton: true,
-                        confirmButtonText: 'Yes, trigger now',
-                        cancelButtonText: 'No, trigger later'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            triggerAICampaign(data.results.id);
-                        }
+            // First, handle image upload if provided
+            const processImage = new Promise((resolve) => {
+                if (imageFile) {
+                    compressImageFile(imageFile, function(compressedBlob) {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            resolve(reader.result); // base64 string
+                        };
+                        reader.readAsDataURL(compressedBlob);
                     });
                 } else {
-                    showToast(data.message || 'Failed to create AI campaign', 'error');
+                    resolve(''); // No image
                 }
-            })
-            .catch(error => {
-                console.error('Error creating AI campaign:', error);
-                showToast('Failed to create AI campaign', 'error');
+            });
+            
+            processImage.then(imageBase64 => {
+                const campaignData = {
+                    title: document.getElementById('aiCampaignTitle').value,
+                    niche: document.getElementById('aiCampaignNiche').value,
+                    target_status: document.getElementById('aiCampaignTargetStatus').value,
+                    message: document.getElementById('aiCampaignMessage').value,
+                    image_url: imageBase64, // Using base64 image
+                    campaign_date: document.getElementById('aiCampaignDate').value,
+                    time_schedule: document.getElementById('aiCampaignTime').value,
+                    limit: parseInt(document.getElementById('aiDeviceLimit').value),
+                    min_delay_seconds: parseInt(document.getElementById('aiMinDelay').value),
+                    max_delay_seconds: parseInt(document.getElementById('aiMaxDelay').value),
+                    ai: 'ai'
+                };
+                
+                if (!campaignData.title || !campaignData.niche || !campaignData.message || 
+                    !campaignData.campaign_date || !campaignData.limit) {
+                    showToast('Please fill all required fields', 'error');
+                    return;
+                }
+                
+                if (campaignData.limit <= 0) {
+                    showToast('Device limit must be greater than 0', 'error');
+                    return;
+                }
+                
+                fetch('/api/campaigns', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(campaignData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('aiCampaignModal'));
+                        modal.hide();
+                        loadCampaigns();
+                        showToast('AI Campaign created successfully', 'success');
+                        
+                        Swal.fire({
+                            title: 'Campaign Created!',
+                            text: 'Do you want to trigger the campaign now?',
+                            icon: 'success',
+                            showCancelButton: true,
+                            confirmButtonText: 'Yes, trigger now',
+                            cancelButtonText: 'No, trigger later'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                triggerAICampaign(data.results.id);
+                            }
+                        });
+                    } else {
+                        showToast(data.message || 'Failed to create AI campaign', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating AI campaign:', error);
+                    showToast('Failed to create AI campaign', 'error');
+                });
             });
         }
         
