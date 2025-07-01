@@ -1,28 +1,28 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: July 01, 2025 - 02:45 AM**  
+**Last Updated: July 01, 2025 - 07:30 PM**  
 **Status: ✅ Production-ready with OPTIMIZED 3000+ device support**
 **Architecture: ✅ Redis-optimized parallel processing with auto-scaling workers**
 **Deploy**: ✅ Auto-deployment triggered via Railway
 
-## 🚨 LATEST UPDATES: July 01, 2025 - 02:45 AM
+## 🚨 LATEST UPDATES: July 01, 2025 - 07:30 PM
 
-### ✅ UI/UX Improvements
-1. **Device Management Enhanced**:
-   - Added logout button for connected devices
-   - Removed auto-reload after QR scan success
-   - Added phone number editing in device settings
-   - Improved device card UI with better action buttons
+### ✅ Device Report Improvements
+1. **Fixed Lead Count Display**:
+   - Device report now shows accurate total lead counts
+   - Summary cards (Total/Pending/Success/Failed) are now clickable
+   - Click on any summary card to see all leads across all devices
+   - Added visual feedback with cursor pointer on hover
 
-2. **Campaign Improvements**:
-   - Clone campaign now includes target_status selection
-   - Fixed campaign list refresh after cloning
-   - Enhanced campaign summary with complete status flow
-   - Status flow: Pending → Triggered → Processing → Finished/Failed
+2. **Enhanced Lead Details Modal**:
+   - Shows leads from all devices when clicking summary cards
+   - Shows device-specific leads when clicking table rows
+   - Displays device name for each lead
+   - Proper filtering by status (all/pending/success/failed)
 
-3. **Database Schema Fixes**:
-   - Fixed "devices" table references (now uses "user_devices")
-   - Fixed "bm.message" column errors (now uses "content")
-   - Fixed "last_processed_at" column errors (uses "updated_at")
+3. **Backend Debugging**:
+   - Added detailed logging for device report generation
+   - Logs show campaign ID, device counts, and lead statistics
+   - Helps troubleshoot any counting discrepancies
 
 ### ✅ System Improvements (July 01, 2025)
 1. **Sequence Progress Tracking**:

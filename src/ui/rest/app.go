@@ -2318,12 +2318,17 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	if err == nil {
 		defer msgRows.Close()
 		
+		// Debug: log the query results
+		log.Printf("Device Report - Campaign ID: %d, User ID: %s", campaignId, session.UserID)
+		
 		for msgRows.Next() {
 			var deviceId, status string
 			var count int
 			if err := msgRows.Scan(&deviceId, &status, &count); err != nil {
 				continue
 			}
+			
+			log.Printf("Device Report - Device: %s, Status: %s, Count: %d", deviceId, status, count)
 			
 			if report, exists := deviceMap[deviceId]; exists {
 				report.TotalLeads += count
@@ -2349,7 +2354,14 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	activeDevices := 0
 	disconnectedDevices := 0
 	
-	for _, report := range deviceMap {
+	// Debug: Log device reports
+	log.Printf("Device Report - Processing %d devices", len(deviceMap))
+	
+	for deviceId, report := range deviceMap {
+		log.Printf("Device %s (%s): Total=%d, Pending=%d, Success=%d, Failed=%d", 
+			deviceId, report.Name, report.TotalLeads, report.PendingLeads, 
+			report.SuccessLeads, report.FailedLeads)
+		
 		deviceReports = append(deviceReports, *report)
 		totalLeads += report.TotalLeads
 		pendingLeads += report.PendingLeads
@@ -2362,6 +2374,10 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 			disconnectedDevices++
 		}
 	}
+	
+	// Log final totals
+	log.Printf("Device Report Final - Total Devices: %d, Total Leads: %d, Pending: %d, Success: %d, Failed: %d", 
+		len(devices), totalLeads, pendingLeads, successLeads, failedLeads)
 	
 	result := map[string]interface{}{
 		"totalDevices":        len(devices),

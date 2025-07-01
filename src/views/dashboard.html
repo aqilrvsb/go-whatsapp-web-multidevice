@@ -1196,7 +1196,7 @@
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="card bg-primary text-white">
+                                    <div class="card bg-primary text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('all'); return false;">
                                         <div class="card-body">
                                             <h4 id="totalLeads">0</h4>
                                             <p class="mb-0">Total Leads</p>
@@ -1206,7 +1206,7 @@
                             </div>
                             <div class="row text-center mt-3">
                                 <div class="col-md-4">
-                                    <div class="card bg-warning">
+                                    <div class="card bg-warning" style="cursor: pointer;" onclick="showAllCampaignLeads('pending'); return false;">
                                         <div class="card-body">
                                             <h4 id="pendingLeads">0</h4>
                                             <p class="mb-0">Pending</p>
@@ -1214,7 +1214,7 @@
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card bg-success text-white">
+                                    <div class="card bg-success text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('success'); return false;">
                                         <div class="card-body">
                                             <h4 id="successLeads">0</h4>
                                             <p class="mb-0">Success</p>
@@ -1222,7 +1222,7 @@
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="card bg-danger text-white">
+                                    <div class="card bg-danger text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('failed'); return false;">
                                         <div class="card-body">
                                             <h4 id="failedLeads">0</h4>
                                             <p class="mb-0">Failed</p>
@@ -4507,6 +4507,7 @@
         
         // Campaign Device Report Functions
         let currentCampaignForReport = null;
+        let currentDeviceReport = null; // Store the device report globally
         
         function showCampaignDeviceReport(campaign) {
             // Store campaign for use in other functions
@@ -4528,6 +4529,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
+                        currentDeviceReport = data.results; // Store the report globally
                         displayDeviceReport(data.results);
                     } else {
                         document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load device report</td></tr>';
@@ -4637,6 +4639,73 @@
                     console.error('Error loading lead details:', error);
                     document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading leads</td></tr>';
                 });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
+            modal.show();
+        }
+        
+        function showAllCampaignLeads(status) {
+            if (!currentCampaignForReport) {
+                showAlert('error', 'No campaign selected');
+                return;
+            }
+            
+            // Update modal title
+            let statusText = status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1);
+            document.getElementById('leadDetailsTitle').textContent = `${statusText} Campaign Leads`;
+            
+            // Show loading state
+            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading all leads...</td></tr>';
+            
+            // We need to fetch leads from all devices for this campaign
+            // Since we don't have a combined endpoint, we'll use the device report data
+            const report = currentDeviceReport; // Store the report globally when loaded
+            if (!report || !report.devices) {
+                document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No device data available</td></tr>';
+                const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
+                modal.show();
+                return;
+            }
+            
+            // Collect all leads from all devices
+            let allLeads = [];
+            let fetchPromises = [];
+            
+            report.devices.forEach(device => {
+                // Only fetch from devices that have leads
+                if ((status === 'all' && device.totalLeads > 0) ||
+                    (status === 'pending' && device.pendingLeads > 0) ||
+                    (status === 'success' && device.successLeads > 0) ||
+                    (status === 'failed' && device.failedLeads > 0)) {
+                    
+                    fetchPromises.push(
+                        fetch(`/api/campaigns/${currentCampaignForReport.id}/device/${device.id}/leads?status=${status}`, { credentials: 'include' })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.code === 'SUCCESS' && data.results) {
+                                    // Add device name to each lead
+                                    data.results.forEach(lead => {
+                                        lead.deviceName = device.name;
+                                    });
+                                    allLeads = allLeads.concat(data.results);
+                                }
+                            })
+                            .catch(error => {
+                                console.error(`Error loading leads for device ${device.id}:`, error);
+                            })
+                    );
+                }
+            });
+            
+            // Wait for all fetches to complete
+            Promise.all(fetchPromises).then(() => {
+                if (allLeads.length > 0) {
+                    displayLeadDetails(allLeads);
+                } else {
+                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+                }
+            });
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
