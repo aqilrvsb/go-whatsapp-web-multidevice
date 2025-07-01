@@ -25,12 +25,12 @@ func cleanStuckMessages() {
 	db := database.GetDB()
 	
 	// Find messages that have been queued for more than 5 minutes
-	// These are likely stuck due to worker crash or other issues
+	// Mark them as failed instead of pending to avoid infinite loops
 	result, err := db.Exec(`
 		UPDATE broadcast_messages 
-		SET status = 'pending', 
+		SET status = 'failed', 
 		    updated_at = CURRENT_TIMESTAMP,
-		    error_message = 'Reset from stuck queued state'
+		    error_message = 'Message timeout - device was not available'
 		WHERE status = 'queued' 
 		AND updated_at < (CURRENT_TIMESTAMP - INTERVAL '5 minutes')
 	`)
@@ -42,6 +42,6 @@ func cleanStuckMessages() {
 	
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected > 0 {
-		logrus.Warnf("Reset %d stuck messages from 'queued' back to 'pending'", rowsAffected)
+		logrus.Warnf("Marked %d stuck queued messages as failed after timeout", rowsAffected)
 	}
 }

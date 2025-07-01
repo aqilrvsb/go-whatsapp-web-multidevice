@@ -199,6 +199,12 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 			status, created_at, updated_at
 		FROM campaigns
 		WHERE status = 'pending'
+		AND id NOT IN (
+			-- Exclude campaigns that already have broadcast messages
+			SELECT DISTINCT campaign_id 
+			FROM broadcast_messages 
+			WHERE campaign_id IS NOT NULL
+		)
 		AND (
 			-- Immediate execution (no time set)
 			time_schedule IS NULL 

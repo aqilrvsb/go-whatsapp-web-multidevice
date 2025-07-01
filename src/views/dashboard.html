@@ -4564,6 +4564,9 @@
             
             if (report.devices && report.devices.length > 0) {
                 report.devices.forEach(device => {
+                    // Debug log
+                    console.log('Device Report - Device:', device);
+                    
                     const successRate = device.totalLeads > 0 
                         ? ((device.successLeads / device.totalLeads) * 100).toFixed(1) 
                         : 0;
@@ -4618,6 +4621,9 @@
         }
         
         function showLeadDetails(deviceId, status, campaignId) {
+            // Debug log
+            console.log('showLeadDetails called with:', { deviceId, status, campaignId });
+            
             // Update modal title
             let statusText = status.charAt(0).toUpperCase() + status.slice(1);
             document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads`;
@@ -4723,7 +4729,7 @@
                             <td>${lead.name || 'Unknown'}</td>
                             <td>${lead.phone || '-'}</td>
                             <td>
-                                <span class="badge bg-${lead.status === 'success' ? 'success' : lead.status === 'failed' ? 'danger' : 'warning'}">
+                                <span class="badge bg-${lead.status === 'sent' || lead.status === 'delivered' || lead.status === 'success' ? 'success' : lead.status === 'failed' || lead.status === 'error' ? 'danger' : 'warning'}">
                                     ${lead.status || 'pending'}
                                 </span>
                             </td>

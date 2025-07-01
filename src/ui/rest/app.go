@@ -2300,6 +2300,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		devices = append(devices, device)
 		
 		// Initialize device report
+		log.Printf("Device Report - Initializing device: ID=%s, Name=%s", device.ID, device.DeviceName)
 		deviceMap[device.ID] = &DeviceReport{
 			ID:     device.ID,
 			Name:   device.DeviceName,
@@ -2321,6 +2322,25 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		// Debug: log the query results
 		log.Printf("Device Report - Campaign ID: %d, User ID: %s", campaignId, session.UserID)
 		
+		// First, let's check total messages per device
+		totalQuery := `
+			SELECT device_id, COUNT(*) as total_count
+			FROM broadcast_messages
+			WHERE campaign_id = $1 AND user_id = $2
+			GROUP BY device_id
+		`
+		totalRows, _ := db.Query(totalQuery, campaignId, session.UserID)
+		if totalRows != nil {
+			defer totalRows.Close()
+			for totalRows.Next() {
+				var deviceId string
+				var totalCount int
+				if err := totalRows.Scan(&deviceId, &totalCount); err == nil {
+					log.Printf("Device Report - Device %s has TOTAL %d messages", deviceId, totalCount)
+				}
+			}
+		}
+		
 		for msgRows.Next() {
 			var deviceId, status string
 			var count int
@@ -2334,13 +2354,21 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 				report.TotalLeads += count
 				
 				switch status {
-				case "pending":
+				case "pending", "queued":
 					report.PendingLeads += count
-				case "sent", "delivered":
+				case "sent", "delivered", "success":
 					report.SuccessLeads += count
-				case "failed":
+				case "failed", "error":
 					report.FailedLeads += count
+				default:
+					// Log unknown status
+					log.Printf("Device Report - Unknown status: %s, count: %d", status, count)
+					// Add to pending for now
+					report.PendingLeads += count
 				}
+				
+				// Log what we're adding
+				log.Printf("Device Report - Added to %s: status=%s, count=%d", deviceId, status, count)
 			}
 		}
 	}
@@ -2375,9 +2403,15 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Log final totals
+	// Log final totals and device details
 	log.Printf("Device Report Final - Total Devices: %d, Total Leads: %d, Pending: %d, Success: %d, Failed: %d", 
 		len(devices), totalLeads, pendingLeads, successLeads, failedLeads)
+	
+	// Log each device's counts
+	for _, report := range deviceReports {
+		log.Printf("Device %s: Total=%d (Pending=%d, Success=%d, Failed=%d)", 
+			report.Name, report.TotalLeads, report.PendingLeads, report.SuccessLeads, report.FailedLeads)
+	}
 	
 	result := map[string]interface{}{
 		"totalDevices":        len(devices),
@@ -2435,6 +2469,11 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	
 	// Get real broadcast message data
 	db := database.GetDB()
+	
+	// Log the query parameters
+	log.Printf("GetCampaignDeviceLeads - Campaign: %d, Device: %s, User: %s, Status: %s", 
+		campaignId, deviceId, session.UserID, status)
+	
 	query := `
 		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
 		FROM broadcast_messages bm
@@ -2445,11 +2484,11 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	// Add status filter if not "all"
 	if status != "all" {
 		if status == "success" {
-			query += ` AND bm.status IN ('sent', 'delivered')`
+			query += ` AND bm.status IN ('sent', 'delivered', 'success')`
 		} else if status == "pending" {
-			query += ` AND bm.status = 'pending'`
+			query += ` AND bm.status IN ('pending', 'queued')`
 		} else if status == "failed" {
-			query += ` AND bm.status = 'failed'`
+			query += ` AND bm.status IN ('failed', 'error')`
 		}
 	}
 	

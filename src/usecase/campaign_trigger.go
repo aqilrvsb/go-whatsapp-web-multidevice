@@ -4,6 +4,7 @@ import (
 	"time"
 
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -77,6 +78,11 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 	
 	if len(connectedDevices) == 0 {
 		logrus.Errorf("No connected devices found for user %s", campaign.UserID)
+		// Update campaign status to failed immediately
+		campaignRepo := repository.GetCampaignRepository()
+		if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "failed"); err != nil {
+			logrus.Errorf("Failed to update campaign status to failed: %v", err)
+		}
 		return
 	}
 	
@@ -146,14 +152,29 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 		}
 	}
 	
-	// Update campaign status to triggered
+	// Update campaign status based on results
 	campaignRepo := repository.GetCampaignRepository()
-	if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "triggered"); err != nil {
-		logrus.Errorf("Failed to update campaign status to triggered: %v", err)
+	if successful == 0 && failed > 0 {
+		// All messages failed - mark campaign as failed
+		if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "failed"); err != nil {
+			logrus.Errorf("Failed to update campaign status to failed: %v", err)
+		}
+		logrus.Infof("Campaign %s marked as failed: 0 messages queued, %d failed", 
+			campaign.Title, failed)
+	} else if successful > 0 {
+		// At least some messages queued - mark as triggered
+		if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "triggered"); err != nil {
+			logrus.Errorf("Failed to update campaign status to triggered: %v", err)
+		}
+		logrus.Infof("Campaign %s triggered: %d messages queued across %d devices, %d failed", 
+			campaign.Title, successful, len(connectedDevices), failed)
+	} else {
+		// No leads found - mark as completed
+		if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "completed"); err != nil {
+			logrus.Errorf("Failed to update campaign status to completed: %v", err)
+		}
+		logrus.Infof("Campaign %s completed: No leads found matching criteria", campaign.Title)
 	}
-	
-	logrus.Infof("Campaign %s completed: %d messages queued across %d devices, %d failed", 
-		campaign.Title, successful, len(connectedDevices), failed)
 }
 
 // ProcessSequenceTriggers processes new leads for sequence enrollment
@@ -263,23 +284,53 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 				continue // No step found for this day
 			}
 			
-			// Get user's connected devices
+			// Get the lead's assigned device from database
+			db := database.GetDB()
+			var leadDeviceID string
+			err = db.QueryRow(`
+				SELECT device_id FROM leads 
+				WHERE phone = $1 AND user_id = $2
+				LIMIT 1
+			`, contact.ContactPhone, sequence.UserID).Scan(&leadDeviceID)
+			
+			if err != nil {
+				logrus.Errorf("Failed to get device for contact %s: %v", contact.ContactPhone, err)
+				continue
+			}
+			
+			// Check if the lead's device is connected
 			devices, err := userRepo.GetUserDevices(sequence.UserID)
 			if err != nil {
 				continue
 			}
 			
-			// Find a connected device
+			// Find the lead's specific device
 			var device *models.UserDevice
 			for _, d := range devices {
-				if d.Status == "connected" {
+				if d.ID == leadDeviceID && (d.Status == "connected" || d.Status == "online") {
 					device = d
 					break
 				}
 			}
 			
 			if device == nil {
-				logrus.Warnf("No connected device for sequence %s", sequence.Name)
+				logrus.Warnf("Lead's device %s not connected for sequence %s, skipping contact %s", 
+					leadDeviceID, sequence.Name, contact.ContactPhone)
+				// Don't advance the sequence if the lead's device is not available
+				continue
+			}
+			
+			// Check if we already created a message for this contact/day
+			var existingCount int
+			err = db.QueryRow(`
+				SELECT COUNT(*) FROM broadcast_messages 
+				WHERE sequence_id = $1 
+				AND recipient_phone = $2 
+				AND group_order = $3
+			`, sequence.ID, contact.ContactPhone, nextDay).Scan(&existingCount)
+			
+			if err == nil && existingCount > 0 {
+				logrus.Infof("Message already exists for contact %s day %d, skipping", contact.ContactPhone, nextDay)
 				continue
 			}
 			
@@ -300,9 +351,13 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			err = broadcastRepo.QueueMessage(msg)
 			if err != nil {
 				logrus.Errorf("Failed to queue sequence message: %v", err)
+				// Don't update progress if we couldn't queue the message
 			} else {
-				// Update contact progress
-				sequenceRepo.UpdateContactProgress(contact.ID, nextDay, "active")
+				// Update contact progress only after successfully queuing
+				err = sequenceRepo.UpdateContactProgress(contact.ID, nextDay, "active")
+				if err != nil {
+					logrus.Errorf("Failed to update contact progress: %v", err)
+				}
 				
 				// Log the message
 				log := &models.SequenceLog{
@@ -310,7 +365,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 					ContactID:  contact.ID,
 					StepID:     nextStep.ID,
 					Day:        nextDay,
-					Status:     "sent",
+					Status:     "queued", // Not "sent" yet
 					SentAt:     time.Now(),
 				}
 				sequenceRepo.CreateSequenceLog(log)

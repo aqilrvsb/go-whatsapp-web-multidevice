@@ -384,9 +384,38 @@ func (bwp *BroadcastWorkerPool) checkCompletion() {
 				if err != nil {
 					logrus.Errorf("Failed to update campaign status: %v", err)
 				}
+				
+				// If campaign failed, update all queued messages to failed
+				if status == "failed" {
+					_, err := db.Exec(`
+						UPDATE broadcast_messages 
+						SET status = 'failed', 
+						    error_message = 'Campaign failed - device not available',
+						    updated_at = NOW() 
+						WHERE campaign_id = $1 AND status = 'queued'`, 
+						bwp.broadcastID)
+					if err != nil {
+						logrus.Errorf("Failed to update queued messages to failed: %v", err)
+					} else {
+						logrus.Infof("Updated all queued messages to failed for campaign %s", bwp.broadcastID)
+					}
+				}
 			} else if bwp.broadcastType == "sequence" {
-				// For sequences, we might not want to change the status
-				// as sequences can have multiple steps
+				// For sequences, also update failed messages
+				if failed == total && total > 0 {
+					_, err := db.Exec(`
+						UPDATE broadcast_messages 
+						SET status = 'failed', 
+						    error_message = 'Sequence message failed - device not available',
+						    updated_at = NOW() 
+						WHERE sequence_id = $1 AND status = 'queued'`, 
+						bwp.broadcastID)
+					if err != nil {
+						logrus.Errorf("Failed to update queued sequence messages to failed: %v", err)
+					} else {
+						logrus.Infof("Updated all queued messages to failed for sequence %s", bwp.broadcastID)
+					}
+				}
 				logrus.Infof("Sequence %s broadcast completed", bwp.broadcastID)
 			}
 			
