@@ -2493,16 +2493,35 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	// Get real broadcast message data
 	db := database.GetDB()
 	
-	// Log the query parameters
-	log.Printf("GetCampaignDeviceLeads - Campaign: %d, Device: %s, User: %s, Status: %s", 
-		campaignId, deviceId, session.UserID, status)
+	// First check if this is an AI campaign by checking the 'ai' column
+	var aiType sql.NullString
+	err = db.QueryRow("SELECT ai FROM campaigns WHERE id = $1", campaignId).Scan(&aiType)
+	if err != nil {
+		log.Printf("Error checking campaign ai type: %v", err)
+	}
 	
-	query := `
-		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
-		FROM broadcast_messages bm
-		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
-		WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
-	`
+	// Log the query parameters
+	log.Printf("GetCampaignDeviceLeads - Campaign: %d, Device: %s, User: %s, Status: %s, AI: %v", 
+		campaignId, deviceId, session.UserID, status, aiType.String)
+	
+	var query string
+	if aiType.Valid && aiType.String == "ai" {
+		// For AI campaigns (when ai column = 'ai'), join with leads_ai table
+		query = `
+			SELECT bm.recipient_phone, bm.status, bm.sent_at, lai.name
+			FROM broadcast_messages bm
+			LEFT JOIN leads_ai lai ON lai.phone = bm.recipient_phone AND lai.user_id = bm.user_id
+			WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
+		`
+	} else {
+		// For regular campaigns, join with leads table
+		query = `
+			SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
+			FROM broadcast_messages bm
+			LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
+			WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
+		`
+	}
 	
 	// Add status filter if not "all"
 	if status != "all" {

@@ -4921,7 +4921,7 @@
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 ` : ''}
-                                ${(currentCampaignForReport && currentCampaignForReport.ai === 'ai' && device.successLeads > 0 && (device.status === 'online' || device.status === 'connected')) ? `
+                                ${(currentCampaignForReport && currentCampaignForReport.ai === 'ai' && device.successLeads > 0 && (device.status === 'online' || device.status === 'connected' || device.status === 'active')) ? `
                                     <button class="btn btn-sm btn-outline-success ms-1" onclick="transferAILeadsToDevice('${device.id}', '${campaignId}'); return false;" title="Transfer successful AI leads to device">
                                         <i class="bi bi-arrow-right-square"></i>
                                     </button>
@@ -5144,11 +5144,15 @@
                     showToast('Transferring AI leads...', 'info');
                     
                     // Call API to transfer leads
-                    fetch(`/api/campaigns-ai/${campaignId}/device/${deviceId}/transfer-leads`, {
+                    fetch('/api/ai-campaign/transfer-leads', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
+                        body: JSON.stringify({
+                            device_id: deviceId,
+                            campaign_id: campaignId
+                        }),
                         credentials: 'include'
                     })
                     .then(response => response.json())
