@@ -1,0 +1,10 @@
+Deployment trigger: Fixed logout device stuck loading issue
+Date: ${new Date().toISOString()}
+
+Changes:
+- Fixed logout function to properly hide loading spinner
+- Added timeout protection (30s) to prevent infinite loading
+- Ensured loading is hidden before showing success message
+- Clear timeout on completion or error
+
+This file triggers Railway deployment.
