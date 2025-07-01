@@ -1,0 +1,33 @@
+			err := p.sendLeadMessage(ctx, lead, device, campaign)
+			if err != nil {
+				// Device failed (probably banned) - mark it and don't retry
+				logrus.Errorf("Device %s failed to send (possibly banned): %v", device.ID, err)
+				tracker.Status = "failed"
+				tracker.Failed++
+				
+				// Update device progress in database
+				p.updateDeviceProgress(campaignID, device.ID, tracker)
+			} else {
+				// Success! Message is queued
+				tracker.Sent++
+				successCount++
+				assigned = true
+				
+				// IMPORTANT: Only assign device, but keep status as pending
+				// The actual sending will be done by the worker processor
+				// Worker will update status to "sent" when actually delivered
+				p.leadAIRepo.AssignDevice(lead.ID, device.ID)
+				// DO NOT update status here - let worker handle it
+				
+				// Check if device reached limit
+				if tracker.Sent >= tracker.Limit {
+					tracker.Status = "limit_reached"
+					logrus.Infof("Device %s reached its limit of %d messages", device.ID, tracker.Limit)
+				}
+				
+				// Update progress in database
+				p.updateDeviceProgress(campaignID, device.ID, tracker)
+				
+				logrus.Infof("Successfully queued lead %s for device %s (%d/%d)", 
+					lead.Phone, device.ID, tracker.Sent, tracker.Limit)
+			}

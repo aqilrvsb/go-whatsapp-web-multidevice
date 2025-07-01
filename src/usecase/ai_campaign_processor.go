@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"sync"
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/go-redis/redis/v8"
+	"github.com/sirupsen/logrus"
 )
 
 type DeviceTracker struct {
@@ -28,6 +28,7 @@ type AICampaignProcessor struct {
 	campaignRepo  repository.CampaignRepository
 	redisClient   *redis.Client
 }
+
 func NewAICampaignProcessor(
 	broadcastRepo *repository.BroadcastRepository,
 	leadAIRepo repository.LeadAIRepository,
@@ -45,6 +46,8 @@ func NewAICampaignProcessor(
 }
 
 func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID int) error {
+	logrus.Infof("Starting AI Campaign processing for campaign ID: %d", campaignID)
+	
 	// 1. Get campaign details
 	campaign, err := p.campaignRepo.GetCampaignByID(campaignID)
 	if err != nil {
@@ -56,6 +59,8 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 		return fmt.Errorf("campaign %d is not an AI campaign", campaignID)
 	}
 	
+	logrus.Infof("AI Campaign: %s, Device Limit: %d", campaign.Title, campaign.Limit)
+	
 	// 2. Get all pending AI leads based on campaign criteria
 	var leads []models.LeadAI
 	if campaign.TargetStatus == "all" {
@@ -66,7 +71,8 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 	
 	if err != nil {
 		return fmt.Errorf("failed to get AI leads: %w", err)
-	}	
+	}
+	
 	// Filter only pending leads
 	var pendingLeads []models.LeadAI
 	for _, lead := range leads {
@@ -76,8 +82,12 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 	}
 	
 	if len(pendingLeads) == 0 {
+		logrus.Info("No pending leads found for AI campaign")
+		p.campaignRepo.UpdateCampaignStatus(campaignID, "completed")
 		return nil
 	}
+	
+	logrus.Infof("Found %d pending leads to process", len(pendingLeads))
 	
 	// 3. Get all connected devices for the user
 	devices, err := p.userRepo.GetUserDevices(campaign.UserID)
@@ -85,18 +95,28 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 		return fmt.Errorf("failed to get user devices: %w", err)
 	}
 	
-	// Filter only connected devices
+	// Filter only connected devices (check multiple status variations)
 	var connectedDevices []*models.UserDevice
 	for _, device := range devices {
-		if device.Status == "online" {
+		if device.Status == "online" || device.Status == "Online" || 
+		   device.Status == "connected" || device.Status == "Connected" {
 			connectedDevices = append(connectedDevices, device)
 		}
 	}
 	
 	if len(connectedDevices) == 0 {
-		// Mark campaign as failed
+		logrus.Error("No connected devices available for AI campaign")
 		p.campaignRepo.UpdateCampaignStatus(campaignID, "failed")
 		return fmt.Errorf("no connected devices available")
+	}
+	
+	logrus.Infof("Found %d connected devices", len(connectedDevices))
+	
+	// Check total capacity
+	totalCapacity := len(connectedDevices) * campaign.Limit
+	if len(pendingLeads) > totalCapacity {
+		logrus.Warnf("Warning: %d leads but only %d total capacity across all devices", 
+			len(pendingLeads), totalCapacity)
 	}
 	
 	// 4. Initialize device tracking
@@ -119,104 +139,115 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 			Status:     "active",
 		}
 		p.leadAIRepo.UpdateCampaignProgress(progress)
-	}	
-	// 5. Start round-robin assignment
+	}
+	
+	// 5. SEQUENTIAL Round-Robin Assignment (ONE BY ONE)
 	deviceIndex := 0
 	successCount := 0
-	failCount := 0
+	pendingCount := 0
 	
-	// Create a wait group for concurrent processing
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 5) // Limit concurrent sends
-	
-	for _, lead := range pendingLeads {
+	// Process each lead SEQUENTIALLY
+	for i, lead := range pendingLeads {
+		logrus.Debugf("Processing lead %d/%d: %s", i+1, len(pendingLeads), lead.Phone)
+		
 		assigned := false
 		attempts := 0
 		
-		// Try to assign to a device
+		// Try each device in round-robin until we find one that can send
 		for attempts < len(connectedDevices) && !assigned {
-			device := connectedDevices[deviceIndex%len(connectedDevices)]
+			device := connectedDevices[deviceIndex % len(connectedDevices)]
 			tracker := deviceStatus[device.ID]
+			deviceIndex++ // Move to next device for next iteration
 			
-			// Check if device can accept more leads
-			if tracker.Status == "active" && tracker.Sent < tracker.Limit {
-				// Assign lead to device
-				wg.Add(1)
-				semaphore <- struct{}{} // Acquire semaphore
-				
-				go func(l models.LeadAI, d *models.UserDevice, t *DeviceTracker) {
-					defer wg.Done()
-					defer func() { <-semaphore }() // Release semaphore
-					
-					err := p.assignAndSendLead(ctx, l, d, campaign)
-					if err != nil {
-						t.Failed++
-						failCount++
-						
-						// Mark device as failed after 3 consecutive failures
-						if t.Failed > 3 {
-							t.Status = "failed"
-							p.updateDeviceProgress(campaignID, d.ID, t)
-						}
-						
-						// Update lead status to failed
-						p.leadAIRepo.UpdateStatus(l.ID, "failed")
-					} else {
-						t.Sent++
-						successCount++
-						assigned = true
-						
-						// Update lead with device assignment
-						p.leadAIRepo.AssignDevice(l.ID, d.ID)
-						p.leadAIRepo.UpdateStatus(l.ID, "sent")
-						
-						// Check if device reached limit
-						if t.Sent >= t.Limit {
-							t.Status = "limit_reached"
-						}
-						
-						// Update progress in database
-						p.updateDeviceProgress(campaignID, d.ID, t)
-					}
-				}(lead, device, tracker)
-				
-				assigned = true // Mark as assigned to prevent multiple attempts
+			// Skip if device is failed or reached limit
+			if tracker.Status == "failed" || tracker.Sent >= tracker.Limit {
+				attempts++
+				continue
 			}
 			
-			deviceIndex++
+			// Try to send with this device
+			logrus.Debugf("Attempting to send lead %s via device %s", lead.Phone, device.ID)
+			
+			err := p.sendLeadMessage(ctx, lead, device, campaign)
+			if err != nil {
+				// Device failed (probably banned) - mark it and don't retry
+				logrus.Errorf("Device %s failed to send (possibly banned): %v", device.ID, err)
+				tracker.Status = "failed"
+				tracker.Failed++
+				
+				// Update device progress in database
+				p.updateDeviceProgress(campaignID, device.ID, tracker)
+			} else {
+				// Success!
+				tracker.Sent++
+				successCount++
+				assigned = true
+				
+				// Update lead with device assignment and status
+				p.leadAIRepo.AssignDevice(lead.ID, device.ID)
+				p.leadAIRepo.UpdateStatus(lead.ID, "sent")
+				
+				// Check if device reached limit
+				if tracker.Sent >= tracker.Limit {
+					tracker.Status = "limit_reached"
+					logrus.Infof("Device %s reached its limit of %d messages", device.ID, tracker.Limit)
+				}
+				
+				// Update progress in database
+				p.updateDeviceProgress(campaignID, device.ID, tracker)
+				
+				logrus.Infof("Successfully sent lead %s via device %s (%d/%d)", 
+					lead.Phone, device.ID, tracker.Sent, tracker.Limit)
+			}
+			
 			attempts++
-		}		
-		// If not assigned after all attempts, mark as failed
-		if !assigned {
-			p.leadAIRepo.UpdateStatus(lead.ID, "failed")
-			failCount++
 		}
 		
-		// Add a small delay between lead assignments
-		time.Sleep(time.Duration(rand.Intn(500)+500) * time.Millisecond)
+		// If not assigned, it stays pending (don't mark as failed)
+		if !assigned {
+			pendingCount++
+			logrus.Infof("Lead %s remains pending - no available devices", lead.Phone)
+			// Status remains "pending" - we do NOT update to "failed"
+		}
+		
+		// Add human-like delay between messages (even if failed)
+		if i < len(pendingLeads)-1 { // Don't delay after last message
+			delay := p.getRandomDelay(campaign.MinDelaySeconds, campaign.MaxDelaySeconds)
+			logrus.Debugf("Waiting %d seconds before next message", delay)
+			time.Sleep(time.Duration(delay) * time.Second)
+		}
 	}
-	
-	// Wait for all goroutines to complete
-	wg.Wait()
 	
 	// 6. Update campaign status
 	var campaignStatus string
-	if successCount > 0 {
-		if failCount > 0 {
-			campaignStatus = "completed_with_errors"
-		} else {
-			campaignStatus = "completed"
-		}
+	if successCount == len(pendingLeads) {
+		campaignStatus = "completed"
+		logrus.Infof("AI Campaign completed successfully: %d/%d messages sent", successCount, len(pendingLeads))
+	} else if successCount > 0 {
+		campaignStatus = "completed_with_pending"
+		logrus.Infof("AI Campaign completed with pending: %d sent, %d pending", successCount, pendingCount)
 	} else {
 		campaignStatus = "failed"
+		logrus.Errorf("AI Campaign failed: No messages could be sent")
 	}
 	
 	p.campaignRepo.UpdateCampaignStatus(campaignID, campaignStatus)
 	
+	// Log final statistics
+	logrus.Infof("AI Campaign %d finished:", campaignID)
+	logrus.Infof("- Total leads processed: %d", len(pendingLeads))
+	logrus.Infof("- Successfully sent: %d", successCount)
+	logrus.Infof("- Remaining pending: %d", pendingCount)
+	logrus.Infof("- Device statistics:")
+	for _, device := range connectedDevices {
+		tracker := deviceStatus[device.ID]
+		logrus.Infof("  - Device %s: Sent=%d, Status=%s", device.ID, tracker.Sent, tracker.Status)
+	}
+	
 	return nil
 }
 
-func (p *AICampaignProcessor) assignAndSendLead(ctx context.Context, lead models.LeadAI, device *models.UserDevice, campaign *models.Campaign) error {
+func (p *AICampaignProcessor) sendLeadMessage(ctx context.Context, lead models.LeadAI, device *models.UserDevice, campaign *models.Campaign) error {
 	// Create broadcast message
 	message := domainBroadcast.BroadcastMessage{
 		ID:             fmt.Sprintf("ai_%d_%d_%s", campaign.ID, lead.ID, time.Now().Format("20060102150405")),
@@ -236,25 +267,18 @@ func (p *AICampaignProcessor) assignAndSendLead(ctx context.Context, lead models
 		MaxDelay:       campaign.MaxDelaySeconds,
 	}
 	
+	// If image URL is provided, set type to image
+	if campaign.ImageURL != "" {
+		message.Type = "image"
+	}
+	
 	// Queue message to database
 	err := p.broadcastRepo.QueueMessage(message)
 	if err != nil {
 		return fmt.Errorf("failed to queue broadcast message: %w", err)
 	}
 	
-	// Add delay between messages (human-like behavior)
-	minDelay := campaign.MinDelaySeconds
-	maxDelay := campaign.MaxDelaySeconds
-	if minDelay < 5 {
-		minDelay = 5
-	}
-	if maxDelay < minDelay {
-		maxDelay = minDelay + 10
-	}
-	
-	delay := rand.Intn(maxDelay-minDelay) + minDelay
-	time.Sleep(time.Duration(delay) * time.Second)
-	
+	// Message queued successfully
 	return nil
 }
 
@@ -265,7 +289,22 @@ func (p *AICampaignProcessor) updateDeviceProgress(campaignID int, deviceID stri
 		LeadsSent:   tracker.Sent,
 		LeadsFailed: tracker.Failed,
 		Status:      tracker.Status,
+		LastActivity: time.Now(),
 	}
 	
-	p.leadAIRepo.UpdateCampaignProgress(progress)
+	err := p.leadAIRepo.UpdateCampaignProgress(progress)
+	if err != nil {
+		logrus.Errorf("Failed to update campaign progress for device %s: %v", deviceID, err)
+	}
+}
+
+func (p *AICampaignProcessor) getRandomDelay(minSeconds, maxSeconds int) int {
+	if minSeconds < 5 {
+		minSeconds = 5
+	}
+	if maxSeconds < minSeconds {
+		maxSeconds = minSeconds + 10
+	}
+	
+	return rand.Intn(maxSeconds-minSeconds+1) + minSeconds
 }
