@@ -1087,7 +1087,24 @@
                         <div class="mb-3">
                             <label class="form-label">Message <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="campaignMessage" rows="5" required 
-                                      placeholder="Enter your broadcast message..."></textarea>
+                                      placeholder="Enter your broadcast message..."
+                                      oninput="updateLivePreview()"></textarea>
+                            <small class="text-muted d-block mt-1">
+                                <strong>WhatsApp Formatting:</strong> 
+                                *bold* | _italic_ | ~strikethrough~ | ```monospace``` | 😊 Emojis supported
+                            </small>
+                        </div>
+                        
+                        <!-- Live Preview -->
+                        <div class="mb-3">
+                            <label class="form-label">Live Preview</label>
+                            <div class="border rounded p-3" style="background: #f0f2f5;">
+                                <div class="whatsapp-preview" style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                    <div id="livePreviewMessage" style="white-space: pre-wrap; word-break: break-word; color: #333;">
+                                        <span class="text-muted">Your formatted message will appear here...</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
@@ -1512,6 +1529,10 @@
                         <div class="mb-3">
                             <label class="form-label">Message *</label>
                             <textarea class="form-control" id="aiCampaignMessage" rows="4" required></textarea>
+                            <small class="text-muted d-block mt-1">
+                                <strong>WhatsApp Formatting:</strong> 
+                                *bold* | _italic_ | ~strikethrough~ | ```monospace``` | 😊 Emojis supported
+                            </small>
                         </div>
                         
                         <div class="mb-3">
@@ -4545,8 +4566,8 @@
                 imageDiv.innerHTML = '';
             }
             
-            // Show message
-            document.getElementById('previewMessage').textContent = campaign.message || 'No message content';
+            // Show message with WhatsApp formatting
+            document.getElementById('previewMessage').innerHTML = formatWhatsAppText(campaign.message || 'No message content');
             
             // Set timestamp
             const now = new Date();
@@ -5137,6 +5158,48 @@
             if (!dateString) return '-';
             const date = new Date(dateString);
             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Format WhatsApp text to HTML
+        function formatWhatsAppText(text) {
+            if (!text) return '';
+            
+            // Escape HTML first
+            text = text.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+            
+            // Apply WhatsApp formatting
+            // Monospace (triple backticks) - process first to avoid conflicts
+            text = text.replace(/```(.*?)```/g, '<code style="background: #f0f2f5; padding: 2px 4px; border-radius: 4px; font-family: monospace;">$1</code>');
+            
+            // Bold (*text*)
+            text = text.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+            
+            // Italic (_text_)
+            text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+            
+            // Strikethrough (~text~)
+            text = text.replace(/~([^~]+)~/g, '<del>$1</del>');
+            
+            // Convert newlines to <br>
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
+        }
+        
+        // Update live preview for campaign message
+        function updateLivePreview() {
+            const message = document.getElementById('campaignMessage').value;
+            const previewDiv = document.getElementById('livePreviewMessage');
+            
+            if (message.trim()) {
+                previewDiv.innerHTML = formatWhatsAppText(message);
+            } else {
+                previewDiv.innerHTML = '<span class="text-muted">Your formatted message will appear here...</span>';
+            }
         }
         
         // AI Lead Management Functions
