@@ -1528,11 +1528,24 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Message *</label>
-                            <textarea class="form-control" id="aiCampaignMessage" rows="4" required></textarea>
+                            <textarea class="form-control" id="aiCampaignMessage" rows="4" required 
+                                      oninput="updateAILivePreview()"></textarea>
                             <small class="text-muted d-block mt-1">
                                 <strong>WhatsApp Formatting:</strong> 
                                 *bold* | _italic_ | ~strikethrough~ | ```monospace``` | 😊 Emojis supported
                             </small>
+                        </div>
+                        
+                        <!-- AI Campaign Live Preview -->
+                        <div class="mb-3">
+                            <label class="form-label">Live Preview</label>
+                            <div class="border rounded p-3" style="background: #f0f2f5;">
+                                <div class="whatsapp-preview" style="background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                    <div id="aiLivePreviewMessage" style="white-space: pre-wrap; word-break: break-word; color: #333;">
+                                        <span class="text-muted">Your formatted message will appear here...</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
@@ -5202,11 +5215,76 @@
             }
         }
         
+        // Update live preview for AI campaign message
+        function updateAILivePreview() {
+            const message = document.getElementById('aiCampaignMessage').value;
+            const previewDiv = document.getElementById('aiLivePreviewMessage');
+            
+            if (message.trim()) {
+                previewDiv.innerHTML = formatWhatsAppText(message);
+            } else {
+                previewDiv.innerHTML = '<span class="text-muted">Your formatted message will appear here...</span>';
+            }
+        }
+        
+        // Compress image file to 350KB max
+        function compressImageFile(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Start with reasonable dimensions
+                    let width = img.width;
+                    let height = img.height;
+                    let quality = 0.9;
+                    
+                    // First resize if too large
+                    const maxSize = 1000;
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Compress until under 350KB
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                callback(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    
+                    tryCompress();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
         // AI Lead Management Functions
         function loadAILeads() {
-            fetch('/api/leads-ai')
+            console.log('Loading AI leads...');
+            fetch('/api/leads-ai', { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
+                    console.log('AI leads response:', data);
                     if (data.code === 'SUCCESS' && data.results) {
                         displayAILeads(data.results);
                         updateAILeadStats(data.results);
@@ -5434,6 +5512,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify(leadData)
             })
             .then(response => response.json())
@@ -5454,7 +5533,7 @@
         }
         
         function editAILead(leadId) {
-            fetch(`/api/leads-ai`)
+            fetch(`/api/leads-ai`, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
@@ -5491,7 +5570,8 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     fetch(`/api/leads-ai/${leadId}`, {
-                        method: 'DELETE'
+                        method: 'DELETE',
+                        credentials: 'include'
                     })
                     .then(response => response.json())
                     .then(data => {
