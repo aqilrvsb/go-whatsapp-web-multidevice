@@ -1,0 +1,285 @@
+<!-- AI Leads Tab Content -->
+<div class="tab-pane fade" id="manage-ai" role="tabpanel">
+    <!-- Header Section - Exact copy of device leads UI -->
+    <div class="device-info">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-1">
+                    <i class="bi bi-robot text-primary"></i>
+                    AI Lead Management
+                </h4>
+                <p class="text-muted mb-0">
+                    Total AI Leads: <span id="totalAILeads">0</span> | 
+                    Pending: <span id="pendingAILeads">0</span> | 
+                    Sent: <span id="sentAILeads">0</span>
+                </p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary me-2" onclick="exportAILeads()">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="btn btn-outline-primary me-2" onclick="importAILeads()">
+                    <i class="bi bi-upload"></i> Import
+                </button>
+                <button class="add-lead-btn" onclick="showAddAILeadModal()">
+                    <i class="bi bi-plus-circle"></i> Add AI Lead
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white rounded-3 p-3 mb-4 shadow-sm mt-3">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0" id="aiSearchInput" 
+                           placeholder="Search by name, phone, or niche..." onkeyup="searchAILeads()">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <button class="btn btn-success float-end" onclick="showCreateAICampaignModal()">
+                    <i class="bi bi-broadcast"></i> Create AI Campaign
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Leads Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="aiLeadsTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Niche</th>
+                            <th>Target Status</th>
+                            <th>Status</th>
+                            <th>Device</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="aiLeadsTableBody">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Lead Modal (Add/Edit) -->
+<div class="modal fade" id="aiLeadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="aiLeadModalTitle">Add AI Lead</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="aiLeadForm">
+                    <input type="hidden" id="aiLeadId">
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="aiLeadName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="aiLeadPhone" 
+                               placeholder="60123456789" required>
+                        <small class="text-muted">Format: Country code + number (e.g., 60123456789)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="aiLeadEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Niche</label>
+                        <input type="text" class="form-control" id="aiLeadNiche" 
+                               placeholder="e.g., EXSTART, ITADRESS">
+                        <small class="text-muted">Can be single or multiple (comma-separated)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target Status</label>
+                        <select class="form-select" id="aiLeadTargetStatus">
+                            <option value="prospect">Prospect</option>
+                            <option value="customer">Customer</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Additional Notes</label>
+                        <textarea class="form-control" id="aiLeadNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAILead()">Save Lead</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Import Modal -->
+<div class="modal fade" id="aiImportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import AI Leads</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Upload a CSV file with the following columns:</p>
+                <ul>
+                    <li>name (required)</li>
+                    <li>phone (required - format: 60123456789)</li>
+                    <li>email (optional)</li>
+                    <li>niche (optional - can be single: EXSTART or multiple: EXSTART,ITADRESS)</li>
+                    <li>target_status (optional: prospect, customer)</li>
+                    <li>notes (optional)</li>
+                </ul>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> AI leads are not assigned to devices initially. 
+                    They will be distributed during AI campaign execution.
+                </div>
+                <div class="mt-3">
+                    <input type="file" class="form-control" id="aiImportFile" accept=".csv">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processAILeadsImport()">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Campaign Modal -->
+<div class="modal fade" id="aiCampaignModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create AI Campaign</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="aiCampaignForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Campaign Title <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="aiCampaignTitle" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Device Limit <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="aiDeviceLimit" 
+                                       placeholder="Max leads per device" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Target Niche</label>
+                                <input type="text" class="form-control" id="aiCampaignNiche" 
+                                       placeholder="e.g., EXSTART">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Target Status</label>
+                                <select class="form-select" id="aiCampaignTargetStatus">
+                                    <option value="all">All</option>
+                                    <option value="prospect">Prospects Only</option>
+                                    <option value="customer">Customers Only</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Message <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="aiCampaignMessage" rows="4" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Image URL (Optional)</label>
+                        <input type="url" class="form-control" id="aiCampaignImageUrl" 
+                               placeholder="https://example.com/image.jpg">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Campaign Date</label>
+                                <input type="date" class="form-control" id="aiCampaignDate" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Time</label>
+                                <input type="time" class="form-control" id="aiCampaignTime" required>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="mb-3">
+                                <label class="form-label">Min Delay (s)</label>
+                                <input type="number" class="form-control" id="aiMinDelay" value="10" min="5">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="mb-3">
+                                <label class="form-label">Max Delay (s)</label>
+                                <input type="number" class="form-control" id="aiMaxDelay" value="30" min="10">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> AI Campaign will distribute leads across all connected devices 
+                        using round-robin algorithm, respecting the device limit.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAICampaign()">Create Campaign</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* AI Lead Management Styles - Same as device leads */
+.device-info {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border-left: 4px solid var(--primary);
+}
+
+.add-lead-btn {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.add-lead-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+</style>
