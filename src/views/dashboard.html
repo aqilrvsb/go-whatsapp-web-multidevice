@@ -5172,7 +5172,8 @@
             document.getElementById('aiLeadModalTitle').textContent = 'Add AI Lead';
             document.getElementById('aiLeadForm').reset();
             document.getElementById('aiLeadId').value = '';
-            $('#aiLeadModal').modal('show');
+            const modal = new bootstrap.Modal(document.getElementById('aiLeadModal'));
+            modal.show();
         }
         
         function saveAILead() {
@@ -5206,7 +5207,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.code === 'SUCCESS') {
-                    $('#aiLeadModal').modal('hide');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('aiLeadModal'));
+                    modal.hide();
                     loadAILeads();
                     showToast(isEdit ? 'AI Lead updated successfully' : 'AI Lead added successfully', 'success');
                 } else {
@@ -5234,7 +5236,8 @@
                             document.getElementById('aiLeadNiche').value = lead.niche || '';
                             document.getElementById('aiLeadTargetStatus').value = lead.target_status;
                             document.getElementById('aiLeadNotes').value = lead.notes || '';
-                            $('#aiLeadModal').modal('show');
+                            const modal = new bootstrap.Modal(document.getElementById('aiLeadModal'));
+                            modal.show();
                         }
                     }
                 })
@@ -5278,7 +5281,8 @@
         function showCreateAICampaignModal() {
             document.getElementById('aiCampaignForm').reset();
             document.getElementById('aiCampaignDate').value = new Date().toISOString().split('T')[0];
-            $('#aiCampaignModal').modal('show');
+            const modal = new bootstrap.Modal(document.getElementById('aiCampaignModal'));
+            modal.show();
         }
         
         function saveAICampaign() {
@@ -5317,7 +5321,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.code === 'SUCCESS') {
-                    $('#aiCampaignModal').modal('hide');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('aiCampaignModal'));
+                    modal.hide();
                     loadCampaigns();
                     showToast('AI Campaign created successfully', 'success');
                     
