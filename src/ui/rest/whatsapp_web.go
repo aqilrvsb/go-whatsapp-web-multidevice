@@ -26,7 +26,7 @@ func (handler *App) WhatsAppWebView(c *fiber.Ctx) error {
 	}
 	
 	// Session is valid, render WhatsApp Web
-	return c.Render("views/whatsapp_web", fiber.Map{
+	return c.Render("whatsapp_web", fiber.Map{
 		"DeviceID": deviceId,
 	})
 }
