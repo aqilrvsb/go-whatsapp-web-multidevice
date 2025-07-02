@@ -27,6 +27,11 @@ func GetDeviceIDFromContext(ctx context.Context) string {
 
 // StoreWhatsAppMessage stores a message in the whatsapp_messages table
 func StoreWhatsAppMessage(deviceID, chatJID, messageID, senderJID, messageText, messageType string) {
+	StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, time.Now().Unix())
+}
+
+// StoreWhatsAppMessageWithTimestamp stores a message with specific timestamp
+func StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType string, timestamp int64) {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
@@ -44,16 +49,17 @@ func StoreWhatsAppMessage(deviceID, chatJID, messageID, senderJID, messageText, 
 		}
 	}
 	
-	// Insert message (trigger will handle cleanup)
+	// Insert message (trigger will handle cleanup if exists)
 	query := `
 		INSERT INTO whatsapp_messages (device_id, chat_jid, message_id, sender_jid, message_text, message_type, timestamp)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (device_id, message_id) DO UPDATE SET
 			message_text = EXCLUDED.message_text,
+			message_type = EXCLUDED.message_type,
 			timestamp = EXCLUDED.timestamp
 	`
 	
-	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, time.Now().Unix())
+	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, timestamp)
 	if err != nil {
 		logrus.Warnf("Failed to store message: %v", err)
 	}

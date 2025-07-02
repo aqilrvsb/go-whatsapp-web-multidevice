@@ -9,6 +9,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/appstate"
 )
 
 // GetWhatsAppWebChats gets recent chats based on messages in our database
@@ -265,7 +266,7 @@ func formatMessageTime(timestamp int64) string {
 	return t.Format("Jan 2")
 }
 
-// RefreshWhatsAppChats triggers a manual refresh
+// RefreshWhatsAppChats triggers a manual history sync
 func RefreshWhatsAppChats(deviceID string) error {
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
@@ -277,6 +278,10 @@ func RefreshWhatsAppChats(deviceID string) error {
 	if client.Store.ID != nil {
 		client.SendPresence(types.PresenceAvailable)
 		logrus.Info("Sent presence update to trigger sync")
+		
+		// Request app state sync which includes chat history
+		client.FetchAppState(context.Background(), appstate.WAPatchCriticalBlock, true, false)
+		logrus.Info("Requested app state sync")
 	}
 	
 	return nil

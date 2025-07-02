@@ -1,11 +1,6 @@
 package whatsapp
 
 import (
-	"fmt"
-	"strings"
-	"time"
-	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -49,7 +44,7 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 		}
 	}
 	
-	// Store message using the new function
+	// Store message using the helper function
 	StoreWhatsAppMessage(
 		deviceID, 
 		evt.Info.Chat.String(), 
@@ -64,183 +59,194 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 
 // HandleHistorySyncForWebView processes history sync to get recent messages
 func HandleHistorySyncForWebView(deviceID string, evt *events.HistorySync) {
-	logrus.Infof("Processing history sync for WhatsApp Web view - device %s", deviceID)
+	logrus.Infof("Processing history sync for device %s - Type: %s", deviceID, evt.Data.GetSyncType())
 	
-	count := 0
-	for _, conv := range evt.Data.Conversations {
-		// Skip groups
-		if conv.ID != nil && (strings.Contains(*conv.ID, "@g.us") || strings.Contains(*conv.ID, "@broadcast")) {
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to get client for history sync: %v", err)
+		return
+	}
+	
+	messageCount := 0
+	
+	// Process conversations from history sync
+	for _, conv := range evt.Data.GetConversations() {
+		// Skip if no ID
+		if conv.GetId() == "" {
 			continue
 		}
 		
-		// Process only recent 20 messages per chat
-		msgCount := 0
-		for i := len(conv.Messages) - 1; i >= 0 && msgCount < 20; i-- {
-			msg := conv.Messages[i]
-			if msg.Message == nil || msg.Message.Key == nil {
-				continue
-			}
-			
-			// Extract message info
-			messageID := msg.Message.Key.GetId()
-			chatJID := msg.Message.Key.GetRemoteJid()
-			senderJID := msg.Message.Key.GetParticipant()
-			if senderJID == "" && msg.Message.Key.GetFromMe() {
-				senderJID = msg.Message.Key.GetRemoteJid()
-			}
-			
-			messageText := extractMessageFromProto(msg.Message.Message)
-			timestamp := time.Unix(int64(msg.Message.GetMessageTimestamp()), 0)
-			isFromMe := msg.Message.Key.GetFromMe()
-			
-			storeMessage(deviceID, chatJID, messageID, senderJID, messageText, timestamp, isFromMe)
-			msgCount++
-			count++
-		}
-	}
-	
-	logrus.Infof("Stored %d personal chat messages for device %s", count, deviceID)
-}
-
-// GetMessagesForChatWeb retrieves recent messages for a chat (WhatsApp Web view)
-func GetMessagesForChatWeb(deviceID string, chatJID string) ([]map[string]interface{}, error) {
-	userRepo := repository.GetUserRepository()
-	db := userRepo.DB()
-	
-	// Get last 20 messages for this chat
-	query := `
-		SELECT message_id, sender_jid, message_text, timestamp, is_from_me
-		FROM whatsapp_messages
-		WHERE device_id = $1 AND chat_jid = $2
-		ORDER BY timestamp DESC
-		LIMIT 20
-	`
-	
-	rows, err := db.Query(query, deviceID, chatJID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query messages: %v", err)
-	}
-	defer rows.Close()
-	
-	var messages []map[string]interface{}
-	
-	for rows.Next() {
-		var messageID, senderJID, messageText string
-		var timestamp int64
-		var isFromMe bool
-		
-		err := rows.Scan(&messageID, &senderJID, &messageText, &timestamp, &isFromMe)
+		// Parse chat JID
+		chatJID, err := types.ParseJID(conv.GetId())
 		if err != nil {
 			continue
 		}
 		
-		msgTime := time.Unix(timestamp, 0)
-		
-		messages = append(messages, map[string]interface{}{
-			"id":        messageID,
-			"text":      messageText,
-			"fromMe":    isFromMe,
-			"time":      msgTime.Format("3:04 PM"),
-			"timestamp": timestamp,
-			"status":    "sent",
-		})
-	}
-	
-	// Reverse to show oldest first (like WhatsApp Web)
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
-	}
-	
-	return messages, nil
-}
-
-// Helper functions
-
-func storeMessage(deviceID, chatJID, messageID, senderJID, messageText string, 
-	timestamp time.Time, isFromMe bool) {
-	
-	userRepo := repository.GetUserRepository()
-	db := userRepo.DB()
-	
-	query := `
-		INSERT INTO whatsapp_messages 
-		(device_id, chat_jid, message_id, sender_jid, message_text, timestamp, is_from_me)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (device_id, chat_jid, message_id) DO NOTHING
-	`
-	
-	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, 
-		messageText, timestamp.Unix(), isFromMe)
-	
-	if err != nil {
-		logrus.Debugf("Failed to store message: %v", err)
-	}
-}
-
-func extractMessageText(evt *events.Message) string {
-	if evt.Message.GetConversation() != "" {
-		return evt.Message.GetConversation()
-	}
-	
-	if ext := evt.Message.GetExtendedTextMessage(); ext != nil {
-		return ext.GetText()
-	}
-	
-	// Media messages
-	if img := evt.Message.GetImageMessage(); img != nil {
-		if img.GetCaption() != "" {
-			return "📷 " + img.GetCaption()
+		// Skip groups and broadcasts for WhatsApp Web
+		if chatJID.Server != types.DefaultUserServer {
+			continue
 		}
-		return "📷 Photo"
+		
+		// Process messages in this conversation
+		for _, historyMsg := range conv.GetMessages() {
+			webMsg := historyMsg.GetMessage()
+			if webMsg == nil {
+				continue
+			}
+			
+			// Parse the web message to get a proper Message event
+			parsedMsg, err := client.ParseWebMessage(chatJID, webMsg)
+			if err != nil {
+				logrus.Debugf("Failed to parse history message: %v", err)
+				continue
+			}
+			
+			// Extract message details
+			messageID := webMsg.GetKey().GetId()
+			senderJID := webMsg.GetKey().GetFromMe()
+			timestamp := webMsg.GetMessageTimestamp()
+			
+			// Get sender JID string
+			var senderStr string
+			if senderJID {
+				senderStr = client.Store.ID.String()
+			} else {
+				if webMsg.GetParticipant() != "" {
+					senderStr = webMsg.GetParticipant()
+				} else {
+					senderStr = chatJID.String()
+				}
+			}
+			
+			// Extract message text
+			messageText := extractMessageFromParsed(parsedMsg)
+			messageType := getMessageType(parsedMsg.Message)
+			
+			// Store in database with proper timestamp
+			StoreHistoryMessage(
+				deviceID,
+				chatJID.String(),
+				messageID,
+				senderStr,
+				messageText,
+				messageType,
+				int64(timestamp),
+			)
+			
+			messageCount++
+		}
 	}
 	
-	if vid := evt.Message.GetVideoMessage(); vid != nil {
-		return "📹 Video"
-	}
-	
-	if aud := evt.Message.GetAudioMessage(); aud != nil {
-		return "🎵 Voice message"
-	}
-	
-	if doc := evt.Message.GetDocumentMessage(); doc != nil {
-		return "📄 Document"
-	}
-	
-	return ""
+	logrus.Infof("Processed %d messages from history sync for device %s", messageCount, deviceID)
 }
 
-func extractMessageFromProto(msg *waProto.Message) string {
-	if msg == nil {
+// extractMessageFromParsed extracts text from a parsed message
+func extractMessageFromParsed(msg *events.Message) string {
+	if msg.Message == nil {
 		return ""
 	}
 	
-	if msg.Conversation != nil {
-		return *msg.Conversation
+	// Try different message types
+	if text := msg.Message.GetConversation(); text != "" {
+		return text
 	}
-	
-	if msg.ExtendedTextMessage != nil && msg.ExtendedTextMessage.Text != nil {
-		return *msg.ExtendedTextMessage.Text
+	if extText := msg.Message.GetExtendedTextMessage(); extText != nil {
+		return extText.GetText()
 	}
-	
-	// Media messages
-	if msg.ImageMessage != nil {
-		if msg.ImageMessage.Caption != nil {
-			return "📷 " + *msg.ImageMessage.Caption
-		}
-		return "📷 Photo"
+	if imageMsg := msg.Message.GetImageMessage(); imageMsg != nil {
+		return imageMsg.GetCaption()
 	}
-	
-	if msg.VideoMessage != nil {
-		return "📹 Video"
+	if videoMsg := msg.Message.GetVideoMessage(); videoMsg != nil {
+		return videoMsg.GetCaption()
 	}
-	
-	if msg.AudioMessage != nil {
-		return "🎵 Voice message"
-	}
-	
-	if msg.DocumentMessage != nil {
-		return "📄 Document"
+	if docMsg := msg.Message.GetDocumentMessage(); docMsg != nil {
+		return "📄 " + docMsg.GetFileName()
 	}
 	
 	return ""
+}
+
+// getMessageType determines the type of message
+func getMessageType(msg *waProto.Message) string {
+	if msg.GetImageMessage() != nil {
+		return "image"
+	}
+	if msg.GetVideoMessage() != nil {
+		return "video"
+	}
+	if msg.GetAudioMessage() != nil {
+		return "audio"
+	}
+	if msg.GetDocumentMessage() != nil {
+		return "document"
+	}
+	if msg.GetStickerMessage() != nil {
+		return "sticker"
+	}
+	return "text"
+}
+
+// extractMessageText extracts text from various message types
+func extractMessageText(evt *events.Message) string {
+	if evt.Message == nil {
+		return ""
+	}
+	
+	// Regular text message
+	if text := evt.Message.GetConversation(); text != "" {
+		return text
+	}
+	
+	// Extended text message
+	if extText := evt.Message.GetExtendedTextMessage(); extText != nil {
+		return extText.GetText()
+	}
+	
+	// Image caption
+	if img := evt.Message.GetImageMessage(); img != nil && img.GetCaption() != "" {
+		return img.GetCaption()
+	}
+	
+	// Video caption
+	if vid := evt.Message.GetVideoMessage(); vid != nil && vid.GetCaption() != "" {
+		return vid.GetCaption()
+	}
+	
+	// Document filename
+	if doc := evt.Message.GetDocumentMessage(); doc != nil {
+		return "📄 " + doc.GetFileName()
+	}
+	
+	// Audio/voice message
+	if evt.Message.GetAudioMessage() != nil {
+		return "🎵 Voice message"
+	}
+	
+	// Sticker
+	if evt.Message.GetStickerMessage() != nil {
+		return "Sticker"
+	}
+	
+	// Location
+	if loc := evt.Message.GetLocationMessage(); loc != nil {
+		return "📍 Location"
+	}
+	
+	// Contact
+	if evt.Message.GetContactMessage() != nil {
+		return "👤 Contact"
+	}
+	
+	// Poll
+	if evt.Message.GetPollCreationMessage() != nil {
+		return "📊 Poll"
+	}
+	
+	return ""
+}
+
+// StoreHistoryMessage stores a message from history sync with specific timestamp
+func StoreHistoryMessage(deviceID, chatJID, messageID, senderJID, messageText, messageType string, timestamp int64) {
+	StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, timestamp)
 }
