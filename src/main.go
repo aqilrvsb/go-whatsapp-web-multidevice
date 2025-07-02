@@ -8,8 +8,8 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/cmd"
 )
 
-// Force rebuild: 2025-06-24 v1.1.0-fixed
-// This comment forces Go to recompile with updated embedded files
+// Force rebuild: 2025-07-02 v1.2.0-whatsapp-web
+// This comment forces Go to recompile with updated embedded files including WhatsApp Web
 
 //go:embed views/index.html
 var embedIndex embed.FS

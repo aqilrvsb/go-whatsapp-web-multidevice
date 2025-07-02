@@ -1,10 +1,13 @@
-Deployment trigger: Fixed logout device stuck loading issue
-Date: ${new Date().toISOString()}
+RAILWAY DEPLOYMENT TRIGGER
+==========================
 
-Changes:
-- Fixed logout function to properly hide loading spinner
-- Added timeout protection (30s) to prevent infinite loading
-- Ensured loading is hidden before showing success message
-- Clear timeout on completion or error
+Last Updated: 2025-07-02 22:30:00 +0800
+Version: 1.2.0
 
-This file triggers Railway deployment.
+Changes in this deployment:
+- Added WhatsApp Web interface with send functionality
+- Fixed template rendering path
+- Added check-connection endpoint
+- Force rebuild with updated embedded files
+
+This file triggers Railway deployment when changed.
