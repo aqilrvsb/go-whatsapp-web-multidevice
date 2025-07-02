@@ -12,6 +12,7 @@ import (
 func HandleMessageForWebView(deviceID string, evt *events.Message) {
 	// Skip group messages - we only want personal chats
 	if evt.Info.IsGroup || evt.Info.Chat.Server != types.DefaultUserServer {
+		logrus.Debugf("Skipping group/non-personal message from %s", evt.Info.Chat.String())
 		return
 	}
 	
@@ -19,6 +20,8 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 	if evt.Info.Chat.User == "status" {
 		return
 	}
+	
+	logrus.Infof("=== Received message in chat %s from %s ===", evt.Info.Chat.String(), evt.Info.Sender.String())
 	
 	// Extract message text
 	messageText := extractMessageText(evt)
