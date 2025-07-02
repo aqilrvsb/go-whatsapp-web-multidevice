@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
@@ -209,7 +210,7 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 		}
 		imageName = request.Image.Filename
 	} else {
-		return response, pkgError.BadRequest("No image provided")
+		return response, pkgError.InternalServerError("No image provided")
 	}
 	deletedItems = append(deletedItems, oriImagePath)
 

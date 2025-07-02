@@ -327,7 +327,7 @@ func (s *SendHandler) handleSendImage(ctx context.Context, request mcp.CallToolR
 	}
 
 	if imageURLOk && imageURL != "" {
-		imageRequest.ImageURL = &imageURL
+		imageRequest.ImageURL = imageURL
 	}
 	res, err := s.sendService.SendImage(ctx, imageRequest)
 	if err != nil {
