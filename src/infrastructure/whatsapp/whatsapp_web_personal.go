@@ -1,7 +1,7 @@
 package whatsapp
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,9 +10,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
+	"go.mau.fi/whatsmeow/appstate"
 )
 
-// GetWhatsAppWebChats gets personal chats only (no groups) from WhatsMeow's store
+// GetWhatsAppWebChats gets personal chats from the WhatsApp client
 func GetWhatsAppWebChats(deviceID string) ([]map[string]interface{}, error) {
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
@@ -24,52 +25,143 @@ func GetWhatsAppWebChats(deviceID string) ([]map[string]interface{}, error) {
 	if client.Store.ID == nil {
 		return nil, fmt.Errorf("device not logged in")
 	}
-	ourJID := client.Store.ID.String()
 	
-	// Get database connection
+	// Get all contacts from the store
+	contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+	if err != nil {
+		logrus.Warnf("Failed to get contacts: %v", err)
+		// Try alternative method
+		return getChatsFromDatabase(deviceID, client.Store.ID.String())
+	}
+	
+	var chats []map[string]interface{}
+	
+	// Process each contact
+	for jid, contact := range contacts {
+		// Skip groups and broadcasts
+		if strings.Contains(jid.String(), "@g.us") || 
+		   strings.Contains(jid.String(), "@broadcast") ||
+		   jid.String() == "status@broadcast" {
+			continue
+		}
+		
+		// Skip non-user JIDs
+		if jid.Server != types.DefaultUserServer {
+			continue
+		}
+		
+		// Get contact name
+		contactName := ""
+		if contact.PushName != "" {
+			contactName = contact.PushName
+		} else if contact.BusinessName != "" {
+			contactName = contact.BusinessName
+		} else if contact.FullName != "" {
+			contactName = contact.FullName
+		} else if contact.FirstName != "" {
+			contactName = contact.FirstName
+		} else {
+			// Use phone number as fallback
+			contactName = jid.User
+		}
+		
+		// Get last message from database
+		lastMessage, lastTimestamp := getLastMessage(deviceID, jid.String())
+		
+		// Format time
+		timeStr := ""
+		if lastTimestamp > 0 {
+			t := time.Unix(lastTimestamp, 0)
+			now := time.Now()
+			if t.Day() == now.Day() && t.Month() == now.Month() && t.Year() == now.Year() {
+				timeStr = t.Format("15:04")
+			} else if t.Year() == now.Year() {
+				timeStr = t.Format("Jan 2")
+			} else {
+				timeStr = t.Format("2006-01-02")
+			}
+		}
+		
+		chat := map[string]interface{}{
+			"id":          jid.String(),
+			"name":        contactName,
+			"phone":       jid.User,
+			"lastMessage": lastMessage,
+			"time":        timeStr,
+			"timestamp":   lastTimestamp,
+			"unread":      0,
+			"isGroup":     false,
+		}
+		
+		chats = append(chats, chat)
+	}
+	
+	// Sort by timestamp (most recent first)
+	sort.Slice(chats, func(i, j int) bool {
+		ts1, _ := chats[i]["timestamp"].(int64)
+		ts2, _ := chats[j]["timestamp"].(int64)
+		return ts1 > ts2
+	})
+	
+	return chats, nil
+}
+
+// getLastMessage gets the last message for a chat from the database
+func getLastMessage(deviceID, chatJID string) (string, int64) {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
-	// Query to get all personal chats with contact info and last message
-	// This joins whatsmeow_chat_settings with whatsmeow_contacts and our messages
-	// EXCLUDING groups (chat_jid NOT LIKE '%@g.us')
 	query := `
-		SELECT 
-			cs.chat_jid,
-			cs.muted_until,
-			cs.pinned,
-			cs.archived,
-			COALESCE(c.push_name, c.business_name, c.full_name, c.first_name, '') as contact_name,
-			m.last_message,
-			m.last_timestamp
-		FROM whatsmeow_chat_settings cs
-		LEFT JOIN whatsmeow_contacts c ON c.our_jid = cs.our_jid AND c.their_jid = cs.chat_jid
-		LEFT JOIN (
-			SELECT 
-				chat_jid, 
-				message_text as last_message,
-				timestamp as last_timestamp
-			FROM (
-				SELECT 
-					chat_jid, 
-					message_text, 
-					timestamp,
-					ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) as rn
-				FROM whatsapp_messages
-				WHERE device_id = $1
-			) t WHERE rn = 1
-		) m ON m.chat_jid = cs.chat_jid
-		WHERE cs.our_jid = $1 
-		AND cs.chat_jid NOT LIKE '%@g.us'
-		AND cs.chat_jid NOT LIKE '%@broadcast'
-		AND cs.chat_jid != 'status@broadcast'
-		ORDER BY cs.pinned DESC, m.last_timestamp DESC NULLS LAST
+		SELECT message_text, timestamp 
+		FROM whatsapp_messages 
+		WHERE device_id = $1 AND chat_jid = $2 
+		ORDER BY timestamp DESC 
+		LIMIT 1
 	`
 	
-	rows, err := db.Query(query, ourJID)
+	var message string
+	var timestamp int64
+	
+	err := db.QueryRow(query, deviceID, chatJID).Scan(&message, &timestamp)
 	if err != nil {
-		logrus.Warnf("Failed to query chats: %v", err)
-		// If table doesn't exist, return empty
+		// No messages found
+		return "", 0
+	}
+	
+	return message, timestamp
+}
+
+// Fallback method using database
+func getChatsFromDatabase(deviceID, ourJID string) ([]map[string]interface{}, error) {
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	// Get unique chats from messages table
+	query := `
+		SELECT DISTINCT 
+			m.chat_jid,
+			m.message_text,
+			m.timestamp,
+			COALESCE(c.push_name, c.business_name, c.full_name, c.first_name, '') as contact_name
+		FROM (
+			SELECT DISTINCT ON (chat_jid) 
+				chat_jid, 
+				message_text, 
+				timestamp
+			FROM whatsapp_messages
+			WHERE device_id = $1
+			AND chat_jid NOT LIKE '%@g.us'
+			AND chat_jid NOT LIKE '%@broadcast'
+			AND chat_jid != 'status@broadcast'
+			ORDER BY chat_jid, timestamp DESC
+		) m
+		LEFT JOIN whatsmeow_contacts c ON c.our_jid = $2 AND c.their_jid = m.chat_jid
+		ORDER BY m.timestamp DESC
+	`
+	
+	rows, err := db.Query(query, deviceID, ourJID)
+	if err != nil {
+		logrus.Warnf("Failed to query chats from database: %v", err)
 		return []map[string]interface{}{}, nil
 	}
 	defer rows.Close()
@@ -78,118 +170,129 @@ func GetWhatsAppWebChats(deviceID string) ([]map[string]interface{}, error) {
 	
 	for rows.Next() {
 		var chatJID string
-		var mutedUntil sql.NullInt64
-		var pinned sql.NullBool
-		var archived sql.NullBool
+		var lastMessage string
+		var timestamp int64
 		var contactName string
-		var lastMessage sql.NullString
-		var lastTimestamp sql.NullInt64
 		
-		err := rows.Scan(&chatJID, &mutedUntil, &pinned, &archived, &contactName, &lastMessage, &lastTimestamp)
+		err := rows.Scan(&chatJID, &lastMessage, &timestamp, &contactName)
 		if err != nil {
-			logrus.Warnf("Error scanning row: %v", err)
 			continue
 		}
 		
-		// Parse JID to get phone number
+		// Parse JID
 		jid, err := types.ParseJID(chatJID)
 		if err != nil {
 			continue
 		}
 		
-		// Skip non-personal chats
-		if jid.Server != types.DefaultUserServer {
-			continue
-		}
-		
-		// Format contact name
+		// Use phone number as name if contact name is empty
 		if contactName == "" {
-			// Use phone number if no name
-			contactName = formatPhoneNumberWA(jid.User)
+			contactName = jid.User
 		}
 		
-		// Check if muted
-		isMuted := false
-		if mutedUntil.Valid && mutedUntil.Int64 > 0 {
-			mutedTime := time.Unix(mutedUntil.Int64, 0)
-			isMuted = mutedTime.After(time.Now())
-		}
-		
-		// Format last message time
+		// Format time
 		timeStr := ""
-		if lastTimestamp.Valid && lastTimestamp.Int64 > 0 {
-			msgTime := time.Unix(lastTimestamp.Int64, 0)
-			timeStr = formatWhatsAppTime(msgTime)
+		if timestamp > 0 {
+			t := time.Unix(timestamp, 0)
+			now := time.Now()
+			if t.Day() == now.Day() && t.Month() == now.Month() && t.Year() == now.Year() {
+				timeStr = t.Format("15:04")
+			} else if t.Year() == now.Year() {
+				timeStr = t.Format("Jan 2")
+			} else {
+				timeStr = t.Format("2006-01-02")
+			}
 		}
 		
 		chat := map[string]interface{}{
 			"id":          chatJID,
 			"name":        contactName,
 			"phone":       jid.User,
-			"lastMessage": lastMessage.String,
+			"lastMessage": lastMessage,
 			"time":        timeStr,
-			"timestamp":   lastTimestamp.Int64,
-			"unread":      0, // TODO: Implement unread count
+			"timestamp":   timestamp,
+			"unread":      0,
 			"isGroup":     false,
-			"isMuted":     isMuted,
-			"isArchived":  archived.Valid && archived.Bool,
-			"isPinned":    pinned.Valid && pinned.Bool,
 		}
 		
 		chats = append(chats, chat)
 	}
 	
-	// Sort: Pinned first, then by last message time
-	sort.Slice(chats, func(i, j int) bool {
-		// Pinned chats first
-		if chats[i]["isPinned"].(bool) != chats[j]["isPinned"].(bool) {
-			return chats[i]["isPinned"].(bool)
-		}
-		// Then by last message timestamp
-		t1, _ := chats[i]["timestamp"].(int64)
-		t2, _ := chats[j]["timestamp"].(int64)
-		return t1 > t2
-	})
-	
-	logrus.Infof("Found %d personal chats for device %s", len(chats), deviceID)
 	return chats, nil
 }
 
 // GetWhatsAppWebMessages gets messages for a specific chat
-// Returns last 20 messages like WhatsApp Web
-func GetWhatsAppWebMessages(deviceID string, chatJID string, limit int) ([]map[string]interface{}, error) {
-	// Validate chat JID
-	_, err := types.ParseJID(chatJID)
+func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]interface{}, error) {
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid chat JID: %v", err)
+		return nil, fmt.Errorf("device not connected: %v", err)
 	}
 	
-	// Get messages from our message store
-	messages, err := GetMessagesForChatWeb(deviceID, chatJID)
+	// Get our JID
+	if client.Store.ID == nil {
+		return nil, fmt.Errorf("device not logged in")
+	}
+	ourJID := client.Store.ID.String()
+	
+	// Get messages from database
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	query := `
+		SELECT message_id, sender_jid, message_text, message_type, timestamp
+		FROM whatsapp_messages
+		WHERE device_id = $1 AND chat_jid = $2
+		ORDER BY timestamp DESC
+		LIMIT $3
+	`
+	
+	rows, err := db.Query(query, deviceID, chatJID, limit)
 	if err != nil {
-		logrus.Warnf("Failed to get messages: %v", err)
-		// Return empty instead of error
+		logrus.Warnf("Failed to query messages: %v", err)
 		return []map[string]interface{}{}, nil
+	}
+	defer rows.Close()
+	
+	var messages []map[string]interface{}
+	
+	for rows.Next() {
+		var messageID, senderJID, messageText, messageType string
+		var timestamp int64
+		
+		err := rows.Scan(&messageID, &senderJID, &messageText, &messageType, &timestamp)
+		if err != nil {
+			continue
+		}
+		
+		// Determine if sent or received
+		sent := senderJID == ourJID
+		
+		// Format time
+		t := time.Unix(timestamp, 0)
+		timeStr := t.Format("15:04")
+		
+		message := map[string]interface{}{
+			"id":        messageID,
+			"text":      messageText,
+			"type":      messageType,
+			"sent":      sent,
+			"time":      timeStr,
+			"timestamp": timestamp,
+		}
+		
+		messages = append(messages, message)
+	}
+	
+	// Reverse to show oldest first
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
 	}
 	
 	return messages, nil
 }
 
-// formatPhoneNumberWA formats phone number for display
-func formatPhoneNumberWA(phone string) string {
-	if phone == "" {
-		return "Unknown"
-	}
-	
-	// Add + if not present
-	if !strings.HasPrefix(phone, "+") {
-		return "+" + phone
-	}
-	
-	return phone
-}
-
-// RefreshWhatsAppChats triggers a contact sync for a device
+// RefreshWhatsAppChats triggers a sync of contacts
 func RefreshWhatsAppChats(deviceID string) error {
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
@@ -197,39 +300,11 @@ func RefreshWhatsAppChats(deviceID string) error {
 		return fmt.Errorf("device not connected: %v", err)
 	}
 	
-	// Request presence subscription to trigger contact sync
-	err = client.SubscribePresence(types.JID{User: "status", Server: types.BroadcastServer})
+	// Request contact refresh
+	err = client.FetchAppState(context.Background(), appstate.WAPatchCriticalUnblockLow, false, false)
 	if err != nil {
-		logrus.Warnf("Failed to subscribe presence: %v", err)
+		logrus.Warnf("Failed to fetch app state: %v", err)
 	}
 	
-	logrus.Infof("Contact refresh triggered for device %s", deviceID)
 	return nil
-}
-
-// formatWhatsAppTime formats time like WhatsApp Web
-func formatWhatsAppTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	yesterday := today.AddDate(0, 0, -1)
-	
-	if t.After(today) {
-		// Today - show time
-		return t.Format("3:04 PM")
-	} else if t.After(yesterday) {
-		return "Yesterday"
-	} else if t.After(today.AddDate(0, 0, -7)) {
-		// Last week - show day name
-		return t.Format("Monday")
-	} else if t.Year() == now.Year() {
-		// This year - show date
-		return t.Format("1/2")
-	} else {
-		// Older - show full date
-		return t.Format("1/2/06")
-	}
 }
