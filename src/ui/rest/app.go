@@ -113,7 +113,6 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	
 	// AI Campaign Trigger Route
 	app.Post("/api/campaigns-ai/:id/trigger", rest.TriggerAICampaign)
-	app.Post("/api/campaigns-ai/:campaignId/device/:deviceId/transfer-leads", rest.TransferAILeadsToDevice)
 	
 	// Sequence summary endpoint
 	app.Get("/api/sequences/summary", rest.GetSequenceSummary)

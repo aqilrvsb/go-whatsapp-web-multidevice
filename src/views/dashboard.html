@@ -5143,34 +5143,52 @@
                 if (result.isConfirmed) {
                     showToast('Transferring AI leads...', 'info');
                     
-                    // Call API to transfer leads
-                    fetch('/api/ai-campaign/transfer-leads', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            device_id: deviceId,
-                            campaign_id: campaignId
-                        }),
+                    // First, get the successful AI leads
+                    fetch(`/api/campaigns/${campaignId}/device/${deviceId}/leads?status=success`, {
                         credentials: 'include'
                     })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.code === 'SUCCESS') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Transfer Complete!',
-                                html: `Successfully transferred ${data.results.transferred} leads to device ${device.name}`,
-                                confirmButtonText: 'OK'
+                        if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
+                            // Create promises to add each lead to the device
+                            const addPromises = data.results.map(lead => {
+                                return fetch('/api/leads', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        device_id: deviceId,
+                                        name: lead.name || 'AI Lead',
+                                        phone: lead.phone
+                                    }),
+                                    credentials: 'include'
+                                });
                             });
+                            
+                            // Execute all lead creations
+                            return Promise.all(addPromises).then(() => data.results.length);
                         } else {
-                            showToast(data.message || 'Failed to transfer leads', 'error');
+                            throw new Error('No successful leads found');
                         }
+                    })
+                    .then(transferredCount => {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Transfer Complete!',
+                            html: `Successfully transferred ${transferredCount} leads to device ${device.name}`,
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
                     })
                     .catch(error => {
                         console.error('Error transferring leads:', error);
-                        showToast('Error transferring leads', 'error');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Transfer Failed',
+                            text: error.message || 'Failed to transfer leads',
+                            confirmButtonText: 'OK'
+                        });
                     });
                 }
             });
