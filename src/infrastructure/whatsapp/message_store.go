@@ -27,14 +27,39 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 	
 	// Extract message text
 	messageText := extractMessageText(evt)
-	if messageText == "" && evt.Message.GetImageMessage() == nil && 
-	   evt.Message.GetVideoMessage() == nil && evt.Message.GetAudioMessage() == nil {
-		return // Skip empty messages
+	messageType := "text"
+	
+	// Check for different message types
+	if evt.Message.GetImageMessage() != nil {
+		messageType = "image"
+		if caption := evt.Message.GetImageMessage().GetCaption(); caption != "" {
+			messageText = caption
+		}
+	} else if evt.Message.GetVideoMessage() != nil {
+		messageType = "video"
+		if caption := evt.Message.GetVideoMessage().GetCaption(); caption != "" {
+			messageText = caption
+		}
+	} else if evt.Message.GetAudioMessage() != nil {
+		messageType = "audio"
+	} else if evt.Message.GetDocumentMessage() != nil {
+		messageType = "document"
+		if fileName := evt.Message.GetDocumentMessage().GetFileName(); fileName != "" {
+			messageText = "📄 " + fileName
+		}
 	}
 	
-	// Store message
-	storeMessage(deviceID, evt.Info.Chat.String(), evt.Info.ID, 
-		evt.Info.Sender.String(), messageText, evt.Info.Timestamp, evt.Info.IsFromMe)
+	// Store message using the new function
+	StoreWhatsAppMessage(
+		deviceID, 
+		evt.Info.Chat.String(), 
+		evt.Info.ID, 
+		evt.Info.Sender.String(), 
+		messageText, 
+		messageType,
+	)
+	
+	logrus.Debugf("Stored %s message from %s in chat %s", messageType, evt.Info.Sender.String(), evt.Info.Chat.String())
 }
 
 // HandleHistorySyncForWebView processes history sync to get recent messages
