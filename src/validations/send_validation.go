@@ -34,8 +34,13 @@ func ValidateSendImage(ctx context.Context, request domainSend.ImageRequest) err
 		return pkgError.ValidationError(err.Error())
 	}
 
-	if request.Image == nil && (request.ImageURL == nil || *request.ImageURL == "") {
-		return pkgError.ValidationError("either Image or ImageURL must be provided")
+	// Check if at least one image source is provided
+	hasImage := request.Image != nil
+	hasImageURL := request.ImageURL != ""
+	hasImageB64 := request.ImageB64 != "" || len(request.ImageBytes) > 0
+	
+	if !hasImage && !hasImageURL && !hasImageB64 {
+		return pkgError.ValidationError("either Image, ImageURL, or ImageB64 must be provided")
 	}
 
 	if request.Image != nil {
@@ -50,12 +55,8 @@ func ValidateSendImage(ctx context.Context, request domainSend.ImageRequest) err
 		}
 	}
 
-	if request.ImageURL != nil {
-		if *request.ImageURL == "" {
-			return pkgError.ValidationError("ImageURL cannot be empty")
-		}
-
-		err := validation.Validate(*request.ImageURL, is.URL)
+	if request.ImageURL != "" {
+		err := validation.Validate(request.ImageURL, is.URL)
 		if err != nil {
 			return pkgError.ValidationError("ImageURL must be a valid URL")
 		}

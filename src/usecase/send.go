@@ -57,10 +57,16 @@ func (service serviceSend) SendText(ctx context.Context, request domainSend.Mess
 	
 	// Get device-specific client
 	var waClient *whatsmeow.Client
-	if request.DeviceID != "" {
+	// Check context first for device ID (for WhatsApp Web)
+	deviceID := request.DeviceID
+	if deviceID == "" {
+		deviceID = whatsapp.GetDeviceIDFromContext(ctx)
+	}
+	
+	if deviceID != "" {
 		// Use device-specific client
 		cm := whatsapp.GetClientManager()
-		waClient, err = cm.GetClient(request.DeviceID)
+		waClient, err = cm.GetClient(deviceID)
 		if err != nil {
 			return response, fmt.Errorf("device not connected: %v", err)
 		}
@@ -137,10 +143,16 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 	
 	// Get device-specific client
 	var waClient *whatsmeow.Client
-	if request.DeviceID != "" {
+	// Check context first for device ID (for WhatsApp Web)
+	deviceID := request.DeviceID
+	if deviceID == "" {
+		deviceID = whatsapp.GetDeviceIDFromContext(ctx)
+	}
+	
+	if deviceID != "" {
 		// Use device-specific client
 		cm := whatsapp.GetClientManager()
-		waClient, err = cm.GetClient(request.DeviceID)
+		waClient, err = cm.GetClient(deviceID)
 		if err != nil {
 			return response, fmt.Errorf("device not connected: %v", err)
 		}
@@ -165,9 +177,20 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 		oriImagePath   string
 	)
 
-	if request.ImageURL != nil && *request.ImageURL != "" {
+	// Handle base64 image from WhatsApp Web
+	if request.ImageBytes != nil && len(request.ImageBytes) > 0 {
+		// Generate filename
+		imageName = fmt.Sprintf("whatsapp_web_%d.jpg", time.Now().UnixNano())
+		oriImagePath = fmt.Sprintf("%s/%s", config.PathSendItems, imageName)
+		
+		// Save base64 image
+		err = os.WriteFile(oriImagePath, request.ImageBytes, 0644)
+		if err != nil {
+			return response, pkgError.InternalServerError(fmt.Sprintf("failed to save base64 image %v", err))
+		}
+	} else if request.ImageURL != "" {
 		// Download image from URL
-		imageData, fileName, err := utils.DownloadImageFromURL(*request.ImageURL)
+		imageData, fileName, err := utils.DownloadImageFromURL(request.ImageURL)
 		oriImagePath = fmt.Sprintf("%s/%s", config.PathSendItems, fileName)
 		if err != nil {
 			return response, pkgError.InternalServerError(fmt.Sprintf("failed to download image from URL %v", err))
@@ -185,6 +208,8 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 			return response, err
 		}
 		imageName = request.Image.Filename
+	} else {
+		return response, pkgError.BadRequest("No image provided")
 	}
 	deletedItems = append(deletedItems, oriImagePath)
 

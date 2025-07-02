@@ -85,8 +85,11 @@ func HandleDeviceEvent(ctx context.Context, deviceID string, rawEvt interface{})
 	case *events.LoggedOut:
 		handleDeviceLoggedOut(ctx, deviceID)
 	case *events.Message:
-		// Handle messages per device
-		// You can add message handling here
+		// Store messages for WhatsApp Web view (personal chats only)
+		HandleMessageForWebView(deviceID, evt)
+	case *events.HistorySync:
+		// Process history sync to get recent messages
+		HandleHistorySyncForWebView(deviceID, evt)
 	}
 }
 

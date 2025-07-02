@@ -14,6 +14,7 @@ var completedMigrations = map[string]bool{
 	"Create time validation function":       true,
 	"Fix leads table columns":               true,
 	"Fix whatsmeow_message_secrets table":   true,
+	"Create whatsapp_messages table":        true,
 }
 
 // GetMigrations returns only migrations that haven't been completed
@@ -210,6 +211,53 @@ CREATE TABLE IF NOT EXISTS ai_campaign_progress (
 CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_campaign_id ON ai_campaign_progress(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_device_id ON ai_campaign_progress(device_id);
 `,
+		},
+		{
+			Name: "Create whatsapp_messages table",
+			SQL: `
+			-- Create table to store recent WhatsApp messages for Web view
+			CREATE TABLE IF NOT EXISTS whatsapp_messages (
+				device_id TEXT NOT NULL,
+				chat_jid TEXT NOT NULL,
+				message_id TEXT NOT NULL,
+				sender_jid TEXT,
+				message_text TEXT,
+				message_type TEXT DEFAULT 'text',
+				timestamp BIGINT,
+				is_from_me BOOLEAN DEFAULT false,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				PRIMARY KEY (device_id, chat_jid, message_id)
+			);
+
+			-- Index for fast chat queries
+			CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_chat 
+			ON whatsapp_messages(device_id, chat_jid, timestamp DESC);
+
+			-- Function to keep only recent 20 messages per chat
+			CREATE OR REPLACE FUNCTION limit_chat_messages() 
+			RETURNS TRIGGER AS $$
+			BEGIN
+				DELETE FROM whatsapp_messages 
+				WHERE device_id = NEW.device_id 
+				AND chat_jid = NEW.chat_jid
+				AND message_id NOT IN (
+					SELECT message_id 
+					FROM whatsapp_messages 
+					WHERE device_id = NEW.device_id 
+					AND chat_jid = NEW.chat_jid
+					ORDER BY timestamp DESC 
+					LIMIT 20
+				);
+				RETURN NEW;
+			END;
+			$$ LANGUAGE plpgsql;
+
+			-- Apply trigger
+			DROP TRIGGER IF EXISTS limit_messages_trigger ON whatsapp_messages;
+			CREATE TRIGGER limit_messages_trigger 
+			AFTER INSERT ON whatsapp_messages 
+			FOR EACH ROW EXECUTE FUNCTION limit_chat_messages();
+			`,
 		},
 	}
 	

@@ -87,7 +87,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	*/
 
 	// Rest
-	rest.InitRestApp(app, appUsecase)
+	appRest := rest.InitRestApp(app, appUsecase)
+	appRest.SetSendService(sendUsecase) // Set send service for WhatsApp Web
 	rest.InitRestSend(app, sendUsecase)
 	rest.InitRestUser(app, userUsecase)
 	rest.InitRestMessage(app, messageUsecase)

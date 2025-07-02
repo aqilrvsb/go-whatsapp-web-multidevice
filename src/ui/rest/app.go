@@ -15,6 +15,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
+	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
@@ -28,6 +29,7 @@ import (
 
 type App struct {
 	Service domainApp.IAppUsecase
+	Send    *Send // Add Send service for WhatsApp Web messaging
 }
 
 func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
@@ -64,8 +66,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// WhatsApp Web API endpoints
 	app.Get("/api/devices/:id/chats", rest.GetWhatsAppChats)
 	app.Get("/api/devices/:id/messages/:chatId", rest.GetWhatsAppMessages)
-	app.Post("/api/devices/:id/send", rest.SendWhatsAppMessage)
-	app.Post("/api/devices/:id/sync", rest.SyncDeviceChats)
+	app.Post("/api/devices/:id/send", rest.SendWhatsAppWebMessage)
+	app.Post("/api/devices/:id/sync", rest.SyncWhatsAppDevice)
 	app.Get("/api/devices/:id/diagnose", rest.DiagnoseDevice)
 	
 	// Device management endpoints
@@ -152,6 +154,11 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/app/devices", rest.Devices)
 
 	return App{Service: service}
+}
+
+// SetSendService sets the send service for WhatsApp Web messaging
+func (app *App) SetSendService(sendService domainSend.ISendUsecase) {
+	app.Send = &Send{Service: sendService}
 }
 
 func (handler *App) Login(c *fiber.Ctx) error {
