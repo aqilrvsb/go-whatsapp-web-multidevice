@@ -14,12 +14,123 @@ var completedMigrations = map[string]bool{
 	"Create time validation function":       true,
 	"Fix leads table columns":               true,
 	"Fix whatsmeow_message_secrets table":   true,
-	"Create whatsapp_messages table":        true,
+	// Removed "Create whatsapp_messages table" so it will recreate
 }
 
 // GetMigrations returns only migrations that haven't been completed
 func GetMigrations() []Migration {
 	allMigrations := []Migration{
+		{
+			Name: "Recreate whatsapp_messages table with proper schema",
+			SQL: `
+			-- Drop the existing table if it exists
+			DROP TABLE IF EXISTS whatsapp_messages CASCADE;
+			
+			-- Create table with proper structure
+			CREATE TABLE whatsapp_messages (
+				id SERIAL PRIMARY KEY,
+				device_id VARCHAR(255) NOT NULL,
+				chat_jid VARCHAR(255) NOT NULL,
+				message_id VARCHAR(255) NOT NULL,
+				sender_jid VARCHAR(255),
+				sender_name VARCHAR(255),
+				message_text TEXT,
+				message_type VARCHAR(50) DEFAULT 'text',
+				media_url TEXT,
+				is_sent BOOLEAN DEFAULT FALSE,
+				is_read BOOLEAN DEFAULT FALSE,
+				timestamp BIGINT NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(device_id, message_id)
+			);
+
+			-- Create indexes for performance
+			CREATE INDEX idx_whatsapp_messages_device_chat ON whatsapp_messages(device_id, chat_jid);
+			CREATE INDEX idx_whatsapp_messages_timestamp ON whatsapp_messages(timestamp DESC);
+
+			-- Create function to validate and fix timestamps
+			CREATE OR REPLACE FUNCTION fix_whatsapp_message_timestamp()
+			RETURNS TRIGGER AS $$
+			BEGIN
+				-- If timestamp is in milliseconds (13+ digits), convert to seconds
+				IF NEW.timestamp > 1000000000000 THEN
+					NEW.timestamp := NEW.timestamp / 1000;
+				END IF;
+				
+				-- If timestamp is more than 1 year in future, use current time
+				IF NEW.timestamp > EXTRACT(EPOCH FROM NOW() + INTERVAL '1 year')::BIGINT THEN
+					NEW.timestamp := EXTRACT(EPOCH FROM NOW())::BIGINT;
+				END IF;
+				
+				-- If timestamp is negative or too small, use current time
+				IF NEW.timestamp < 946684800 THEN -- Before year 2000
+					NEW.timestamp := EXTRACT(EPOCH FROM NOW())::BIGINT;
+				END IF;
+				
+				RETURN NEW;
+			END;
+			$$ LANGUAGE plpgsql;
+
+			-- Create trigger to fix timestamps automatically
+			DROP TRIGGER IF EXISTS fix_timestamp_before_insert ON whatsapp_messages;
+			CREATE TRIGGER fix_timestamp_before_insert
+			BEFORE INSERT OR UPDATE ON whatsapp_messages
+			FOR EACH ROW
+			EXECUTE FUNCTION fix_whatsapp_message_timestamp();
+
+			-- Function to keep only recent 20 messages per chat
+			CREATE OR REPLACE FUNCTION limit_chat_messages() 
+			RETURNS TRIGGER AS $$
+			BEGIN
+				DELETE FROM whatsapp_messages 
+				WHERE device_id = NEW.device_id 
+				AND chat_jid = NEW.chat_jid
+				AND message_id NOT IN (
+					SELECT message_id 
+					FROM whatsapp_messages 
+					WHERE device_id = NEW.device_id 
+					AND chat_jid = NEW.chat_jid
+					ORDER BY timestamp DESC 
+					LIMIT 20
+				);
+				RETURN NEW;
+			END;
+			$$ LANGUAGE plpgsql;
+
+			-- Apply message limit trigger
+			DROP TRIGGER IF EXISTS limit_messages_trigger ON whatsapp_messages;
+			CREATE TRIGGER limit_messages_trigger 
+			AFTER INSERT ON whatsapp_messages 
+			FOR EACH ROW EXECUTE FUNCTION limit_chat_messages();
+			`,
+		},
+		{
+			Name: "Fix whatsapp_chats column name",
+			SQL: `
+			-- Fix column name from 'name' to 'chat_name'
+			DO $$ 
+			BEGIN
+				-- Check if 'name' column exists and 'chat_name' doesn't
+				IF EXISTS (SELECT 1 FROM information_schema.columns 
+						   WHERE table_name = 'whatsapp_chats' AND column_name = 'name') 
+				   AND NOT EXISTS (SELECT 1 FROM information_schema.columns 
+								   WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
+					-- Rename 'name' to 'chat_name'
+					ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
+				END IF;
+				
+				-- Ensure all required columns exist
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255);
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT FALSE;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_text TEXT;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_time TIMESTAMP;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+			END $$;
+			`,
+		},
 		{
 			Name: "Add target_status columns",
 			SQL: `
@@ -211,53 +322,6 @@ CREATE TABLE IF NOT EXISTS ai_campaign_progress (
 CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_campaign_id ON ai_campaign_progress(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_device_id ON ai_campaign_progress(device_id);
 `,
-		},
-		{
-			Name: "Create whatsapp_messages table",
-			SQL: `
-			-- Create table to store recent WhatsApp messages for Web view
-			CREATE TABLE IF NOT EXISTS whatsapp_messages (
-				device_id TEXT NOT NULL,
-				chat_jid TEXT NOT NULL,
-				message_id TEXT NOT NULL,
-				sender_jid TEXT,
-				message_text TEXT,
-				message_type TEXT DEFAULT 'text',
-				timestamp BIGINT,
-				is_from_me BOOLEAN DEFAULT false,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				PRIMARY KEY (device_id, chat_jid, message_id)
-			);
-
-			-- Index for fast chat queries
-			CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_chat 
-			ON whatsapp_messages(device_id, chat_jid, timestamp DESC);
-
-			-- Function to keep only recent 20 messages per chat
-			CREATE OR REPLACE FUNCTION limit_chat_messages() 
-			RETURNS TRIGGER AS $$
-			BEGIN
-				DELETE FROM whatsapp_messages 
-				WHERE device_id = NEW.device_id 
-				AND chat_jid = NEW.chat_jid
-				AND message_id NOT IN (
-					SELECT message_id 
-					FROM whatsapp_messages 
-					WHERE device_id = NEW.device_id 
-					AND chat_jid = NEW.chat_jid
-					ORDER BY timestamp DESC 
-					LIMIT 20
-				);
-				RETURN NEW;
-			END;
-			$$ LANGUAGE plpgsql;
-
-			-- Apply trigger
-			DROP TRIGGER IF EXISTS limit_messages_trigger ON whatsapp_messages;
-			CREATE TRIGGER limit_messages_trigger 
-			AFTER INSERT ON whatsapp_messages 
-			FOR EACH ROW EXECUTE FUNCTION limit_chat_messages();
-			`,
 		},
 	}
 	
