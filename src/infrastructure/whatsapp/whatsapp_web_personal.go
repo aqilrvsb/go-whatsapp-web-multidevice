@@ -13,6 +13,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // GetWhatsAppWebChats gets recent chats from chat settings
@@ -537,58 +538,46 @@ func SyncWhatsAppHistory(deviceID string) error {
 		return fmt.Errorf("client is not connected to WhatsApp")
 	}
 	
-	// Try to trigger history sync in two ways
-	// Method 1: Try using BuildHistorySyncRequest if available
-	var historySyncMsg *waProto.Message
+	// The proper way to request history sync in whatsmeow
+	// is to use the client.SendMessage with a protocol message
 	
-	// Use reflection to check if method exists
-	method := reflect.ValueOf(client).MethodByName("BuildHistorySyncRequest")
-	if method.IsValid() {
-		// Call BuildHistorySyncRequest(nil, 50)
-		args := []reflect.Value{
-			reflect.ValueOf((*types.JID)(nil)),
-			reflect.ValueOf(50),
-		}
-		results := method.Call(args)
-		if len(results) > 0 && !results[0].IsNil() {
-			historySyncMsg = results[0].Interface().(*waProto.Message)
-		}
+	// Create the history sync notification
+	notification := &waProto.HistorySyncNotification{
+		FileSHA256:     []byte{},
+		FileLength:     proto.Uint64(0),
+		MediaKey:       []byte{},
+		FileEncSHA256:  []byte{},
+		DirectPath:     proto.String(""),
+		SyncType:       waProto.HistorySyncNotification_RECENT.Enum(),
+		ChunkOrder:     proto.Uint32(1),
 	}
 	
-	// Method 2: If BuildHistorySyncRequest didn't work, create manual request
-	if historySyncMsg == nil {
-		logrus.Warn("BuildHistorySyncRequest not available or failed, using alternative approach")
-		
-		// For whatsmeow, we need to trigger history sync differently
-		// Just send a presence update which often triggers sync
-		err := client.SendPresence(types.PresenceAvailable)
-		if err != nil {
-			return fmt.Errorf("failed to send presence for sync trigger: %v", err)
-		}
-		
-		// Also try to fetch recent messages which might trigger sync
-		go func() {
-			// Try to get recent chats to trigger any pending syncs
-			chats, err := client.Store.Chats.GetAllChats()
-			if err == nil {
-				logrus.Infof("Found %d chats, this might trigger history sync", len(chats))
-			}
-		}()
-		
-		logrus.Info("Triggered alternative sync methods")
-		return nil
+	// Wrap in protocol message
+	protocolMsg := &waProto.ProtocolMessage{
+		Type:                    waProto.ProtocolMessage_HISTORY_SYNC_NOTIFICATION.Enum(),
+		HistorySyncNotification: notification,
 	}
 	
-	// Send to WhatsApp status broadcast to request history
+	// Create the message
+	msg := &waProto.Message{
+		ProtocolMessage: protocolMsg,
+	}
+	
+	// Send to our own JID to trigger history sync
 	ctx := context.Background()
-	statusJID := types.JID{
-		Server: "s.whatsapp.net",
-		User:   "status",
-	}
-	
-	resp, err := client.SendMessage(ctx, statusJID, historySyncMsg)
+	resp, err := client.SendMessage(ctx, *client.Store.ID, msg)
 	if err != nil {
-		return fmt.Errorf("failed to send history sync request: %v", err)
+		// If that fails, try alternative approach
+		logrus.Warnf("Failed to send history sync via protocol message: %v, trying alternative", err)
+		
+		// Alternative: Send presence which often triggers sync
+		err = client.SendPresence(types.PresenceAvailable)
+		if err != nil {
+			return fmt.Errorf("failed to trigger sync: %v", err)
+		}
+		
+		logrus.Info("Sent presence update to trigger sync")
+		return nil
 	}
 	
 	logrus.Infof("History sync requested successfully. Response ID: %s", resp.ID)
