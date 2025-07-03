@@ -1,10 +1,13 @@
 package whatsapp
 
 import (
+	"context"
+	"path/filepath"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 )
 
 // HandleMessageForWebView stores messages for WhatsApp Web view
@@ -23,15 +26,25 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 	
 	logrus.Infof("=== Received message in chat %s from %s ===", evt.Info.Chat.String(), evt.Info.Sender.String())
 	
-	// Extract message text
+	// Extract message text and handle images
 	messageText := extractMessageText(evt)
 	messageType := "text"
+	mediaURL := ""
 	
 	// Check for different message types
-	if evt.Message.GetImageMessage() != nil {
+	if imageMsg := evt.Message.GetImageMessage(); imageMsg != nil {
 		messageType = "image"
-		if caption := evt.Message.GetImageMessage().GetCaption(); caption != "" {
+		if caption := imageMsg.GetCaption(); caption != "" {
 			messageText = caption
+		}
+		
+		// Download and store image
+		if media, err := ExtractMedia(context.Background(), config.PathStorages, imageMsg); err == nil {
+			// Convert to web-accessible URL
+			mediaURL = "/media/" + filepath.Base(media.MediaPath)
+			logrus.Infof("Downloaded image to: %s, URL: %s", media.MediaPath, mediaURL)
+		} else {
+			logrus.Errorf("Failed to download image: %v", err)
 		}
 	} else if evt.Message.GetVideoMessage() != nil {
 		messageType = "video"
@@ -47,14 +60,15 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 		}
 	}
 	
-	// Store message using the helper function
-	StoreWhatsAppMessage(
+	// Store message with media URL
+	StoreWhatsAppMessageWithMedia(
 		deviceID, 
 		evt.Info.Chat.String(), 
 		evt.Info.ID, 
 		evt.Info.Sender.String(), 
 		messageText, 
 		messageType,
+		mediaURL,
 	)
 	
 	// Send WebSocket notification for real-time update

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp Web</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -24,7 +25,7 @@
     /* Container - responsive for desktop */
     .chat-container {
       width: 100%;
-      max-width: 1400px;
+      max-width: 1280px;
       height: 100vh;
       background-color: #fff;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -95,7 +96,7 @@
     /* Sidebar for desktop, full width for mobile */
     .sidebar {
       width: 100%;
-      max-width: 400px;
+      max-width: 380px;
       height: calc(100vh - 40px);
       margin-top: 40px;
       border-right: 1px solid #e0e0e0;
@@ -105,44 +106,68 @@
     }
 
     .header {
-      background-color: #008069;
-      color: #fff;
-      padding: 10px 15px;
+      background-color: #f0f2f5;
+      color: #54656f;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      height: 60px;
     }
 
     .header h1 {
-      font-size: 18px;
-      font-weight: 500;
+      font-size: 19px;
+      font-weight: 600;
+      color: #111b21;
     }
 
     .header .icons {
       display: flex;
-      gap: 15px;
+      gap: 8px;
     }
 
-    .header .icons span {
+    .header .icons button {
+      background: none;
+      border: none;
+      color: #54656f;
       font-size: 20px;
       cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .header .icons button:hover {
+      background: rgba(0,0,0,0.05);
     }
 
     /* Search bar */
     .search-bar {
       padding: 8px 12px;
-      background: #f0f2f5;
-      border-bottom: 1px solid #e0e0e0;
+      background: #fff;
+      border-bottom: 1px solid #e9edef;
+    }
+
+    .search-wrapper {
+      position: relative;
     }
 
     .search-input {
       width: 100%;
-      padding: 8px 12px;
+      padding: 8px 12px 8px 40px;
       border: none;
-      border-radius: 20px;
-      background: #fff;
+      border-radius: 8px;
+      background: #f0f2f5;
       outline: none;
       font-size: 14px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #54656f;
     }
 
     .chat-list {
@@ -154,63 +179,73 @@
     .chat-item {
       display: flex;
       align-items: center;
-      padding: 10px 15px;
-      border-bottom: 1px solid #f0f0f0;
+      padding: 12px 16px;
       cursor: pointer;
       transition: background-color 0.2s;
+      position: relative;
     }
 
     .chat-item:hover {
-      background-color: #f5f5f5;
+      background-color: #f5f6f6;
     }
 
     .chat-item.active {
-      background-color: #f0f0f0;
+      background-color: #f0f2f5;
     }
 
     .chat-item .avatar {
-      width: 40px;
-      height: 40px;
+      width: 49px;
+      height: 49px;
       border-radius: 50%;
-      margin-right: 10px;
+      margin-right: 13px;
       overflow: hidden;
-      background-color: #ddd;
+      background-color: #dfe5e7;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
+      flex-shrink: 0;
     }
 
     .chat-item .avatar svg {
-      width: 24px;
-      height: 24px;
-      fill: #fff;
+      width: 28px;
+      height: 28px;
+      fill: #aebac1;
     }
 
     .chat-item .info {
       flex: 1;
       min-width: 0;
+      border-bottom: 1px solid #e9edef;
+      padding-bottom: 12px;
+    }
+
+    .chat-item:last-child .info {
+      border-bottom: none;
     }
 
     .chat-item .info h3 {
-      font-size: 16px;
-      font-weight: 500;
-      color: #111;
+      font-size: 17px;
+      font-weight: 400;
+      color: #111b21;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      margin-bottom: 3px;
     }
 
     .chat-item .info p {
       font-size: 14px;
-      color: #666;
-      margin-top: 4px;
+      color: #667781;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .chat-item .meta {
+      position: absolute;
+      right: 16px;
+      top: 12px;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
@@ -219,16 +254,17 @@
 
     .chat-item .time {
       font-size: 12px;
-      color: #666;
+      color: #667781;
     }
 
     .unread-count {
       background: #25d366;
       color: white;
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 10px;
-      min-width: 18px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 11px;
+      min-width: 20px;
       text-align: center;
     }
 
@@ -237,20 +273,22 @@
       display: none;
       flex: 1;
       flex-direction: column;
-      background-color: #e5ddd5;
+      background-color: #efeae2;
       background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
-      background-size: 300px;
+      background-size: 412.5px 749.25px;
+      background-repeat: repeat;
       margin-top: 40px;
       height: calc(100vh - 40px);
     }
 
     .chat-header {
-      background-color: #008069;
-      color: #fff;
-      padding: 10px 15px;
+      background-color: #f0f2f5;
+      color: #111b21;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      height: 60px;
     }
 
     .chat-header .back {
@@ -258,53 +296,92 @@
       margin-right: 15px;
       cursor: pointer;
       display: none;
+      color: #54656f;
     }
 
     .chat-header .avatar {
-      width: 35px;
-      height: 35px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      margin-right: 12px;
+      margin-right: 15px;
       overflow: hidden;
-      background-color: #ccc;
+      background-color: #dfe5e7;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
+      cursor: pointer;
     }
 
     .chat-header .avatar svg {
-      width: 20px;
-      height: 20px;
-      fill: #fff;
+      width: 24px;
+      height: 24px;
+      fill: #aebac1;
     }
 
     .chat-header .info {
       flex: 1;
+      cursor: pointer;
     }
 
     .chat-header h2 {
       font-size: 16px;
       font-weight: 500;
+      color: #111b21;
     }
 
     .chat-header .status {
       font-size: 13px;
-      opacity: 0.8;
+      color: #667781;
+    }
+
+    .chat-header .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-header .actions button {
+      background: none;
+      border: none;
+      color: #54656f;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .chat-header .actions button:hover {
+      background: rgba(0,0,0,0.05);
     }
 
     .messages {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 20px 9%;
       display: flex;
       flex-direction: column;
       -webkit-overflow-scrolling: touch;
     }
 
+    .date-divider {
+      text-align: center;
+      margin: 20px 0;
+      position: relative;
+    }
+
+    .date-divider span {
+      background: rgba(255,255,255,0.95);
+      color: #54656f;
+      font-size: 12.5px;
+      padding: 5px 12px;
+      border-radius: 7.5px;
+      box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+    }
+
     .message {
       max-width: 65%;
-      margin-bottom: 12px;
+      margin-bottom: 2px;
       display: flex;
       flex-direction: column;
     }
@@ -318,16 +395,16 @@
     }
 
     .message-bubble {
-      padding: 8px 12px;
+      padding: 6px 7px 8px 9px;
       border-radius: 7.5px;
-      font-size: 14px;
-      line-height: 1.4;
+      font-size: 14.2px;
+      line-height: 19px;
       position: relative;
-      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
     }
 
     .message.sent .message-bubble {
-      background-color: #dcf8c6;
+      background-color: #d9fdd3;
       border-top-right-radius: 0;
     }
 
@@ -338,13 +415,15 @@
 
     .message .content {
       word-wrap: break-word;
-      margin-bottom: 2px;
+      color: #111b21;
+      padding-right: 34px;
     }
 
     .message .time {
       font-size: 11px;
       color: #667781;
-      text-align: right;
+      float: right;
+      margin: -2px -5px -5px 5px;
     }
 
     .message.image .message-bubble {
@@ -354,17 +433,20 @@
     }
 
     .message.image img {
-      max-width: 100%;
-      max-height: 300px;
+      max-width: 330px;
+      max-height: 330px;
       border-radius: 7.5px;
       display: block;
       cursor: pointer;
+      width: 100%;
+      height: auto;
     }
 
     .message.image .caption {
-      padding: 8px 12px;
-      background-color: #dcf8c6;
+      padding: 5px 7px 6px 7px;
+      background-color: #d9fdd3;
       border-radius: 0 0 7.5px 7.5px;
+      margin-top: -5px;
     }
 
     .message.received.image .caption {
@@ -373,57 +455,96 @@
 
     .message.image .time {
       position: absolute;
-      bottom: 5px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.5);
+      bottom: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.35);
       color: #fff;
-      padding: 2px 6px;
+      padding: 2px 5px;
       border-radius: 3px;
       font-size: 11px;
+      margin: 0;
+    }
+
+    .message.image.has-caption .time {
+      position: static;
+      background: none;
+      color: #667781;
+      float: right;
+      margin: -2px -5px -5px 5px;
     }
 
     .input-area {
       display: flex;
-      align-items: center;
-      padding: 10px;
+      align-items: flex-end;
+      padding: 5px 10px;
       background-color: #f0f2f5;
-      border-top: 1px solid #e0e0e0;
+      border-top: 1px solid #e9edef;
+      gap: 5px;
+      min-height: 62px;
     }
 
-    .input-area input[type="text"] {
-      flex: 1;
-      padding: 10px 15px;
+    .attachment-btn {
+      background: none;
       border: none;
-      border-radius: 20px;
+      color: #54656f;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 5px;
+      margin: 5px;
+      border-radius: 50%;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+    }
+
+    .attachment-btn:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+    .input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    .message-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      border-radius: 21px;
       background-color: #fff;
-      font-size: 14px;
+      font-size: 15px;
       outline: none;
-      margin: 0 10px;
+      resize: none;
+      max-height: 100px;
+      overflow-y: auto;
+      line-height: 20px;
     }
 
-    .input-area .attachment {
-      font-size: 22px;
+    .send-btn {
+      background: none;
+      border: none;
       color: #54656f;
+      font-size: 24px;
       cursor: pointer;
       padding: 5px;
+      margin: 5px;
+      border-radius: 50%;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
     }
 
-    .input-area .attachment:hover {
-      color: #008069;
+    .send-btn:hover {
+      background: rgba(0,0,0,0.05);
     }
 
-    .input-area .send {
-      font-size: 22px;
-      color: #54656f;
-      cursor: pointer;
-      padding: 5px;
-    }
-
-    .input-area .send:hover {
-      color: #008069;
-    }
-
-    .input-area input[type="file"] {
+    input[type="file"] {
       display: none;
     }
 
@@ -439,12 +560,6 @@
       height: calc(100vh - 40px);
     }
 
-    .empty-state img {
-      width: 250px;
-      opacity: 0.5;
-      margin-bottom: 20px;
-    }
-
     .empty-state h3 {
       color: #41525d;
       font-size: 28px;
@@ -455,6 +570,9 @@
     .empty-state p {
       color: #667781;
       font-size: 14px;
+      line-height: 20px;
+      text-align: center;
+      max-width: 500px;
     }
 
     /* Loading */
@@ -496,29 +614,50 @@
     }
 
     .image-preview-content {
-      background: white;
+      background: #2a2f36;
       border-radius: 8px;
       max-width: 500px;
       width: 90%;
-      padding: 20px;
+      padding: 16px;
+    }
+
+    .preview-header {
+      color: #e9edef;
+      font-size: 19px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .close-preview {
+      background: none;
+      border: none;
+      color: #aebac1;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px;
     }
 
     .preview-image {
       max-width: 100%;
       max-height: 400px;
       display: block;
-      margin: 0 auto 20px;
+      margin: 0 auto 16px;
       border-radius: 4px;
     }
 
     .caption-input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #e9edef;
-      border-radius: 8px;
+      padding: 12px 16px;
+      border: 1px solid #30383d;
+      border-radius: 24px;
       margin-bottom: 16px;
       outline: none;
-      font-size: 14px;
+      font-size: 15px;
+      background: #1e252b;
+      color: #e9edef;
     }
 
     .caption-input:focus {
@@ -527,35 +666,36 @@
 
     .preview-actions {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: flex-end;
     }
 
     .preview-actions button {
       padding: 10px 24px;
       border: none;
-      border-radius: 4px;
+      border-radius: 24px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 14.5px;
       font-weight: 500;
+      transition: all 0.2s;
     }
 
     .btn-cancel {
-      background: #e9edef;
-      color: #111b21;
+      background: #30383d;
+      color: #e9edef;
     }
 
     .btn-send {
       background: #00a884;
-      color: white;
+      color: #111b21;
     }
 
     .btn-cancel:hover {
-      background: #d1d7db;
+      background: #3c464f;
     }
 
     .btn-send:hover {
-      background: #008f6f;
+      background: #06cf9c;
     }
 
     .hidden {
@@ -630,6 +770,10 @@
       .empty-state {
         display: none;
       }
+
+      .messages {
+        padding: 20px 3%;
+      }
     }
 
     @media (min-width: 769px) {
@@ -647,6 +791,36 @@
 
       .chat-window.hidden {
         display: none;
+      }
+    }
+
+    /* 1280x720 optimizations */
+    @media (min-width: 1280px) and (max-height: 720px) {
+      .header {
+        height: 50px;
+        padding: 8px 16px;
+      }
+      
+      .chat-header {
+        height: 50px;
+        padding: 8px 16px;
+      }
+      
+      .messages {
+        padding: 15px 7%;
+      }
+      
+      .empty-state h3 {
+        font-size: 24px;
+      }
+      
+      .input-area {
+        min-height: 56px;
+        padding: 4px 10px;
+      }
+      
+      .message {
+        max-width: 60%;
       }
     }
   </style>
@@ -668,12 +842,19 @@
       <div class="header">
         <h1>WhatsApp</h1>
         <div class="icons">
-          <span onclick="loadChats()" title="Refresh">🔄</span>
-          <span>⋮</span>
+          <button onclick="loadChats()" title="Refresh">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+          <button title="Menu">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
         </div>
       </div>
       <div class="search-bar">
-        <input type="text" class="search-input" id="searchInput" placeholder="Search or start new chat">
+        <div class="search-wrapper">
+          <i class="bi bi-search search-icon"></i>
+          <input type="text" class="search-input" id="searchInput" placeholder="Search or start new chat">
+        </div>
       </div>
       <div class="chat-list" id="chatList">
         <div class="loading-container">
@@ -686,7 +867,9 @@
     <!-- Chat Window -->
     <div class="chat-window" id="chatWindow">
       <div class="chat-header">
-        <span class="back" onclick="showChatList()">←</span>
+        <span class="back" onclick="showChatList()">
+          <i class="bi bi-arrow-left"></i>
+        </span>
         <div class="avatar" id="chatAvatar">
           <svg viewBox="0 0 24 24">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -696,21 +879,37 @@
           <h2 id="chatName">Select a chat</h2>
           <div class="status" id="chatStatus">tap for more info</div>
         </div>
+        <div class="actions">
+          <button title="Search">
+            <i class="bi bi-search"></i>
+          </button>
+          <button title="Menu">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+        </div>
       </div>
       <div class="messages" id="messages">
         <!-- Messages will be loaded here -->
       </div>
       <div class="input-area">
-        <span class="attachment" onclick="selectImage()">📎</span>
+        <button class="attachment-btn" onclick="selectImage()" title="Attach">
+          <i class="bi bi-paperclip"></i>
+        </button>
         <input type="file" id="imageUpload" accept="image/*">
-        <input type="text" id="messageInput" placeholder="Type a message" onkeypress="handleKeyPress(event)">
-        <span class="send" onclick="sendMessage()">➤</span>
+        <div class="input-wrapper">
+          <textarea class="message-input" id="messageInput" placeholder="Type a message" rows="1"></textarea>
+        </div>
+        <button class="send-btn" onclick="sendMessage()" title="Send">
+          <i class="bi bi-send-fill"></i>
+        </button>
       </div>
     </div>
 
     <!-- Empty State for Desktop -->
     <div class="empty-state" id="emptyState">
-      <img src="data:image/png;base64,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" alt="WhatsApp">
+      <div style="font-size: 96px; color: #00a884; margin-bottom: 28px;">
+        <i class="bi bi-whatsapp"></i>
+      </div>
       <h3>WhatsApp Web</h3>
       <p>Send and receive messages without keeping your phone online.</p>
       <p>Use WhatsApp on up to 4 linked devices and 1 phone at the same time.</p>
@@ -720,7 +919,10 @@
   <!-- Image Preview Modal -->
   <div id="imagePreviewModal" class="image-preview-modal hidden">
     <div class="image-preview-content">
-      <h5 style="margin-bottom: 16px; font-size: 18px;">Send Image</h5>
+      <div class="preview-header">
+        <span>Send Image</span>
+        <button class="close-preview" onclick="cancelImage()">×</button>
+      </div>
       <img id="previewImage" class="preview-image" alt="Preview">
       <input type="text" class="caption-input" id="captionInput" placeholder="Add a caption...">
       <div class="preview-actions">
@@ -743,6 +945,7 @@
       loadDeviceInfo();
       setupSearch();
       setupImageInput();
+      setupMessageInput();
       
       // Check if mobile
       if (window.innerWidth <= 768) {
@@ -955,8 +1158,12 @@
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${msg.sent ? 'sent' : 'received'}`;
       
-      if (msg.image) {
+      if (msg.type === 'image' && msg.image) {
         messageDiv.classList.add('image');
+        if (msg.text) {
+          messageDiv.classList.add('has-caption');
+        }
+        
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
         
@@ -981,12 +1188,23 @@
       container.appendChild(messageDiv);
     }
 
-    // Handle key press
-    function handleKeyPress(event) {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
-      }
+    // Setup message input
+    function setupMessageInput() {
+      const input = document.getElementById('messageInput');
+      
+      // Auto-resize textarea
+      input.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+      });
+      
+      // Send on Enter
+      input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
     }
 
     // Compress image file to 350KB max
@@ -1060,6 +1278,7 @@
       container.scrollTop = container.scrollHeight;
       
       input.value = '';
+      input.style.height = 'auto';
       
       // Format phone number
       let phone = currentChat.id.split('@')[0];
@@ -1199,6 +1418,7 @@
         reader.onload = function(e) {
           const tempMsg = {
             sent: true,
+            type: 'image',
             image: e.target.result,
             text: caption,
             time: formatTime(new Date())
@@ -1215,26 +1435,26 @@
           credentials: 'include',
           body: formData
         })
-          .then(res => res.json())
-          .then(data => {
-            if (data.code === 'SUCCESS') {
-              cancelImage();
-              showNotification('✓ Image sent', 'success');
-              updateChatLastMessage(currentChat.id, '📷 Photo');
-            } else {
-              modal.querySelector('.image-preview-content').innerHTML = originalContent;
-              showNotification('Failed to send image', 'error');
-              const container = document.getElementById('messages');
-              container.lastElementChild.remove();
-            }
-          })
-          .catch(err => {
-            console.error('Error sending image:', err);
+        .then(res => res.json())
+        .then(data => {
+          if (data.code === 'SUCCESS') {
+            cancelImage();
+            showNotification('✓ Image sent', 'success');
+            updateChatLastMessage(currentChat.id, '📷 Photo');
+          } else {
             modal.querySelector('.image-preview-content').innerHTML = originalContent;
-            showNotification('Failed to send image', 'error');
+            showNotification(data.message || 'Failed to send image', 'error');
             const container = document.getElementById('messages');
             container.lastElementChild.remove();
-          });
+          }
+        })
+        .catch(err => {
+          console.error('Error sending image:', err);
+          modal.querySelector('.image-preview-content').innerHTML = originalContent;
+          showNotification('Failed to send image', 'error');
+          const container = document.getElementById('messages');
+          container.lastElementChild.remove();
+        });
       });
     }
 

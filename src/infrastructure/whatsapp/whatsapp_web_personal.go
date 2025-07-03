@@ -71,6 +71,7 @@ func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]i
 			sender_jid,
 			message_text,
 			message_type,
+			message_secrets,
 			timestamp
 		FROM whatsapp_messages
 		WHERE device_id = $1 AND chat_jid = $2
@@ -89,10 +90,10 @@ func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]i
 	
 	for rows.Next() {
 		var messageID, senderJID, messageType string
-		var messageText sql.NullString
+		var messageText, messageSecrets sql.NullString
 		var timestamp int64
 		
-		err := rows.Scan(&messageID, &senderJID, &messageText, &messageType, &timestamp)
+		err := rows.Scan(&messageID, &senderJID, &messageText, &messageType, &messageSecrets, &timestamp)
 		if err != nil {
 			continue
 		}
@@ -116,6 +117,11 @@ func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]i
 			"sent":      sent,
 			"time":      timeStr,
 			"timestamp": timestamp,
+		}
+		
+		// Add image URL if it's an image message
+		if messageType == "image" && messageSecrets.Valid && messageSecrets.String != "" {
+			message["image"] = messageSecrets.String
 		}
 		
 		messages = append(messages, message)

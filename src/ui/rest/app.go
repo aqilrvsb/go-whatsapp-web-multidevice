@@ -140,6 +140,9 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// WhatsApp QR code endpoint
 	app.Get("/app/qr", rest.GetQRCode)
 	
+	// Static media files
+	app.Static("/media", config.PathStorages)
+	
 	// Device management endpoints
 	app.Delete("/api/devices/:deviceId/clear", rest.ClearDeviceData)
 	app.Post("/api/devices/reset-all", rest.ResetAllDevices)
