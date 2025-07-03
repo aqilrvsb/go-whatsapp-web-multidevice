@@ -645,6 +645,52 @@
             });
         }
         
+        // WebSocket for real-time updates
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected for real-time updates');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message:', data);
+                    
+                    // Check if it's for our device
+                    if (data.code === 'NEW_MESSAGE' && data.result && data.result.deviceId === deviceId) {
+                        console.log('New message for our device, refreshing chats...');
+                        // Reload chats automatically
+                        loadChats();
+                        
+                        // If current chat is open, reload messages
+                        if (selectedChat && selectedChat.id === data.result.chatJid) {
+                            loadMessages(selectedChat);
+                        }
+                    } else if (data.code === 'CHAT_UPDATE' && data.result && data.result.deviceId === deviceId) {
+                        console.log('Chat update for our device, refreshing...');
+                        loadChats();
+                    }
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected, reconnecting in 5s...');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+        
+        // Connect WebSocket on page load
+        connectWebSocket();
+        
         // Sync chats function
         function syncChats(silent = false) {
             if (!silent) {
@@ -716,14 +762,9 @@
         `;
         document.head.appendChild(style);
         
-        // Auto-sync on load if online
-        setTimeout(() => {
-            const deviceInfoBar = document.getElementById('deviceInfoBar');
-            if (deviceInfoBar && !deviceInfoBar.classList.contains('offline')) {
-                // Trigger silent sync
-                syncChats(true);
-            }
-        }, 2000);
+        // Load chats immediately on page load
+        // Real-time sync will handle updates automatically
+        loadChats();
     </script>
 </body>
 </html>

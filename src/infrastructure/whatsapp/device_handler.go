@@ -87,9 +87,25 @@ func HandleDeviceEvent(ctx context.Context, deviceID string, rawEvt interface{})
 	case *events.Message:
 		// Store messages for WhatsApp Web view (personal chats only)
 		HandleMessageForWebView(deviceID, evt)
+		
+		// Also handle real-time sync
+		cm := GetClientManager()
+		if client, err := cm.GetClient(deviceID); err == nil {
+			// Update chat info in real-time
+			HandleMessageForChats(deviceID, client, evt)
+			
+			// Enable real-time sync
+			EnableRealtimeSync(deviceID, client, evt)
+		}
 	case *events.HistorySync:
 		// Process history sync to get recent messages
 		HandleHistorySyncForWebView(deviceID, evt)
+		
+		// Also update chat list
+		cm := GetClientManager()
+		if client, err := cm.GetClient(deviceID); err == nil {
+			HandleHistorySyncForChats(deviceID, client, evt)
+		}
 	}
 }
 

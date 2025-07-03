@@ -118,6 +118,9 @@ func HandleMessageForChats(deviceID string, client *whatsmeow.Client, evt *event
 	
 	// Also store the message (existing function)
 	HandleMessageForWebView(deviceID, evt)
+	
+	// Send WebSocket notification for chat update
+	NotifyChatUpdate(deviceID)
 }
 
 // HandleHistorySyncForChats processes history sync and updates chat list
