@@ -1,12 +1,12 @@
 package whatsapp
 
 import (
-	"context"
 	"sync"
 	"time"
 	
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 )
