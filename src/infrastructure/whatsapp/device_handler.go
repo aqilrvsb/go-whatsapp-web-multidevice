@@ -85,18 +85,9 @@ func HandleDeviceEvent(ctx context.Context, deviceID string, rawEvt interface{})
 	case *events.LoggedOut:
 		handleDeviceLoggedOut(ctx, deviceID)
 	case *events.Message:
-		// Store messages for WhatsApp Web view (personal chats only)
-		HandleMessageForWebView(deviceID, evt)
-		
-		// Also handle real-time sync
-		cm := GetClientManager()
-		if client, err := cm.GetClient(deviceID); err == nil {
-			// Update chat info in real-time
-			HandleMessageForChats(deviceID, client, evt)
-			
-			// Enable real-time sync
-			EnableRealtimeSync(deviceID, client, evt)
-		}
+		// Skip - already handled in main handler (init.go)
+		// This prevents duplicate message storage
+		logrus.Debugf("Message event for device %s handled by main handler", deviceID)
 	case *events.HistorySync:
 		// Process history sync to get recent messages
 		HandleHistorySyncForWebView(deviceID, evt)

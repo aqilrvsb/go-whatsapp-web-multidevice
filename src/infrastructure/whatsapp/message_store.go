@@ -61,9 +61,6 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 	NotifyMessageUpdate(deviceID, evt.Info.Chat.String(), messageText)
 	
 	logrus.Debugf("Stored %s message from %s in chat %s", messageType, evt.Info.Sender.String(), evt.Info.Chat.String())
-	
-	// Send WebSocket notification for real-time update
-	NotifyMessageUpdate(deviceID, evt.Info.Chat.String(), messageText)
 }
 
 // HandleHistorySyncForWebView processes history sync to get recent messages
