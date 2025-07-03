@@ -293,20 +293,12 @@ func (handler *App) SyncWhatsAppDevice(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Trigger history sync to get recent messages
-	err = whatsapp.SyncWhatsAppHistory(deviceId)
-	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "ERROR",
-			Message: fmt.Sprintf("Failed to sync: %v", err),
-		})
-	}
-	
+	// WhatsApp sends history sync automatically
+	// Just return success
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "History sync initiated. Messages will be available shortly.",
+		Message: "Chats are synced automatically. Please refresh the page.",
 	})
 }
 

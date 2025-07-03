@@ -107,6 +107,37 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			case connectedChan <- true:
 			default:
 			}
+		case *events.Message:
+			// Handle incoming messages for WhatsApp Web
+			if config.WhatsappChatStorage {
+				// Find device ID for this client
+				userRepo := repository.GetUserRepository()
+				if newClient.Store.ID != nil {
+					phoneNumber := newClient.Store.ID.User
+					var deviceID string
+					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
+					if err == nil && deviceID != "" {
+						// Store chat and message
+						whatsapp.HandleMessageForChats(deviceID, newClient, v)
+					}
+				}
+			}
+		case *events.HistorySync:
+			// Handle history sync for WhatsApp Web
+			logrus.Infof("=== HISTORY SYNC EVENT RECEIVED IN LOGIN! Type: %s ===", v.Data.GetSyncType())
+			if config.WhatsappChatStorage {
+				// Find device ID for this client
+				userRepo := repository.GetUserRepository()
+				if newClient.Store.ID != nil {
+					phoneNumber := newClient.Store.ID.User
+					var deviceID string
+					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
+					if err == nil && deviceID != "" {
+						// Process history sync
+						whatsapp.HandleHistorySyncForChats(deviceID, newClient, v)
+					}
+				}
+			}
 			// Keep the client alive by adding keepalive monitoring
 			go func(client *whatsmeow.Client) {
 				ticker := time.NewTicker(30 * time.Second)

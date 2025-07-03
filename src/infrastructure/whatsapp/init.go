@@ -214,131 +214,6 @@ func handleConnectionEvents(_ context.Context) {
 	// Each device should handle its own connection events through device-specific handlers
 	// See app.go Login() function for device-specific handling
 	return
-	
-	if cli.IsLoggedIn() {
-		log.Infof("WhatsApp client is logged in and connected!")
-		
-		// Get device info for database update
-		var phoneNumber, jid string
-		var connectedDeviceID string // Declare here for broader scope
-		
-		if cli.Store.ID != nil {
-			jid = cli.Store.ID.String()
-			phoneNumber = cli.Store.ID.User
-			log.Infof("Connected as: %s (Phone: %s, Name: %s)", jid, phoneNumber, cli.Store.PushName)
-			
-			// Update device status in database
-			userRepo := repository.GetUserRepository()
-			
-			// Look for any active connection session
-			allSessions := GetAllConnectionSessions()
-			log.Infof("Found %d active connection sessions", len(allSessions))
-			
-			// First, try to find a session that matches this connection
-			// We need to match based on some criteria since we don't have phone yet
-			for deviceID, session := range allSessions {
-				if session != nil && session.DeviceID != "" {
-					log.Infof("Found session for device %s, user %s", deviceID, session.UserID)
-					connectedDeviceID = session.DeviceID // Store device ID for the message
-					
-					// Update device status to online
-					err := userRepo.UpdateDeviceStatus(session.DeviceID, "online", phoneNumber, jid)
-					if err != nil {
-						log.Errorf("Failed to update device status: %v", err)
-					} else {
-						log.Infof("Successfully updated device %s to online status", session.DeviceID)
-						log.Infof("Device %s connected with phone: %s", session.DeviceID, phoneNumber)
-						
-						// Register device with client manager using the device ID from database
-						cm := GetClientManager()
-						cm.AddClient(session.DeviceID, cli)
-						log.Infof("Registered device %s with client manager for broadcast system", session.DeviceID)
-						
-						// Trigger initial chat sync
-						go func() {
-							time.Sleep(3 * time.Second) // Wait for connection to stabilize
-							chats, err := GetChatsForDevice(session.DeviceID)
-							if err != nil {
-								log.Errorf("Failed to sync chats for device %s: %v", session.DeviceID, err)
-							} else {
-								log.Infof("Successfully synced %d chats for device %s", len(chats), session.DeviceID)
-							}
-						}()
-					}
-					
-					// Clear the session after successful update
-					ClearConnectionSession(deviceID)
-					break
-				}
-			}
-			
-			// If we didn't find device ID from session, DON'T try to find by phone
-			// This prevents wrong device assignment in multi-device scenarios
-			if connectedDeviceID == "" {
-				log.Warnf("No device ID found in session for phone %s", phoneNumber)
-				log.Infof("Device must be connected through proper QR scan flow with device_id parameter")
-				log.Infof("WhatsApp returned phone: %s, but no matching session found", phoneNumber)
-				
-				// Log all devices for debugging
-				var debugQuery = `SELECT id, COALESCE(phone, ''), device_name FROM user_devices WHERE status != 'deleted'`
-				rows, _ := userRepo.DB().Query(debugQuery)
-				if rows != nil {
-					defer rows.Close()
-					log.Infof("=== All devices in database ===")
-					for rows.Next() {
-						var id, phone, name string
-						if err := rows.Scan(&id, &phone, &name); err != nil {
-							log.Errorf("Error scanning row: %v", err)
-							continue
-						}
-						log.Infof("Device: %s, Phone: '%s', Name: %s", id, phone, name)
-					}
-					log.Infof("=== End of devices ===")
-				}
-			}
-		}
-		
-		// Send connection success message with device ID
-		websocket.Broadcast <- websocket.BroadcastMessage{
-			Code:    "DEVICE_CONNECTED",
-			Message: "WhatsApp fully connected and logged in",
-			Result: map[string]interface{}{
-				"phone":    phoneNumber,
-				"jid":      jid,
-				"deviceId": connectedDeviceID,
-			},
-		}
-		
-		// Auto-trigger history sync for WhatsApp Web when device connects
-		if config.WhatsappChatStorage && connectedDeviceID != "" {
-			go func() {
-				// Wait a bit for connection to stabilize
-				time.Sleep(2 * time.Second)
-				
-				log.Infof("Auto-triggering history sync for device %s", connectedDeviceID)
-				
-				// Just request sync using the connected device ID
-				err := SyncWhatsAppHistory(connectedDeviceID)
-				if err != nil {
-					log.Errorf("Failed to auto-trigger history sync: %v", err)
-				} else {
-					log.Infof("History sync auto-triggered successfully")
-				}
-			}()
-		}
-	}
-	
-	if len(cli.Store.PushName) == 0 {
-		return
-	}
-
-	// Send presence available when connecting and when the pushname is changed.
-	// This makes sure that outgoing messages always have the right pushname.
-	if err := cli.SendPresence(types.PresenceAvailable); err != nil {
-		log.Warnf("Failed to send available presence: %v", err)
-	} else {
-		log.Infof("Marked self as available")
-	}
 }
 
 func handleStreamReplaced(_ context.Context) {
@@ -361,167 +236,44 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 	
 	log.Infof("WhatsappChatStorage enabled: %v", config.WhatsappChatStorage)
 	
-	// Save message to WhatsApp storage for all connected devices
+	// Save message and chat info like whatsapp-mcp-main does
 	if config.WhatsappChatStorage {
 		cm := GetClientManager()
 		allClients := cm.GetAllClients()
 		for deviceID, client := range allClients {
-		// Skip group messages - we only want personal chats
-		if evt.Info.IsGroup || evt.Info.Chat.Server == types.GroupServer {
-			continue
-		}
-		
-		// Skip broadcast and status messages
-		if evt.Info.Chat.Server == types.BroadcastServer || evt.Info.Chat.User == "status" {
-			continue
-		}
-		
-		// Only process personal chats
-		if evt.Info.Chat.Server != types.DefaultUserServer {
-			continue
-		}
-		// Check if this message belongs to this client's conversation
-		// Either sent by this client OR sent to this client
-		if client.Store.ID != nil {
-			// For personal chats, we save all messages
-			// In personal chats, if I didn't send it, then it was sent to me
-			isPersonalChat := evt.Info.Chat.Server == types.DefaultUserServer && !evt.Info.IsGroup
-			
-			// Save all messages in personal chats
-			if isPersonalChat {
-				log.Infof("Saving message for device %s: sender=%s, chat=%s, isFromMe=%v",
-					deviceID, evt.Info.Sender.String(), evt.Info.Chat.String(), evt.Info.IsFromMe)
-			// Get sender name
-			senderName := ""
-			if evt.Info.IsFromMe {
-				senderName = "You"
-			} else {
-				contact, _ := client.Store.Contacts.GetContact(context.Background(), evt.Info.Sender)
-				if contact.Found && contact.PushName != "" {
-					senderName = contact.PushName
-				} else {
-					senderName = evt.Info.Sender.User
-				}
+			// Skip if not the right client
+			if client != cli {
+				continue
 			}
 			
-			// Determine message type
+			// Skip non-personal chats
+			if evt.Info.Chat.Server != types.DefaultUserServer {
+				continue
+			}
+			
+			// Store/update chat first
+			chatJID := evt.Info.Chat.String()
+			chatName := GetChatName(client, evt.Info.Chat, chatJID)
+			err := StoreChat(deviceID, chatJID, chatName, evt.Info.Timestamp)
+			if err != nil {
+				log.Errorf("Failed to store chat: %v", err)
+			}
+			
+			// Store message
 			messageType := "text"
-			mediaURL := ""
-			if evt.Message.ImageMessage != nil {
+			if evt.Message.GetImageMessage() != nil {
 				messageType = "image"
-			} else if evt.Message.VideoMessage != nil {
+			} else if evt.Message.GetVideoMessage() != nil {
 				messageType = "video"
-			} else if evt.Message.AudioMessage != nil {
+			} else if evt.Message.GetAudioMessage() != nil {
 				messageType = "audio"
-			} else if evt.Message.DocumentMessage != nil {
+			} else if evt.Message.GetDocumentMessage() != nil {
 				messageType = "document"
 			}
 			
-			// Save message to database
-			whatsappRepo := repository.GetWhatsAppRepository()
-			whatsappMsg := repository.WhatsAppMessage{
-				DeviceID:    deviceID,
-				ChatJID:     evt.Info.Chat.String(),
-				MessageID:   evt.Info.ID,
-				SenderJID:   evt.Info.Sender.String(),
-				SenderName:  senderName,
-				MessageText: message,
-				MessageType: messageType,
-				MediaURL:    mediaURL,
-				IsSent:      evt.Info.IsFromMe,
-				IsRead:      false,
-				Timestamp:   evt.Info.Timestamp,
-			}
-			
-			if err := whatsappRepo.SaveMessage(&whatsappMsg); err != nil {
-				log.Errorf("Failed to save message: %v", err)
-			}
-			
-			// Update chat's last message
-			chat, err := whatsappRepo.GetChatByJID(deviceID, evt.Info.Chat.String())
-			if err != nil {
-				// Create new chat entry
-				chatName := ""
-				if evt.Info.IsGroup {
-					// Get group info
-					groupInfo, _ := client.GetGroupInfo(evt.Info.Chat)
-					if groupInfo != nil {
-						chatName = groupInfo.Name
-					}
-				} else {
-					// Get contact name
-					contact, _ := client.Store.Contacts.GetContact(context.Background(), evt.Info.Chat)
-					if contact.Found && contact.PushName != "" {
-						chatName = contact.PushName
-					} else {
-						chatName = evt.Info.Chat.User
-					}
-				}
-				
-				chat = &repository.WhatsAppChat{
-					DeviceID:        deviceID,
-					ChatJID:         evt.Info.Chat.String(),
-					ChatName:        chatName,
-					IsGroup:         evt.Info.IsGroup,
-					IsMuted:         false,
-					LastMessageText: message,
-					LastMessageTime: evt.Info.Timestamp,
-					UnreadCount:     0,
-				}
-			} else {
-				// Update existing chat
-				chat.LastMessageText = message
-				chat.LastMessageTime = evt.Info.Timestamp
-				if !evt.Info.IsFromMe {
-					chat.UnreadCount++
-				}
-			}
-			
-			if err := whatsappRepo.SaveOrUpdateChat(chat); err != nil {
-				log.Errorf("Failed to update chat: %v", err)
-			}
-			
+			StoreWhatsAppMessage(deviceID, chatJID, evt.Info.ID, evt.Info.Sender.String(), message, messageType)
+			log.Debugf("Stored message in chat %s", chatJID)
 			break
-			}
-		}
-	}
-	}
-	
-	// Record to database for analytics
-	// TODO: Get actual user and device from session context
-	// For now, we'll need to implement a device mapping system
-	
-	// Determine message status
-	status := "sent"
-	if !evt.Info.IsFromMe {
-		status = "received"
-	}
-	
-	// Try to record in database (if we have user context)
-	if analyticsRepo := ctx.Value("analyticsRepo"); analyticsRepo != nil {
-		if repo, ok := analyticsRepo.(*repository.MessageAnalyticsRepository); ok {
-			// Get user and device info from context
-			userID := ""
-			deviceID := ""
-			
-			if userCtx := ctx.Value("userID"); userCtx != nil {
-				userID = userCtx.(string)
-			}
-			if deviceCtx := ctx.Value("deviceID"); deviceCtx != nil {
-				deviceID = deviceCtx.(string)
-			}
-			
-			if userID != "" && deviceID != "" {
-				repo.RecordMessage(
-					userID,
-					deviceID,
-					evt.Info.ID,
-					evt.Info.Chat.String(),
-					message,
-					evt.Info.IsFromMe,
-					status,
-				)
-			}
 		}
 	}
 
@@ -566,6 +318,7 @@ func handleAutoReply(evt *events.Message) {
 	if config.WhatsappAutoReplyMessage != "" &&
 		!isGroupJid(evt.Info.Chat.String()) &&
 		!evt.Info.IsIncomingBroadcast() &&
+		evt.Message.GetExtendedTextMessage() != nil &&
 		evt.Message.GetExtendedTextMessage().GetText() != "" {
 		_, _ = cli.SendMessage(
 			context.Background(),
@@ -624,6 +377,9 @@ func handlePresence(_ context.Context, evt *events.Presence) {
 }
 
 func handleHistorySync(_ context.Context, evt *events.HistorySync) {
+	log.Infof("=== HISTORY SYNC RECEIVED! Type: %s, Progress: %d%% ===", 
+		evt.Data.GetSyncType(), evt.Data.GetProgress())
+	
 	// Process history sync for WhatsApp Web if enabled
 	if config.WhatsappChatStorage {
 		// Get all connected clients
@@ -635,8 +391,13 @@ func handleHistorySync(_ context.Context, evt *events.HistorySync) {
 			if client == cli {
 				log.Infof("Processing history sync for device %s", deviceID)
 				
-				// Process messages from history sync
+				// Create tables if needed
+				CreateChatTable()
+				
+				// Process each conversation
+				conversationCount := 0
 				messageCount := 0
+				
 				for _, conv := range evt.Data.GetConversations() {
 					if conv.GetId() == "" {
 						continue
@@ -651,6 +412,35 @@ func handleHistorySync(_ context.Context, evt *events.HistorySync) {
 					// Skip non-personal chats
 					if chatJID.Server != types.DefaultUserServer {
 						continue
+					}
+					
+					conversationCount++
+					
+					// Get chat name
+					chatName := GetChatName(client, chatJID, conv.GetId())
+					
+					// Get last message time
+					var lastMessageTime time.Time
+					if len(conv.GetMessages()) > 0 {
+						firstMsg := conv.GetMessages()[0]
+						if firstMsg != nil && firstMsg.GetMessage() != nil {
+							timestamp := firstMsg.GetMessage().GetMessageTimestamp()
+							if timestamp > 0 {
+								lastMessageTime = time.Unix(int64(timestamp), 0)
+							}
+						}
+					}
+					
+					if lastMessageTime.IsZero() {
+						lastMessageTime = time.Now()
+					}
+					
+					// Store chat
+					err = StoreChat(deviceID, conv.GetId(), chatName, lastMessageTime)
+					if err != nil {
+						log.Errorf("Failed to store chat %s: %v", conv.GetId(), err)
+					} else {
+						log.Debugf("Stored chat: %s (%s)", chatName, conv.GetId())
 					}
 					
 					// Process messages
@@ -706,14 +496,13 @@ func handleHistorySync(_ context.Context, evt *events.HistorySync) {
 						}
 						
 						if messageText != "" {
-							// Use the function from message_store.go
 							StoreWhatsAppMessageWithTimestamp(deviceID, chatJID.String(), messageID, senderJID, messageText, messageType, int64(timestamp))
 							messageCount++
 						}
 					}
 				}
 				
-				log.Infof("Processed %d messages from history sync", messageCount)
+				log.Infof("=== History sync complete: %d conversations, %d messages stored ===", conversationCount, messageCount)
 				break
 			}
 		}
