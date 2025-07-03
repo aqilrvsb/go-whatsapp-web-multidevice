@@ -253,16 +253,6 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 			break
 		}
 	}
-				messageType = "audio"
-			} else if evt.Message.GetDocumentMessage() != nil {
-				messageType = "document"
-			}
-			
-			StoreWhatsAppMessage(deviceID, chatJID, evt.Info.ID, evt.Info.Sender.String(), message, messageType)
-			log.Debugf("Stored message in chat %s", chatJID)
-			break
-		}
-	}
 
 	// Handle image message if present
 	handleImageMessage(ctx, evt)
