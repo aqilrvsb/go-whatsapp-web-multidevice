@@ -246,10 +246,20 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 				continue
 			}
 			
-			// Enable real-time sync for this device
+			// Store the message immediately for real-time updates
+			if evt.Info.Chat.Server == types.DefaultUserServer && !evt.Info.IsGroup {
+				// Update chat info first
+				HandleMessageForChats(deviceID, client, evt)
+				
+				// Store the message
+				HandleMessageForWebView(deviceID, evt)
+				
+				log.Debugf("Stored message in real-time for device %s in chat %s", deviceID, evt.Info.Chat.String())
+			}
+			
+			// Also register for real-time sync
 			EnableRealtimeSync(deviceID, client, evt)
 			
-			// The rest of the processing is now handled by the real-time sync manager
 			break
 		}
 	}

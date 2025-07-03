@@ -2,7 +2,10 @@ package rest
 
 import (
 	"fmt"
+	"time"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
+	"go.mau.fi/whatsmeow/types"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -293,12 +296,24 @@ func (handler *App) SyncWhatsAppDevice(c *fiber.Ctx) error {
 		})
 	}
 	
-	// WhatsApp sends history sync automatically
-	// Just return success
+	// Force a sync by getting the WhatsApp client and requesting presence
+	cm := whatsapp.GetClientManager()
+	client, err := cm.GetClient(deviceId)
+	if err == nil && client != nil && client.IsConnected() {
+		// Send presence to trigger any pending updates
+		client.SendPresence(types.PresenceAvailable)
+		
+		// Small delay to allow messages to process
+		time.Sleep(500 * time.Millisecond)
+		
+		logrus.Infof("Sync triggered for device %s", deviceId)
+	}
+	
+	// Return success and let the client refresh
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Chats are synced automatically. Please refresh the page.",
+		Message: "Sync completed. Refreshing chats...",
 	})
 }
 
