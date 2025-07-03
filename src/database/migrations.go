@@ -21,6 +21,35 @@ var completedMigrations = map[string]bool{
 func GetMigrations() []Migration {
 	allMigrations := []Migration{
 		{
+			Name: "Fix whatsapp_chats missing columns and rename",
+			SQL: `
+			-- First add missing columns that might not exist
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT FALSE;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_text TEXT;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_time TIMESTAMP;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+			
+			-- Now fix column name from 'name' to 'chat_name' if needed
+			DO $$ 
+			BEGIN
+				-- Check if 'name' column exists and 'chat_name' doesn't
+				IF EXISTS (SELECT 1 FROM information_schema.columns 
+						   WHERE table_name = 'whatsapp_chats' AND column_name = 'name') 
+				   AND NOT EXISTS (SELECT 1 FROM information_schema.columns 
+								   WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
+					-- Rename 'name' to 'chat_name'
+					ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
+				END IF;
+				
+				-- Ensure chat_name column exists (in case both are missing)
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255);
+			END $$;
+			`,
+		},
+		{
 			Name: "Recreate whatsapp_messages table with proper schema",
 			SQL: `
 			-- Drop the existing table if it exists
@@ -102,33 +131,6 @@ func GetMigrations() []Migration {
 			CREATE TRIGGER limit_messages_trigger 
 			AFTER INSERT ON whatsapp_messages 
 			FOR EACH ROW EXECUTE FUNCTION limit_chat_messages();
-			`,
-		},
-		{
-			Name: "Fix whatsapp_chats column name",
-			SQL: `
-			-- Fix column name from 'name' to 'chat_name'
-			DO $$ 
-			BEGIN
-				-- Check if 'name' column exists and 'chat_name' doesn't
-				IF EXISTS (SELECT 1 FROM information_schema.columns 
-						   WHERE table_name = 'whatsapp_chats' AND column_name = 'name') 
-				   AND NOT EXISTS (SELECT 1 FROM information_schema.columns 
-								   WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
-					-- Rename 'name' to 'chat_name'
-					ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
-				END IF;
-				
-				-- Ensure all required columns exist
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255);
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT FALSE;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_text TEXT;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_time TIMESTAMP;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-			END $$;
 			`,
 		},
 		{
