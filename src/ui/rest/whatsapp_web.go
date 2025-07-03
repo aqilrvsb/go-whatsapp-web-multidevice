@@ -225,11 +225,76 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 func (handler *App) SyncWhatsAppDevice(c *fiber.Ctx) error {
 	deviceId := c.Params("id")
 	
-	// [Authentication checks - simplified for brevity]
-	// You should add the same auth checks as in GetWhatsAppChats
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token found",
+		})
+	}
 	
-	// Trigger contact refresh
-	err := whatsapp.RefreshWhatsAppChats(deviceId)
+	// Get session from database
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil || session == nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get user from database
+	user, err := userRepo.GetUserByID(session.UserID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "USER_NOT_FOUND",
+			Message: "User not found",
+		})
+	}
+	
+	// Get user devices to check if this device belongs to user
+	devices, err := userRepo.GetUserDevices(user.ID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	
+	// Check if device belongs to user and is online
+	deviceBelongsToUser := false
+	isOnline := false
+	for _, device := range devices {
+		if device.ID == deviceId {
+			deviceBelongsToUser = true
+			isOnline = device.Status == "online"
+			break
+		}
+	}
+	
+	if !deviceBelongsToUser {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "FORBIDDEN",
+			Message: "Device does not belong to user",
+		})
+	}
+	
+	if !isOnline {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "DEVICE_OFFLINE",
+			Message: "Device must be online to sync",
+		})
+	}
+	
+	// Trigger history sync to get recent messages
+	err = whatsapp.SyncWhatsAppHistory(deviceId)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -241,7 +306,7 @@ func (handler *App) SyncWhatsAppDevice(c *fiber.Ctx) error {
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
-		Message: "Contact sync initiated",
+		Message: "History sync initiated. Messages will be available shortly.",
 	})
 }
 

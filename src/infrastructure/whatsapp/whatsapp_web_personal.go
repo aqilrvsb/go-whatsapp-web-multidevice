@@ -453,3 +453,81 @@ func RefreshWhatsAppChats(deviceID string) error {
 	// Don't reload or change the contact list
 	return nil
 }
+// StoreHistorySyncMessage stores a message from history sync with proper timestamp
+func StoreHistorySyncMessage(deviceID, chatJID, messageID, senderJID, messageText, messageType string, timestamp int64) {
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	// Ensure table exists
+	createTableQuery := `
+		CREATE TABLE IF NOT EXISTS whatsapp_messages (
+			id SERIAL PRIMARY KEY,
+			device_id TEXT NOT NULL,
+			chat_jid TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			sender_jid TEXT NOT NULL,
+			message_text TEXT,
+			message_type TEXT DEFAULT 'text',
+			timestamp BIGINT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(device_id, message_id)
+		);
+		
+		CREATE INDEX IF NOT EXISTS idx_device_chat_time ON whatsapp_messages(device_id, chat_jid, timestamp DESC);
+	`
+	
+	db.Exec(createTableQuery)
+	
+	// Insert or update message
+	query := `
+		INSERT INTO whatsapp_messages (device_id, chat_jid, message_id, sender_jid, message_text, message_type, timestamp)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (device_id, message_id) 
+		DO UPDATE SET 
+			message_text = EXCLUDED.message_text,
+			message_type = EXCLUDED.message_type,
+			timestamp = EXCLUDED.timestamp
+	`
+	
+	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, timestamp)
+	if err != nil {
+		logrus.Errorf("Failed to store history sync message: %v", err)
+	} else {
+		logrus.Debugf("Stored history message: %s in chat %s", messageID, chatJID)
+	}
+}
+
+// SyncWhatsAppHistory triggers a history sync for the device
+func SyncWhatsAppHistory(deviceID string) error {
+	logrus.Infof("=== Starting WhatsApp history sync for device: %s ===", deviceID)
+	
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err != nil {
+		return fmt.Errorf("device not connected: %v", err)
+	}
+	
+	if client.Store.ID == nil {
+		return fmt.Errorf("device not logged in")
+	}
+	
+	// Request history sync using the client's built-in method
+	// This will trigger the handleHistorySync event handler
+	historySyncMsg := client.BuildHistorySyncRequest(nil, 50)
+	if historySyncMsg == nil {
+		return fmt.Errorf("failed to build history sync request")
+	}
+	
+	// Send to WhatsApp status broadcast to request history
+	_, err = client.SendMessage(context.Background(), types.JID{
+		Server: "s.whatsapp.net",
+		User:   "status",
+	}, historySyncMsg)
+	
+	if err != nil {
+		return fmt.Errorf("failed to request history sync: %v", err)
+	}
+	
+	logrus.Info("History sync requested successfully")
+	return nil
+}

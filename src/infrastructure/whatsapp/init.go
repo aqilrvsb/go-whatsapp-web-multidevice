@@ -308,6 +308,22 @@ func handleConnectionEvents(_ context.Context) {
 				"deviceId": connectedDeviceID,
 			},
 		}
+		
+		// Auto-trigger history sync for WhatsApp Web when device connects
+		if config.WhatsappChatStorage && connectedDeviceID != "" {
+			go func() {
+				// Wait a bit for connection to stabilize
+				time.Sleep(2 * time.Second)
+				
+				log.Infof("Auto-triggering history sync for device %s", connectedDeviceID)
+				err := SyncWhatsAppHistory(connectedDeviceID)
+				if err != nil {
+					log.Errorf("Failed to auto-trigger history sync: %v", err)
+				} else {
+					log.Infof("History sync auto-triggered successfully for device %s", connectedDeviceID)
+				}
+			}()
+		}
 	}
 	
 	if len(cli.Store.PushName) == 0 {
@@ -606,6 +622,102 @@ func handlePresence(_ context.Context, evt *events.Presence) {
 }
 
 func handleHistorySync(_ context.Context, evt *events.HistorySync) {
+	// Process history sync for WhatsApp Web if enabled
+	if config.WhatsappChatStorage {
+		// Get all connected clients
+		cm := GetClientManager()
+		allClients := cm.GetAllClients()
+		
+		// Find the device ID for this history sync
+		for deviceID, client := range allClients {
+			if client == cli {
+				log.Infof("Processing history sync for device %s", deviceID)
+				
+				// Process messages from history sync
+				messageCount := 0
+				for _, conv := range evt.Data.GetConversations() {
+					if conv.GetId() == "" {
+						continue
+					}
+					
+					// Parse chat JID
+					chatJID, err := types.ParseJID(conv.GetId())
+					if err != nil {
+						continue
+					}
+					
+					// Skip non-personal chats
+					if chatJID.Server != types.DefaultUserServer {
+						continue
+					}
+					
+					// Process messages
+					for _, historyMsg := range conv.GetMessages() {
+						webMsg := historyMsg.GetMessage()
+						if webMsg == nil || webMsg.GetKey() == nil {
+							continue
+						}
+						
+						messageID := webMsg.GetKey().GetId()
+						timestamp := webMsg.GetMessageTimestamp()
+						isFromMe := webMsg.GetKey().GetFromMe()
+						
+						var senderJID string
+						if isFromMe {
+							senderJID = client.Store.ID.String()
+						} else {
+							senderJID = chatJID.String()
+						}
+						
+						// Extract message content
+						messageText := ""
+						messageType := "text"
+						
+						if msg := webMsg.GetMessage(); msg != nil {
+							if text := msg.GetConversation(); text != "" {
+								messageText = text
+							} else if extText := msg.GetExtendedTextMessage(); extText != nil {
+								messageText = extText.GetText()
+							} else if img := msg.GetImageMessage(); img != nil {
+								messageText = img.GetCaption()
+								if messageText == "" {
+									messageText = "📷 Photo"
+								}
+								messageType = "image"
+							} else if vid := msg.GetVideoMessage(); vid != nil {
+								messageText = vid.GetCaption()
+								if messageText == "" {
+									messageText = "📹 Video"
+								}
+								messageType = "video"
+							} else if aud := msg.GetAudioMessage(); aud != nil {
+								if aud.GetPtt() {
+									messageText = "🎤 Voice message"
+								} else {
+									messageText = "🎵 Audio"
+								}
+								messageType = "audio"
+							} else if doc := msg.GetDocumentMessage(); doc != nil {
+								messageText = "📄 " + doc.GetFileName()
+								messageType = "document"
+							}
+						}
+						
+						if messageText != "" {
+							// Use the function from message_store.go
+							StoreWhatsAppMessageWithTimestamp(deviceID, chatJID.String(), messageID, senderJID, messageText, messageType, int64(timestamp))
+							messageCount++
+						}
+					}
+				}
+				
+				log.Infof("Processed %d messages from history sync", messageCount)
+				break
+			}
+		}
+	}
+	
+	// Also save to file as before
 	id := atomic.AddInt32(&historySyncID, 1)
 	fileName := fmt.Sprintf("%s/history-%d-%s-%d-%s.json",
 		config.PathStorages,
