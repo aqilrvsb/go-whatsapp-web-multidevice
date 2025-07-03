@@ -691,7 +691,7 @@ func handleHistorySync(_ context.Context, evt *events.HistorySync) {
 								}
 								messageType = "video"
 							} else if aud := msg.GetAudioMessage(); aud != nil {
-								if aud.GetPtt() {
+								if aud.GetPTT() {
 									messageText = "🎤 Voice message"
 								} else {
 									messageText = "🎵 Audio"

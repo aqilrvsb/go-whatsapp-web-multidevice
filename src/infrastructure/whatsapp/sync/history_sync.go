@@ -164,7 +164,7 @@ func (hsm *HistorySyncManager) extractMessageContent(msg *waProto.Message) (stri
 	}
 	
 	if aud := msg.GetAudioMessage(); aud != nil {
-		if aud.GetPtt() {
+		if aud.GetPTT() {
 			return "🎤 Voice message", "audio"
 		}
 		return "🎵 Audio", "audio"
