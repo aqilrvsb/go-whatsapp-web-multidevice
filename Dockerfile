@@ -17,7 +17,7 @@ WORKDIR /app/src
 RUN go mod download
 
 # Build the application
-RUN go build -o /app/whatsapp .
+RUN CGO_ENABLED=0 go build -o /app/whatsapp .
 
 # Runtime stage
 FROM alpine:latest
