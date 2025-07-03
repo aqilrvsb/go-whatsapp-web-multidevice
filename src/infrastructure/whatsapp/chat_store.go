@@ -40,6 +40,18 @@ func StoreChat(deviceID, chatJID, name string, lastMessageTime time.Time) error 
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
+	// Ensure name is never empty
+	if name == "" {
+		// Extract phone number from JID as fallback
+		jid, err := types.ParseJID(chatJID)
+		if err == nil {
+			name = jid.User
+		} else {
+			name = "Unknown"
+		}
+		logrus.Warnf("Empty name for chat %s, using fallback: %s", chatJID, name)
+	}
+	
 	query := `
 		INSERT INTO whatsapp_chats (device_id, chat_jid, chat_name, last_message_time)
 		VALUES ($1, $2, $3, $4)

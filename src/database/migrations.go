@@ -21,6 +21,38 @@ var completedMigrations = map[string]bool{
 func GetMigrations() []Migration {
 	allMigrations := []Migration{
 		{
+			Name: "Fix whatsapp_chats duplicate name columns",
+			SQL: `
+			-- Fix duplicate name columns issue
+			DO $$ 
+			BEGIN
+				-- Only proceed if the table exists
+				IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'whatsapp_chats') THEN
+					-- If we have both 'name' and 'chat_name' columns, we need to fix this
+					IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'name')
+					   AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
+						
+						-- Copy data from 'name' to 'chat_name' where chat_name is empty
+						UPDATE whatsapp_chats 
+						SET chat_name = name 
+						WHERE (chat_name IS NULL OR chat_name = '') AND name IS NOT NULL AND name != '';
+						
+						-- Drop the old 'name' column
+						ALTER TABLE whatsapp_chats DROP COLUMN name;
+						RAISE NOTICE 'Dropped duplicate name column';
+					
+					-- If we only have 'name' column, rename it to 'chat_name'
+					ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'name')
+					      AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
+						
+						ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
+						RAISE NOTICE 'Renamed name column to chat_name';
+					END IF;
+				END IF;
+			END $$;
+			`,
+		},
+		{
 			Name: "Fix whatsapp_chats missing columns and rename",
 			SQL: `
 			-- First add missing columns that might not exist
@@ -45,7 +77,13 @@ func GetMigrations() []Migration {
 				END IF;
 				
 				-- Ensure chat_name column exists (in case both are missing)
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255);
+				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255) DEFAULT '';
+				
+				-- Make sure chat_name is never NULL
+				UPDATE whatsapp_chats SET chat_name = COALESCE(chat_name, '') WHERE chat_name IS NULL;
+				
+				-- Now we can safely set NOT NULL
+				ALTER TABLE whatsapp_chats ALTER COLUMN chat_name SET NOT NULL;
 			END $$;
 			`,
 		},
