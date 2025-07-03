@@ -249,9 +249,6 @@ func handleConnectionEvents(_ context.Context) {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
 						log.Infof("Device %s connected with phone: %s", session.DeviceID, phoneNumber)
 						
-						// Store the client globally for this device
-						cli = client
-						
 						// Register device with client manager using the device ID from database
 						cm := GetClientManager()
 						cm.AddClient(session.DeviceID, cli)
