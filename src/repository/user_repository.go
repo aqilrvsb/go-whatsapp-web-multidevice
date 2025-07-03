@@ -387,8 +387,32 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	defer tx.Rollback()
 	
-	// First, delete all leads associated with this device
-	result, err := tx.Exec("DELETE FROM leads WHERE device_id = $1", deviceID)
+	// First, delete all WhatsApp messages for this device
+	result, err := tx.Exec("DELETE FROM whatsapp_messages WHERE device_id = $1", deviceID)
+	if err != nil {
+		log.Printf("Warning: failed to delete WhatsApp messages: %v", err)
+		// Continue with deletion even if this fails (table might not exist)
+	} else {
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			log.Printf("Deleted %d WhatsApp messages for device %s", rowsAffected, deviceID)
+		}
+	}
+	
+	// Delete all WhatsApp chats for this device
+	result, err = tx.Exec("DELETE FROM whatsapp_chats WHERE device_id = $1", deviceID)
+	if err != nil {
+		log.Printf("Warning: failed to delete WhatsApp chats: %v", err)
+		// Continue with deletion even if this fails (table might not exist)
+	} else {
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			log.Printf("Deleted %d WhatsApp chats for device %s", rowsAffected, deviceID)
+		}
+	}
+	
+	// Delete all leads associated with this device
+	result, err = tx.Exec("DELETE FROM leads WHERE device_id = $1", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete leads for device: %w", err)
 	}
@@ -420,7 +444,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	
-	log.Printf("Successfully deleted device %s and all associated data", deviceID)
+	log.Printf("Successfully deleted device %s and all associated data (including WhatsApp chats and messages)", deviceID)
 	return nil
 }
 
