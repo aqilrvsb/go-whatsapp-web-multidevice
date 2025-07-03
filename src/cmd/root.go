@@ -208,6 +208,9 @@ func initApp() {
 	if err := utils.InitMessageRecords(); err != nil {
 		logrus.Warnf("Failed to initialize message records: %v", err)
 	}
+	
+	// Initialize real-time sync for WhatsApp Web
+	whatsapp.InitializeRealtimeSync()
 
 	// Usecase
 	appUsecase = usecase.NewAppService(whatsappCli, whatsappDB)

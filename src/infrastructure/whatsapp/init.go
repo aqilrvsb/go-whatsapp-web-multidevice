@@ -246,26 +246,13 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 				continue
 			}
 			
-			// Skip non-personal chats
-			if evt.Info.Chat.Server != types.DefaultUserServer {
-				continue
-			}
+			// Enable real-time sync for this device
+			EnableRealtimeSync(deviceID, client, evt)
 			
-			// Store/update chat first
-			chatJID := evt.Info.Chat.String()
-			chatName := GetChatName(client, evt.Info.Chat, chatJID)
-			err := StoreChat(deviceID, chatJID, chatName, evt.Info.Timestamp)
-			if err != nil {
-				log.Errorf("Failed to store chat: %v", err)
-			}
-			
-			// Store message
-			messageType := "text"
-			if evt.Message.GetImageMessage() != nil {
-				messageType = "image"
-			} else if evt.Message.GetVideoMessage() != nil {
-				messageType = "video"
-			} else if evt.Message.GetAudioMessage() != nil {
+			// The rest of the processing is now handled by the real-time sync manager
+			break
+		}
+	}
 				messageType = "audio"
 			} else if evt.Message.GetDocumentMessage() != nil {
 				messageType = "document"

@@ -247,8 +247,8 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 			timestamp = lastMessageTime.Unix()
 		}
 		
-		// Format time
-		timeStr := formatMessageTime(timestamp)
+		// Format time using Malaysia timezone
+		timeStr := FormatMessageTimeMalaysia(timestamp)
 		
 		chat := map[string]interface{}{
 			"id":          chatJID,
@@ -322,8 +322,8 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 		jid, _ := types.ParseJID(chatJID)
 		phone := jid.User
 		
-		// Format time
-		timeStr := formatMessageTime(timestamp)
+		// Format time using Malaysia timezone
+		timeStr := FormatMessageTimeMalaysia(timestamp)
 		
 		chat := map[string]interface{}{
 			"id":          chatJID,

@@ -100,9 +100,9 @@ func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]i
 		// Determine if sent or received
 		sent := senderJID == ourJID
 		
-		// Format time
-		t := time.Unix(timestamp, 0)
-		timeStr := t.Format("15:04")
+		// Format time using Malaysia timezone
+		malaysiaTime := GetMalaysiaTime(timestamp)
+		timeStr := malaysiaTime.Format("15:04")
 		
 		text := ""
 		if messageText.Valid {
