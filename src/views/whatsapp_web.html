@@ -1193,49 +1193,49 @@
         if (caption) {
           formData.append('caption', caption);
         }
-      
-      // Add image to UI immediately for better UX
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const tempMsg = {
-          sent: true,
-          image: e.target.result,
-          text: caption,
-          time: formatTime(new Date())
-        };
-        addMessageToUI(tempMsg);
         
-        const container = document.getElementById('messages');
-        container.scrollTop = container.scrollHeight;
-      };
-      reader.readAsDataURL(selectedImageFile);
-      
-      fetch('/send/image', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.code === 'SUCCESS') {
-            cancelImage();
-            showNotification('✓ Image sent', 'success');
-            updateChatLastMessage(currentChat.id, '📷 Photo');
-          } else {
+        // Add image to UI immediately for better UX
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const tempMsg = {
+            sent: true,
+            image: e.target.result,
+            text: caption,
+            time: formatTime(new Date())
+          };
+          addMessageToUI(tempMsg);
+          
+          const container = document.getElementById('messages');
+          container.scrollTop = container.scrollHeight;
+        };
+        reader.readAsDataURL(selectedImageFile);
+        
+        fetch('/send/image', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.code === 'SUCCESS') {
+              cancelImage();
+              showNotification('✓ Image sent', 'success');
+              updateChatLastMessage(currentChat.id, '📷 Photo');
+            } else {
+              modal.querySelector('.image-preview-content').innerHTML = originalContent;
+              showNotification('Failed to send image', 'error');
+              const container = document.getElementById('messages');
+              container.lastElementChild.remove();
+            }
+          })
+          .catch(err => {
+            console.error('Error sending image:', err);
             modal.querySelector('.image-preview-content').innerHTML = originalContent;
             showNotification('Failed to send image', 'error');
+            const container = document.getElementById('messages');
             container.lastElementChild.remove();
-          }
-        })
-        .catch(err => {
-          console.error('Error sending image:', err);
-          modal.querySelector('.image-preview-content').innerHTML = originalContent;
-          showNotification('Failed to send image', 'error');
-          container.lastElementChild.remove();
-        });
-      };
-      
-      reader.readAsDataURL(selectedImageFile);
+          });
+      });
     }
 
     // View image
