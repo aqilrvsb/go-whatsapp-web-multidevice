@@ -1,7 +1,7 @@
 package whatsapp
 
 import (
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/websocket"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
 )
 
