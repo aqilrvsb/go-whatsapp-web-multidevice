@@ -501,14 +501,31 @@ func StoreHistorySyncMessage(deviceID, chatJID, messageID, senderJID, messageTex
 func SyncWhatsAppHistory(deviceID string) error {
 	logrus.Infof("=== Starting WhatsApp history sync for device: %s ===", deviceID)
 	
+	if deviceID == "" {
+		return fmt.Errorf("device ID is empty")
+	}
+	
 	cm := GetClientManager()
+	if cm == nil {
+		return fmt.Errorf("client manager is nil")
+	}
+	
 	client, err := cm.GetClient(deviceID)
 	if err != nil {
 		return fmt.Errorf("device not connected: %v", err)
 	}
 	
-	if client.Store.ID == nil {
-		return fmt.Errorf("device not logged in")
+	if client == nil {
+		return fmt.Errorf("client is nil")
+	}
+	
+	if client.Store == nil || client.Store.ID == nil {
+		return fmt.Errorf("device not logged in or store is nil")
+	}
+	
+	// Check if client is connected
+	if !client.IsConnected() {
+		return fmt.Errorf("client is not connected to WhatsApp")
 	}
 	
 	// Request history sync using the client's built-in method
@@ -519,13 +536,15 @@ func SyncWhatsAppHistory(deviceID string) error {
 	}
 	
 	// Send to WhatsApp status broadcast to request history
-	_, err = client.SendMessage(context.Background(), types.JID{
+	ctx := context.Background()
+	statusJID := types.JID{
 		Server: "s.whatsapp.net",
 		User:   "status",
-	}, historySyncMsg)
+	}
 	
+	_, err = client.SendMessage(ctx, statusJID, historySyncMsg)
 	if err != nil {
-		return fmt.Errorf("failed to request history sync: %v", err)
+		return fmt.Errorf("failed to send history sync request: %v", err)
 	}
 	
 	logrus.Info("History sync requested successfully")
