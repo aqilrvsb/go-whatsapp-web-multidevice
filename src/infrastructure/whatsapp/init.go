@@ -249,6 +249,9 @@ func handleConnectionEvents(_ context.Context) {
 						log.Infof("Successfully updated device %s to online status", session.DeviceID)
 						log.Infof("Device %s connected with phone: %s", session.DeviceID, phoneNumber)
 						
+						// Store the client globally for this device
+						cli = client
+						
 						// Register device with client manager using the device ID from database
 						cm := GetClientManager()
 						cm.AddClient(session.DeviceID, cli)
@@ -316,11 +319,26 @@ func handleConnectionEvents(_ context.Context) {
 				time.Sleep(2 * time.Second)
 				
 				log.Infof("Auto-triggering history sync for device %s", connectedDeviceID)
-				err := SyncWhatsAppHistory(connectedDeviceID)
-				if err != nil {
-					log.Errorf("Failed to auto-trigger history sync: %v", err)
+				
+				// Use the cli directly instead of getting from manager
+				if cli != nil && cli.IsConnected() {
+					// Build history sync request
+					historyMsg := cli.BuildHistorySyncRequest(nil, 50)
+					if historyMsg != nil {
+						_, err := cli.SendMessage(context.Background(), types.JID{
+							Server: "s.whatsapp.net",
+							User:   "status",
+						}, historyMsg)
+						if err != nil {
+							log.Errorf("Failed to send history sync request: %v", err)
+						} else {
+							log.Infof("History sync auto-triggered successfully for device %s", connectedDeviceID)
+						}
+					} else {
+						log.Errorf("Failed to build history sync request for device %s", connectedDeviceID)
+					}
 				} else {
-					log.Infof("History sync auto-triggered successfully for device %s", connectedDeviceID)
+					log.Errorf("Client not ready for history sync")
 				}
 			}()
 		}

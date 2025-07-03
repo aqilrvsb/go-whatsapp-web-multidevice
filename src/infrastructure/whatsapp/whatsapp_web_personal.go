@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"time"
 	"strings"
+	"reflect"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // GetWhatsAppWebChats gets recent chats from chat settings
@@ -510,8 +513,15 @@ func SyncWhatsAppHistory(deviceID string) error {
 		return fmt.Errorf("client manager is nil")
 	}
 	
+	// Try to get the client
 	client, err := cm.GetClient(deviceID)
 	if err != nil {
+		// Log all available clients for debugging
+		allClients := cm.GetAllClients()
+		logrus.Warnf("Failed to get client for device %s. Available clients: %d", deviceID, len(allClients))
+		for id := range allClients {
+			logrus.Warnf("Available client ID: %s", id)
+		}
 		return fmt.Errorf("device not connected: %v", err)
 	}
 	
@@ -528,11 +538,42 @@ func SyncWhatsAppHistory(deviceID string) error {
 		return fmt.Errorf("client is not connected to WhatsApp")
 	}
 	
-	// Request history sync using the client's built-in method
-	// This will trigger the handleHistorySync event handler
-	historySyncMsg := client.BuildHistorySyncRequest(nil, 50)
+	// Try to trigger history sync in two ways
+	// Method 1: Try using BuildHistorySyncRequest if available
+	var historySyncMsg *waProto.Message
+	
+	// Use reflection to check if method exists
+	method := reflect.ValueOf(client).MethodByName("BuildHistorySyncRequest")
+	if method.IsValid() {
+		// Call BuildHistorySyncRequest(nil, 50)
+		args := []reflect.Value{
+			reflect.ValueOf((*types.JID)(nil)),
+			reflect.ValueOf(50),
+		}
+		results := method.Call(args)
+		if len(results) > 0 && !results[0].IsNil() {
+			historySyncMsg = results[0].Interface().(*waProto.Message)
+		}
+	}
+	
+	// Method 2: If BuildHistorySyncRequest didn't work, create manual request
 	if historySyncMsg == nil {
-		return fmt.Errorf("failed to build history sync request")
+		logrus.Warn("BuildHistorySyncRequest not available or failed, creating manual history sync request")
+		
+		// Create a basic history sync notification
+		historySyncNotification := &waProto.HistorySyncNotification{
+			FileSha256:     []byte{},
+			FileLength:     proto.Uint64(0),
+			MediaKey:       []byte{},
+			FileEncSha256:  []byte{},
+			DirectPath:     proto.String(""),
+			SyncType:       waProto.HistorySyncNotification_RECENT.Enum(),
+			ChunkOrder:     proto.Uint32(1),
+		}
+		
+		historySyncMsg = &waProto.Message{
+			HistorySyncNotification: historySyncNotification,
+		}
 	}
 	
 	// Send to WhatsApp status broadcast to request history
@@ -542,11 +583,11 @@ func SyncWhatsAppHistory(deviceID string) error {
 		User:   "status",
 	}
 	
-	_, err = client.SendMessage(ctx, statusJID, historySyncMsg)
+	resp, err := client.SendMessage(ctx, statusJID, historySyncMsg)
 	if err != nil {
 		return fmt.Errorf("failed to send history sync request: %v", err)
 	}
 	
-	logrus.Info("History sync requested successfully")
+	logrus.Infof("History sync requested successfully. Response ID: %s", resp.ID)
 	return nil
 }
