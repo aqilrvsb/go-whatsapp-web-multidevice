@@ -113,6 +113,11 @@ NotifyMessageUpdate(deviceID, chatJID, message) // WebSocket broadcast
 
 ## 🛠️ Fixed Issues
 
+### January 5, 2025 UI Enhancement Update - Part 2
+1. **Image Upload Second Attempt Fix**: Fixed issue where second image upload wouldn't show preview modal
+2. **File Input Reset**: Now properly resets file input to allow selecting same file multiple times
+3. **Syntax Errors Fixed**: Corrected function declarations and variable initialization
+
 ### January 5, 2025 UI Enhancement Update
 1. **Sent Image Fix**: Images now properly saved to disk and displayed after sending (no more 404 errors)
 2. **Clean Interface**: Removed refresh button and all loading spinners for seamless experience

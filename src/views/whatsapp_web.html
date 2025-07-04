@@ -1341,11 +1341,12 @@
     function setupImageInput() {
       const imageInput = document.getElementById('imageUpload');
       imageInput.addEventListener('change', function(e) {
+        console.log('Image input changed, files:', e.target.files.length);
         const file = e.target.files[0];
         if (file && file.type.startsWith('image/')) {
           selectedImageFile = file;
           showImagePreview(file);
-        } else {
+        } else if (file) {
           showNotification('Please select a valid image file', 'error');
         }
       });
@@ -1357,7 +1358,10 @@
         showNotification('Please select a chat first', 'error');
         return;
       }
-      document.getElementById('imageUpload').click();
+      // Reset the file input value to ensure change event fires even for same file
+      const imageInput = document.getElementById('imageUpload');
+      imageInput.value = '';
+      imageInput.click();
     }
 
     // Show image preview
