@@ -1366,31 +1366,49 @@
 
     // Show image preview
     function showImagePreview(file) {
+      console.log('showImagePreview called with file:', file.name);
       const reader = new FileReader();
       reader.onload = function(e) {
+        console.log('FileReader loaded');
         const previewImg = document.getElementById('previewImage');
         if (previewImg) {
           previewImg.src = e.target.result;
           const modal = document.getElementById('imagePreviewModal');
           if (modal) {
+            console.log('Showing modal');
             modal.classList.remove('hidden');
+            modal.style.display = 'flex'; // Fallback: use direct style
             const captionInput = document.getElementById('captionInput');
-            if (captionInput) captionInput.focus();
+            if (captionInput) {
+              captionInput.value = ''; // Clear previous caption
+              captionInput.focus();
+            }
+          } else {
+            console.error('Modal not found!');
           }
+        } else {
+          console.error('Preview image element not found!');
         }
+      };
+      reader.onerror = function(e) {
+        console.error('FileReader error:', e);
       };
       reader.readAsDataURL(file);
     }
 
     // Cancel image
     function cancelImage() {
+      console.log('Canceling image...');
       selectedImageFile = null;
       const imageInput = document.getElementById('imageUpload');
       if (imageInput) imageInput.value = '';
       const captionInput = document.getElementById('captionInput');
       if (captionInput) captionInput.value = '';
       const modal = document.getElementById('imagePreviewModal');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none'; // Fallback: use direct style
+      }
     }
 
     // Send image
