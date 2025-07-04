@@ -923,7 +923,7 @@
   </div>
 
   <!-- Image Preview Modal -->
-  <div id="imagePreviewModal" class="image-preview-modal hidden">
+  <div id="imagePreviewModal" class="image-preview-modal" style="display: none;">
     <div class="image-preview-content">
       <div class="preview-header">
         <span>Send Image</span>
@@ -1341,13 +1341,10 @@
     function setupImageInput() {
       const imageInput = document.getElementById('imageUpload');
       imageInput.addEventListener('change', function(e) {
-        console.log('Image input changed, files:', e.target.files.length);
         const file = e.target.files[0];
         if (file && file.type.startsWith('image/')) {
           selectedImageFile = file;
           showImagePreview(file);
-        } else if (file) {
-          showNotification('Please select a valid image file', 'error');
         }
       });
     }
@@ -1358,57 +1355,26 @@
         showNotification('Please select a chat first', 'error');
         return;
       }
-      // Reset the file input value to ensure change event fires even for same file
-      const imageInput = document.getElementById('imageUpload');
-      imageInput.value = '';
-      imageInput.click();
+      document.getElementById('imageUpload').value = ''; // Reset to allow same file
+      document.getElementById('imageUpload').click();
     }
 
     // Show image preview
     function showImagePreview(file) {
-      console.log('showImagePreview called with file:', file.name);
       const reader = new FileReader();
       reader.onload = function(e) {
-        console.log('FileReader loaded');
-        const previewImg = document.getElementById('previewImage');
-        if (previewImg) {
-          previewImg.src = e.target.result;
-          const modal = document.getElementById('imagePreviewModal');
-          if (modal) {
-            console.log('Showing modal');
-            modal.classList.remove('hidden');
-            modal.style.display = 'flex'; // Fallback: use direct style
-            const captionInput = document.getElementById('captionInput');
-            if (captionInput) {
-              captionInput.value = ''; // Clear previous caption
-              captionInput.focus();
-            }
-          } else {
-            console.error('Modal not found!');
-          }
-        } else {
-          console.error('Preview image element not found!');
-        }
-      };
-      reader.onerror = function(e) {
-        console.error('FileReader error:', e);
+        document.getElementById('previewImage').src = e.target.result;
+        document.getElementById('imagePreviewModal').style.display = 'flex';
+        document.getElementById('captionInput').value = '';
+        document.getElementById('captionInput').focus();
       };
       reader.readAsDataURL(file);
     }
 
     // Cancel image
     function cancelImage() {
-      console.log('Canceling image...');
       selectedImageFile = null;
-      const imageInput = document.getElementById('imageUpload');
-      if (imageInput) imageInput.value = '';
-      const captionInput = document.getElementById('captionInput');
-      if (captionInput) captionInput.value = '';
-      const modal = document.getElementById('imagePreviewModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.style.display = 'none'; // Fallback: use direct style
-      }
+      document.getElementById('imagePreviewModal').style.display = 'none';
     }
 
     // Send image
