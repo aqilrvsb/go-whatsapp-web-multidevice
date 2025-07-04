@@ -7,14 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 )
 
 // SendImageFromWeb handles image sending from WhatsApp Web interface
@@ -67,15 +64,7 @@ func SendImageFromWeb(ctx context.Context, client *whatsmeow.Client, recipientJI
 		StoreWhatsAppMessageWithMedia(client.Store.ID.String(), recipientJID.String(), resp.ID, client.Store.ID.String(), caption, "image", uploadResp.URL)
 		
 		// Notify WebSocket
-		NotifyMessageUpdate(client.Store.ID.String(), recipientJID.String(), map[string]interface{}{
-			"id":        resp.ID,
-			"text":      caption,
-			"type":      "image",
-			"sent":      true,
-			"time":      time.Now().Format("15:04"),
-			"timestamp": time.Now().Unix(),
-			"image":     uploadResp.URL,
-		})
+		NotifyMessageUpdate(client.Store.ID.String(), recipientJID.String(), "Image sent")
 	}()
 	
 	return resp.ID, nil
@@ -128,39 +117,10 @@ func SendImageFromURL(ctx context.Context, client *whatsmeow.Client, recipientJI
 		StoreWhatsAppMessageWithMedia(client.Store.ID.String(), recipientJID.String(), msgResp.ID, client.Store.ID.String(), caption, "image", uploadResp.URL)
 		
 		// Notify WebSocket
-		NotifyMessageUpdate(client.Store.ID.String(), recipientJID.String(), map[string]interface{}{
-			"id":        msgResp.ID,
-			"text":      caption,
-			"type":      "image",
-			"sent":      true,
-			"time":      time.Now().Format("15:04"),
-			"timestamp": time.Now().Unix(),
-			"image":     uploadResp.URL,
-		})
+		NotifyMessageUpdate(client.Store.ID.String(), recipientJID.String(), "Image sent")
 	}()
 	
 	return msgResp.ID, nil
 }
 
-// StoreWhatsAppMessageWithMedia stores message with media URL in message_secrets column
-func StoreWhatsAppMessageWithMedia(deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL string) {
-	userRepo := repository.GetUserRepository()
-	db := userRepo.DB()
-	
-	query := `
-		INSERT INTO whatsapp_messages 
-		(device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (device_id, message_id) DO UPDATE
-		SET message_text = EXCLUDED.message_text,
-		    message_secrets = EXCLUDED.message_secrets,
-		    timestamp = EXCLUDED.timestamp
-	`
-	
-	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL, time.Now().Unix())
-	if err != nil {
-		logrus.Errorf("Failed to store message with media: %v", err)
-	} else {
-		logrus.Debugf("Stored %s message with media URL: %s", messageType, mediaURL)
-	}
-}
+

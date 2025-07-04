@@ -2,7 +2,6 @@ package rest
 
 import (
 	"fmt"
-	"time"
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -211,14 +210,7 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 		go whatsapp.StoreWhatsAppMessage(deviceId, request.ChatID, resp.ID, client.Store.ID.String(), request.Message, "text")
 		
 		// Notify WebSocket
-		go whatsapp.NotifyMessageUpdate(deviceId, request.ChatID, map[string]interface{}{
-			"id":        resp.ID,
-			"text":      request.Message,
-			"type":      "text",
-			"sent":      true,
-			"time":      time.Now().Format("15:04"),
-			"timestamp": time.Now().Unix(),
-		})
+		go whatsapp.NotifyMessageUpdate(deviceId, request.ChatID, request.Message)
 		
 		return c.JSON(utils.ResponseData{
 			Status:  200,
