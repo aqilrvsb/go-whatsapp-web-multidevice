@@ -854,9 +854,6 @@
       <div class="header">
         <h1>WhatsApp</h1>
         <div class="icons">
-          <button onclick="loadChats()" title="Refresh">
-            <i class="bi bi-arrow-clockwise"></i>
-          </button>
           <button title="Menu">
             <i class="bi bi-three-dots-vertical"></i>
           </button>
@@ -869,10 +866,7 @@
         </div>
       </div>
       <div class="chat-list" id="chatList">
-        <div class="loading-container">
-          <div class="loading-spinner"></div>
-          <p>Loading chats...</p>
-        </div>
+        <!-- Chats will be loaded here -->
       </div>
     </div>
 
@@ -1011,13 +1005,7 @@
     // Load chats
     function loadChats() {
       const chatList = document.getElementById('chatList');
-      chatList.innerHTML = `
-        <div class="loading-container">
-          <div class="loading-spinner"></div>
-          <p>Loading chats...</p>
-        </div>
-      `;
-
+      
       fetch(`/api/devices/${deviceId}/chats`, { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
@@ -1131,12 +1119,6 @@
     // Load messages
     function loadMessages(chatId) {
       const container = document.getElementById('messages');
-      container.innerHTML = `
-        <div class="loading-container">
-          <div class="loading-spinner"></div>
-          <p>Loading messages...</p>
-        </div>
-      `;
       
       fetch(`/api/devices/${deviceId}/messages/${chatId}`, { credentials: 'include' })
         .then(res => res.json())

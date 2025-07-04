@@ -6,6 +6,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
@@ -15,6 +16,9 @@ import (
 	"io"
 	"net/http"
 	"go.mau.fi/whatsmeow"
+	"os"
+	"path/filepath"
+	"github.com/sirupsen/logrus"
 )
 
 // SendWhatsAppWebMessage handles sending messages from WhatsApp Web view
@@ -219,7 +223,15 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 		}
 		
 		// Store in messages table with media URL
-		mediaURL := "/media/" + resp.ID + ".jpg" // Create a predictable media URL
+		// Save the image to disk first
+		filename := fmt.Sprintf("%s.jpg", resp.ID)
+		imagePath := filepath.Join(config.PathStorages, filename)
+		err = os.WriteFile(imagePath, imageData, 0644)
+		if err != nil {
+			logrus.Errorf("Failed to save sent image: %v", err)
+		}
+		
+		mediaURL := "/media/" + filename
 		go whatsapp.StoreWhatsAppMessageWithMedia(deviceId, request.ChatID, resp.ID, client.Store.ID.String(), request.Message, "image", mediaURL)
 		
 		// Notify WebSocket
