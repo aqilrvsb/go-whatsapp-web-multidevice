@@ -922,22 +922,6 @@
     </div>
   </div>
 
-  <!-- Image Preview Modal -->
-  <div id="imagePreviewModal" class="image-preview-modal" style="display: none;">
-    <div class="image-preview-content">
-      <div class="preview-header">
-        <span>Send Image</span>
-        <button class="close-preview" onclick="cancelImage()">×</button>
-      </div>
-      <img id="previewImage" class="preview-image" alt="Preview">
-      <input type="text" class="caption-input" id="captionInput" placeholder="Add a caption...">
-      <div class="preview-actions">
-        <button class="btn-cancel" onclick="cancelImage()">Cancel</button>
-        <button class="btn-send" onclick="sendImage()">Send</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     // Get device ID from URL
     const pathParts = window.location.pathname.split('/');
@@ -1344,7 +1328,8 @@
         const file = e.target.files[0];
         if (file && file.type.startsWith('image/')) {
           selectedImageFile = file;
-          showImagePreview(file);
+          // Send directly without preview
+          sendImageDirect(file);
         }
       });
     }
@@ -1369,6 +1354,76 @@
         document.getElementById('captionInput').focus();
       };
       reader.readAsDataURL(file);
+    }
+
+    // Send image directly without preview
+    function sendImageDirect(file) {
+      if (!file || !currentChat) return;
+      
+      showNotification('Sending image...', 'info');
+      
+      // Compress image before sending
+      compressImageFile(file, function(compressedBlob) {
+        // Convert blob to base64
+        const reader = new FileReader();
+        reader.onloadend = function() {
+          const base64data = reader.result;
+          
+          // Add image to UI immediately for better UX
+          const tempMsg = {
+            sent: true,
+            type: 'image',
+            image: base64data,
+            text: '',
+            time: formatTime(new Date())
+          };
+          addMessageToUI(tempMsg);
+          
+          const container = document.getElementById('messages');
+          container.scrollTop = container.scrollHeight;
+          
+          // Send via API
+          fetch(`/api/devices/${deviceId}/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              chatId: currentChat.id,
+              message: '',
+              imageB64: base64data
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.code === 'SUCCESS') {
+              showNotification('Image sent successfully', 'success');
+              updateChatLastMessage(currentChat.id, '📷 Photo');
+              // Update the temp message with server URL if provided
+              if (data.results && data.results.imageUrl) {
+                const messages = container.getElementsByClassName('message');
+                const lastMessage = messages[messages.length - 1];
+                const img = lastMessage.querySelector('img');
+                if (img) {
+                  img.src = data.results.imageUrl;
+                }
+              }
+            } else {
+              showNotification(data.message || 'Failed to send image', 'error');
+              const container = document.getElementById('messages');
+              container.lastElementChild.remove();
+            }
+          })
+          .catch(err => {
+            console.error('Error sending image:', err);
+            showNotification('Failed to send image', 'error');
+            const container = document.getElementById('messages');
+            container.lastElementChild.remove();
+          });
+        };
+        reader.readAsDataURL(compressedBlob);
+      });
     }
 
     // Cancel image
