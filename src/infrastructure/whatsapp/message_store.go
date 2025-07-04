@@ -268,5 +268,5 @@ func extractMessageText(evt *events.Message) string {
 
 // StoreHistoryMessage stores a message from history sync with specific timestamp
 func StoreHistoryMessage(deviceID, chatJID, messageID, senderJID, messageText, messageType string, timestamp int64) {
-	StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, timestamp)
+	StoreWhatsAppMessageWithMediaAndTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, "", timestamp)
 }

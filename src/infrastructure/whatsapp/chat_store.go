@@ -181,7 +181,7 @@ func HandleHistorySyncForChats(deviceID string, client *whatsmeow.Client, evt *e
 	HandleHistorySyncForWebView(deviceID, evt)
 }
 
-// GetChatsFromDatabase retrieves ONLY chats with recent messages (within last month)
+// GetChatsFromDatabase retrieves ONLY chats with actual messages
 func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
@@ -189,37 +189,49 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 	// Ensure table exists
 	CreateChatTable()
 	
-	// Modified query to only show chats with recent messages
+	// Query to get chats based on messages only (not relying on whatsapp_chats table)
+	// This ensures we only show chats where messages have been exchanged
 	query := `
-		SELECT 
-			c.chat_jid,
-			c.chat_name,
-			c.last_message_time,
-			m.message_text,
-			m.timestamp,
-			m.message_count
-		FROM whatsapp_chats c
-		INNER JOIN (
+		WITH recent_messages AS (
+			SELECT DISTINCT ON (chat_jid)
+				chat_jid,
+				sender_jid,
+				message_text,
+				message_type,
+				timestamp
+			FROM whatsapp_messages
+			WHERE device_id = $1
+				AND chat_jid NOT LIKE '%@g.us'  -- Exclude groups
+				AND chat_jid NOT LIKE '%@broadcast'  -- Exclude broadcasts
+				AND chat_jid != 'status@broadcast'  -- Exclude status
+				AND message_text IS NOT NULL
+				AND message_text != ''
+				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::BIGINT
+			ORDER BY chat_jid, timestamp DESC
+		),
+		chat_counts AS (
 			SELECT 
 				chat_jid,
-				MAX(message_text) as message_text,
-				MAX(timestamp) as timestamp,
 				COUNT(*) as message_count
-			FROM (
-				SELECT 
-					chat_jid,
-					message_text,
-					timestamp,
-					ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) as rn
-				FROM whatsapp_messages
-				WHERE device_id = $1
-					AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::BIGINT
-			) ranked_messages
-			WHERE rn = 1
+			FROM whatsapp_messages
+			WHERE device_id = $1
+				AND chat_jid NOT LIKE '%@g.us'
+				AND chat_jid NOT LIKE '%@broadcast'
+				AND chat_jid != 'status@broadcast'
 			GROUP BY chat_jid
-		) m ON c.chat_jid = m.chat_jid
-		WHERE c.device_id = $1
-		ORDER BY m.timestamp DESC
+		)
+		SELECT 
+			rm.chat_jid,
+			COALESCE(c.chat_name, SPLIT_PART(rm.chat_jid, '@', 1)) as chat_name,
+			rm.message_text,
+			rm.message_type,
+			rm.timestamp,
+			cc.message_count
+		FROM recent_messages rm
+		LEFT JOIN whatsapp_chats c ON c.device_id = $1 AND c.chat_jid = rm.chat_jid
+		LEFT JOIN chat_counts cc ON cc.chat_jid = rm.chat_jid
+		WHERE cc.message_count > 0  -- Only show chats with at least one message
+		ORDER BY rm.timestamp DESC
 	`
 	
 	rows, err := db.Query(query, deviceID)
@@ -231,13 +243,11 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 	var chats []map[string]interface{}
 	
 	for rows.Next() {
-		var chatJID, name string
-		var lastMessageTime time.Time
-		var messageText string
-		var messageTimestamp int64
+		var chatJID, name, messageText, messageType string
+		var timestamp int64
 		var messageCount int
 		
-		err := rows.Scan(&chatJID, &name, &lastMessageTime, &messageText, &messageTimestamp, &messageCount)
+		err := rows.Scan(&chatJID, &name, &messageText, &messageType, &timestamp, &messageCount)
 		if err != nil {
 			logrus.Warnf("Failed to scan chat row: %v", err)
 			continue
@@ -247,20 +257,30 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 		jid, _ := types.ParseJID(chatJID)
 		phone := jid.User
 		
-		// Get timestamp
-		timestamp := messageTimestamp
-		if timestamp == 0 {
-			timestamp = lastMessageTime.Unix()
-		}
-		
 		// Format time using Malaysia timezone
 		timeStr := FormatMessageTimeMalaysia(timestamp)
+		
+		// Format message preview based on type
+		lastMessage := messageText
+		if messageType == "image" {
+			if messageText != "" {
+				lastMessage = "📷 " + messageText
+			} else {
+				lastMessage = "📷 Photo"
+			}
+		} else if messageType == "video" {
+			lastMessage = "📹 Video"
+		} else if messageType == "audio" {
+			lastMessage = "🎵 Voice message"
+		} else if messageType == "document" {
+			lastMessage = messageText
+		}
 		
 		chat := map[string]interface{}{
 			"id":          chatJID,
 			"name":        name,
 			"phone":       phone,
-			"lastMessage": messageText,
+			"lastMessage": lastMessage,
 			"time":        timeStr,
 			"timestamp":   timestamp,
 			"unread":      0,
@@ -271,7 +291,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 		chats = append(chats, chat)
 	}
 	
-	logrus.Infof("Retrieved %d recent chats (with messages in last 30 days) for device %s", len(chats), deviceID)
+	logrus.Infof("Retrieved %d chats with messages for device %s", len(chats), deviceID)
 	return chats, nil
 }
 

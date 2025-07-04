@@ -70,6 +70,9 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/devices/:id/sync", rest.SyncWhatsAppDevice)
 	app.Get("/api/devices/:id/diagnose", rest.DiagnoseDevice)
 	
+	// Media serving endpoint
+	app.Get("/media/:filename", rest.ServeMedia)
+	
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
 	app.Post("/api/devices/:deviceId/connect", rest.DeviceConnect)

@@ -16,6 +16,15 @@ import (
 
 // SendImageFromWeb handles image sending from WhatsApp Web interface
 func SendImageFromWeb(ctx context.Context, client *whatsmeow.Client, recipientJID types.JID, imageB64 string, caption string) (string, error) {
+	// First check if client is connected and logged in
+	if !client.IsConnected() {
+		return "", fmt.Errorf("client is not connected")
+	}
+	
+	if !client.IsLoggedIn() {
+		return "", fmt.Errorf("client is not logged in")
+	}
+	
 	// Extract base64 data (remove data:image/jpeg;base64, prefix if present)
 	b64Data := imageB64
 	if strings.Contains(b64Data, ",") {
@@ -31,10 +40,25 @@ func SendImageFromWeb(ctx context.Context, client *whatsmeow.Client, recipientJI
 		return "", fmt.Errorf("failed to decode base64 image: %v", err)
 	}
 	
-	// Upload the image
-	uploadResp, err := client.Upload(ctx, imageData, whatsmeow.MediaImage)
-	if err != nil {
-		return "", fmt.Errorf("failed to upload image: %v", err)
+	// Upload the image with retry
+	var uploadResp whatsmeow.UploadResponse
+	var uploadErr error
+	
+	for i := 0; i < 3; i++ {
+		uploadResp, uploadErr = client.Upload(ctx, imageData, whatsmeow.MediaImage)
+		if uploadErr == nil {
+			break
+		}
+		if strings.Contains(uploadErr.Error(), "websocket not connected") {
+			// Try to reconnect
+			client.Connect()
+			continue
+		}
+		return "", fmt.Errorf("failed to upload image: %v", uploadErr)
+	}
+	
+	if uploadErr != nil {
+		return "", fmt.Errorf("failed to upload image after retries: %v", uploadErr)
 	}
 	
 	// Create image message

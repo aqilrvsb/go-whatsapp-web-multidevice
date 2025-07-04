@@ -70,6 +70,11 @@ func StoreWhatsAppMessageWithMedia(deviceID, chatJID, messageID, senderJID, mess
 
 // StoreWhatsAppMessageWithTimestamp stores a message with specific timestamp
 func StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType string, timestamp int64) {
+	StoreWhatsAppMessageWithMediaAndTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, "", timestamp)
+}
+
+// StoreWhatsAppMessageWithMediaAndTimestamp stores a message with media URL and specific timestamp
+func StoreWhatsAppMessageWithMediaAndTimestamp(deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL string, timestamp int64) {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
@@ -87,19 +92,22 @@ func StoreWhatsAppMessageWithTimestamp(deviceID, chatJID, messageID, senderJID, 
 		}
 	}
 	
-	// Insert message (trigger will handle cleanup if exists)
+	// Insert message with media URL if provided
 	query := `
-		INSERT INTO whatsapp_messages (device_id, chat_jid, message_id, sender_jid, message_text, message_type, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO whatsapp_messages (device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (device_id, message_id) DO UPDATE SET
 			message_text = EXCLUDED.message_text,
 			message_type = EXCLUDED.message_type,
+			message_secrets = EXCLUDED.message_secrets,
 			timestamp = EXCLUDED.timestamp
 	`
 	
-	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, timestamp)
+	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL, timestamp)
 	if err != nil {
 		logrus.Warnf("Failed to store message: %v", err)
+	} else {
+		logrus.Debugf("Stored %s message for chat %s (media: %s)", messageType, chatJID, mediaURL)
 	}
 }
 
