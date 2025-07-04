@@ -219,7 +219,8 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 		}
 		
 		// Store in messages table with media URL
-		go whatsapp.StoreWhatsAppMessageWithMedia(deviceId, request.ChatID, resp.ID, client.Store.ID.String(), request.Message, "image", uploadResp.URL)
+		mediaURL := "/media/" + resp.ID + ".jpg" // Create a predictable media URL
+		go whatsapp.StoreWhatsAppMessageWithMedia(deviceId, request.ChatID, resp.ID, client.Store.ID.String(), request.Message, "image", mediaURL)
 		
 		// Notify WebSocket
 		go whatsapp.NotifyMessageUpdate(deviceId, request.ChatID, request.Message)
@@ -231,6 +232,7 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 			Results: map[string]interface{}{
 				"messageId": resp.ID,
 				"status":    "sent",
+				"imageUrl":  mediaURL,
 			},
 		})
 		

@@ -725,6 +725,7 @@
       z-index: 9999;
       max-width: 300px;
       animation: slideIn 0.3s ease-out;
+      display: none;
     }
 
     @keyframes slideIn {
@@ -950,6 +951,9 @@
     let currentChat = null;
     let allChats = [];
     let selectedImageFile = null;
+    let refreshTimer = null;
+    let wsReconnectTimer = null;
+    let ws = null;
 
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
@@ -957,6 +961,7 @@
       setupSearch();
       setupImageInput();
       setupMessageInput();
+      setupWebSocket();
       
       // Check if mobile
       if (window.innerWidth <= 768) {
@@ -1297,12 +1302,7 @@
       input.value = '';
       input.style.height = 'auto';
       
-      // Format phone number
-      let phone = currentChat.id.split('@')[0];
-      if (!phone.startsWith('+')) {
-        phone = '+' + phone;
-      }
-      
+      // Send via API
       fetch(`/api/devices/${deviceId}/send`, {
         method: 'POST',
         headers: {
@@ -1317,7 +1317,6 @@
       .then(res => res.json())
       .then(data => {
         if (data.code === 'SUCCESS') {
-          showNotification('✓ Message sent', 'success');
           updateChatLastMessage(currentChat.id, message);
         } else {
           showNotification('Failed to send message', 'error');
@@ -1383,9 +1382,16 @@
     function showImagePreview(file) {
       const reader = new FileReader();
       reader.onload = function(e) {
-        document.getElementById('previewImage').src = e.target.result;
-        document.getElementById('imagePreviewModal').classList.remove('hidden');
-        document.getElementById('captionInput').focus();
+        const previewImg = document.getElementById('previewImage');
+        if (previewImg) {
+          previewImg.src = e.target.result;
+          const modal = document.getElementById('imagePreviewModal');
+          if (modal) {
+            modal.classList.remove('hidden');
+            const captionInput = document.getElementById('captionInput');
+            if (captionInput) captionInput.focus();
+          }
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -1418,12 +1424,6 @@
           <p style="margin-top: 16px;">Sending image...</p>
         </div>
       `;
-      
-      // Format phone number
-      let phone = currentChat.id.split('@')[0];
-      if (!phone.startsWith('+')) {
-        phone = '+' + phone;
-      }
       
       // Compress image before sending
       compressImageFile(selectedImageFile, function(compressedBlob) {
@@ -1463,8 +1463,16 @@
             isSendingImage = false; // Reset flag
             if (data.code === 'SUCCESS') {
               cancelImage();
-              showNotification('✓ Image sent', 'success');
               updateChatLastMessage(currentChat.id, '📷 Photo');
+              // Update the temp message with server URL if provided
+              if (data.results && data.results.imageUrl) {
+                const messages = container.getElementsByClassName('message');
+                const lastMessage = messages[messages.length - 1];
+                const img = lastMessage.querySelector('img');
+                if (img) {
+                  img.src = data.results.imageUrl;
+                }
+              }
             } else {
               modal.querySelector('.image-preview-content').innerHTML = originalContent;
               showNotification(data.message || 'Failed to send image', 'error');
@@ -1501,109 +1509,86 @@
     }
 
     // Show notification
-    function showNotification(message, type = 'info') {
-      const notification = document.createElement('div');
-      notification.className = `notification ${type}`;
-      notification.innerHTML = message;
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
-        setTimeout(() => notification.remove(), 300);
-      }, 2000);
+    function showNotification(message, type = 'success') {
+      // Silent operation - no visible notifications
+      console.log(`[${type}] ${message}`);
     }
 
     // Format time
     function formatTime(date) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
     }
 
     // Escape HTML
     function escapeHtml(text) {
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return text.replace(/[&<>"']/g, m => map[m]);
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
     }
 
-    // WebSocket for real-time updates
-    function connectWebSocket() {
+    // Setup WebSocket for real-time updates
+    function setupWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
       
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-      };
-      
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.code === 'NEW_MESSAGE' && data.result && data.result.deviceId === deviceId) {
-            // Reload chats to update last message
-            loadChats();
-            
-            // If current chat is open, reload messages to show the new one
-            if (currentChat && currentChat.id === data.result.chatJid) {
-              // Just reload messages, don't add manually to avoid duplicates
-              loadMessages(currentChat.id);
-            }
+      function connect() {
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          // Clear reconnect timer
+          if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
           }
-        } catch (err) {
-          console.error('WebSocket error:', err);
-        }
-      };
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.code === 'NEW_MESSAGE' && data.result && data.result.deviceId === deviceId) {
+              // Silently reload chats to update last message
+              fetch(`/api/devices/${deviceId}/chats`, { credentials: 'include' })
+                .then(res => res.json())
+                .then(chatsData => {
+                  if (chatsData.code === 'SUCCESS' && chatsData.results) {
+                    allChats = chatsData.results;
+                    displayChats(allChats);
+                  }
+                });
+              
+              // If current chat is open, reload messages
+              if (currentChat && currentChat.id === data.result.chatJid) {
+                // Debounce message reload to avoid too many requests
+                if (refreshTimer) {
+                  clearTimeout(refreshTimer);
+                }
+                refreshTimer = setTimeout(() => {
+                  loadMessages(currentChat.id);
+                }, 1000);
+              }
+            }
+          } catch (err) {
+            console.error('WebSocket error:', err);
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket disconnected');
+          // Reconnect after 5 seconds
+          wsReconnectTimer = setTimeout(connect, 5000);
+        };
+      }
       
-      ws.onclose = () => {
-        console.log('WebSocket disconnected, reconnecting...');
-        setTimeout(connectWebSocket, 5000);
-      };
+      connect();
     }
-    
-    // Connect WebSocket
-    connectWebSocket();
-    
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 768) {
-        document.getElementById('sidebar').style.display = 'block';
-        if (!currentChat) {
-          document.getElementById('emptyState').style.display = 'flex';
-          document.getElementById('chatWindow').style.display = 'none';
-        }
-      } else {
-        if (!currentChat) {
-          document.getElementById('sidebar').style.display = 'block';
-          document.getElementById('chatWindow').classList.remove('active');
-        }
-      }
-    });
-
-    // Auto-sync
-    setInterval(() => {
-      if (document.hidden) return;
-      
-      fetch(`/api/devices/${deviceId}/sync`, {
-        method: 'POST',
-        credentials: 'include'
-      }).catch(() => {});
-    }, 30000);
-
-    // Add slideOut animation
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes slideOut {
-        to {
-          transform: translateX(120%);
-          opacity: 0;
-        }
-      }
-    `;
-    document.head.appendChild(style);
   </script>
 </body>
 </html>
