@@ -24,6 +24,12 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 		return
 	}
 	
+	// Skip messages sent by us (they're already stored when sending)
+	if evt.Info.IsFromMe {
+		logrus.Debugf("Skipping own message in chat %s", evt.Info.Chat.String())
+		return
+	}
+	
 	logrus.Infof("=== Received message in chat %s from %s ===", evt.Info.Chat.String(), evt.Info.Sender.String())
 	
 	// Extract message text and handle images
