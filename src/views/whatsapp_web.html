@@ -1271,12 +1271,16 @@
     }
 
     // Send message
+    let isSending = false; // Prevent double sending
     function sendMessage() {
+      if (isSending) return; // Prevent duplicate sends
+      
       const input = document.getElementById('messageInput');
       const message = input.value.trim();
       
       if (!message || !currentChat) return;
       
+      isSending = true; // Set flag
       input.disabled = true;
       
       // Add message to UI immediately
@@ -1331,6 +1335,7 @@
       .finally(() => {
         input.disabled = false;
         input.focus();
+        isSending = false; // Reset flag
       });
     }
 
@@ -1388,14 +1393,20 @@
     // Cancel image
     function cancelImage() {
       selectedImageFile = null;
-      document.getElementById('imageUpload').value = '';
-      document.getElementById('captionInput').value = '';
-      document.getElementById('imagePreviewModal').classList.add('hidden');
+      const imageInput = document.getElementById('imageUpload');
+      if (imageInput) imageInput.value = '';
+      const captionInput = document.getElementById('captionInput');
+      if (captionInput) captionInput.value = '';
+      const modal = document.getElementById('imagePreviewModal');
+      if (modal) modal.classList.add('hidden');
     }
 
     // Send image
+    let isSendingImage = false; // Prevent double sending
     function sendImage() {
-      if (!selectedImageFile || !currentChat) return;
+      if (isSendingImage || !selectedImageFile || !currentChat) return;
+      
+      isSendingImage = true; // Set flag
       
       const caption = document.getElementById('captionInput').value.trim();
       
@@ -1449,6 +1460,7 @@
           })
           .then(res => res.json())
           .then(data => {
+            isSendingImage = false; // Reset flag
             if (data.code === 'SUCCESS') {
               cancelImage();
               showNotification('✓ Image sent', 'success');
@@ -1461,6 +1473,7 @@
             }
           })
           .catch(err => {
+            isSendingImage = false; // Reset flag
             console.error('Error sending image:', err);
             modal.querySelector('.image-preview-content').innerHTML = originalContent;
             showNotification('Failed to send image', 'error');
@@ -1534,18 +1547,10 @@
             // Reload chats to update last message
             loadChats();
             
-            // If current chat is open, add the new message
+            // If current chat is open, reload messages to show the new one
             if (currentChat && currentChat.id === data.result.chatJid) {
-              // Only add if it's not our own message
-              if (!data.result.fromMe) {
-                addMessageToUI({
-                  sent: false,
-                  text: data.result.message,
-                  time: formatTime(new Date())
-                });
-                const container = document.getElementById('messages');
-                container.scrollTop = container.scrollHeight;
-              }
+              // Just reload messages, don't add manually to avoid duplicates
+              loadMessages(currentChat.id);
             }
           }
         } catch (err) {
