@@ -198,9 +198,16 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 	logrus.Infof("Device %s logged out", deviceID)
 	
+	// Clear WhatsApp session data first
+	err := ClearWhatsAppSessionData(deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to clear WhatsApp session data: %v", err)
+		// Continue with logout even if session clear fails
+	}
+	
 	// Update device status
 	userRepo := repository.GetUserRepository()
-	err := userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+	err = userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
 	if err != nil {
 		logrus.Errorf("Failed to update device status: %v", err)
 	}
@@ -224,4 +231,54 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 			"deviceId": deviceID,
 		},
 	}
+}
+
+// ClearWhatsAppSessionData clears all WhatsApp session data for a device
+func ClearWhatsAppSessionData(deviceID string) error {
+	// Get repository to access DB
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	// Start transaction
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	
+	// Clear tables in correct order to avoid foreign key constraints
+	tables := []string{
+		"whatsmeow_app_state_mutation_macs",
+		"whatsmeow_app_state_sync_keys", 
+		"whatsmeow_app_state_version",
+		"whatsmeow_chat_settings",
+		"whatsmeow_contacts",
+		"whatsmeow_disappearing_timers",
+		"whatsmeow_group_participants",
+		"whatsmeow_groups",
+		"whatsmeow_history_syncs",
+		"whatsmeow_media_backfill_requests",
+		"whatsmeow_message_secrets",
+		"whatsmeow_portal_backfill",
+		"whatsmeow_portal_backfill_queue", 
+		"whatsmeow_portal_message",
+		"whatsmeow_portal_message_part",
+		"whatsmeow_portal_reaction",
+		"whatsmeow_portal",
+		"whatsmeow_privacy_settings",
+		"whatsmeow_sender_keys",
+		"whatsmeow_sessions",
+		"whatsmeow_device",
+	}
+	
+	for _, table := range tables {
+		_, err = tx.Exec(`DELETE FROM ` + table + ` WHERE jid = $1`, deviceID)
+		if err != nil {
+			logrus.Warnf("Error clearing %s: %v", table, err)
+			// Continue with other tables
+		}
+	}
+	
+	// Commit transaction
+	return tx.Commit()
 }

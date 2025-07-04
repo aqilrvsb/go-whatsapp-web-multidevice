@@ -191,6 +191,13 @@ func (handler *App) Login(c *fiber.Ctx) error {
 	log.Printf("Login request - UserID: %v, DeviceID: %s", userID, deviceId)
 	
 	if userID != nil && deviceId != "" {
+		// Clear any existing WhatsApp session for this device before new login
+		err := whatsapp.ClearWhatsAppSessionData(deviceId)
+		if err != nil {
+			logrus.Warnf("Failed to clear existing session data for device %s: %v", deviceId, err)
+			// Continue anyway
+		}
+		
 		// Store connection session for this device
 		logrus.Infof("Storing connection session for user %s, device %s", userID, deviceId)
 		whatsapp.StoreConnectionSession(deviceId, &whatsapp.ConnectionSession{

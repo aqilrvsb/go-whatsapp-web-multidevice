@@ -1,17 +1,17 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 5, 2025 - Direct Image Send (No Preview)**  
+**Last Updated: January 7, 2025 - Real-time Device Logout & Session Fix**  
 **Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface**
 **Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync for 3000 devices**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🎯 LATEST UPDATE: Direct Image Send (January 5, 2025)
+## 🎯 LATEST UPDATE: Real-time Device Logout & Session Fix (January 7, 2025)
 
-### ✅ WhatsApp Web Interface - INSTANT IMAGE SEND!
-- **Direct Send**: Images now send immediately upon selection - no preview modal needed
-- **No More Errors**: Eliminated all modal-related issues by removing preview entirely
-- **Faster Workflow**: Select image → Instantly sends → Ready for next image
-- **Clean UI**: Removed preview modal code for simpler, more reliable operation
-- **3000 Device Ready**: Optimized for massive concurrent connections
+### ✅ Device Management Improvements
+- **Real-time Logout Updates**: Device status now updates immediately when WhatsApp logs out - no refresh needed!
+- **Session Cleanup**: Fixed foreign key constraint errors when reconnecting after logout
+- **WebSocket Enhancement**: Added DEVICE_LOGGED_OUT handler for instant UI updates
+- **Database Session Clear**: Properly clears all WhatsApp session data on logout
+- **Reconnection Fix**: Can now scan QR code again after logout without errors
 
 ### 📱 WhatsApp Web Features:
 
@@ -112,6 +112,13 @@ NotifyMessageUpdate(deviceID, chatJID, message) // WebSocket broadcast
 5. **Browser Updates** → Auto-refresh UI
 
 ## 🛠️ Fixed Issues
+
+### January 7, 2025 Real-time Device Logout & Session Fix
+1. **Real-time Logout Status**: Added DEVICE_LOGGED_OUT WebSocket handler for instant UI updates
+2. **Foreign Key Constraint Fix**: Clear all WhatsApp session tables on logout to prevent reconnection errors
+3. **Session Cleanup**: Enhanced logout process to remove all whatsmeow_* table entries
+4. **UI Auto-Update**: Device status changes to offline immediately without manual refresh
+5. **QR Scan Fix**: Can now scan QR code again after logout without database errors
 
 ### January 5, 2025 UI Enhancement Update - Part 3
 1. **Fixed Image Preview Element**: Corrected incomplete img tag that was causing "Preview image element not found" error
