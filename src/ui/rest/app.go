@@ -35,6 +35,9 @@ type App struct {
 func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	rest := App{Service: service}
 	
+	// Initialize Send service as nil - will be set later by SetSendService
+	rest.Send = nil
+	
 	// Health check endpoint
 	app.Get("/health", rest.HealthCheck)
 	app.Get("/api/health", rest.HealthCheck)

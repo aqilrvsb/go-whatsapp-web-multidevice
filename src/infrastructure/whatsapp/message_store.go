@@ -40,8 +40,9 @@ func HandleMessageForWebView(deviceID string, evt *events.Message) {
 		
 		// Download and store image
 		if media, err := ExtractMedia(context.Background(), config.PathStorages, imageMsg); err == nil {
-			// Convert to web-accessible URL
-			mediaURL = "/media/" + filepath.Base(media.MediaPath)
+			// Convert to web-accessible URL - use just the filename
+			filename := filepath.Base(media.MediaPath)
+			mediaURL = "/media/" + filename
 			logrus.Infof("Downloaded image to: %s, URL: %s", media.MediaPath, mediaURL)
 		} else {
 			logrus.Errorf("Failed to download image: %v", err)
