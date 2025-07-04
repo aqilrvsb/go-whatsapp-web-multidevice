@@ -424,6 +424,18 @@
       color: #667781;
       float: right;
       margin: -2px -5px -5px 5px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    
+    .message .ticks {
+      font-size: 16px;
+      color: #53bdeb;
+    }
+    
+    .message.sent .ticks {
+      color: #53bdeb;
     }
 
     .message.image .message-bubble {
@@ -1171,16 +1183,18 @@
         if (msg.text) {
           content += `<div class="caption">${escapeHtml(msg.text)}</div>`;
         }
-        content += `<span class="time">${msg.time || formatTime(new Date())}</span>`;
+        const ticks = msg.sent ? '<span class="ticks">✓✓</span>' : '';
+        content += `<span class="time">${msg.time || formatTime(new Date())}${ticks}</span>`;
         
         bubble.innerHTML = content;
         messageDiv.appendChild(bubble);
       } else {
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
+        const ticks = msg.sent ? '<span class="ticks">✓✓</span>' : '';
         bubble.innerHTML = `
           <div class="content">${escapeHtml(msg.text)}</div>
-          <div class="time">${msg.time || formatTime(new Date())}</div>
+          <div class="time">${msg.time || formatTime(new Date())}${ticks}</div>
         `;
         messageDiv.appendChild(bubble);
       }
@@ -1286,15 +1300,14 @@
         phone = '+' + phone;
       }
       
-      fetch('/send/message', {
+      fetch(`/api/devices/${deviceId}/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
         body: JSON.stringify({
-          device_id: deviceId,
-          phone: phone,
+          chatId: currentChat.id,
           message: message
         })
       })
@@ -1404,22 +1417,16 @@
       
       // Compress image before sending
       compressImageFile(selectedImageFile, function(compressedBlob) {
-        // Use FormData for image upload
-        const formData = new FormData();
-        formData.append('device_id', deviceId);
-        formData.append('phone', phone);
-        formData.append('image', compressedBlob, 'compressed.jpg');
-        if (caption) {
-          formData.append('caption', caption);
-        }
-        
-        // Add image to UI immediately for better UX
+        // Convert blob to base64
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onloadend = function() {
+          const base64data = reader.result;
+          
+          // Add image to UI immediately for better UX
           const tempMsg = {
             sent: true,
             type: 'image',
-            image: e.target.result,
+            image: base64data,
             text: caption,
             time: formatTime(new Date())
           };
@@ -1427,34 +1434,42 @@
           
           const container = document.getElementById('messages');
           container.scrollTop = container.scrollHeight;
-        };
-        reader.readAsDataURL(selectedImageFile);
-        
-        fetch('/send/image', {
-          method: 'POST',
-          credentials: 'include',
-          body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.code === 'SUCCESS') {
-            cancelImage();
-            showNotification('✓ Image sent', 'success');
-            updateChatLastMessage(currentChat.id, '📷 Photo');
-          } else {
+          
+          // Send via API
+          fetch(`/api/devices/${deviceId}/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              chatId: currentChat.id,
+              message: caption || '',
+              imageB64: base64data
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.code === 'SUCCESS') {
+              cancelImage();
+              showNotification('✓ Image sent', 'success');
+              updateChatLastMessage(currentChat.id, '📷 Photo');
+            } else {
+              modal.querySelector('.image-preview-content').innerHTML = originalContent;
+              showNotification(data.message || 'Failed to send image', 'error');
+              const container = document.getElementById('messages');
+              container.lastElementChild.remove();
+            }
+          })
+          .catch(err => {
+            console.error('Error sending image:', err);
             modal.querySelector('.image-preview-content').innerHTML = originalContent;
-            showNotification(data.message || 'Failed to send image', 'error');
+            showNotification('Failed to send image', 'error');
             const container = document.getElementById('messages');
             container.lastElementChild.remove();
-          }
-        })
-        .catch(err => {
-          console.error('Error sending image:', err);
-          modal.querySelector('.image-preview-content').innerHTML = originalContent;
-          showNotification('Failed to send image', 'error');
-          const container = document.getElementById('messages');
-          container.lastElementChild.remove();
-        });
+          });
+        };
+        reader.readAsDataURL(compressedBlob);
       });
     }
 

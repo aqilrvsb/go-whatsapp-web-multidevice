@@ -6,10 +6,13 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
 	"strings"
+	"encoding/base64"
+	"context"
 )
 
 // SendWhatsAppWebMessage handles sending messages from WhatsApp Web view
@@ -110,15 +113,6 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Get the send service
-	if handler.Send == nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "ERROR",
-			Message: "Send service not available",
-		})
-	}
-	
 	// Parse JID for recipient
 	recipientJID, err := types.ParseJID(request.ChatID)
 	if err != nil {
@@ -137,38 +131,58 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 	
 	// Send message based on type
 	if request.ImageURL != "" || request.ImageB64 != "" {
-		// Get WhatsApp client directly
-		cm := whatsapp.GetClientManager()
-		client, err := cm.GetClient(deviceId)
-		if err != nil || client == nil || !client.IsConnected() {
-			return c.Status(400).JSON(utils.ResponseData{
-				Status:  400,
-				Code:    "DEVICE_OFFLINE",
-				Message: "Device is not connected",
+		// Use the send service for images (it handles compression, thumbnails, etc.)
+		if handler.Send == nil {
+			return c.Status(500).JSON(utils.ResponseData{
+				Status:  500,
+				Code:    "ERROR",
+				Message: "Send service not available",
 			})
 		}
 		
-		var messageID string
+		imageReq := domainSend.ImageRequest{
+			Phone:    phone,
+			Caption:  request.Message,
+			Compress: true, // Always compress for WhatsApp Web
+			DeviceID: deviceId,
+		}
 		
-		// Send image based on source
+		// Handle base64 image
 		if request.ImageB64 != "" {
-			messageID, err = whatsapp.SendImageFromWeb(c.UserContext(), client, recipientJID, request.ImageB64, request.Message)
+			// Extract base64 data (remove data:image/jpeg;base64, prefix if present)
+			b64Data := request.ImageB64
+			if strings.Contains(b64Data, ",") {
+				parts := strings.Split(b64Data, ",")
+				if len(parts) > 1 {
+					b64Data = parts[1]
+				}
+			}
+			
+			// Decode base64
+			imageData, err := base64.StdEncoding.DecodeString(b64Data)
 			if err != nil {
-				return c.Status(500).JSON(utils.ResponseData{
-					Status:  500,
-					Code:    "SEND_FAILED",
-					Message: fmt.Sprintf("Failed to send image: %v", err),
+				return c.Status(400).JSON(utils.ResponseData{
+					Status:  400,
+					Code:    "INVALID_IMAGE",
+					Message: "Failed to decode base64 image",
 				})
 			}
+			
+			imageReq.ImageBytes = imageData
 		} else if request.ImageURL != "" {
-			messageID, err = whatsapp.SendImageFromURL(c.UserContext(), client, recipientJID, request.ImageURL, request.Message)
-			if err != nil {
-				return c.Status(500).JSON(utils.ResponseData{
-					Status:  500,
-					Code:    "SEND_FAILED",
-					Message: fmt.Sprintf("Failed to send image: %v", err),
-				})
-			}
+			imageReq.ImageURL = request.ImageURL
+		}
+		
+		// Use context to pass device ID
+		ctx := context.WithValue(c.UserContext(), "deviceID", deviceId)
+		
+		response, err := handler.Send.Service.SendImage(ctx, imageReq)
+		if err != nil {
+			return c.Status(500).JSON(utils.ResponseData{
+				Status:  500,
+				Code:    "SEND_FAILED",
+				Message: fmt.Sprintf("Failed to send image: %v", err),
+			})
 		}
 		
 		return c.JSON(utils.ResponseData{
@@ -176,7 +190,7 @@ func (handler *App) SendWhatsAppWebMessage(c *fiber.Ctx) error {
 			Code:    "SUCCESS",
 			Message: "Image sent successfully",
 			Results: map[string]interface{}{
-				"messageId": messageID,
+				"messageId": response.MessageID,
 				"status":    "sent",
 			},
 		})
