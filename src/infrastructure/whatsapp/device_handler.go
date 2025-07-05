@@ -254,36 +254,28 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	}
 	defer tx.Rollback()
 	
-	// Clear tables in correct order to avoid foreign key constraints
-	tables := []string{
-		"whatsmeow_app_state_mutation_macs",
-		"whatsmeow_app_state_sync_keys", 
-		"whatsmeow_app_state_version",
-		"whatsmeow_chat_settings",
-		"whatsmeow_contacts",
-		"whatsmeow_disappearing_timers",
-		"whatsmeow_group_participants",
-		"whatsmeow_groups",
-		"whatsmeow_history_syncs",
-		"whatsmeow_media_backfill_requests",
-		"whatsmeow_message_secrets",
-		"whatsmeow_portal_backfill",
-		"whatsmeow_portal_backfill_queue", 
-		"whatsmeow_portal_message",
-		"whatsmeow_portal_message_part",
-		"whatsmeow_portal_reaction",
-		"whatsmeow_portal",
-		"whatsmeow_privacy_settings",
-		"whatsmeow_sender_keys",
-		"whatsmeow_sessions",
-		"whatsmeow_device",
-	}
-	
-	for _, table := range tables {
-		_, err = tx.Exec(`DELETE FROM ` + table + ` WHERE jid = $1`, deviceID)
+	// First, try to delete from whatsmeow_device as it's the parent table
+	// This should cascade delete all related records
+	_, err = tx.Exec(`DELETE FROM whatsmeow_device WHERE jid = $1`, deviceID)
+	if err != nil {
+		// If that fails, try without specifying JID (might be stored differently)
+		logrus.Warnf("Failed to delete by JID, trying alternative approach: %v", err)
+		
+		// Try to find and delete by any matching device
+		_, err = tx.Exec(`
+			DELETE FROM whatsmeow_device 
+			WHERE jid = $1 
+			   OR jid LIKE '%' || $1 || '%'
+			   OR EXISTS (
+			       SELECT 1 FROM user_devices 
+			       WHERE user_devices.id = $1 
+			       AND whatsmeow_device.jid = user_devices.jid
+			   )
+		`, deviceID)
+		
 		if err != nil {
-			logrus.Warnf("Error clearing %s: %v", table, err)
-			// Continue with other tables
+			logrus.Errorf("Failed to clear WhatsApp device: %v", err)
+			// Don't return error, try to clean other tables
 		}
 	}
 	
