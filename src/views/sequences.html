@@ -281,6 +281,22 @@
                                 <input type="text" class="form-control" id="sequenceNiche" 
                                        placeholder="e.g., Sales, Onboarding, Follow-up">
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label">Default Send Time</label>
+                                <input type="time" class="form-control" id="sequenceTimeSchedule" 
+                                       placeholder="HH:MM" value="09:00">
+                                <small class="text-muted">Default time to send messages each day</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Min Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="sequenceMinDelay" value="10" min="1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Max Delay (seconds)</label>
+                                    <input type="number" class="form-control" id="sequenceMaxDelay" value="30" min="1">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Sequence Steps -->
@@ -373,7 +389,7 @@
                     </div>
                 </div>
                 
-                <p class="text-muted small mb-3">Niche: {niche}</p>
+                <p class="text-muted small mb-3">Niche: {niche} | Time: {schedule_time}</p>
                 <p class="mb-3">{description}</p>
                 
                 <div class="step-timeline">
@@ -469,6 +485,7 @@
                     .replace(/{name}/g, seq.name || 'Untitled')
                     .replace(/{status}/g, seq.status)
                     .replace(/{niche}/g, seq.niche || 'General')
+                    .replace(/{schedule_time}/g, seq.schedule_time || '09:00')
                     .replace(/{description}/g, seq.description || 'No description')
                     .replace(/{contacts_count}/g, seq.contacts_count || 0)
                     .replace(/{step_count}/g, seq.steps ? seq.steps.length : 0)
@@ -574,11 +591,16 @@
             const steps = [];
             document.querySelectorAll('.step-input').forEach((stepEl, index) => {
                 const step = {
+                    day: index + 1,
                     day_number: index + 1,
+                    message_type: stepEl.querySelector('.step-image-url').value ? 'image' : 'text',
                     content: stepEl.querySelector('.step-content').value,
                     image_url: stepEl.querySelector('.step-image-url').value || '',
+                    media_url: stepEl.querySelector('.step-image-url').value || '',
                     min_delay_seconds: parseInt(stepEl.querySelector('.step-min-delay').value) || 5,
-                    max_delay_seconds: parseInt(stepEl.querySelector('.step-max-delay').value) || 15
+                    max_delay_seconds: parseInt(stepEl.querySelector('.step-max-delay').value) || 15,
+                    send_time: document.getElementById('sequenceTimeSchedule').value || '09:00',
+                    time_schedule: document.getElementById('sequenceTimeSchedule').value || '09:00'
                 };
                 if (step.content || step.image_url) {
                     steps.push(step);
@@ -593,9 +615,13 @@
             const sequenceData = {
                 name: document.getElementById('sequenceName').value,
                 description: document.getElementById('sequenceDescription').value,
-                niche: document.getElementById('sequenceNiche').value,
+                niche: document.getElementById('sequenceNiche').value || '',
+                time_schedule: document.getElementById('sequenceTimeSchedule').value || '09:00',
+                min_delay_seconds: parseInt(document.getElementById('sequenceMinDelay').value) || 10,
+                max_delay_seconds: parseInt(document.getElementById('sequenceMaxDelay').value) || 30,
                 steps: steps,
-                status: 'draft'
+                status: 'draft',
+                is_active: false
             };
             
             try {

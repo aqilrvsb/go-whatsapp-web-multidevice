@@ -32,13 +32,16 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	
 	// Create sequence - no device_id needed as it will use all user's connected devices
 	sequence := &models.Sequence{
-		UserID:      request.UserID,
-		Name:        request.Name,
-		Description: request.Description,
-		Niche:       request.Niche,
-		TotalDays:   len(request.Steps),
-		IsActive:    request.IsActive,
-		Status:      request.Status,
+		UserID:          request.UserID,
+		Name:            request.Name,
+		Description:     request.Description,
+		Niche:           request.Niche,
+		TimeSchedule:    request.TimeSchedule,
+		MinDelaySeconds: request.MinDelaySeconds,
+		MaxDelaySeconds: request.MaxDelaySeconds,
+		TotalDays:       len(request.Steps),
+		IsActive:        request.IsActive,
+		Status:          request.Status,
 	}
 	
 	repo := repository.GetSequenceRepository()
@@ -49,13 +52,18 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	// Create steps
 	for _, stepReq := range request.Steps {
 		step := &models.SequenceStep{
-			SequenceID:  sequence.ID,
-			Day:         stepReq.Day,
-			MessageType: stepReq.MessageType,
-			Content:     stepReq.Content,
-			MediaURL:    stepReq.MediaURL,
-			Caption:     stepReq.Caption,
-			SendTime:    stepReq.SendTime,
+			SequenceID:      sequence.ID,
+			Day:             stepReq.Day,
+			DayNumber:       stepReq.DayNumber,
+			MessageType:     stepReq.MessageType,
+			Content:         stepReq.Content,
+			MediaURL:        stepReq.MediaURL,
+			ImageURL:        stepReq.ImageURL,
+			Caption:         stepReq.Caption,
+			SendTime:        stepReq.SendTime,
+			TimeSchedule:    stepReq.TimeSchedule,
+			MinDelaySeconds: stepReq.MinDelaySeconds,
+			MaxDelaySeconds: stepReq.MaxDelaySeconds,
 		}
 		
 		if err := repo.CreateSequenceStep(step); err != nil {
@@ -64,17 +72,21 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	}
 	
 	response = domainSequence.SequenceResponse{
-		ID:          sequence.ID,
-		Name:        sequence.Name,
-		Description: sequence.Description,
-		UserID:      sequence.UserID,
-		DeviceID:    nil, // Sequences use all user devices
-		TotalSteps:  len(request.Steps),
-		TotalDays:   sequence.TotalDays,
-		IsActive:    sequence.IsActive,
-		Status:      sequence.Status,
-		CreatedAt:   sequence.CreatedAt,
-		UpdatedAt:   sequence.UpdatedAt,
+		ID:              sequence.ID,
+		Name:            sequence.Name,
+		Description:     sequence.Description,
+		UserID:          sequence.UserID,
+		DeviceID:        nil, // Sequences use all user devices
+		Niche:           sequence.Niche,
+		Status:          sequence.Status,
+		TotalSteps:      len(request.Steps),
+		TotalDays:       sequence.TotalDays,
+		IsActive:        sequence.IsActive,
+		ScheduleTime:    sequence.TimeSchedule,
+		MinDelaySeconds: sequence.MinDelaySeconds,
+		MaxDelaySeconds: sequence.MaxDelaySeconds,
+		CreatedAt:       sequence.CreatedAt,
+		UpdatedAt:       sequence.UpdatedAt,
 	}
 	
 	return response, nil
@@ -92,17 +104,47 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		// Get contact count
 		contacts, _ := repo.GetSequenceContacts(seq.ID)
 		
+		// Get steps
+		steps, _ := repo.GetSequenceSteps(seq.ID)
+		
 		response := domainSequence.SequenceResponse{
-			ID:           seq.ID,
-			Name:         seq.Name,
-			Description:  seq.Description,
-			UserID:       seq.UserID,
-			DeviceID:     seq.DeviceID,
-			TotalDays:    seq.TotalDays,
-			IsActive:     seq.IsActive,
-			ContactCount: len(contacts),
-			CreatedAt:    seq.CreatedAt,
-			UpdatedAt:    seq.UpdatedAt,
+			ID:              seq.ID,
+			Name:            seq.Name,
+			Description:     seq.Description,
+			UserID:          seq.UserID,
+			DeviceID:        seq.DeviceID,
+			Niche:           seq.Niche,
+			Status:          seq.Status,
+			TotalDays:       seq.TotalDays,
+			IsActive:        seq.IsActive,
+			ScheduleTime:    seq.TimeSchedule,
+			MinDelaySeconds: seq.MinDelaySeconds,
+			MaxDelaySeconds: seq.MaxDelaySeconds,
+			ContactCount:    len(contacts),
+			ContactsCount:   len(contacts),
+			StepCount:       len(steps),
+			CreatedAt:       seq.CreatedAt,
+			UpdatedAt:       seq.UpdatedAt,
+		}
+		
+		// Add steps to response
+		for _, step := range steps {
+			stepResp := domainSequence.SequenceStepResponse{
+				ID:              step.ID,
+				SequenceID:      step.SequenceID,
+				Day:             step.Day,
+				DayNumber:       step.DayNumber,
+				MessageType:     step.MessageType,
+				SendTime:        step.SendTime,
+				TimeSchedule:    step.TimeSchedule,
+				Content:         step.Content,
+				ImageURL:        step.ImageURL,
+				MediaURL:        step.MediaURL,
+				Caption:         step.Caption,
+				MinDelaySeconds: step.MinDelaySeconds,
+				MaxDelaySeconds: step.MaxDelaySeconds,
+			}
+			response.Steps = append(response.Steps, stepResp)
 		}
 		responses = append(responses, response)
 	}
@@ -134,30 +176,42 @@ func (s *sequenceService) GetSequenceByID(sequenceID string) (domainSequence.Seq
 	
 	// Build response
 	response.SequenceResponse = domainSequence.SequenceResponse{
-		ID:           sequence.ID,
-		Name:         sequence.Name,
-		Description:  sequence.Description,
-		UserID:       sequence.UserID,
-		DeviceID:     sequence.DeviceID,
-		TotalDays:    sequence.TotalDays,
-		TotalSteps:   len(steps),
-		IsActive:     sequence.IsActive,
-		ContactCount: len(contacts),
-		CreatedAt:    sequence.CreatedAt,
-		UpdatedAt:    sequence.UpdatedAt,
+		ID:              sequence.ID,
+		Name:            sequence.Name,
+		Description:     sequence.Description,
+		UserID:          sequence.UserID,
+		DeviceID:        sequence.DeviceID,
+		Niche:           sequence.Niche,
+		Status:          sequence.Status,
+		TotalDays:       sequence.TotalDays,
+		TotalSteps:      len(steps),
+		IsActive:        sequence.IsActive,
+		ScheduleTime:    sequence.TimeSchedule,
+		MinDelaySeconds: sequence.MinDelaySeconds,
+		MaxDelaySeconds: sequence.MaxDelaySeconds,
+		ContactCount:    len(contacts),
+		ContactsCount:   len(contacts),
+		StepCount:       len(steps),
+		CreatedAt:       sequence.CreatedAt,
+		UpdatedAt:       sequence.UpdatedAt,
 	}
 	
 	// Add steps
 	for _, step := range steps {
 		response.Steps = append(response.Steps, domainSequence.SequenceStepResponse{
-			ID:          step.ID,
-			SequenceID:  step.SequenceID,
-			Day:         step.Day,
-			MessageType: step.MessageType,
-			Content:     step.Content,
-			MediaURL:    step.MediaURL,
-			Caption:     step.Caption,
-			SendTime:    step.SendTime,
+			ID:              step.ID,
+			SequenceID:      step.SequenceID,
+			Day:             step.Day,
+			DayNumber:       step.DayNumber,
+			MessageType:     step.MessageType,
+			Content:         step.Content,
+			ImageURL:        step.ImageURL,
+			MediaURL:        step.MediaURL,
+			Caption:         step.Caption,
+			SendTime:        step.SendTime,
+			TimeSchedule:    step.TimeSchedule,
+			MinDelaySeconds: step.MinDelaySeconds,
+			MaxDelaySeconds: step.MaxDelaySeconds,
 		})
 	}
 	
@@ -188,7 +242,22 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	if request.Description != "" {
 		sequence.Description = request.Description
 	}
+	if request.Niche != "" {
+		sequence.Niche = request.Niche
+	}
+	if request.TimeSchedule != "" {
+		sequence.TimeSchedule = request.TimeSchedule
+	}
+	if request.MinDelaySeconds > 0 {
+		sequence.MinDelaySeconds = request.MinDelaySeconds
+	}
+	if request.MaxDelaySeconds > 0 {
+		sequence.MaxDelaySeconds = request.MaxDelaySeconds
+	}
 	sequence.IsActive = request.IsActive
+	if request.Status != "" {
+		sequence.Status = request.Status
+	}
 	
 	// Update sequence
 	if err := repo.UpdateSequence(sequence); err != nil {
