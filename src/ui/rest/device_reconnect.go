@@ -2,6 +2,9 @@ package rest
 
 import (
 	"context"
+	"database/sql"
+	"strings"
+	"time"
 	
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -10,9 +13,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
+	_ "github.com/lib/pq"
 )
 
 // ReconnectDeviceSession attempts to reconnect using existing WhatsApp session
@@ -56,12 +60,12 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Check if device has phone for reconnection
-	if device.Phone == "" {
+	// Check if device has JID for reconnection
+	if device.JID == "" {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "NO_SESSION",
-			Message: "Device has no previous session. Please scan QR code.",
+			Message: "Device has no JID. Please scan QR code to connect.",
 		})
 	}
 	
@@ -76,56 +80,126 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 			Results: map[string]interface{}{
 				"deviceId": deviceID,
 				"phone":    device.Phone,
+				"jid":      device.JID,
 				"status":   "connected",
 			},
 		})
 	}
 	
-	// Try to reconnect using PostgreSQL WhatsApp store
-	logrus.Infof("Attempting to reconnect device %s using stored session...", deviceID)
+	logrus.Infof("Attempting to reconnect device %s with JID %s...", deviceID, device.JID)
 	
-	// Initialize WhatsApp store
+	// Check if we have WhatsApp session data in the database
+	db, err := sql.Open("postgres", config.DBURI)
+	if err != nil {
+		logrus.Errorf("Failed to open database: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Database connection failed",
+		})
+	}
+	defer db.Close()
+	
+	// Query whatsmeow_sessions table using the JID
+	var sessionData []byte
+	err = db.QueryRow(`
+		SELECT session 
+		FROM whatsmeow_sessions 
+		WHERE our_jid = $1
+		LIMIT 1
+	`, device.JID).Scan(&sessionData)
+	
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logrus.Infof("No session found in whatsmeow_sessions for JID %s", device.JID)
+			return c.JSON(utils.ResponseData{
+				Status:  200,
+				Code:    "QR_REQUIRED",
+				Message: "Session not found in database. Please scan QR code.",
+				Results: map[string]interface{}{
+					"deviceId": deviceID,
+					"jid":      device.JID,
+					"reason":   "no_session_in_database",
+				},
+			})
+		}
+		logrus.Errorf("Error querying session: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to query session data",
+		})
+	}
+	
+	logrus.Infof("Found session data in database for JID %s", device.JID)
+	
+	// Initialize WhatsApp store container
 	ctx := context.Background()
 	dbLog := waLog.Stdout("Database", config.WhatsappLogLevel, true)
-	container, err := sqlstore.New(ctx, "postgres", config.DBURI, dbLog)
+	
+	// Convert postgresql:// to postgres:// for whatsmeow
+	dbURI := config.DBURI
+	if strings.HasPrefix(dbURI, "postgresql://") {
+		dbURI = strings.Replace(dbURI, "postgresql://", "postgres://", 1)
+	}
+	
+	container, err := sqlstore.New(ctx, "postgres", dbURI, dbLog)
 	if err != nil {
 		logrus.Errorf("Failed to create store container: %v", err)
-		return c.JSON(utils.ResponseData{
+		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
 			Message: "Failed to initialize WhatsApp store",
 		})
 	}
 	
-	// Try to get all devices and find one matching our phone number
-	devices, err := container.GetAllDevices(ctx)
+	// Parse the JID to get the proper device
+	jid, err := types.ParseJID(device.JID)
 	if err != nil {
-		logrus.Errorf("Failed to get devices from store: %v", err)
+		logrus.Errorf("Failed to parse JID %s: %v", device.JID, err)
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "QR_REQUIRED",
-			Message: "No stored session found. Please scan QR code.",
+			Message: "Invalid JID format. Please scan QR code.",
+			Results: map[string]interface{}{
+				"deviceId": deviceID,
+				"jid":      device.JID,
+				"reason":   "invalid_jid",
+			},
 		})
 	}
 	
-	// Find device by phone number
-	var waDevice *store.Device
-	for _, d := range devices {
-		if d.ID != nil && d.ID.User == device.Phone {
-			waDevice = d
-			logrus.Infof("Found stored WhatsApp device for phone %s", device.Phone)
-			break
-		}
+	// Get device by JID from store
+	waDevice, err := container.GetDevice(ctx, jid)
+	if err != nil {
+		logrus.Errorf("Failed to get device from store: %v", err)
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "QR_REQUIRED",
+			Message: "Device not found in store. Please scan QR code.",
+			Results: map[string]interface{}{
+				"deviceId": deviceID,
+				"jid":      device.JID,
+				"reason":   "device_not_in_store",
+			},
+		})
 	}
 	
 	if waDevice == nil {
-		logrus.Infof("No stored session found for phone %s", device.Phone)
+		logrus.Warnf("Device is nil for JID %s", device.JID)
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "QR_REQUIRED",
-			Message: "Session not found in database. Please scan QR code.",
+			Message: "Session data missing. Please scan QR code.",
+			Results: map[string]interface{}{
+				"deviceId": deviceID,
+				"jid":      device.JID,
+				"reason":   "null_device",
+			},
 		})
 	}
+	
+	logrus.Infof("Found WhatsApp device for JID %s", device.JID)
 	
 	// Create client with stored device
 	client := whatsmeow.NewClient(waDevice, waLog.Stdout("Client", config.WhatsappLogLevel, true))
@@ -145,16 +219,43 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 			Status:  200,
 			Code:    "QR_REQUIRED",
 			Message: "Failed to reconnect. Please scan QR code.",
+			Results: map[string]interface{}{
+				"deviceId": deviceID,
+				"phone":    device.Phone,
+				"reason":   "connection_failed",
+				"error":    err.Error(),
+			},
 		})
 	}
 	
-	// Check if logged in
-	if client.IsLoggedIn() {
+	// Wait a bit for connection to establish
+	ctx2, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	connected := false
+	for i := 0; i < 20; i++ {
+		if client.IsConnected() && client.IsLoggedIn() {
+			connected = true
+			break
+		}
+		select {
+		case <-ctx2.Done():
+			break
+		case <-time.After(500 * time.Millisecond):
+			continue
+		}
+	}
+	
+	if connected {
 		// Register with ClientManager
 		cm.AddClient(deviceID, client)
 		
 		// Update device status
-		userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, client.Store.ID.String())
+		jidStr := ""
+		if client.Store.ID != nil {
+			jidStr = client.Store.ID.String()
+		}
+		userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, jidStr)
 		
 		logrus.Infof("✅ Successfully reconnected device %s", deviceID)
 		
@@ -165,18 +266,23 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 			Results: map[string]interface{}{
 				"deviceId": deviceID,
 				"phone":    device.Phone,
-				"jid":      client.Store.ID.String(),
+				"jid":      jidStr,
 				"status":   "connected",
 			},
 		})
 	}
 	
-	// Not logged in, disconnect and request QR
+	// Not connected after timeout
 	client.Disconnect()
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "QR_REQUIRED",
 		Message: "Session expired. Please scan QR code.",
+		Results: map[string]interface{}{
+			"deviceId": deviceID,
+			"phone":    device.Phone,
+			"reason":   "login_timeout",
+		},
 	})
 }
