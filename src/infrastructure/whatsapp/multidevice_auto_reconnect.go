@@ -1,7 +1,6 @@
 package whatsapp
 
 import (
-	"context"
 	"sync"
 	"time"
 	
