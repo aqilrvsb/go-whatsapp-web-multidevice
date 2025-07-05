@@ -4106,33 +4106,27 @@
         }
         
         // Sequences Functions
-        async function toggleSequence(id, isActive) {
-            const action = isActive ? 'start' : 'pause';
-            const endpoint = `/api/sequences/${id}/${action}`;
-            
+        async function toggleSequence(id, currentStatus) {
             try {
-                const response = await fetch(endpoint, { method: 'POST' });
+                const response = await fetch(`/api/sequences/${id}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS') {
-                    showToast(`Sequence ${action}ed successfully!`, 'success');
+                    const newStatus = data.results.status;
+                    showToast(`Sequence ${newStatus} successfully!`, 'success');
                     loadSequences();
                 } else {
-                    showToast(data.message || `Failed to ${action} sequence`, 'error');
-                    // Revert checkbox state
-                    const checkbox = document.getElementById(`toggle-${id}`);
-                    if (checkbox) checkbox.checked = !isActive;
-                    const checkbox2 = document.getElementById(`toggle2-${id}`);
-                    if (checkbox2) checkbox2.checked = !isActive;
+                    showToast(data.message || `Failed to toggle sequence`, 'error');
                 }
             } catch (error) {
-                console.error(`Error ${action}ing sequence:`, error);
-                showToast(`Failed to ${action} sequence`, 'error');
-                // Revert checkbox state
-                const checkbox = document.getElementById(`toggle-${id}`);
-                if (checkbox) checkbox.checked = !isActive;
-                const checkbox2 = document.getElementById(`toggle2-${id}`);
-                if (checkbox2) checkbox2.checked = !isActive;
+                console.error(`Error toggling sequence:`, error);
+                showToast(`Failed to toggle sequence`, 'error');
             }
         }
         
