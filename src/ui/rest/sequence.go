@@ -7,6 +7,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type Sequence struct {
@@ -18,6 +19,7 @@ func InitRestSequence(app *fiber.App, service sequence.ISequenceUsecase) {
 	
 	// Sequence routes
 	app.Get("/api/sequences", rest.GetSequences)
+	app.Get("/api/sequences/summary", rest.GetSequencesSummary)
 	app.Post("/api/sequences", rest.CreateSequence)
 	app.Get("/api/sequences/:id", rest.GetSequenceByID)
 	app.Put("/api/sequences/:id", rest.UpdateSequence)
@@ -50,12 +52,15 @@ func (controller *Sequence) GetSequences(c *fiber.Ctx) error {
 	
 	sequences, err := controller.Service.GetSequences(userID)
 	if err != nil {
+		logrus.Errorf("Failed to get sequences for user %s: %v", userID, err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
 			Message: err.Error(),
 		})
 	}
+	
+	logrus.Infof("Found %d sequences for user %s", len(sequences), userID)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
@@ -316,5 +321,87 @@ func (controller *Sequence) SequenceDetailPage(c *fiber.Ctx) error {
 	return c.Render("views/sequence_detail", fiber.Map{
 		"Title":    "Sequence Detail",
 		"Sequence": sequence,
+	})
+}
+
+// GetSequencesSummary gets sequences summary for dashboard
+func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
+	userID, err := getUserID(c)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Authentication required",
+		})
+	}
+	
+	sequences, err := controller.Service.GetSequences(userID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: err.Error(),
+		})
+	}
+	
+	// Calculate summary
+	summary := map[string]interface{}{
+		"sequences": map[string]int{
+			"total":  len(sequences),
+			"active": 0,
+			"paused": 0,
+			"draft":  0,
+		},
+		"contacts": map[string]interface{}{
+			"total":                0,
+			"average_per_sequence": 0.0,
+		},
+		"recent_sequences": []interface{}{},
+	}
+	
+	// Count statuses and contacts
+	totalContacts := 0
+	for _, seq := range sequences {
+		switch seq.Status {
+		case "active":
+			summary["sequences"].(map[string]int)["active"]++
+		case "paused":
+			summary["sequences"].(map[string]int)["paused"]++
+		case "draft", "inactive":
+			summary["sequences"].(map[string]int)["draft"]++
+		}
+		totalContacts += seq.ContactsCount
+	}
+	
+	// Calculate averages
+	summary["contacts"].(map[string]interface{})["total"] = totalContacts
+	if len(sequences) > 0 {
+		summary["contacts"].(map[string]interface{})["average_per_sequence"] = float64(totalContacts) / float64(len(sequences))
+	}
+	
+	// Get recent sequences (up to 5)
+	recentCount := 5
+	if len(sequences) < recentCount {
+		recentCount = len(sequences)
+	}
+	
+	recentSequences := make([]interface{}, 0, recentCount)
+	for i := 0; i < recentCount; i++ {
+		seq := sequences[i]
+		recentSequences = append(recentSequences, map[string]interface{}{
+			"id":             seq.ID,
+			"name":           seq.Name,
+			"niche":          seq.Niche,
+			"status":         seq.Status,
+			"contacts_count": seq.ContactsCount,
+		})
+	}
+	summary["recent_sequences"] = recentSequences
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Sequences summary retrieved",
+		Results: summary,
 	})
 }
