@@ -5,8 +5,11 @@ import (
 	"time"
 	
 	"github.com/sirupsen/logrus"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"go.mau.fi/whatsmeow"
+	waLog "go.mau.fi/whatsmeow/util/log"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 )
@@ -17,6 +20,12 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
+	
+	// First, set all devices to offline to ensure clean state
+	_, err := db.Exec(`UPDATE user_devices SET status = 'offline' WHERE status = 'online'`)
+	if err != nil {
+		logrus.Warnf("Failed to reset device statuses: %v", err)
+	}
 	
 	// Find all devices that have a JID (were previously connected)
 	rows, err := db.Query(`
@@ -32,6 +41,8 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	defer rows.Close()
 	
 	reconnectCount := 0
+	attemptCount := 0
+	
 	for rows.Next() {
 		var deviceID, name, phone, jid string
 		err := rows.Scan(&deviceID, &name, &phone, &jid)
@@ -40,14 +51,19 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 			continue
 		}
 		
-		logrus.Infof("Attempting to reconnect device %s (%s) with JID %s", name, deviceID, jid)
+		attemptCount++
+		logrus.Infof("[%d] Attempting to reconnect device %s (%s) with JID %s", attemptCount, name, deviceID, jid)
 		
 		// Try to reconnect this device
-		go func(devID, devName, devJID string) {
+		go func(devID, devName, devJID, devPhone string) {
+			// Small delay to prevent overwhelming the system
+			time.Sleep(time.Duration(attemptCount) * 2 * time.Second)
+			
 			// Try to get existing device from store
 			devices, err := container.GetAllDevices(context.Background())
 			if err != nil {
-				logrus.Warnf("Failed to get devices from store: %v", err)
+				logrus.Errorf("Failed to get devices from store: %v", err)
+				userRepo.UpdateDeviceStatus(devID, "offline", devPhone, devJID)
 				return
 			}
 			
@@ -62,54 +78,86 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 			
 			if device == nil {
 				logrus.Warnf("No stored session found for device %s with JID %s", devName, devJID)
-				// Update status to offline
-				userRepo.UpdateDeviceStatus(devID, "offline", "", "")
+				userRepo.UpdateDeviceStatus(devID, "offline", devPhone, devJID)
 				return
 			}
 			
-			// Create client
-			client := whatsmeow.NewClient(device, nil)
+			// Create client with proper logging
+			client := whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
 			
-			// Add event handler
-			client.AddEventHandler(CreateDeviceEventHandlerForReconnect(devID))
+			// Add device-specific event handler
+			client.AddEventHandler(func(evt interface{}) {
+				HandleDeviceEvent(context.Background(), devID, evt)
+			})
 			
 			// Try to connect
+			logrus.Infof("Connecting device %s...", devName)
 			err = client.Connect()
 			if err != nil {
-				logrus.Warnf("Failed to reconnect device %s: %v", devName, err)
-				// Update status to offline
-				userRepo.UpdateDeviceStatus(devID, "offline", "", "")
+				logrus.Errorf("Failed to connect device %s: %v", devName, err)
+				userRepo.UpdateDeviceStatus(devID, "offline", devPhone, devJID)
 				return
 			}
 			
-			// Wait a bit for connection to establish
-			time.Sleep(3 * time.Second)
+			// Wait for connection to establish properly
+			time.Sleep(5 * time.Second)
+			
+			// Verify connection status
+			if !client.IsConnected() {
+				logrus.Warnf("Device %s failed to establish connection", devName)
+				client.Disconnect()
+				userRepo.UpdateDeviceStatus(devID, "offline", devPhone, devJID)
+				return
+			}
 			
 			// Check if logged in
-			if client.IsLoggedIn() && client.IsConnected() {
-				logrus.Infof("Successfully reconnected device %s", devName)
-				
-				// Register with client manager
-				cm := GetClientManager()
-				cm.AddClient(devID, client)
-				
-				// Update status
-				userRepo.UpdateDeviceStatus(devID, "online", client.Store.ID.User, client.Store.ID.String())
-				
-				reconnectCount++
-			} else {
-				logrus.Warnf("Device %s session expired or not connected, needs QR scan", devName)
+			if !client.IsLoggedIn() {
+				logrus.Warnf("Device %s connected but not logged in - session expired", devName)
 				client.Disconnect()
-				// Update status to offline but keep JID/phone
-				userRepo.UpdateDeviceStatus(devID, "offline", phone, devJID)
+				userRepo.UpdateDeviceStatus(devID, "offline", devPhone, devJID)
+				return
 			}
-		}(deviceID, name, jid)
-		
-		// Small delay between reconnection attempts
-		time.Sleep(2 * time.Second)
+			
+			// Success! Register with client manager
+			cm := GetClientManager()
+			cm.AddClient(devID, client)
+			
+			// Update device status
+			actualPhone := devPhone
+			actualJID := devJID
+			if client.Store.ID != nil {
+				actualPhone = client.Store.ID.User
+				actualJID = client.Store.ID.String()
+			}
+			
+			err = userRepo.UpdateDeviceStatus(devID, "online", actualPhone, actualJID)
+			if err != nil {
+				logrus.Errorf("Failed to update device status: %v", err)
+			}
+			
+			logrus.Infof("✅ Successfully reconnected device %s (%s)", devName, devID)
+			
+			// Send WebSocket notification
+			websocket.Broadcast <- websocket.BroadcastMessage{
+				Code:    "DEVICE_RECONNECTED",
+				Message: "Device auto-reconnected after restart",
+				Result: map[string]interface{}{
+					"deviceId": devID,
+					"phone":    actualPhone,
+					"name":     devName,
+					"status":   "online",
+				},
+			}
+			
+			reconnectCount++
+			
+		}(deviceID, name, jid, phone)
 	}
 	
-	logrus.Infof("Auto-reconnect completed. Successfully reconnected %d devices", reconnectCount)
+	// Wait a bit for all goroutines to start
+	time.Sleep(2 * time.Second)
+	
+	logrus.Infof("Auto-reconnect initiated for %d devices", attemptCount)
 }
 
 // StartAutoReconnectRoutine starts a routine that periodically checks and reconnects devices
@@ -121,13 +169,6 @@ func StartAutoReconnectRoutine(container *sqlstore.Container, interval time.Dura
 			AutoReconnectDevices(container)
 		}
 	}()
-}
-
-// CreateDeviceEventHandlerForReconnect creates an event handler for reconnected devices
-func CreateDeviceEventHandlerForReconnect(deviceID string) func(evt interface{}) {
-	// Return the device-specific event handler
-	return func(evt interface{}) {
-		// Let the device handler process events
-		HandleDeviceEvent(context.Background(), deviceID, evt)
-	}
+	
+	logrus.Infof("Started auto-reconnect routine with %v interval", interval)
 }
