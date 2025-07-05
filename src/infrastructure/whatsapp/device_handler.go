@@ -2,10 +2,12 @@ package whatsapp
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 	
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
@@ -247,6 +249,13 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
+	// First, get the JID from user_devices
+	var jid sql.NullString
+	err := db.QueryRow("SELECT jid FROM user_devices WHERE id = $1", deviceID).Scan(&jid)
+	if err != nil && err != sql.ErrNoRows {
+		logrus.Warnf("Failed to get JID for device %s: %v", deviceID, err)
+	}
+	
 	// Start transaction
 	tx, err := db.Begin()
 	if err != nil {
@@ -254,29 +263,53 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	}
 	defer tx.Rollback()
 	
-	// First, try to delete from whatsmeow_device as it's the parent table
-	// This should cascade delete all related records
-	_, err = tx.Exec(`DELETE FROM whatsmeow_device WHERE jid = $1`, deviceID)
-	if err != nil {
-		// If that fails, try without specifying JID (might be stored differently)
-		logrus.Warnf("Failed to delete by JID, trying alternative approach: %v", err)
-		
-		// Try to find and delete by any matching device
-		_, err = tx.Exec(`
-			DELETE FROM whatsmeow_device 
-			WHERE jid = $1 
-			   OR jid LIKE '%' || $1 || '%'
-			   OR EXISTS (
-			       SELECT 1 FROM user_devices 
-			       WHERE user_devices.id = $1 
-			       AND whatsmeow_device.jid = user_devices.jid
-			   )
-		`, deviceID)
-		
+	// Clear using both device ID and JID
+	jidsToCheck := []string{deviceID}
+	if jid.Valid && jid.String != "" {
+		jidsToCheck = append(jidsToCheck, jid.String)
+	}
+	
+	// Tables to clear in order (to avoid foreign key violations)
+	// Order is important - child tables first, then parent tables
+	queries := []string{
+		"DELETE FROM whatsmeow_app_state_mutation_macs WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_app_state_sync_keys WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_app_state_version WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_chat_settings WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_contacts WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_disappearing_timers WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_group_participants WHERE group_jid IN (SELECT jid FROM whatsmeow_groups WHERE jid = ANY($1))",
+		"DELETE FROM whatsmeow_groups WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_history_syncs WHERE device_jid = ANY($1)",
+		"DELETE FROM whatsmeow_media_backfill_requests WHERE user_jid = ANY($1) OR portal_jid = ANY($1)",
+		"DELETE FROM whatsmeow_message_secrets WHERE chat_jid = ANY($1)",
+		"DELETE FROM whatsmeow_portal_backfill WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
+		"DELETE FROM whatsmeow_portal_backfill_queue WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
+		"DELETE FROM whatsmeow_portal_message_part WHERE message_id IN (SELECT id FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1)))",
+		"DELETE FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
+		"DELETE FROM whatsmeow_portal_reaction WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
+		"DELETE FROM whatsmeow_portal WHERE receiver = ANY($1)",
+		"DELETE FROM whatsmeow_privacy_settings WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_sender_keys WHERE our_jid = ANY($1)",
+		"DELETE FROM whatsmeow_sessions WHERE our_jid = ANY($1)",
+		"DELETE FROM whatsmeow_pre_keys WHERE jid = ANY($1)",
+		"DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY($1)",
+		"DELETE FROM whatsmeow_device WHERE jid = ANY($1)",
+	}
+	
+	// Execute each query
+	for _, query := range queries {
+		_, err = tx.Exec(query, pq.Array(jidsToCheck))
 		if err != nil {
-			logrus.Errorf("Failed to clear WhatsApp device: %v", err)
-			// Don't return error, try to clean other tables
+			// Log but continue - some tables might not exist
+			logrus.Debugf("Query failed (continuing): %s - %v", query, err)
 		}
+	}
+	
+	// Update device status
+	_, err = tx.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
+	if err != nil {
+		logrus.Warnf("Failed to update device status: %v", err)
 	}
 	
 	// Commit transaction
