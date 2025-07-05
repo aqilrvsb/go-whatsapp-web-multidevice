@@ -107,6 +107,8 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		// Get steps
 		steps, _ := repo.GetSequenceSteps(seq.ID)
 		
+		logrus.Infof("Processing sequence: ID=%s, Name=%s, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
+		
 		response := domainSequence.SequenceResponse{
 			ID:              seq.ID,
 			Name:            seq.Name,
@@ -125,6 +127,11 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			StepCount:       len(steps),
 			CreatedAt:       seq.CreatedAt,
 			UpdatedAt:       seq.UpdatedAt,
+		}
+		
+		// Set default status if empty
+		if response.Status == "" {
+			response.Status = "inactive"
 		}
 		
 		// Add steps to response

@@ -100,6 +100,11 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 		&seq.CreatedAt, &seq.UpdatedAt)
 	
 	if err != nil {
+		if err == sql.ErrNoRows {
+			logrus.Errorf("Sequence not found: %s", sequenceID)
+		} else {
+			logrus.Errorf("Failed to get sequence %s: %v", sequenceID, err)
+		}
 		return nil, err
 	}
 	
