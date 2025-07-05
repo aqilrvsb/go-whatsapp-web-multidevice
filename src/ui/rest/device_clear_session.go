@@ -74,10 +74,17 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 			logrus.Infof("Got from client - Phone: %s, JID: %s", phone, jid)
 		}
 		
-		// DON'T call Logout() - just disconnect like linked device logout does
-		// client.Logout() clears the store data!
+		// Logout from WhatsApp to remove from linked devices
+		if client.IsConnected() {
+			err = client.Logout(c.UserContext())
+			if err != nil {
+				logrus.Errorf("Error logging out from WhatsApp: %v", err)
+			} else {
+				logrus.Info("Successfully logged out from WhatsApp (removed from linked devices)")
+			}
+		}
 		
-		// Just disconnect client
+		// Disconnect client
 		client.Disconnect()
 		
 		// Remove from client manager
@@ -95,6 +102,7 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 	}
 	
 	// Clear WhatsApp session tables for this device
+	// This should happen AFTER logout to ensure clean state
 	err = whatsapp.ClearWhatsAppSessionData(deviceID)
 	if err != nil {
 		logrus.Errorf("Error clearing WhatsApp session: %v", err)
@@ -104,11 +112,16 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 	logrus.Infof("Device before update - DB Phone: %s, DB JID: %s", device.Phone, device.JID)
 	logrus.Infof("Will update with - Phone: %s, JID: %s", phone, jid)
 	
+	// IMPORTANT: Even after logout, we keep phone/JID for easier reconnection
+	// The user can scan QR with same device and it will update to online
+	
 	// Update device status to offline but KEEP phone and JID
 	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phone, jid)
 	if err != nil {
 		logrus.Errorf("Error updating device status: %v", err)
 	}
+	
+	logrus.Infof("Device logout complete - preserved Phone: %s, JID: %s for reconnection", phone, jid)
 	
 	// Clear any connection session
 	whatsapp.ClearConnectionSession(session.UserID)
