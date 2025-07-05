@@ -5049,6 +5049,20 @@
         }
         
         function displaySequenceSummary(summary) {
+            // Handle null or undefined summary
+            if (!summary) {
+                summary = {
+                    sequences: { total: 0, active: 0, paused: 0, draft: 0 },
+                    contacts: { total: 0, average_per_sequence: 0 },
+                    recent_sequences: []
+                };
+            }
+            
+            // Ensure all properties exist
+            summary.sequences = summary.sequences || { total: 0, active: 0, paused: 0, draft: 0 };
+            summary.contacts = summary.contacts || { total: 0, average_per_sequence: 0 };
+            summary.recent_sequences = summary.recent_sequences || [];
+            
             const html = `
                 <div class="row mb-4">
                     <div class="col-md-3">
@@ -5112,7 +5126,7 @@
                                 <h5 class="mb-0">Recent Sequences</h5>
                             </div>
                             <div class="card-body">
-                                ${summary.recent_sequences.length > 0 ? `
+                                ${summary.recent_sequences && summary.recent_sequences.length > 0 ? `
                                     <div class="table-responsive">
                                         <table class="table">
                                             <thead>
