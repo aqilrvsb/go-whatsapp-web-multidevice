@@ -27,9 +27,32 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 		logrus.Warnf("Failed to reset device statuses: %v", err)
 	}
 	
+	// Debug: Check what columns exist in user_devices table
+	logrus.Info("Checking user_devices table structure...")
+	colRows, err := db.Query(`
+		SELECT column_name 
+		FROM information_schema.columns 
+		WHERE table_name = 'user_devices'
+		ORDER BY ordinal_position
+	`)
+	if err == nil {
+		defer colRows.Close()
+		logrus.Info("user_devices columns:")
+		for colRows.Next() {
+			var col string
+			if err := colRows.Scan(&col); err == nil {
+				logrus.Infof("  - %s", col)
+			}
+		}
+	} else {
+		logrus.Errorf("Failed to query table columns: %v", err)
+	}
+	
 	// Find all devices that have a JID (were previously connected)
+	// Try with device_name first
+	logrus.Info("Attempting to query devices with device_name column...")
 	rows, err := db.Query(`
-		SELECT id, name, phone, jid 
+		SELECT id, device_name, phone, jid 
 		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
 		ORDER BY last_seen DESC
@@ -44,15 +67,15 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	attemptCount := 0
 	
 	for rows.Next() {
-		var deviceID, name, phone, jid string
-		err := rows.Scan(&deviceID, &name, &phone, &jid)
+		var deviceID, deviceName, phone, jid string
+		err := rows.Scan(&deviceID, &deviceName, &phone, &jid)
 		if err != nil {
 			logrus.Warnf("Failed to scan device row: %v", err)
 			continue
 		}
 		
 		attemptCount++
-		logrus.Infof("[%d] Attempting to reconnect device %s (%s) with JID %s", attemptCount, name, deviceID, jid)
+		logrus.Infof("[%d] Attempting to reconnect device %s (%s) with JID %s", attemptCount, deviceName, deviceID, jid)
 		
 		// Try to reconnect this device
 		go func(devID, devName, devJID, devPhone string) {
@@ -151,7 +174,7 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 			
 			reconnectCount++
 			
-		}(deviceID, name, jid, phone)
+		}(deviceID, deviceName, jid, phone)
 	}
 	
 	// Wait a bit for all goroutines to start
