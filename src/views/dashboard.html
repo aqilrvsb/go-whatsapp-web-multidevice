@@ -456,6 +456,49 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        
+        /* Sequence Calendar Styles */
+        .sequence-days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .sequence-day-box {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+            position: relative;
+            min-height: 80px;
+        }
+        
+        .sequence-day-box:hover {
+            border-color: var(--primary) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .sequence-day-box.active {
+            border-color: var(--success);
+            background: #f0fdf4;
+        }
+        
+        @media (max-width: 768px) {
+            .sequence-days-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sequence-days-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1583,7 +1626,7 @@
 
     <!-- Create Sequence Modal -->
     <div class="modal fade" id="createSequenceModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create New Sequence</h5>
@@ -1593,71 +1636,100 @@
                     <form id="createSequenceForm">
                         <!-- Basic Info -->
                         <div class="mb-4">
-                            <h6 class="fw-bold mb-3">Basic Information</h6>
-                            <div class="mb-3">
-                                <label class="form-label">Sequence Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="sequenceName" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <textarea class="form-control" id="sequenceDescription" rows="2"></textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Niche/Category</label>
-                                <input type="text" class="form-control" id="sequenceNiche" 
-                                       placeholder="e.g., Sales, Onboarding, Follow-up">
-                            </div>
-                        </div>
-
-                        <!-- Sequence Steps -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold mb-3">Sequence Steps</h6>
-                            <div id="sequenceSteps">
-                                <!-- Step 1 (Default) -->
-                                <div class="step-input" data-step="1">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0">Day 1</h6>
-                                        <button type="button" class="btn btn-sm btn-outline-danger remove-step" style="display:none;">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
+                            <div class="row">
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Message</label>
-                                        <textarea class="form-control step-content" rows="3" placeholder="Enter your message..."></textarea>
-                                        <small class="text-muted d-block mt-1">
-                                            <strong>WhatsApp Formatting:</strong> 
-                                            *bold* | _italic_ | ~strikethrough~ | ```monospace``` | 😊 Emojis supported
-                                        </small>
+                                        <label class="form-label">Sequence Name <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="sequenceName" required>
                                     </div>
+                                </div>
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Image (Optional)</label>
-                                        <input type="file" class="form-control step-image-file" accept="image/*" onchange="compressStepImage(this)">
-                                        <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
-                                        <input type="hidden" class="step-image-url">
-                                        <div class="step-image-preview mt-2"></div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Min Delay (seconds)</label>
-                                            <input type="number" class="form-control step-min-delay" value="5" min="1">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Max Delay (seconds)</label>
-                                            <input type="number" class="form-control step-max-delay" value="15" min="1">
-                                        </div>
+                                        <label class="form-label">Sequence Tag <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="sequenceNiche" placeholder="e.g., Sales, Onboarding" required>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <button type="button" class="add-step-btn" id="addStepBtn" style="border: 2px dashed #d0d0d0; background: transparent; color: #666; padding: 15px; width: 100%; border-radius: 8px; transition: all 0.3s;">
-                                <i class="bi bi-plus-circle"></i> Add Next Day
-                            </button>
+                            <div class="mb-3">
+                                <label class="form-label">Sequence Description <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="sequenceDescription" rows="2" required></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Min Delay (seconds)</label>
+                                        <input type="number" class="form-control" id="sequenceMinDelay" value="5" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Max Delay (seconds)</label>
+                                        <input type="number" class="form-control" id="sequenceMaxDelay" value="15" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Schedule Time</label>
+                                        <input type="time" class="form-control" id="sequenceScheduleTime" value="09:00">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Days Calendar Grid -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-3">Sequence Days</h6>
+                            <div class="sequence-days-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;">
+                                <!-- Days 1-31 will be generated here -->
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="createSequence()">Create Sequence</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Message Modal -->
+    <div class="modal fade" id="dayMessageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dayMessageTitle">Day 1 Message</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="currentDayNumber">
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
+                        <textarea class="form-control" id="dayMessageContent" rows="5" placeholder="Enter your message..." oninput="updateSequenceLivePreview()"></textarea>
+                        <small class="text-muted d-block mt-1">
+                            <strong>WhatsApp Formatting:</strong> 
+                            *bold* | _italic_ | ~strikethrough~ | ```monospace``` | 😊 Emojis supported
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Live Preview</label>
+                        <div class="border rounded p-3 bg-light" style="min-height: 100px;">
+                            <div id="sequenceLivePreview" style="white-space: pre-wrap;">Your formatted message will appear here...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Image (Optional)</label>
+                        <input type="file" class="form-control" id="dayMessageImage" accept="image/*" onchange="compressDayImage(this)">
+                        <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
+                        <input type="hidden" id="dayMessageImageUrl">
+                        <div id="dayImagePreview" class="mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveDayMessage()">Finish</button>
                 </div>
             </div>
         </div>
@@ -4238,8 +4310,210 @@
         
         // Open Create Sequence Modal function
         function openCreateSequenceModal() {
+            // Initialize the days grid
+            initializeSequenceDaysGrid();
             const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
             modal.show();
+        }
+        
+        // Initialize sequence days grid
+        let sequenceDays = {};
+        function initializeSequenceDaysGrid() {
+            const grid = document.querySelector('.sequence-days-grid');
+            grid.innerHTML = '';
+            sequenceDays = {}; // Reset days data
+            
+            // Create 31 day buttons
+            for (let i = 1; i <= 31; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'sequence-day-box';
+                dayDiv.style.cssText = `
+                    border: 2px solid #e0e0e0;
+                    border-radius: 8px;
+                    padding: 15px;
+                    text-align: center;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    background: white;
+                    position: relative;
+                `;
+                dayDiv.innerHTML = `
+                    <div style="font-size: 18px; font-weight: bold; color: #666;">Day ${i}</div>
+                    <div class="day-status" style="font-size: 12px; color: #999; margin-top: 5px;">
+                        <i class="bi bi-plus-circle"></i> Add
+                    </div>
+                `;
+                dayDiv.onclick = () => openDayMessageModal(i);
+                
+                // Hover effect
+                dayDiv.onmouseover = () => {
+                    dayDiv.style.borderColor = '#128c7e';
+                    dayDiv.style.transform = 'translateY(-2px)';
+                    dayDiv.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                };
+                dayDiv.onmouseout = () => {
+                    dayDiv.style.borderColor = sequenceDays[i] ? '#25d366' : '#e0e0e0';
+                    dayDiv.style.transform = 'none';
+                    dayDiv.style.boxShadow = 'none';
+                };
+                
+                grid.appendChild(dayDiv);
+            }
+        }
+        
+        // Open day message modal
+        function openDayMessageModal(dayNumber) {
+            document.getElementById('currentDayNumber').value = dayNumber;
+            document.getElementById('dayMessageTitle').textContent = `Day ${dayNumber} Message`;
+            
+            // Load existing data if any
+            if (sequenceDays[dayNumber]) {
+                document.getElementById('dayMessageContent').value = sequenceDays[dayNumber].content || '';
+                document.getElementById('dayMessageImageUrl').value = sequenceDays[dayNumber].image_url || '';
+                if (sequenceDays[dayNumber].image_url) {
+                    document.getElementById('dayImagePreview').innerHTML = 
+                        `<img src="${sequenceDays[dayNumber].image_url}" class="img-thumbnail" style="max-height: 150px;">`;
+                }
+            } else {
+                document.getElementById('dayMessageContent').value = '';
+                document.getElementById('dayMessageImageUrl').value = '';
+                document.getElementById('dayImagePreview').innerHTML = '';
+            }
+            
+            updateSequenceLivePreview();
+            
+            // Show day modal
+            const dayModal = new bootstrap.Modal(document.getElementById('dayMessageModal'));
+            dayModal.show();
+        }
+        
+        // Save day message
+        function saveDayMessage() {
+            const dayNumber = parseInt(document.getElementById('currentDayNumber').value);
+            const content = document.getElementById('dayMessageContent').value;
+            const imageUrl = document.getElementById('dayMessageImageUrl').value;
+            
+            if (!content && !imageUrl) {
+                Swal.fire('Error', 'Please add a message or image', 'error');
+                return;
+            }
+            
+            // Save day data
+            sequenceDays[dayNumber] = {
+                day_number: dayNumber,
+                content: content,
+                image_url: imageUrl,
+                min_delay_seconds: parseInt(document.getElementById('sequenceMinDelay').value) || 5,
+                max_delay_seconds: parseInt(document.getElementById('sequenceMaxDelay').value) || 15
+            };
+            
+            // Update day box appearance
+            updateDayBoxStatus(dayNumber, true);
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('dayMessageModal')).hide();
+            
+            // Clear form
+            document.getElementById('dayMessageContent').value = '';
+            document.getElementById('dayMessageImageUrl').value = '';
+            document.getElementById('dayImagePreview').innerHTML = '';
+        }
+        
+        // Update day box status
+        function updateDayBoxStatus(dayNumber, hasContent) {
+            const dayBoxes = document.querySelectorAll('.sequence-day-box');
+            const dayBox = dayBoxes[dayNumber - 1];
+            
+            if (hasContent) {
+                dayBox.style.borderColor = '#25d366';
+                dayBox.style.background = '#f0fdf4';
+                dayBox.querySelector('.day-status').innerHTML = '<i class="bi bi-check-circle-fill" style="color: #25d366;"></i> Set';
+            } else {
+                dayBox.style.borderColor = '#e0e0e0';
+                dayBox.style.background = 'white';
+                dayBox.querySelector('.day-status').innerHTML = '<i class="bi bi-plus-circle"></i> Add';
+            }
+        }
+        
+        // Update live preview for sequence
+        function updateSequenceLivePreview() {
+            const content = document.getElementById('dayMessageContent').value;
+            const preview = document.getElementById('sequenceLivePreview');
+            
+            if (!content) {
+                preview.textContent = 'Your formatted message will appear here...';
+                preview.style.color = '#666';
+                return;
+            }
+            
+            // Format the message
+            let formatted = content
+                .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+                .replace(/_(.*?)_/g, '<em>$1</em>')
+                .replace(/~(.*?)~/g, '<del>$1</del>')
+                .replace(/```(.*?)```/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+            
+            preview.innerHTML = formatted;
+            preview.style.color = '#000';
+        }
+        
+        // Compress day image
+        function compressDayImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    let width = img.width;
+                    let height = img.height;
+                    let quality = 0.9;
+                    
+                    const maxSize = 1000;
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    function tryCompress() {
+                        canvas.toBlob(function(blob) {
+                            if (blob.size > 350 * 1024 && quality > 0.1) {
+                                quality -= 0.1;
+                                tryCompress();
+                            } else {
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    document.getElementById('dayMessageImageUrl').value = e.target.result;
+                                    document.getElementById('dayImagePreview').innerHTML = 
+                                        `<img src="${e.target.result}" class="img-thumbnail" style="max-height: 150px;">
+                                         <small class="d-block mt-1">Size: ${(blob.size / 1024).toFixed(0)}KB</small>`;
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    
+                    tryCompress();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
         
         // Create Sequence function
@@ -4250,9 +4524,58 @@
                 return;
             }
             
-            // Collect steps
-            const steps = [];
-            document.querySelectorAll('.step-input').forEach((stepEl, index) => {
+            // Convert sequenceDays object to array
+            const steps = Object.values(sequenceDays);
+            
+            if (steps.length === 0) {
+                Swal.fire('Error', 'Please add at least one day message', 'error');
+                return;
+            }
+            
+            // Get global delay settings
+            const minDelay = parseInt(document.getElementById('sequenceMinDelay').value) || 5;
+            const maxDelay = parseInt(document.getElementById('sequenceMaxDelay').value) || 15;
+            
+            // Apply global delays to all steps
+            steps.forEach(step => {
+                step.min_delay_seconds = minDelay;
+                step.max_delay_seconds = maxDelay;
+            });
+            
+            const sequenceData = {
+                name: document.getElementById('sequenceName').value,
+                description: document.getElementById('sequenceDescription').value,
+                niche: document.getElementById('sequenceNiche').value,
+                steps: steps,
+                status: 'draft'
+            };
+            
+            try {
+                const response = await fetch('/api/sequences', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(sequenceData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && (data.code === 'CREATED' || data.code === 'SUCCESS')) {
+                    Swal.fire('Success', 'Sequence created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createSequenceModal')).hide();
+                    // Reset form
+                    form.reset();
+                    sequenceDays = {};
+                    loadSequences();
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to create sequence', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating sequence:', error);
+                Swal.fire('Error', 'Failed to create sequence', 'error');
+            }
+        }
                 const step = {
                     day_number: index + 1,
                     content: stepEl.querySelector('.step-content').value,
