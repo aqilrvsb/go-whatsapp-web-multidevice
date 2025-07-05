@@ -63,21 +63,21 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 	// Disconnect WhatsApp client
 	cm := whatsapp.GetClientManager()
 	var jid string
+	var phone string
+	
+	// Get phone and JID BEFORE doing anything
 	if client, err := cm.GetClient(deviceID); err == nil && client != nil {
-		// Get JID before disconnecting
+		// Get JID and phone before any disconnect/logout
 		if client.Store != nil && client.Store.ID != nil {
 			jid = client.Store.ID.String()
+			phone = client.Store.ID.User
+			logrus.Infof("Got from client - Phone: %s, JID: %s", phone, jid)
 		}
 		
-		// Logout from WhatsApp
-		if client.IsConnected() {
-			err = client.Logout(c.UserContext())
-			if err != nil {
-				logrus.Errorf("Error logging out: %v", err)
-			}
-		}
+		// DON'T call Logout() - just disconnect like linked device logout does
+		// client.Logout() clears the store data!
 		
-		// Disconnect client
+		// Just disconnect client
 		client.Disconnect()
 		
 		// Remove from client manager
@@ -86,25 +86,26 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 		logrus.Info("WhatsApp client disconnected and removed from manager")
 	}
 	
+	// If we couldn't get from client, get from database
+	if phone == "" && device.Phone != "" {
+		phone = device.Phone
+	}
+	if jid == "" && device.JID != "" {
+		jid = device.JID
+	}
+	
 	// Clear WhatsApp session tables for this device
 	err = whatsapp.ClearWhatsAppSessionData(deviceID)
 	if err != nil {
 		logrus.Errorf("Error clearing WhatsApp session: %v", err)
 	}
 	
-	// Get current device info to preserve phone/JID
-	var phone, jidStr string
-	if device.Phone != "" {
-		phone = device.Phone
-	}
-	if jid != "" {
-		jidStr = jid
-	} else if device.JID != "" {
-		jidStr = device.JID
-	}
+	// Log current state
+	logrus.Infof("Device before update - DB Phone: %s, DB JID: %s", device.Phone, device.JID)
+	logrus.Infof("Will update with - Phone: %s, JID: %s", phone, jid)
 	
 	// Update device status to offline but KEEP phone and JID
-	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phone, jidStr)
+	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phone, jid)
 	if err != nil {
 		logrus.Errorf("Error updating device status: %v", err)
 	}
