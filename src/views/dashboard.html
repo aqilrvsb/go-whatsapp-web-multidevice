@@ -4568,6 +4568,12 @@
                     
                     // Initialize grid and show modal
                     initializeSequenceDaysGrid();
+                    
+                    // Update day boxes to show which days have content
+                    Object.keys(sequenceDays).forEach(dayNumber => {
+                        updateDayBoxStatus(parseInt(dayNumber), true);
+                    });
+                    
                     const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
                     modal.show();
                 }
@@ -5001,186 +5007,128 @@
         }
         
         // Sequence Summary Functions
-        async function loadSequenceSummary() {
-            try {
-                // Load all sequences instead of summary
-                const response = await fetch('/api/sequences');
-                const data = await response.json();
-                
-                if (data.code === 'SUCCESS' && data.results) {
-                    displaySequenceSummary(data.results);
-                } else {
+        function loadSequenceSummary() {
+            fetch('/api/sequences/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        displaySequenceSummary(data.results);
+                    } else {
+                        document.getElementById('sequenceSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load sequence summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sequence summary:', error);
                     document.getElementById('sequenceSummaryContent').innerHTML = 
-                        '<div class="alert alert-warning">No sequences found</div>';
-                }
-            } catch (error) {
-                console.error('Error loading sequences:', error);
-                document.getElementById('sequenceSummaryContent').innerHTML = 
-                    '<div class="alert alert-danger">Error loading sequences</div>';
-            }
-        }
-        
-        function displaySequenceSummary(sequences) {
-            if (!sequences || sequences.length === 0) {
-                document.getElementById('sequenceSummaryContent').innerHTML = 
-                    '<div class="alert alert-info">No sequences created yet</div>';
-                return;
-            }
-            
-            let html = `
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">All Sequences</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Description</th>
-                                        <th>Tag</th>
-                                        <th>Days</th>
-                                        <th>Contacts</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-            `;
-            
-            sequences.forEach(seq => {
-                const statusBadge = seq.status === 'active' ? 'success' : 
-                                   seq.status === 'paused' ? 'warning' : 'secondary';
-                
-                html += `
-                    <tr>
-                        <td><strong>${seq.name}</strong></td>
-                        <td>${seq.description || '-'}</td>
-                        <td>${seq.niche || '-'}</td>
-                        <td>${seq.total_days || seq.steps?.length || 0}</td>
-                        <td>${seq.contacts_count || 0}</td>
-                        <td><span class="badge bg-${statusBadge}">${seq.status}</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="previewSequenceMessages('${seq.id}')" title="Preview Messages">
-                                <i class="bi bi-eye"></i> Preview
-                            </button>
-                            <button class="btn btn-sm btn-primary" onclick="viewEditSequence('${seq.id}')" title="Edit">
-                                <i class="bi bi-pencil"></i> Edit
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('sequenceSummaryContent').innerHTML = html;
-        }
-        
-        // Preview Sequence Messages
-        async function previewSequenceMessages(sequenceId) {
-            try {
-                const response = await fetch(`/api/sequences/${sequenceId}`);
-                const data = await response.json();
-                
-                if (data.code === 'SUCCESS' && data.results) {
-                    const sequence = data.results;
-                    showSequencePreviewModal(sequence);
-                }
-            } catch (error) {
-                console.error('Error loading sequence:', error);
-                Swal.fire('Error', 'Failed to load sequence details', 'error');
-            }
-        }
-        
-        // Show Sequence Preview Modal
-        function showSequencePreviewModal(sequence) {
-            let messagesHtml = '';
-            
-            if (sequence.steps && sequence.steps.length > 0) {
-                sequence.steps.sort((a, b) => a.day_number - b.day_number);
-                
-                sequence.steps.forEach(step => {
-                    messagesHtml += `
-                        <div class="mb-4 p-3 border rounded">
-                            <h6 class="text-primary mb-2">Day ${step.day_number}</h6>
-                            ${step.content ? `
-                                <div class="mb-2">
-                                    <strong>Message:</strong>
-                                    <div class="mt-1 p-2 bg-light rounded" style="white-space: pre-wrap;">${formatWhatsAppMessage(step.content)}</div>
-                                </div>
-                            ` : ''}
-                            ${step.image_url ? `
-                                <div class="mb-2">
-                                    <strong>Image:</strong><br>
-                                    <img src="${step.image_url}" class="img-thumbnail mt-1" style="max-height: 200px;">
-                                </div>
-                            ` : ''}
-                            <div class="text-muted small">
-                                <i class="bi bi-clock"></i> Delay: ${step.min_delay_seconds}-${step.max_delay_seconds} seconds
-                            </div>
-                        </div>
-                    `;
+                        '<div class="alert alert-danger">Error loading data</div>';
                 });
-            } else {
-                messagesHtml = '<p class="text-muted">No messages configured</p>';
-            }
-            
-            const modalHtml = `
-                <div class="modal fade" id="sequencePreviewModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Sequence: ${sequence.name}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        }
+        
+        function displaySequenceSummary(summary) {
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-primary">${summary.sequences.total}</h3>
+                                <p class="text-muted mb-0">Total Sequences</p>
                             </div>
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <strong>Description:</strong> ${sequence.description || '-'}<br>
-                                    <strong>Tag:</strong> ${sequence.niche || '-'}<br>
-                                    <strong>Status:</strong> <span class="badge bg-${sequence.status === 'active' ? 'success' : 'secondary'}">${sequence.status}</span>
-                                </div>
-                                <hr>
-                                <h6 class="mb-3">Messages Timeline:</h6>
-                                <div style="max-height: 400px; overflow-y: auto;">
-                                    ${messagesHtml}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-success">${summary.sequences.active}</h3>
+                                <p class="text-muted mb-0">Active</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-warning">${summary.sequences.paused}</h3>
+                                <p class="text-muted mb-0">Paused</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-secondary">${summary.sequences.draft}</h3>
+                                <p class="text-muted mb-0">Draft</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Contact Statistics</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Total Contacts: <strong>${summary.contacts.total}</strong></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1">Average per Sequence: <strong>${summary.contacts.average_per_sequence.toFixed(1)}</strong></p>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="button" class="btn btn-primary" onclick="viewEditSequence('${sequence.id}')" data-bs-dismiss="modal">
-                                    <i class="bi bi-pencil"></i> Edit Sequence
-                                </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Recent Sequences</h5>
+                            </div>
+                            <div class="card-body">
+                                ${summary.recent_sequences.length > 0 ? `
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Niche</th>
+                                                    <th>Contacts</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${summary.recent_sequences.map(sequence => `
+                                                    <tr>
+                                                        <td>${sequence.name}</td>
+                                                        <td>${sequence.niche || '-'}</td>
+                                                        <td>${sequence.contacts_count}</td>
+                                                        <td>
+                                                            <span class="badge bg-${getStatusColor(sequence.status)}">
+                                                                ${sequence.status}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/sequences/${sequence.id}'" title="View Details">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ` : '<p class="text-muted text-center">No sequences yet</p>'}
                             </div>
                         </div>
                     </div>
                 </div>
             `;
-            
-            // Remove existing modal if any
-            const existingModal = document.getElementById('sequencePreviewModal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-            
-            // Add modal to body
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('sequencePreviewModal'));
-            modal.show();
-            
-            // Clean up when modal is hidden
-            document.getElementById('sequencePreviewModal').addEventListener('hidden.bs.modal', function () {
-                this.remove();
-            });
+            document.getElementById('sequenceSummaryContent').innerHTML = html;
         }
         
         // Format WhatsApp message helper
