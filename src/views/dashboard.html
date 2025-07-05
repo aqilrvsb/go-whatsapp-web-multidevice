@@ -1672,7 +1672,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Sequence Tag <span class="text-danger">*</span></label>
+                                        <label class="form-label">Trigger <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="sequenceNiche" placeholder="e.g., Sales, Onboarding" required>
                                     </div>
                                 </div>
@@ -4262,7 +4262,7 @@
                                     ${seq.status}
                                 </span>
                             </div>
-                            <p class="text-muted small mb-2">Niche: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}</p>
+                            <p class="text-muted small mb-2">Trigger: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}</p>
                             <p class="card-text">${seq.description || 'No description'}</p>
                             <div class="progress mb-3" style="height: 5px;">
                                 <div class="progress-bar bg-${statusColor}" style="width: ${(seq.completed_count / seq.contacts_count * 100) || 0}%"></div>
@@ -4314,7 +4314,7 @@
                                 <h5 class="card-title">${seq.name}</h5>
                                 <p class="text-muted mb-2">${seq.description || 'No description'}</p>
                                 <div class="mb-3">
-                                    <small class="text-muted">Niche: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}</small>
+                                    <small class="text-muted">Trigger: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}</small>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="badge bg-${statusColor}">${seq.status}</span>
