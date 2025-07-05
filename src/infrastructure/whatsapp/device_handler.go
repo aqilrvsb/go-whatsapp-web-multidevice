@@ -282,9 +282,8 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	// If no JID found, we can't clean WhatsApp sessions
 	if !jid.Valid || jid.String == "" {
 		logrus.Infof("No JID found for device %s, skipping WhatsApp session cleanup", deviceID)
-		// Just update device status
-		_, err = db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = $1", deviceID)
-		return err
+		// Don't update status here - let the caller handle it
+		return nil
 	}
 	
 	logrus.Infof("Clearing WhatsApp session for device %s with JID %s", deviceID, jid.String)
@@ -355,11 +354,8 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	
 	logrus.Infof("Successfully cleared %d/%d tables for device %s", successCount, len(clearOperations), deviceID)
 	
-	// Update device status in a separate transaction
-	_, err = db.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
-	if err != nil {
-		logrus.Warnf("Failed to update device status: %v", err)
-	}
+	// Don't update device status here - that should be handled by the caller
+	// We're just clearing WhatsApp session data, not logging out the device
 	
 	return nil
 }
