@@ -9,7 +9,7 @@ import (
 )
 
 // CheckDeviceConnectionStatus checks real-time connection status of all devices
-func (handler *App) CheckDeviceConnectionStatus(c *fiber.Ctx) error {
+func CheckDeviceConnectionStatus(c *fiber.Ctx) error {
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {

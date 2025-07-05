@@ -57,6 +57,14 @@ func (handler *App) DeviceConnect(c *fiber.Ctx) error {
 	
 	// Get or create device connection using multi-device manager
 	dm := multidevice.GetDeviceManager()
+	if dm == nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Device manager not initialized",
+		})
+	}
+	
 	conn, err := dm.GetOrCreateDeviceConnection(deviceID, userID.(string), device.Phone)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{

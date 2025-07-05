@@ -79,12 +79,13 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Device management endpoints
 	app.Delete("/api/devices/:id", rest.DeleteDevice)
 	app.Post("/api/devices/:deviceId/connect", rest.DeviceConnect)
+	app.Post("/api/devices/:deviceId/refresh", RefreshDevice) // New simpler refresh endpoint
 	app.Get("/api/devices/:deviceId/qr", rest.GetDeviceQR)
 	app.Post("/api/devices/:deviceId/disconnect", rest.DisconnectDevice)
 	app.Post("/api/devices/:deviceId/reset", rest.ResetDevice)
 	app.Post("/api/devices/:deviceId/clear-session", rest.ClearDeviceSession)
 	app.Post("/api/devices/clear-all-sessions", rest.ClearAllSessions)
-	app.Get("/api/devices/check-connection", rest.CheckDeviceConnectionStatus)
+	app.Get("/api/devices/check-connection", CheckDeviceConnectionStatus)
 	app.Get("/app/logout", rest.LogoutDevice)
 	app.Get("/app/reconnect", rest.ReconnectDevice)
 	app.Get("/app/devices", rest.GetDevices)

@@ -1960,11 +1960,17 @@
 
         // Load Devices
         function loadDevices(silent = false) {
-            // First check real-time connection status
+            // First try to check real-time connection status (optional)
             fetch('/api/devices/check-connection', { credentials: 'include' })
-                .then(response => response.json())
+                .then(response => {
+                    // If check-connection fails, just continue
+                    if (!response.ok) {
+                        console.log('Check-connection endpoint not available, continuing...');
+                    }
+                    return response.ok ? response.json() : null;
+                })
                 .then(statusData => {
-                    // Connection status checked, now load devices
+                    // Connection status checked (or skipped), now load devices
                     return fetch('/api/devices', { credentials: 'include' });
                 })
                 .then(response => {
@@ -2422,8 +2428,8 @@
                     // Show progress toast
                     showToast('Attempting to reconnect device...', 'info');
                     
-                    // Call the device connect endpoint (handles reconnection properly)
-                    fetch(`/api/devices/${deviceId}/connect`, {
+                    // Call the device refresh endpoint (simpler, avoids nil pointer)
+                    fetch(`/api/devices/${deviceId}/refresh`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: {
