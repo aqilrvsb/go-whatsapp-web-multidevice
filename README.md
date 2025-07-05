@@ -17,18 +17,17 @@
 1. **First QR Scan** → Connects and saves phone/JID → Shows online ✅
 2. **Linked Device Logout** → Updates to offline instantly, keeps phone/JID → Can rescan ✅
 3. **Manual Logout Button** → Removes from WhatsApp linked devices, keeps phone/JID → Can rescan ✅
-4. **Railway Restart** → Attempts to reconnect all devices with valid sessions ✅
+4. **Manual Refresh** → Click refresh button to reconnect devices with valid sessions ✅
 5. **No Duplicate Sessions** → Proper logout prevents multiple active sessions ✅
 
-### 🔄 Auto-Reconnect Behavior (After Server Restart):
-- **Smart Detection**: Only attempts to reconnect devices that have valid session data
-- **Actual Reconnection**: Uses `GetOrCreateDeviceConnection` to restore connections
-- **Status Preservation**: Does NOT automatically set devices to offline
-- **Connection Verification**: Checks if device is already connected before attempting
-- **Proper Registration**: Successfully reconnected devices are registered with ClientManager
-- **Real-time Updates**: Sends WebSocket notifications for successful reconnections
-- **Graceful Failures**: Devices that can't reconnect keep their previous status
-- **Optimized for Scale**: Handles 3000+ devices with parallel processing (10 concurrent)
+### 🔄 Manual Device Refresh (NEW):
+- **Refresh Button**: Added in device dropdown menu (green refresh icon)
+- **Smart Reconnection**: Attempts to restore connection using existing WhatsApp session
+- **Session Detection**: Automatically detects if session is still valid
+- **Graceful Handling**: If session expired, prompts to scan QR code
+- **No Auto-Reconnect**: Removed automatic reconnection on server restart
+- **User Control**: You decide when to reconnect devices
+- **Instant Feedback**: Shows progress and results immediately
 
 ### 📱 WhatsApp Web Features:
 

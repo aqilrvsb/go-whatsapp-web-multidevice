@@ -117,12 +117,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	websocket.RegisterRoutes(app, appUsecase)
 	go websocket.RunHub()
 
-	// REMOVED: Old single-device auto-reconnect functions
-	// go helpers.SetAutoConnectAfterBooting(appUsecase)
-	// go helpers.SetAutoReconnectChecking(whatsappCli)
-	
-	// Start NEW multi-device auto-reconnect (optimized for 3000+ devices)
-	whatsapp.StartMultiDeviceAutoReconnect()
+	// REMOVED: Auto-reconnect is now manual via Refresh button
+	// whatsapp.StartMultiDeviceAutoReconnect()
 	
 	// Start auto flush chat csv
 	if config.WhatsappChatStorage {
