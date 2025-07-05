@@ -1,4 +1,4 @@
-package cmd
+﻿package cmd
 
 import (
 	"fmt"
@@ -125,8 +125,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Start multi-device auto-reconnect after server restart
 	go func() {
-		time.Sleep(30 * time.Second) // Wait longer for server and all components to fully initialize
-		logrus.Info("Starting multi-device auto-reconnect after 30s delay...")
+		time.Sleep(60 * time.Second) // Wait longer for server and all components to fully initialize
+		logrus.Info("Starting multi-device auto-reconnect after 60s delay...")
 		whatsapp.AutoReconnectDevices(whatsappDB)
 		
 		// Start periodic reconnect check every 5 minutes
