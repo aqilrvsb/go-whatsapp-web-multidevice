@@ -29,7 +29,7 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	
 	// Find all devices that have a JID (were previously connected)
 	rows, err := db.Query(`
-		SELECT id, name, phone, jid 
+		SELECT id, device_name, phone, jid 
 		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
 		ORDER BY last_seen DESC
