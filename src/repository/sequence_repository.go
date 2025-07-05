@@ -50,7 +50,7 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 // GetSequences gets all sequences for a user
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, niche, total_days, is_active, 
+		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
 		       COALESCE(schedule_time, '09:00') as schedule_time, created_at, updated_at
 		FROM sequences
 		WHERE user_id = $1
@@ -68,15 +68,11 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	for rows.Next() {
 		var seq models.Sequence
 		err := rows.Scan(&seq.ID, &seq.UserID, &seq.DeviceID, &seq.Name, 
-			&seq.Description, &seq.Niche, &seq.TotalDays, &seq.IsActive, 
+			&seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
 			&seq.TimeSchedule, &seq.CreatedAt, &seq.UpdatedAt)
 		if err != nil {
 			logrus.Errorf("Failed to scan sequence row: %v", err)
 			continue
-		}
-		// Set default values for fields not in query
-		if seq.Status == "" {
-			seq.Status = "inactive"
 		}
 		sequences = append(sequences, seq)
 	}
