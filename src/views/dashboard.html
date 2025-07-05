@@ -4409,9 +4409,13 @@
             
             // Save day data
             sequenceDays[dayNumber] = {
+                day: dayNumber,
                 day_number: dayNumber,
                 content: content,
                 image_url: imageUrl,
+                media_url: imageUrl,
+                message_type: imageUrl ? 'image' : 'text',
+                send_time: document.getElementById('sequenceScheduleTime')?.value || '09:00',
                 min_delay_seconds: parseInt(document.getElementById('sequenceMinDelay').value) || 5,
                 max_delay_seconds: parseInt(document.getElementById('sequenceMaxDelay').value) || 15
             };
@@ -4545,10 +4549,15 @@
                     sequenceDays = {};
                     if (sequence.steps && Array.isArray(sequence.steps)) {
                         sequence.steps.forEach(step => {
-                            sequenceDays[step.day_number] = {
-                                day_number: step.day_number,
+                            const dayNum = step.day_number || step.day;
+                            sequenceDays[dayNum] = {
+                                day: dayNum,
+                                day_number: dayNum,
                                 content: step.content || '',
-                                image_url: step.image_url || '',
+                                image_url: step.image_url || step.media_url || '',
+                                media_url: step.media_url || step.image_url || '',
+                                message_type: step.message_type || 'text',
+                                send_time: step.send_time || '09:00',
                                 min_delay_seconds: step.min_delay_seconds || 5,
                                 max_delay_seconds: step.max_delay_seconds || 15
                             };
@@ -4558,6 +4567,11 @@
                         if (sequence.steps.length > 0) {
                             document.getElementById('sequenceMinDelay').value = sequence.steps[0].min_delay_seconds || 5;
                             document.getElementById('sequenceMaxDelay').value = sequence.steps[0].max_delay_seconds || 15;
+                        }
+                        
+                        // Set schedule time if available
+                        if (sequence.time_schedule) {
+                            document.getElementById('sequenceScheduleTime').value = sequence.time_schedule;
                         }
                     }
                     
