@@ -4,6 +4,7 @@ import (
 	"fmt"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
+	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/gofiber/fiber/v2"
@@ -428,7 +429,7 @@ func (controller *Sequence) ToggleSequence(c *fiber.Ctx) error {
 	}
 	
 	// Update sequence
-	updateReq := sequence.UpdateSequenceRequest{
+	updateReq := domainSequence.UpdateSequenceRequest{
 		Status:   newStatus,
 		IsActive: newStatus == "active",
 	}

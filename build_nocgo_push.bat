@@ -1,6 +1,7 @@
 @echo off
-echo Building locally...
+echo Building locally without CGO...
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main\src
+set CGO_ENABLED=0
 go build -o whatsapp.exe
 if %errorlevel% neq 0 (
     echo Build failed!
