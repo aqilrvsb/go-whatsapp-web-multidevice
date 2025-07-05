@@ -32,7 +32,7 @@ type CreateSequenceRequest struct {
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
 	IsActive        bool                        `json:"is_active"`
-	ScheduleTime    string                      `json:"schedule_time"`
+	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
 	MaxDelaySeconds int                         `json:"max_delay_seconds"`
 	Steps           []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`
@@ -78,7 +78,7 @@ type SequenceResponse struct {
 	TotalSteps      int                    `json:"total_steps"`
 	TotalDays       int                    `json:"total_days"`
 	IsActive        bool                   `json:"is_active"`
-	ScheduleTime    string                 `json:"schedule_time"`
+	TimeSchedule    string                 `json:"time_schedule"`
 	MinDelaySeconds int                    `json:"min_delay_seconds"`
 	MaxDelaySeconds int                    `json:"max_delay_seconds"`
 	ContactCount    int                    `json:"contact_count"`
