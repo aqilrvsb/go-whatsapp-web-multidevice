@@ -7,6 +7,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type sequenceRepository struct {
@@ -49,8 +50,8 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 // GetSequences gets all sequences for a user
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
-		       schedule_time, min_delay_seconds, max_delay_seconds, created_at, updated_at
+		SELECT id, user_id, device_id, name, description, niche, total_days, is_active, 
+		       COALESCE(schedule_time, '09:00') as schedule_time, created_at, updated_at
 		FROM sequences
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -58,6 +59,7 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
+		logrus.Errorf("Failed to query sequences: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -66,15 +68,20 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	for rows.Next() {
 		var seq models.Sequence
 		err := rows.Scan(&seq.ID, &seq.UserID, &seq.DeviceID, &seq.Name, 
-			&seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
-			&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
-			&seq.CreatedAt, &seq.UpdatedAt)
+			&seq.Description, &seq.Niche, &seq.TotalDays, &seq.IsActive, 
+			&seq.TimeSchedule, &seq.CreatedAt, &seq.UpdatedAt)
 		if err != nil {
+			logrus.Errorf("Failed to scan sequence row: %v", err)
 			continue
+		}
+		// Set default values for fields not in query
+		if seq.Status == "" {
+			seq.Status = "inactive"
 		}
 		sequences = append(sequences, seq)
 	}
 	
+	logrus.Infof("Repository: Found %d sequences for user %s", len(sequences), userID)
 	return sequences, nil
 }
 // GetSequenceByID gets sequence by ID
