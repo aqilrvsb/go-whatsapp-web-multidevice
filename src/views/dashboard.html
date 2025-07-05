@@ -4233,7 +4233,7 @@
                                     <i class="bi bi-people"></i> ${seq.contacts_count || 0} contacts
                                 </small>
                                 <div>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/sequences/${seq.id}'" title="View Details">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewEditSequence('${seq.id}')" title="View/Edit Sequence">
                                         <i class="bi bi-eye"></i> View
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSequence('${seq.id}')" title="Delete Sequence">
@@ -4284,7 +4284,7 @@
                                     <div class="progress-bar bg-${statusColor}" style="width: ${(seq.completed_count / seq.contacts_count * 100) || 0}%"></div>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/sequences/${seq.id}'" title="View Details">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewEditSequence('${seq.id}')" title="View/Edit Sequence">
                                         <i class="bi bi-eye"></i> View
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSequence('${seq.id}')" title="Delete Sequence">
@@ -4366,6 +4366,12 @@
             document.getElementById('currentDayNumber').value = dayNumber;
             document.getElementById('dayMessageTitle').textContent = `Day ${dayNumber} Message`;
             
+            // Reset the file input
+            const fileInput = document.getElementById('dayMessageImage');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
             // Load existing data if any
             if (sequenceDays[dayNumber]) {
                 document.getElementById('dayMessageContent').value = sequenceDays[dayNumber].content || '';
@@ -4373,8 +4379,11 @@
                 if (sequenceDays[dayNumber].image_url) {
                     document.getElementById('dayImagePreview').innerHTML = 
                         `<img src="${sequenceDays[dayNumber].image_url}" class="img-thumbnail" style="max-height: 150px;">`;
+                } else {
+                    document.getElementById('dayImagePreview').innerHTML = '';
                 }
             } else {
+                // Clear all fields for new day
                 document.getElementById('dayMessageContent').value = '';
                 document.getElementById('dayMessageImageUrl').value = '';
                 document.getElementById('dayImagePreview').innerHTML = '';
@@ -4516,6 +4525,124 @@
             reader.readAsDataURL(file);
         }
         
+        // View/Edit Sequence function
+        let currentEditingSequenceId = null;
+        async function viewEditSequence(sequenceId) {
+            try {
+                const response = await fetch(`/api/sequences/${sequenceId}`);
+                const data = await response.json();
+                
+                if (data.code === 'SUCCESS' && data.results) {
+                    const sequence = data.results;
+                    currentEditingSequenceId = sequenceId;
+                    
+                    // Populate form fields
+                    document.getElementById('sequenceName').value = sequence.name || '';
+                    document.getElementById('sequenceDescription').value = sequence.description || '';
+                    document.getElementById('sequenceNiche').value = sequence.niche || '';
+                    
+                    // Reset and populate days
+                    sequenceDays = {};
+                    if (sequence.steps && Array.isArray(sequence.steps)) {
+                        sequence.steps.forEach(step => {
+                            sequenceDays[step.day_number] = {
+                                day_number: step.day_number,
+                                content: step.content || '',
+                                image_url: step.image_url || '',
+                                min_delay_seconds: step.min_delay_seconds || 5,
+                                max_delay_seconds: step.max_delay_seconds || 15
+                            };
+                        });
+                        
+                        // Set global delays from first step
+                        if (sequence.steps.length > 0) {
+                            document.getElementById('sequenceMinDelay').value = sequence.steps[0].min_delay_seconds || 5;
+                            document.getElementById('sequenceMaxDelay').value = sequence.steps[0].max_delay_seconds || 15;
+                        }
+                    }
+                    
+                    // Change modal title and button text
+                    document.querySelector('#createSequenceModal .modal-title').textContent = 'Edit Sequence';
+                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Update Sequence';
+                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = () => updateSequence(sequenceId);
+                    
+                    // Initialize grid and show modal
+                    initializeSequenceDaysGrid();
+                    const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
+                    modal.show();
+                }
+            } catch (error) {
+                console.error('Error loading sequence:', error);
+                Swal.fire('Error', 'Failed to load sequence', 'error');
+            }
+        }
+        
+        // Update Sequence function
+        async function updateSequence(sequenceId) {
+            const form = document.getElementById('createSequenceForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            // Convert sequenceDays object to array
+            const steps = Object.values(sequenceDays);
+            
+            if (steps.length === 0) {
+                Swal.fire('Error', 'Please add at least one day message', 'error');
+                return;
+            }
+            
+            // Get global delay settings
+            const minDelay = parseInt(document.getElementById('sequenceMinDelay').value) || 5;
+            const maxDelay = parseInt(document.getElementById('sequenceMaxDelay').value) || 15;
+            
+            // Apply global delays to all steps
+            steps.forEach(step => {
+                step.min_delay_seconds = minDelay;
+                step.max_delay_seconds = maxDelay;
+            });
+            
+            const sequenceData = {
+                name: document.getElementById('sequenceName').value,
+                description: document.getElementById('sequenceDescription').value,
+                niche: document.getElementById('sequenceNiche').value,
+                steps: steps,
+                status: 'draft'
+            };
+            
+            try {
+                const response = await fetch(`/api/sequences/${sequenceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(sequenceData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.code === 'SUCCESS') {
+                    Swal.fire('Success', 'Sequence updated successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createSequenceModal')).hide();
+                    // Reset form
+                    form.reset();
+                    sequenceDays = {};
+                    currentEditingSequenceId = null;
+                    // Reset modal for create mode
+                    document.querySelector('#createSequenceModal .modal-title').textContent = 'Create New Sequence';
+                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Create Sequence';
+                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = createSequence;
+                    loadSequences();
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to update sequence', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating sequence:', error);
+                Swal.fire('Error', 'Failed to update sequence', 'error');
+            }
+        }
+        
         // Create Sequence function
         async function createSequence() {
             const form = document.getElementById('createSequenceForm');
@@ -4590,6 +4717,20 @@
             if (sequencesTab) {
                 sequencesTab.addEventListener('shown.bs.tab', function() {
                     loadSequences();
+                });
+            }
+            
+            // Reset modal when closed
+            const createSequenceModal = document.getElementById('createSequenceModal');
+            if (createSequenceModal) {
+                createSequenceModal.addEventListener('hidden.bs.modal', function () {
+                    // Reset to create mode if not saving
+                    if (currentEditingSequenceId) {
+                        document.querySelector('#createSequenceModal .modal-title').textContent = 'Create New Sequence';
+                        document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Create Sequence';
+                        document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = createSequence;
+                        currentEditingSequenceId = null;
+                    }
                 });
             }
             
@@ -4860,25 +5001,198 @@
         }
         
         // Sequence Summary Functions
-        function loadSequenceSummary() {
-            fetch('/api/sequences/summary')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.code === 'SUCCESS') {
-                        displaySequenceSummary(data.results);
-                    } else {
-                        document.getElementById('sequenceSummaryContent').innerHTML = 
-                            '<div class="alert alert-danger">Failed to load sequence summary</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading sequence summary:', error);
+        async function loadSequenceSummary() {
+            try {
+                // Load all sequences instead of summary
+                const response = await fetch('/api/sequences');
+                const data = await response.json();
+                
+                if (data.code === 'SUCCESS' && data.results) {
+                    displaySequenceSummary(data.results);
+                } else {
                     document.getElementById('sequenceSummaryContent').innerHTML = 
-                        '<div class="alert alert-danger">Error loading data</div>';
-                });
+                        '<div class="alert alert-warning">No sequences found</div>';
+                }
+            } catch (error) {
+                console.error('Error loading sequences:', error);
+                document.getElementById('sequenceSummaryContent').innerHTML = 
+                    '<div class="alert alert-danger">Error loading sequences</div>';
+            }
         }
         
-        function displaySequenceSummary(summary) {
+        function displaySequenceSummary(sequences) {
+            if (!sequences || sequences.length === 0) {
+                document.getElementById('sequenceSummaryContent').innerHTML = 
+                    '<div class="alert alert-info">No sequences created yet</div>';
+                return;
+            }
+            
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">All Sequences</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Tag</th>
+                                        <th>Days</th>
+                                        <th>Contacts</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            sequences.forEach(seq => {
+                const statusBadge = seq.status === 'active' ? 'success' : 
+                                   seq.status === 'paused' ? 'warning' : 'secondary';
+                
+                html += `
+                    <tr>
+                        <td><strong>${seq.name}</strong></td>
+                        <td>${seq.description || '-'}</td>
+                        <td>${seq.niche || '-'}</td>
+                        <td>${seq.total_days || seq.steps?.length || 0}</td>
+                        <td>${seq.contacts_count || 0}</td>
+                        <td><span class="badge bg-${statusBadge}">${seq.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="previewSequenceMessages('${seq.id}')" title="Preview Messages">
+                                <i class="bi bi-eye"></i> Preview
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="viewEditSequence('${seq.id}')" title="Edit">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('sequenceSummaryContent').innerHTML = html;
+        }
+        
+        // Preview Sequence Messages
+        async function previewSequenceMessages(sequenceId) {
+            try {
+                const response = await fetch(`/api/sequences/${sequenceId}`);
+                const data = await response.json();
+                
+                if (data.code === 'SUCCESS' && data.results) {
+                    const sequence = data.results;
+                    showSequencePreviewModal(sequence);
+                }
+            } catch (error) {
+                console.error('Error loading sequence:', error);
+                Swal.fire('Error', 'Failed to load sequence details', 'error');
+            }
+        }
+        
+        // Show Sequence Preview Modal
+        function showSequencePreviewModal(sequence) {
+            let messagesHtml = '';
+            
+            if (sequence.steps && sequence.steps.length > 0) {
+                sequence.steps.sort((a, b) => a.day_number - b.day_number);
+                
+                sequence.steps.forEach(step => {
+                    messagesHtml += `
+                        <div class="mb-4 p-3 border rounded">
+                            <h6 class="text-primary mb-2">Day ${step.day_number}</h6>
+                            ${step.content ? `
+                                <div class="mb-2">
+                                    <strong>Message:</strong>
+                                    <div class="mt-1 p-2 bg-light rounded" style="white-space: pre-wrap;">${formatWhatsAppMessage(step.content)}</div>
+                                </div>
+                            ` : ''}
+                            ${step.image_url ? `
+                                <div class="mb-2">
+                                    <strong>Image:</strong><br>
+                                    <img src="${step.image_url}" class="img-thumbnail mt-1" style="max-height: 200px;">
+                                </div>
+                            ` : ''}
+                            <div class="text-muted small">
+                                <i class="bi bi-clock"></i> Delay: ${step.min_delay_seconds}-${step.max_delay_seconds} seconds
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                messagesHtml = '<p class="text-muted">No messages configured</p>';
+            }
+            
+            const modalHtml = `
+                <div class="modal fade" id="sequencePreviewModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Sequence: ${sequence.name}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <strong>Description:</strong> ${sequence.description || '-'}<br>
+                                    <strong>Tag:</strong> ${sequence.niche || '-'}<br>
+                                    <strong>Status:</strong> <span class="badge bg-${sequence.status === 'active' ? 'success' : 'secondary'}">${sequence.status}</span>
+                                </div>
+                                <hr>
+                                <h6 class="mb-3">Messages Timeline:</h6>
+                                <div style="max-height: 400px; overflow-y: auto;">
+                                    ${messagesHtml}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="viewEditSequence('${sequence.id}')" data-bs-dismiss="modal">
+                                    <i class="bi bi-pencil"></i> Edit Sequence
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('sequencePreviewModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('sequencePreviewModal'));
+            modal.show();
+            
+            // Clean up when modal is hidden
+            document.getElementById('sequencePreviewModal').addEventListener('hidden.bs.modal', function () {
+                this.remove();
+            });
+        }
+        
+        // Format WhatsApp message helper
+        function formatWhatsAppMessage(text) {
+            if (!text) return '';
+            return text
+                .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+                .replace(/_(.*?)_/g, '<em>$1</em>')
+                .replace(/~(.*?)~/g, '<del>$1</del>')
+                .replace(/```(.*?)```/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+        }
             const html = `
                 <div class="row mb-4">
                     <div class="col-md-3">
