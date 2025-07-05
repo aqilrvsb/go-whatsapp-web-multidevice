@@ -477,7 +477,7 @@
                     .replace(/{name}/g, seq.name || 'Untitled')
                     .replace(/{status}/g, seq.status || 'inactive')
                     .replace(/{niche}/g, seq.niche || 'General')
-                    .replace(/{schedule_time}/g, seq.schedule_time || seq.ScheduleTime || '09:00')
+                    .replace(/{schedule_time}/g, seq.time_schedule || seq.schedule_time || seq.ScheduleTime || '09:00')
                     .replace(/{description}/g, seq.description || 'No description')
                     .replace(/{contacts_count}/g, seq.contacts_count || 0)
                     .replace(/{step_count}/g, seq.steps ? seq.steps.length : 0)

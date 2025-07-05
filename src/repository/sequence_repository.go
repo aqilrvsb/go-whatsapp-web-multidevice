@@ -116,11 +116,11 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	
 	query := `
 		UPDATE sequences 
-		SET name = $1, description = $2, total_days = $3, is_active = $4, updated_at = $5
-		WHERE id = $6
+		SET name = $1, description = $2, status = $3, total_days = $4, is_active = $5, updated_at = $6
+		WHERE id = $7
 	`
 	
-	_, err := r.db.Exec(query, sequence.Name, sequence.Description, 
+	_, err := r.db.Exec(query, sequence.Name, sequence.Description, sequence.Status,
 		sequence.TotalDays, sequence.IsActive, sequence.UpdatedAt, sequence.ID)
 		
 	return err
