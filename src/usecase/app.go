@@ -152,6 +152,34 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			}(newClient)
 		case *events.LoggedOut:
 			logrus.Warn("Device logged out")
+			// Handle logout event
+			if newClient.Store.ID != nil {
+				phoneNumber := newClient.Store.ID.User
+				logrus.Infof("Device with phone %s logged out", phoneNumber)
+				
+				// Find device ID by phone
+				userRepo := repository.GetUserRepository()
+				var deviceID string
+				err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
+				if err == nil && deviceID != "" {
+					// Update device status and send WebSocket notification
+					userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+					
+					// Remove from client manager
+					cm := whatsapp.GetClientManager()
+					cm.RemoveClient(deviceID)
+					
+					// Send WebSocket notification with phone number
+					websocket.Broadcast <- websocket.BroadcastMessage{
+						Code:    "DEVICE_LOGGED_OUT",
+						Message: "Device logged out",
+						Result: map[string]interface{}{
+							"deviceId": deviceID,
+							"phone":    phoneNumber,
+						},
+					}
+				}
+			}
 		}
 	})
 	

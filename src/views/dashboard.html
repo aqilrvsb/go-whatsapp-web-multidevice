@@ -2947,8 +2947,14 @@
                         case 'DEVICE_LOGGED_OUT':
                             // Update device status to offline when logged out
                             console.log('Device logged out:', data.result);
+                            const loggedOutPhone = data.result?.phone;
                             const loggedOutDeviceId = data.result?.deviceId;
-                            if (loggedOutDeviceId) {
+                            
+                            // Try to update by phone number first (like QR scan does)
+                            if (loggedOutPhone) {
+                                updateDeviceStatusByPhone(loggedOutPhone, 'offline');
+                            } else if (loggedOutDeviceId) {
+                                // Fallback to device ID if phone not available
                                 const device = devices.find(d => d.id === loggedOutDeviceId);
                                 if (device) {
                                     device.status = 'offline';

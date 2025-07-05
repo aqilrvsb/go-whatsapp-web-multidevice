@@ -198,8 +198,16 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 	logrus.Infof("Device %s logged out", deviceID)
 	
+	// Get phone number before clearing everything
+	phoneNumber := ""
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err == nil && client != nil && client.Store != nil && client.Store.ID != nil {
+		phoneNumber = client.Store.ID.User
+	}
+	
 	// Clear WhatsApp session data first
-	err := ClearWhatsAppSessionData(deviceID)
+	err = ClearWhatsAppSessionData(deviceID)
 	if err != nil {
 		logrus.Errorf("Failed to clear WhatsApp session data: %v", err)
 		// Continue with logout even if session clear fails
@@ -217,18 +225,18 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 	dm.UpdateDeviceStatus(deviceID, false, "")
 	
 	// Remove from client manager
-	cm := GetClientManager()
 	cm.RemoveClient(deviceID)
 	
 	// Clear QR channel
 	ClearDeviceQRChannel(deviceID)
 	
-	// Broadcast logout
+	// Broadcast logout with phone number (like QR scan does)
 	websocket.Broadcast <- websocket.BroadcastMessage{
 		Code:    "DEVICE_LOGGED_OUT",
 		Message: "Device logged out",
 		Result: map[string]interface{}{
 			"deviceId": deviceID,
+			"phone":    phoneNumber, // Include phone number for updateDeviceStatusByPhone
 		},
 	}
 }
