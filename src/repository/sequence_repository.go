@@ -32,12 +32,15 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 	sequence.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO sequences (id, user_id, device_id, name, description, niche, total_days, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, total_days, 
+		                      is_active, schedule_time, min_delay_seconds, max_delay_seconds, 
+		                      created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	
 	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, nil, // device_id is NULL - sequences use all user devices
-		sequence.Name, sequence.Description, sequence.Niche, sequence.TotalDays, sequence.IsActive,
+		sequence.Name, sequence.Description, sequence.Niche, sequence.Status, sequence.TotalDays, 
+		sequence.IsActive, sequence.TimeSchedule, sequence.MinDelaySeconds, sequence.MaxDelaySeconds,
 		sequence.CreatedAt, sequence.UpdatedAt)
 		
 	return err
@@ -46,7 +49,8 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 // GetSequences gets all sequences for a user
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, total_days, is_active, created_at, updated_at
+		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
+		       schedule_time, min_delay_seconds, max_delay_seconds, created_at, updated_at
 		FROM sequences
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -62,7 +66,9 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	for rows.Next() {
 		var seq models.Sequence
 		err := rows.Scan(&seq.ID, &seq.UserID, &seq.DeviceID, &seq.Name, 
-			&seq.Description, &seq.TotalDays, &seq.IsActive, &seq.CreatedAt, &seq.UpdatedAt)
+			&seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
+			&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
+			&seq.CreatedAt, &seq.UpdatedAt)
 		if err != nil {
 			continue
 		}
