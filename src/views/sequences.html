@@ -471,7 +471,7 @@
             const template = document.getElementById('sequenceCardTemplate').innerHTML;
             
             sequences.forEach(seq => {
-                console.log('Sequence data:', seq); // Debug log
+                console.log('Sequence data:', seq); // Debug log to see actual data
                 let card = template
                     .replace(/{id}/g, seq.id || '')
                     .replace(/{name}/g, seq.name || 'Untitled')
