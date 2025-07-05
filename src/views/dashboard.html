@@ -4584,6 +4584,9 @@
                     document.getElementById('sequenceName').value = sequence.name || '';
                     document.getElementById('sequenceDescription').value = sequence.description || '';
                     document.getElementById('sequenceNiche').value = sequence.niche || '';
+                    document.getElementById('sequenceScheduleTime').value = sequence.time_schedule || sequence.schedule_time || '09:00';
+                    document.getElementById('sequenceMinDelay').value = sequence.min_delay_seconds || 5;
+                    document.getElementById('sequenceMaxDelay').value = sequence.max_delay_seconds || 15;
                     
                     // Reset and populate days
                     sequenceDays = {};
@@ -4671,7 +4674,7 @@
                 min_delay_seconds: minDelay,
                 max_delay_seconds: maxDelay,
                 steps: steps,
-                status: 'draft'
+                status: 'inactive'
             };
             
             try {
@@ -4740,7 +4743,7 @@
                 min_delay_seconds: minDelay,
                 max_delay_seconds: maxDelay,
                 steps: steps,
-                status: 'draft'
+                status: 'inactive'
             };
             
             console.log('Creating sequence with data:', sequenceData);
