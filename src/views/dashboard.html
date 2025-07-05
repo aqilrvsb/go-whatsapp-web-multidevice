@@ -2428,8 +2428,8 @@
                     // Show progress toast
                     showToast('Attempting to reconnect device...', 'info');
                     
-                    // Call the device refresh endpoint (simpler, avoids nil pointer)
-                    fetch(`/api/devices/${deviceId}/refresh`, {
+                    // First try to reconnect with existing session
+                    fetch(`/api/devices/${deviceId}/reconnect`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: {
@@ -2458,11 +2458,23 @@
                             // Refresh devices list to get updated status
                             setTimeout(loadDevices, 2000);
                         } else if (data.code === 'QR_REQUIRED') {
-                            // Session expired, needs QR scan
+                            // Session expired or not found, needs QR scan
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'QR Scan Required',
+                                text: data.message || 'The WhatsApp session was not found. Please scan the QR code.',
+                                confirmButtonText: 'Scan QR Code'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    scanQR(deviceId);
+                                }
+                            });
+                        } else if (data.code === 'NO_SESSION') {
+                            // No previous session
                             Swal.fire({
                                 icon: 'warning',
-                                title: 'Session Expired',
-                                text: 'The WhatsApp session has expired. Please scan the QR code to reconnect.',
+                                title: 'No Previous Session',
+                                text: 'This device has never been connected. Please scan QR code to connect.',
                                 confirmButtonText: 'Scan QR Code'
                             }).then((result) => {
                                 if (result.isConfirmed) {
