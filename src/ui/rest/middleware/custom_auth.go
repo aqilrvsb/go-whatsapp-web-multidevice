@@ -15,8 +15,6 @@ var PublicRoutes = []string{
 	"/register",
 	"/logout",
 	"/dashboard",         // Allow dashboard access
-	"/api",              // Allow all API endpoints temporarily
-	"/app",              // Allow all /app endpoints for WhatsApp functionality
 	"/health",
 	"/statics",
 	"/assets",
@@ -31,9 +29,9 @@ func CustomAuth() fiber.Handler {
 		// Check if route is public
 		path := c.Path()
 		
-		// Check exact matches and prefix matches
+		// Check exact matches and prefix matches for truly public routes
 		for _, publicRoute := range PublicRoutes {
-			if path == publicRoute || strings.HasPrefix(path, publicRoute) {
+			if path == publicRoute || strings.HasPrefix(path, publicRoute + "/") {
 				return c.Next()
 			}
 		}
@@ -43,6 +41,7 @@ func CustomAuth() fiber.Handler {
 			return c.Next()
 		}
 		
+		// For API and APP routes, we need to check authentication
 		// Check session token from cookie
 		token := c.Cookies("session_token")
 		

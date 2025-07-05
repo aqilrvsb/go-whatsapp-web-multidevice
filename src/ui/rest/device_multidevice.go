@@ -24,11 +24,24 @@ func (handler *App) DeviceConnect(c *fiber.Ctx) error {
 	// Get user from context
 	userID := c.Locals("userID")
 	if userID == nil {
-		return c.Status(401).JSON(utils.ResponseData{
-			Status:  401,
-			Code:    "UNAUTHORIZED",
-			Message: "Authentication required",
-		})
+		// Try to get from session cookie as fallback
+		token := c.Cookies("session_token")
+		if token != "" {
+			userRepo := repository.GetUserRepository()
+			session, err := userRepo.GetSession(token)
+			if err == nil && session != nil {
+				userID = session.UserID
+			}
+		}
+		
+		// Still no user ID?
+		if userID == nil {
+			return c.Status(401).JSON(utils.ResponseData{
+				Status:  401,
+				Code:    "UNAUTHORIZED",
+				Message: "Authentication required",
+			})
+		}
 	}
 	
 	// Get device from database to verify ownership and get phone number
