@@ -155,7 +155,8 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			// Handle logout event
 			if newClient.Store.ID != nil {
 				phoneNumber := newClient.Store.ID.User
-				logrus.Infof("Device with phone %s logged out", phoneNumber)
+				jidStr := newClient.Store.ID.String()
+				logrus.Infof("Device with phone %s (JID: %s) logged out", phoneNumber, jidStr)
 				
 				// Find device ID by phone
 				userRepo := repository.GetUserRepository()
@@ -163,7 +164,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
 				if err == nil && deviceID != "" {
 					// Update device status but KEEP phone and JID for reconnection
-					userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, "")
+					userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, jidStr)
 					
 					// Remove from client manager
 					cm := whatsapp.GetClientManager()

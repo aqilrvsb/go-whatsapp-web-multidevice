@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 	
@@ -200,20 +201,34 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 	logrus.Infof("Device %s logged out", deviceID)
 	
-	// Get phone number before clearing everything
+	// Get phone number and JID before updating
 	phoneNumber := ""
+	jidStr := ""
 	cm := GetClientManager()
 	client, err := cm.GetClient(deviceID)
 	if err == nil && client != nil && client.Store != nil && client.Store.ID != nil {
 		phoneNumber = client.Store.ID.User
+		jidStr = client.Store.ID.String()
 	}
 	
-	// DON'T clear WhatsApp session data on logout - keep it for reconnection
-	// Just update status to offline
+	// If we couldn't get from client, try to get from database
+	if phoneNumber == "" || jidStr == "" {
+		userRepo := repository.GetUserRepository()
+		var dbPhone, dbJID sql.NullString
+		err = userRepo.DB().QueryRow("SELECT phone, jid FROM user_devices WHERE id = $1", deviceID).Scan(&dbPhone, &dbJID)
+		if err == nil {
+			if phoneNumber == "" && dbPhone.Valid {
+				phoneNumber = dbPhone.String
+			}
+			if jidStr == "" && dbJID.Valid {
+				jidStr = dbJID.String
+			}
+		}
+	}
 	
 	// Update device status - KEEP JID AND PHONE for easier reconnection
 	userRepo := repository.GetUserRepository()
-	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, "")
+	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, jidStr)
 	if err != nil {
 		logrus.Errorf("Failed to update device status: %v", err)
 	}
@@ -234,33 +249,54 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 		Message: "Device logged out",
 		Result: map[string]interface{}{
 			"deviceId": deviceID,
-			"phone":    phoneNumber, // Include phone number for updateDeviceStatusByPhone
+			"phone":    phoneNumber,
 		},
 	}
 }
 
 // ClearWhatsAppSessionData clears all WhatsApp session data for a device
 func ClearWhatsAppSessionData(deviceID string) error {
+	// Validate device ID format (should be UUID)
+	if strings.HasPrefix(deviceID, "device_") {
+		logrus.Warnf("Invalid device ID format: %s (expected UUID)", deviceID)
+		return fmt.Errorf("invalid device ID format")
+	}
+	
 	// Get repository to access DB
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
-	// First, get the JID from user_devices
+	// First, get the JID and phone from user_devices
 	var jid sql.NullString
-	err := db.QueryRow("SELECT jid FROM user_devices WHERE id = $1", deviceID).Scan(&jid)
-	if err != nil && err != sql.ErrNoRows {
-		logrus.Warnf("Failed to get JID for device %s: %v", deviceID, err)
+	var phone sql.NullString
+	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = $1", deviceID).Scan(&jid, &phone)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logrus.Warnf("Device %s not found in database", deviceID)
+			return nil
+		}
+		logrus.Warnf("Failed to get device info for %s: %v", deviceID, err)
+		return nil
 	}
 	
-	// If no JID found, just update device status and return
+	// If no JID found, we can't clean WhatsApp sessions
 	if !jid.Valid || jid.String == "" {
-		logrus.Infof("No JID found for device %s, just updating status", deviceID)
-		_, err = db.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
+		logrus.Infof("No JID found for device %s, skipping WhatsApp session cleanup", deviceID)
+		// Just update device status
+		_, err = db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = $1", deviceID)
 		return err
 	}
 	
+	logrus.Infof("Clearing WhatsApp session for device %s with JID %s", deviceID, jid.String)
+	
 	// Use separate transactions for each operation to avoid transaction abort issues
-	jidsToCheck := []string{deviceID, jid.String}
+	jidsToCheck := []string{jid.String}
+	
+	// Also check if phone-based JID exists
+	if phone.Valid && phone.String != "" {
+		phoneJID := phone.String + "@s.whatsapp.net"
+		jidsToCheck = append(jidsToCheck, phoneJID)
+	}
 	
 	// Tables to clear in order (to avoid foreign key violations)
 	clearOperations := []struct {
