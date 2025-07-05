@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -88,39 +87,24 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 	}
 	
 	// Clear WhatsApp session tables for this device
-	if jid != "" {
-		db := userRepo.DB()
-		tables := []string{
-			"whatsmeow_device",
-			"whatsmeow_identity_keys",
-			"whatsmeow_pre_keys",
-			"whatsmeow_sessions",
-			"whatsmeow_sender_keys",
-			"whatsmeow_app_state_sync_keys",
-			"whatsmeow_app_state_version",
-			"whatsmeow_message_secrets",
-			"whatsmeow_privacy_tokens",
-			"whatsmeow_chat_settings",
-			"whatsmeow_contacts",
-			"whatsmeow_app_state_mutation_macs",
-		}
-		
-		for _, table := range tables {
-			query := fmt.Sprintf("DELETE FROM %s WHERE jid = $1", table)
-			result, err := db.Exec(query, jid)
-			if err != nil {
-				logrus.Warnf("Failed to clear table %s for JID %s: %v", table, jid, err)
-			} else {
-				rowsAffected, _ := result.RowsAffected()
-				if rowsAffected > 0 {
-					logrus.Infof("Cleared %d rows from table %s for JID %s", rowsAffected, table, jid)
-				}
-			}
-		}
+	err = whatsapp.ClearWhatsAppSessionData(deviceID)
+	if err != nil {
+		logrus.Errorf("Error clearing WhatsApp session: %v", err)
 	}
 	
-	// Update device status to offline (not disconnected)
-	err = userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+	// Get current device info to preserve phone/JID
+	var phone, jidStr string
+	if device.Phone != "" {
+		phone = device.Phone
+	}
+	if jid != "" {
+		jidStr = jid
+	} else if device.JID != "" {
+		jidStr = device.JID
+	}
+	
+	// Update device status to offline but KEEP phone and JID
+	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phone, jidStr)
 	if err != nil {
 		logrus.Errorf("Error updating device status: %v", err)
 	}
