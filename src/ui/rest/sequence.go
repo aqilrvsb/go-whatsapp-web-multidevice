@@ -33,6 +33,7 @@ func InitRestSequence(app *fiber.App, service sequence.ISequenceUsecase) {
 	// Actions
 	app.Post("/api/sequences/:id/start", rest.StartSequence)
 	app.Post("/api/sequences/:id/pause", rest.PauseSequence)
+	app.Post("/api/sequences/:id/toggle", rest.ToggleSequence)
 	
 	// UI routes
 	app.Get("/sequences", rest.SequencesPage)
@@ -403,5 +404,50 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Sequences summary retrieved",
 		Results: summary,
+	})
+}
+
+// ToggleSequence toggles sequence status between active and inactive
+func (controller *Sequence) ToggleSequence(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+	
+	// Get current sequence
+	sequence, err := controller.Service.GetSequenceByID(sequenceID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Sequence not found",
+		})
+	}
+	
+	// Toggle status
+	newStatus := "inactive"
+	if sequence.Status != "active" {
+		newStatus = "active"
+	}
+	
+	// Update sequence
+	updateReq := sequence.UpdateSequenceRequest{
+		Status:   newStatus,
+		IsActive: newStatus == "active",
+	}
+	
+	err = controller.Service.UpdateSequence(sequenceID, updateReq)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: err.Error(),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Sequence %s successfully", newStatus),
+		Results: map[string]string{
+			"status": newStatus,
+		},
 	})
 }

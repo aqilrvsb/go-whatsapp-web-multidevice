@@ -472,6 +472,7 @@
             
             sequences.forEach(seq => {
                 console.log('Sequence data:', seq); // Debug log to see actual data
+                console.log('Schedule time value:', seq.time_schedule, seq.schedule_time, seq.ScheduleTime);
                 let card = template
                     .replace(/{id}/g, seq.id || '')
                     .replace(/{name}/g, seq.name || 'Untitled')
@@ -645,31 +646,26 @@
         }
         
         async function toggleSequence(id, currentStatus) {
-            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-            
             try {
-                const response = await fetch(`/api/sequences/${id}`, {
-                    method: 'PUT',
+                const response = await fetch(`/api/sequences/${id}/toggle`, {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        status: newStatus,
-                        is_active: newStatus === 'active'
-                    })
+                    }
                 });
                 
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS') {
-                    Swal.fire('Success', `Sequence ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`, 'success');
+                    const newStatus = data.results.status;
+                    Swal.fire('Success', `Sequence ${newStatus} successfully!`, 'success');
                     loadSequences();
                 } else {
-                    Swal.fire('Error', data.message || `Failed to update sequence`, 'error');
+                    Swal.fire('Error', data.message || `Failed to toggle sequence`, 'error');
                 }
             } catch (error) {
                 console.error(`Error toggling sequence:`, error);
-                Swal.fire('Error', `Failed to update sequence`, 'error');
+                Swal.fire('Error', `Failed to toggle sequence`, 'error');
             }
         }
         
