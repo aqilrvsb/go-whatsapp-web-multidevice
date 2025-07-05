@@ -83,7 +83,7 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 // GetSequenceByID gets sequence by ID
 func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, niche, total_days, is_active, 
+		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
 		       COALESCE(schedule_time, '09:00') as schedule_time, created_at, updated_at
 		FROM sequences
 		WHERE id = $1
@@ -91,7 +91,7 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 	
 	var seq models.Sequence
 	err := r.db.QueryRow(query, sequenceID).Scan(&seq.ID, &seq.UserID, &seq.DeviceID, 
-		&seq.Name, &seq.Description, &seq.Niche, &seq.TotalDays, &seq.IsActive, 
+		&seq.Name, &seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
 		&seq.TimeSchedule, &seq.CreatedAt, &seq.UpdatedAt)
 	
 	if err != nil {

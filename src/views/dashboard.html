@@ -488,6 +488,33 @@
             background: #f0fdf4;
         }
         
+        /* Sequence card styles */
+        .sequence-card {
+            transition: all 0.3s ease;
+            border: 1px solid #e9ecef;
+        }
+        
+        .sequence-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        /* Status badge colors for sequences */
+        .badge.bg-danger {
+            background-color: #dc3545 !important;
+        }
+        
+        /* Toggle switch colors based on checked state */
+        .sequence-card .form-check-input:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        
+        .sequence-card .form-check-input:not(:checked) {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        
         @media (max-width: 768px) {
             .sequence-days-grid {
                 grid-template-columns: repeat(4, 1fr);
@@ -4166,7 +4193,24 @@
                 if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
                     displaySequences(data.results);
                 } else {
-                    // Show empty state (already in HTML)
+                    // Show empty state
+                    const container = document.getElementById('sequencesList');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-body text-center py-5">
+                                        <i class="bi bi-collection display-3 text-muted mb-3"></i>
+                                        <h5>No Sequences Yet</h5>
+                                        <p class="text-muted">Create your first automated message sequence</p>
+                                        <a href="/sequences" class="btn btn-primary">
+                                            <i class="bi bi-plus-circle"></i> Create Sequence
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }
             } catch (error) {
                 console.error('Error loading sequences:', error);
@@ -4206,6 +4250,7 @@
                 col.className = 'col-md-6 col-lg-4 mb-3';
                 
                 const statusColor = seq.status === 'active' ? 'success' : 
+                                  seq.status === 'inactive' ? 'danger' :
                                   seq.status === 'paused' ? 'warning' : 'secondary';
                 
                 col.innerHTML = `
@@ -4259,6 +4304,7 @@
             let html = '<div class="row g-3">';
             sequences.forEach(seq => {
                 const statusColor = seq.status === 'active' ? 'success' : 
+                                   seq.status === 'inactive' ? 'danger' :
                                    seq.status === 'paused' ? 'warning' : 'secondary';
                 
                 html += `

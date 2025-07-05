@@ -288,6 +288,15 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_days INTEGER DEFAULT 0;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS time_schedule TEXT;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'inactive';
+	
+	-- Update existing sequences to have proper status based on is_active
+	UPDATE sequences 
+	SET status = CASE 
+		WHEN is_active = true THEN 'active' 
+		ELSE 'inactive' 
+	END
+	WHERE status IS NULL OR status = '';
 	
 	-- Add missing columns to broadcast_messages if they don't exist
 	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -296,6 +305,18 @@ func InitializeSchema() error {
 	
 	-- Make device_id nullable since sequences use all user devices
 	ALTER TABLE sequences ALTER COLUMN device_id DROP NOT NULL;
+	
+	-- Add more missing columns to sequences table
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS target_status VARCHAR(50) DEFAULT 'all';
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS schedule_time VARCHAR(5) DEFAULT '09:00';
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS contacts_count INTEGER DEFAULT 0;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS total_contacts INTEGER DEFAULT 0;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS active_contacts INTEGER DEFAULT 0;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS completed_contacts INTEGER DEFAULT 0;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS failed_contacts INTEGER DEFAULT 0;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS progress_percentage DECIMAL(5,2) DEFAULT 0.00;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP;
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS estimated_completion_at TIMESTAMP;
 
 	-- Add missing columns to sequence_steps table
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS day INTEGER;
