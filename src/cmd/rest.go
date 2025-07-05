@@ -125,8 +125,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Start multi-device auto-reconnect after server restart
 	go func() {
-		time.Sleep(5 * time.Second) // Wait for server to fully start
-		logrus.Info("Starting multi-device auto-reconnect...")
+		time.Sleep(30 * time.Second) // Wait longer for server and all components to fully initialize
+		logrus.Info("Starting multi-device auto-reconnect after 30s delay...")
 		whatsapp.AutoReconnectDevices(whatsappDB)
 		
 		// Start periodic reconnect check every 5 minutes

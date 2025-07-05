@@ -1,0 +1,10 @@
+	// Start multi-device auto-reconnect after server restart
+	go func() {
+		// Wait longer for server and all components to fully initialize
+		time.Sleep(30 * time.Second) 
+		logrus.Info("Starting multi-device auto-reconnect after 30s delay...")
+		whatsapp.AutoReconnectDevices(whatsappDB)
+		
+		// Start periodic reconnect check every 5 minutes
+		whatsapp.StartAutoReconnectRoutine(whatsappDB, 5*time.Minute)
+	}()

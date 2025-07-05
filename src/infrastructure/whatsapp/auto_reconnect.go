@@ -29,7 +29,7 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	
 	// Find all devices that have a JID (were previously connected)
 	rows, err := db.Query(`
-		SELECT id, name, phone, jid 
+		SELECT id, device_name, phone, jid 
 		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
 		ORDER BY last_seen DESC
@@ -44,15 +44,15 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	attemptCount := 0
 	
 	for rows.Next() {
-		var deviceID, name, phone, jid string
-		err := rows.Scan(&deviceID, &name, &phone, &jid)
+		var deviceID, deviceName, phone, jid string
+		err := rows.Scan(&deviceID, &deviceName, &phone, &jid)
 		if err != nil {
 			logrus.Warnf("Failed to scan device row: %v", err)
 			continue
 		}
 		
 		attemptCount++
-		logrus.Infof("[%d] Attempting to reconnect device %s (%s) with JID %s", attemptCount, name, deviceID, jid)
+		logrus.Infof("[%d] Attempting to reconnect device %s (%s) with JID %s", attemptCount, deviceName, deviceID, jid)
 		
 		// Try to reconnect this device
 		go func(devID, devName, devJID, devPhone string) {
@@ -151,7 +151,7 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 			
 			reconnectCount++
 			
-		}(deviceID, name, jid, phone)
+		}(deviceID, deviceName, jid, phone)
 	}
 	
 	// Wait a bit for all goroutines to start
