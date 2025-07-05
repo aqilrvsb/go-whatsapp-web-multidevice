@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 	
-	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
@@ -255,6 +253,8 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 }
 
 // ClearWhatsAppSessionData clears all WhatsApp session data for a device
+// This function is now in session_cleanup_enhanced.go with better handling
+/*
 func ClearWhatsAppSessionData(deviceID string) error {
 	// Validate device ID format (should be UUID)
 	if strings.HasPrefix(deviceID, "device_") {
@@ -359,3 +359,4 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	
 	return nil
 }
+*/
