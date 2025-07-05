@@ -36,7 +36,7 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		Name:            request.Name,
 		Description:     request.Description,
 		Niche:           request.Niche,
-		TimeSchedule:    request.TimeSchedule,
+		TimeSchedule:    request.ScheduleTime,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
 		TotalDays:       len(request.Steps),

@@ -64,6 +64,11 @@
             color: #0a5f0a;
         }
 
+        .status-inactive {
+            background-color: #ffd4d4;
+            color: #d32f2f;
+        }
+
         .status-paused {
             background-color: #fff3cd;
             color: #856404;
@@ -224,13 +229,8 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#paused-sequences">
-                    Paused <span class="badge bg-warning ms-1" id="pausedCount">0</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#draft-sequences">
-                    Drafts <span class="badge bg-secondary ms-1" id="draftCount">0</span>
+                <a class="nav-link" data-bs-toggle="tab" href="#inactive-sequences">
+                    Inactive <span class="badge bg-danger ms-1" id="inactiveCount">0</span>
                 </a>
             </li>
         </ul>
@@ -242,14 +242,9 @@
                     <!-- Active sequences will be loaded here -->
                 </div>
             </div>
-            <div class="tab-pane fade" id="paused-sequences">
-                <div class="row" id="pausedSequencesList">
-                    <!-- Paused sequences will be loaded here -->
-                </div>
-            </div>
-            <div class="tab-pane fade" id="draft-sequences">
-                <div class="row" id="draftSequencesList">
-                    <!-- Draft sequences will be loaded here -->
+            <div class="tab-pane fade" id="inactive-sequences">
+                <div class="row" id="inactiveSequencesList">
+                    <!-- Inactive sequences will be loaded here -->
                 </div>
             </div>
         </div>
@@ -282,10 +277,9 @@
                                        placeholder="e.g., Sales, Onboarding, Follow-up">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Default Send Time</label>
-                                <input type="time" class="form-control" id="sequenceTimeSchedule" 
-                                       placeholder="HH:MM" value="09:00">
-                                <small class="text-muted">Default time to send messages each day</small>
+                                <label class="form-label">Schedule Time</label>
+                                <input type="time" class="form-control" id="sequenceTimeSchedule" value="09:00">
+                                <small class="text-muted">Time to send messages each day (24-hour format)</small>
                             </div>
                             <div class="row">
                                 <div class="col-md-6">
@@ -452,18 +446,15 @@
         
         function displaySequences() {
             const active = sequences.filter(s => s.status === 'active');
-            const paused = sequences.filter(s => s.status === 'paused');
-            const draft = sequences.filter(s => s.status === 'draft');
+            const inactive = sequences.filter(s => s.status === 'inactive' || s.status === 'draft' || s.status === 'paused');
             
             // Update counts
             document.getElementById('activeCount').textContent = active.length;
-            document.getElementById('pausedCount').textContent = paused.length;
-            document.getElementById('draftCount').textContent = draft.length;
+            document.getElementById('inactiveCount').textContent = inactive.length;
             
             // Display sequences
             displaySequenceList('activeSequencesList', active);
-            displaySequenceList('pausedSequencesList', paused);
-            displaySequenceList('draftSequencesList', draft);
+            displaySequenceList('inactiveSequencesList', inactive);
         }
 
         
@@ -489,7 +480,7 @@
                     .replace(/{description}/g, seq.description || 'No description')
                     .replace(/{contacts_count}/g, seq.contacts_count || 0)
                     .replace(/{step_count}/g, seq.steps ? seq.steps.length : 0)
-                    .replace(/{toggleText}/g, seq.status === 'active' ? 'Pause' : 'Start')
+                    .replace(/{toggleText}/g, seq.status === 'active' ? 'Deactivate' : 'Activate')
                     .replace(/{steps}/g, generateStepsHTML(seq.steps || []));
                 
                 container.insertAdjacentHTML('beforeend', card);
@@ -513,7 +504,7 @@
         }
         
         function displayEmptyState() {
-            ['activeSequencesList', 'pausedSequencesList', 'draftSequencesList'].forEach(id => {
+            ['activeSequencesList', 'inactiveSequencesList'].forEach(id => {
                 const container = document.getElementById(id);
                 const template = document.getElementById('emptyStateTemplate');
                 container.innerHTML = '';
@@ -616,11 +607,11 @@
                 name: document.getElementById('sequenceName').value,
                 description: document.getElementById('sequenceDescription').value,
                 niche: document.getElementById('sequenceNiche').value || '',
-                time_schedule: document.getElementById('sequenceTimeSchedule').value || '09:00',
+                schedule_time: document.getElementById('sequenceTimeSchedule').value || '09:00',
                 min_delay_seconds: parseInt(document.getElementById('sequenceMinDelay').value) || 10,
                 max_delay_seconds: parseInt(document.getElementById('sequenceMaxDelay').value) || 30,
                 steps: steps,
-                status: 'draft',
+                status: 'inactive',
                 is_active: false
             };
             
@@ -653,22 +644,31 @@
         }
         
         async function toggleSequence(id, currentStatus) {
-            const action = currentStatus === 'active' ? 'pause' : 'start';
-            const endpoint = `/api/sequences/${id}/${action}`;
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
             
             try {
-                const response = await fetch(endpoint, { method: 'POST' });
+                const response = await fetch(`/api/sequences/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        status: newStatus,
+                        is_active: newStatus === 'active'
+                    })
+                });
+                
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS') {
-                    Swal.fire('Success', `Sequence ${action}ed successfully!`, 'success');
+                    Swal.fire('Success', `Sequence ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`, 'success');
                     loadSequences();
                 } else {
-                    Swal.fire('Error', data.message || `Failed to ${action} sequence`, 'error');
+                    Swal.fire('Error', data.message || `Failed to update sequence`, 'error');
                 }
             } catch (error) {
-                console.error(`Error ${action}ing sequence:`, error);
-                Swal.fire('Error', `Failed to ${action} sequence`, 'error');
+                console.error(`Error toggling sequence:`, error);
+                Swal.fire('Error', `Failed to update sequence`, 'error');
             }
         }
         

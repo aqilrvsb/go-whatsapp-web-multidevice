@@ -32,7 +32,7 @@ type CreateSequenceRequest struct {
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
 	IsActive        bool                        `json:"is_active"`
-	TimeSchedule    string                      `json:"time_schedule"`
+	ScheduleTime    string                      `json:"schedule_time"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
 	MaxDelaySeconds int                         `json:"max_delay_seconds"`
 	Steps           []CreateSequenceStepRequest `json:"steps" validate:"required,min=1"`

@@ -4223,7 +4223,7 @@
                                     ${seq.status}
                                 </span>
                             </div>
-                            <p class="text-muted small mb-2">Tag: ${seq.niche || 'Not set'}</p>
+                            <p class="text-muted small mb-2">Niche: ${seq.niche || 'Not set'}</p>
                             <p class="card-text">${seq.description || 'No description'}</p>
                             <div class="progress mb-3" style="height: 5px;">
                                 <div class="progress-bar bg-${statusColor}" style="width: ${(seq.completed_count / seq.contacts_count * 100) || 0}%"></div>
@@ -4274,7 +4274,7 @@
                                 <h5 class="card-title">${seq.name}</h5>
                                 <p class="text-muted mb-2">${seq.description || 'No description'}</p>
                                 <div class="mb-3">
-                                    <small class="text-muted">Tag: ${seq.niche || 'Not set'}</small>
+                                    <small class="text-muted">Niche: ${seq.niche || 'Not set'}</small>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="badge bg-${statusColor}">${seq.status}</span>
