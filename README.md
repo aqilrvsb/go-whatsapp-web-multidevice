@@ -20,14 +20,28 @@
 4. **Manual Refresh** → Click refresh button to reconnect devices with valid sessions ✅
 5. **No Duplicate Sessions** → Proper logout prevents multiple active sessions ✅
 
-### 🔄 Manual Device Refresh (NEW):
+### 🔄 Manual Device Refresh (NEW & AMAZING!):
 - **Refresh Button**: Added in device dropdown menu (green refresh icon)
-- **Smart Reconnection**: Attempts to restore connection using existing WhatsApp session
-- **Session Detection**: Automatically detects if session is still valid
-- **Graceful Handling**: If session expired, prompts to scan QR code
-- **No Auto-Reconnect**: Removed automatic reconnection on server restart
+- **Smart Reconnection**: Uses exact JID from database to restore WhatsApp session
+- **Direct Session Query**: Queries `whatsmeow_sessions` table using device JID
+- **No QR Scan Needed**: If device is still linked in WhatsApp, reconnects automatically!
+- **Efficient**: No more searching through all devices - direct lookup by JID
 - **User Control**: You decide when to reconnect devices
 - **Instant Feedback**: Shows progress and results immediately
+
+#### How Reconnection Works:
+1. **Click Refresh** → Fetches device JID from `user_devices` table
+2. **Query Session** → Checks `whatsmeow_sessions` WHERE `our_jid = device.JID`
+3. **Load Device** → Uses `GetDevice(ctx, jid)` for direct device retrieval
+4. **Auto Connect** → If session valid, reconnects without QR scan!
+5. **Fallback** → Only asks for QR if session expired or not found
+
+#### Why This is Amazing:
+- **No More Unnecessary QR Scans**: If your device is still linked in WhatsApp, it just reconnects!
+- **Server Restart Friendly**: Sessions persist in PostgreSQL database
+- **Direct JID Lookup**: Uses exact JID like `60146674397:74@s.whatsapp.net`
+- **Preserves Multi-Device**: Maintains WhatsApp's multi-device sessions
+- **Railway Compatible**: Works perfectly with PostgreSQL on Railway
 
 ### 📱 WhatsApp Web Features:
 
@@ -101,6 +115,39 @@ New Message → Store in DB → WebSocket Notification → UI Auto-Updates
 | Timezone | ✅ MALAYSIA | UTC+8 everywhere |
 
 ## 🚀 Technical Implementation
+
+### Device Reconnection (No QR Needed!)
+```go
+// Direct JID-based session query
+SELECT session FROM whatsmeow_sessions WHERE our_jid = $1
+
+// Get specific device by JID
+waDevice, err := container.GetDevice(ctx, jid)
+
+// Create client with existing session
+client := whatsmeow.NewClient(waDevice, waLog)
+client.Connect() // Reconnects without QR!
+```
+
+### Database Schema
+```sql
+-- user_devices table stores JID
+CREATE TABLE user_devices (
+    id UUID PRIMARY KEY,
+    user_id UUID,
+    device_name VARCHAR(255),
+    phone VARCHAR(50),
+    jid VARCHAR(255),  -- Stores full JID like 60146674397:74@s.whatsapp.net
+    status VARCHAR(50)
+);
+
+-- whatsmeow_sessions stores actual WhatsApp session
+CREATE TABLE whatsmeow_sessions (
+    our_jid TEXT PRIMARY KEY,  -- Device JID
+    their_id TEXT,
+    session BYTEA              -- Encrypted session data
+);
+```
 
 ### WebSocket Integration
 ```javascript
@@ -302,6 +349,9 @@ SELECT pg_reload_conf();
 - Malaysia timezone
 - Auto migrations
 - Build scripts
+- **Manual device reconnection without QR scan** 🎉
+- **Direct JID-based session restoration** 🚀
+- **Persistent WhatsApp sessions across restarts** 💪
 
 ### Future Enhancements
 - Message search
