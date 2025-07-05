@@ -1356,8 +1356,23 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 		logrus.Info("WhatsApp client disconnected and removed from manager")
 	}
 	
-	// Update device status in database
-	err = userRepo.UpdateDeviceStatus(deviceId, "disconnected", "", "")
+	// Get current device info before updating
+	var phone, jid sql.NullString
+	err = userRepo.DB().QueryRow("SELECT phone, jid FROM user_devices WHERE id = $1", deviceId).Scan(&phone, &jid)
+	if err != nil {
+		logrus.Warnf("Failed to get device info: %v", err)
+	}
+	
+	// Update device status in database but KEEP phone and JID
+	phoneStr := ""
+	jidStr := ""
+	if phone.Valid {
+		phoneStr = phone.String
+	}
+	if jid.Valid {
+		jidStr = jid.String
+	}
+	err = userRepo.UpdateDeviceStatus(deviceId, "disconnected", phoneStr, jidStr)
 	if err != nil {
 		logrus.Errorf("Error updating device status: %v", err)
 	}

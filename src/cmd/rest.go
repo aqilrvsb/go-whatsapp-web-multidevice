@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
@@ -121,6 +122,17 @@ func restServer(_ *cobra.Command, _ []string) {
 	go helpers.SetAutoConnectAfterBooting(appUsecase)
 	// Set auto reconnect checking
 	go helpers.SetAutoReconnectChecking(whatsappCli)
+	
+	// Start multi-device auto-reconnect after server restart
+	go func() {
+		time.Sleep(5 * time.Second) // Wait for server to fully start
+		logrus.Info("Starting multi-device auto-reconnect...")
+		whatsapp.AutoReconnectDevices(whatsappDB)
+		
+		// Start periodic reconnect check every 5 minutes
+		whatsapp.StartAutoReconnectRoutine(whatsappDB, 5*time.Minute)
+	}()
+	
 	// Start auto flush chat csv
 	if config.WhatsappChatStorage {
 		go helpers.StartAutoFlushChatStorage()

@@ -2361,8 +2361,7 @@
                             const device = devices.find(d => d.id === deviceId);
                             if (device) {
                                 device.status = 'offline';
-                                device.phone = '';
-                                device.jid = '';
+                                // Keep phone and JID for reconnection
                                 device.lastSeen = new Date().toISOString();
                             }
                             renderDevices();
