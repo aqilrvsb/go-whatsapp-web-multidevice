@@ -2952,14 +2952,21 @@
                             
                             // Try to update by phone number first (like QR scan does)
                             if (loggedOutPhone) {
-                                updateDeviceStatusByPhone(loggedOutPhone, 'offline');
+                                // Update status but KEEP phone number for reconnection
+                                const device = devices.find(d => d.phone === loggedOutPhone);
+                                if (device) {
+                                    device.status = 'offline';
+                                    // Keep phone and JID for easier reconnection
+                                    device.lastSeen = new Date().toISOString();
+                                    renderDevices();
+                                    console.log(`Updated device with phone ${loggedOutPhone} to offline status`);
+                                }
                             } else if (loggedOutDeviceId) {
                                 // Fallback to device ID if phone not available
                                 const device = devices.find(d => d.id === loggedOutDeviceId);
                                 if (device) {
                                     device.status = 'offline';
-                                    device.phone = '';
-                                    device.jid = '';
+                                    // Keep phone and JID for easier reconnection
                                     device.lastSeen = new Date().toISOString();
                                     renderDevices();
                                     

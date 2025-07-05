@@ -208,23 +208,19 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 		phoneNumber = client.Store.ID.User
 	}
 	
-	// Clear WhatsApp session data first
-	err = ClearWhatsAppSessionData(deviceID)
-	if err != nil {
-		logrus.Errorf("Failed to clear WhatsApp session data: %v", err)
-		// Continue with logout even if session clear fails
-	}
+	// DON'T clear WhatsApp session data on logout - keep it for reconnection
+	// Just update status to offline
 	
-	// Update device status
+	// Update device status - KEEP JID AND PHONE for easier reconnection
 	userRepo := repository.GetUserRepository()
-	err = userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, "")
 	if err != nil {
 		logrus.Errorf("Failed to update device status: %v", err)
 	}
 	
 	// Update device manager
 	dm := multidevice.GetDeviceManager()
-	dm.UpdateDeviceStatus(deviceID, false, "")
+	dm.UpdateDeviceStatus(deviceID, false, phoneNumber)
 	
 	// Remove from client manager
 	cm.RemoveClient(deviceID)
@@ -256,62 +252,78 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		logrus.Warnf("Failed to get JID for device %s: %v", deviceID, err)
 	}
 	
-	// Start transaction
-	tx, err := db.Begin()
-	if err != nil {
+	// If no JID found, just update device status and return
+	if !jid.Valid || jid.String == "" {
+		logrus.Infof("No JID found for device %s, just updating status", deviceID)
+		_, err = db.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
 		return err
 	}
-	defer tx.Rollback()
 	
-	// Clear using both device ID and JID
-	jidsToCheck := []string{deviceID}
-	if jid.Valid && jid.String != "" {
-		jidsToCheck = append(jidsToCheck, jid.String)
-	}
+	// Use separate transactions for each operation to avoid transaction abort issues
+	jidsToCheck := []string{deviceID, jid.String}
 	
 	// Tables to clear in order (to avoid foreign key violations)
-	// Order is important - child tables first, then parent tables
-	queries := []string{
-		"DELETE FROM whatsmeow_app_state_mutation_macs WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_app_state_sync_keys WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_app_state_version WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_chat_settings WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_contacts WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_disappearing_timers WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_group_participants WHERE group_jid IN (SELECT jid FROM whatsmeow_groups WHERE jid = ANY($1))",
-		"DELETE FROM whatsmeow_groups WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_history_syncs WHERE device_jid = ANY($1)",
-		"DELETE FROM whatsmeow_media_backfill_requests WHERE user_jid = ANY($1) OR portal_jid = ANY($1)",
-		"DELETE FROM whatsmeow_message_secrets WHERE chat_jid = ANY($1)",
-		"DELETE FROM whatsmeow_portal_backfill WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
-		"DELETE FROM whatsmeow_portal_backfill_queue WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
-		"DELETE FROM whatsmeow_portal_message_part WHERE message_id IN (SELECT id FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1)))",
-		"DELETE FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
-		"DELETE FROM whatsmeow_portal_reaction WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))",
-		"DELETE FROM whatsmeow_portal WHERE receiver = ANY($1)",
-		"DELETE FROM whatsmeow_privacy_settings WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_sender_keys WHERE our_jid = ANY($1)",
-		"DELETE FROM whatsmeow_sessions WHERE our_jid = ANY($1)",
-		"DELETE FROM whatsmeow_pre_keys WHERE jid = ANY($1)",
-		"DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY($1)",
-		"DELETE FROM whatsmeow_device WHERE jid = ANY($1)",
+	clearOperations := []struct {
+		name  string
+		query string
+	}{
+		{"app_state_mutation_macs", "DELETE FROM whatsmeow_app_state_mutation_macs WHERE jid = ANY($1)"},
+		{"app_state_sync_keys", "DELETE FROM whatsmeow_app_state_sync_keys WHERE jid = ANY($1)"},
+		{"app_state_version", "DELETE FROM whatsmeow_app_state_version WHERE jid = ANY($1)"},
+		{"chat_settings", "DELETE FROM whatsmeow_chat_settings WHERE jid = ANY($1)"},
+		{"contacts", "DELETE FROM whatsmeow_contacts WHERE jid = ANY($1)"},
+		{"disappearing_timers", "DELETE FROM whatsmeow_disappearing_timers WHERE jid = ANY($1)"},
+		{"group_participants", "DELETE FROM whatsmeow_group_participants WHERE group_jid IN (SELECT jid FROM whatsmeow_groups WHERE jid = ANY($1))"},
+		{"groups", "DELETE FROM whatsmeow_groups WHERE jid = ANY($1)"},
+		{"history_syncs", "DELETE FROM whatsmeow_history_syncs WHERE device_jid = ANY($1)"},
+		{"media_backfill_requests", "DELETE FROM whatsmeow_media_backfill_requests WHERE user_jid = ANY($1) OR portal_jid = ANY($1)"},
+		{"message_secrets", "DELETE FROM whatsmeow_message_secrets WHERE chat_jid = ANY($1)"},
+		{"portal_data", "DELETE FROM whatsmeow_portal_message_part WHERE message_id IN (SELECT id FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1)))"},
+		{"portal_messages", "DELETE FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
+		{"portal_reactions", "DELETE FROM whatsmeow_portal_reaction WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
+		{"portal_backfill", "DELETE FROM whatsmeow_portal_backfill WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
+		{"portal_backfill_queue", "DELETE FROM whatsmeow_portal_backfill_queue WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
+		{"portals", "DELETE FROM whatsmeow_portal WHERE receiver = ANY($1)"},
+		{"privacy_settings", "DELETE FROM whatsmeow_privacy_settings WHERE jid = ANY($1)"},
+		{"sender_keys", "DELETE FROM whatsmeow_sender_keys WHERE our_jid = ANY($1)"},
+		{"sessions", "DELETE FROM whatsmeow_sessions WHERE our_jid = ANY($1)"},
+		{"pre_keys", "DELETE FROM whatsmeow_pre_keys WHERE jid = ANY($1)"},
+		{"identity_keys", "DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY($1)"},
+		{"device", "DELETE FROM whatsmeow_device WHERE jid = ANY($1)"},
 	}
 	
-	// Execute each query
-	for _, query := range queries {
-		_, err = tx.Exec(query, pq.Array(jidsToCheck))
-		if err != nil {
-			// Log but continue - some tables might not exist
-			logrus.Debugf("Query failed (continuing): %s - %v", query, err)
-		}
+	// Execute each operation in its own transaction
+	successCount := 0
+	for _, op := range clearOperations {
+		func() {
+			tx, err := db.Begin()
+			if err != nil {
+				logrus.Debugf("Failed to begin transaction for %s: %v", op.name, err)
+				return
+			}
+			defer tx.Rollback()
+			
+			_, err = tx.Exec(op.query, pq.Array(jidsToCheck))
+			if err != nil {
+				logrus.Debugf("Failed to clear %s: %v", op.name, err)
+				return
+			}
+			
+			if err = tx.Commit(); err != nil {
+				logrus.Debugf("Failed to commit %s: %v", op.name, err)
+				return
+			}
+			successCount++
+		}()
 	}
 	
-	// Update device status
-	_, err = tx.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
+	logrus.Infof("Successfully cleared %d/%d tables for device %s", successCount, len(clearOperations), deviceID)
+	
+	// Update device status in a separate transaction
+	_, err = db.Exec("UPDATE user_devices SET status = 'offline', phone = NULL, jid = NULL WHERE id = $1", deviceID)
 	if err != nil {
 		logrus.Warnf("Failed to update device status: %v", err)
 	}
 	
-	// Commit transaction
-	return tx.Commit()
+	return nil
 }

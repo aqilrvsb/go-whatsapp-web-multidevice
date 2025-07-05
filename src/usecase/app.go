@@ -162,8 +162,8 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				var deviceID string
 				err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
 				if err == nil && deviceID != "" {
-					// Update device status and send WebSocket notification
-					userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+					// Update device status but KEEP phone and JID for reconnection
+					userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, "")
 					
 					// Remove from client manager
 					cm := whatsapp.GetClientManager()
