@@ -18,11 +18,8 @@ func MultiDeviceAutoReconnect() {
 	userRepo := repository.GetUserRepository()
 	db := userRepo.DB()
 	
-	// First, set all devices to offline to ensure clean state
-	_, err := db.Exec(`UPDATE user_devices SET status = 'offline' WHERE status = 'online'`)
-	if err != nil {
-		logrus.Warnf("Failed to reset device statuses: %v", err)
-	}
+	// Don't set devices offline - just find devices with JID
+	// They should remain "online" in database if they have valid sessions
 	
 	// Find all devices that have a JID (were previously connected)
 	rows, err := db.Query(`
@@ -85,40 +82,87 @@ func MultiDeviceAutoReconnect() {
 
 // reconnectDevice attempts to reconnect a single device using DeviceManager
 func reconnectDevice(deviceID, deviceName, jid, phone string) bool {
-	logrus.Debugf("Attempting to reconnect device %s (%s)", deviceName, deviceID)
+	logrus.Infof("Checking device %s (%s) - JID: %s", deviceName, deviceID, jid)
 	
 	// Get DeviceManager instance
 	dm := multidevice.GetDeviceManager()
 	
-	// Check if device already has a connection
-	conn, err := dm.GetDeviceConnection(deviceID)
-	if err == nil && conn != nil && conn.Client.IsConnected() {
-		logrus.Debugf("Device %s already connected", deviceName)
+	// Try to get or create device connection
+	conn, err := dm.GetOrCreateDeviceConnection(deviceID, "", phone)
+	if err != nil {
+		logrus.Warnf("Failed to get/create connection for device %s: %v", deviceName, err)
+		// Don't set offline - device might still have valid session
+		return false
+	}
+	
+	// Check if already connected
+	if conn.Client.IsConnected() {
+		logrus.Infof("✅ Device %s is already connected", deviceName)
+		
+		// Make sure it's registered with ClientManager
+		cm := GetClientManager()
+		cm.AddClient(deviceID, conn.Client)
+		
+		// Update status to online (in case it was marked offline)
+		userRepo := repository.GetUserRepository()
+		userRepo.UpdateDeviceStatus(deviceID, "online", phone, jid)
+		
+		// Send success notification
+		websocket.Broadcast <- websocket.BroadcastMessage{
+			Code:    "DEVICE_RECONNECTED",
+			Message: "Device reconnected successfully",
+			Result: map[string]interface{}{
+				"deviceId": deviceID,
+				"phone":    phone,
+				"name":     deviceName,
+				"status":   "online",
+			},
+		}
+		
 		return true
 	}
 	
-	// Try to restore device connection
-	// Note: This requires DeviceManager to have a method to restore connections
-	// For now, we'll just update the database status
-	
-	userRepo := repository.GetUserRepository()
-	err = userRepo.UpdateDeviceStatus(deviceID, "offline", phone, jid)
+	// Try to connect if not connected
+	logrus.Infof("Device %s not connected, attempting to connect...", deviceName)
+	err = conn.Client.Connect()
 	if err != nil {
-		logrus.Errorf("Failed to update device status: %v", err)
+		logrus.Warnf("Failed to connect device %s: %v", deviceName, err)
+		// Don't set offline - keep trying in future attempts
+		return false
 	}
 	
-	// Send WebSocket notification
-	websocket.Broadcast <- websocket.BroadcastMessage{
-		Code:    "DEVICE_OFFLINE",
-		Message: "Device requires manual reconnection",
-		Result: map[string]interface{}{
-			"deviceId": deviceID,
-			"phone":    phone,
-			"name":     deviceName,
-			"status":   "offline",
-		},
+	// Wait a bit for connection to establish
+	time.Sleep(3 * time.Second)
+	
+	// Check if connected and logged in
+	if conn.Client.IsConnected() && conn.Client.IsLoggedIn() {
+		logrus.Infof("✅ Successfully reconnected device %s", deviceName)
+		
+		// Register with ClientManager
+		cm := GetClientManager()
+		cm.AddClient(deviceID, conn.Client)
+		
+		// Update status
+		userRepo := repository.GetUserRepository()
+		userRepo.UpdateDeviceStatus(deviceID, "online", phone, jid)
+		
+		// Send success notification
+		websocket.Broadcast <- websocket.BroadcastMessage{
+			Code:    "DEVICE_RECONNECTED",
+			Message: "Device reconnected successfully",
+			Result: map[string]interface{}{
+				"deviceId": deviceID,
+				"phone":    phone,
+				"name":     deviceName,
+				"status":   "online",
+			},
+		}
+		
+		return true
 	}
 	
+	logrus.Warnf("Device %s failed to establish connection or login", deviceName)
+	// Don't set offline - session might still be valid for next attempt
 	return false
 }
 
