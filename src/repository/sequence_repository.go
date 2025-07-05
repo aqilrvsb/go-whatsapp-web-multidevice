@@ -33,14 +33,15 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 	sequence.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, total_days, 
-		                      is_active, schedule_time, min_delay_seconds, max_delay_seconds, 
-		                      created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, 
+		                      start_trigger, end_trigger, total_days, is_active, schedule_time, 
+		                      min_delay_seconds, max_delay_seconds, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 	`
 	
 	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, nil, // device_id is NULL - sequences use all user devices
-		sequence.Name, sequence.Description, sequence.Niche, sequence.Status, sequence.TotalDays, 
+		sequence.Name, sequence.Description, sequence.Niche, sequence.Status, 
+		sequence.StartTrigger, sequence.EndTrigger, sequence.TotalDays, 
 		sequence.IsActive, sequence.TimeSchedule, sequence.MinDelaySeconds, sequence.MaxDelaySeconds,
 		sequence.CreatedAt, sequence.UpdatedAt)
 		
@@ -50,7 +51,10 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 // GetSequences gets all sequences for a user
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
+		SELECT id, user_id, device_id, name, description, niche, status, 
+		       COALESCE(start_trigger, '') as start_trigger,
+		       COALESCE(end_trigger, '') as end_trigger,
+		       total_days, is_active, 
 		       COALESCE(schedule_time, '09:00') as schedule_time, 
 		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -71,7 +75,8 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 	for rows.Next() {
 		var seq models.Sequence
 		err := rows.Scan(&seq.ID, &seq.UserID, &seq.DeviceID, &seq.Name, 
-			&seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
+			&seq.Description, &seq.Niche, &seq.Status, &seq.StartTrigger, &seq.EndTrigger,
+			&seq.TotalDays, &seq.IsActive, 
 			&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
 			&seq.CreatedAt, &seq.UpdatedAt)
 		if err != nil {
@@ -87,7 +92,10 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 // GetSequenceByID gets sequence by ID
 func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequence, error) {
 	query := `
-		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
+		SELECT id, user_id, device_id, name, description, niche, status, 
+		       COALESCE(start_trigger, '') as start_trigger,
+		       COALESCE(end_trigger, '') as end_trigger,
+		       total_days, is_active, 
 		       COALESCE(schedule_time, '09:00') as schedule_time,
 		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -98,7 +106,8 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 	
 	var seq models.Sequence
 	err := r.db.QueryRow(query, sequenceID).Scan(&seq.ID, &seq.UserID, &seq.DeviceID, 
-		&seq.Name, &seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
+		&seq.Name, &seq.Description, &seq.Niche, &seq.Status, &seq.StartTrigger, &seq.EndTrigger,
+		&seq.TotalDays, &seq.IsActive, 
 		&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
 		&seq.CreatedAt, &seq.UpdatedAt)
 	
@@ -120,15 +129,17 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	
 	query := `
 		UPDATE sequences 
-		SET name = $1, description = $2, niche = $3, status = $4, total_days = $5, 
-		    is_active = $6, schedule_time = $7, min_delay_seconds = $8, max_delay_seconds = $9, 
-		    updated_at = $10
-		WHERE id = $11
+		SET name = $1, description = $2, niche = $3, status = $4, 
+		    start_trigger = $5, end_trigger = $6, total_days = $7, 
+		    is_active = $8, schedule_time = $9, min_delay_seconds = $10, 
+		    max_delay_seconds = $11, updated_at = $12
+		WHERE id = $13
 	`
 	
 	_, err := r.db.Exec(query, sequence.Name, sequence.Description, sequence.Niche, 
-		sequence.Status, sequence.TotalDays, sequence.IsActive, sequence.TimeSchedule,
-		sequence.MinDelaySeconds, sequence.MaxDelaySeconds, sequence.UpdatedAt, sequence.ID)
+		sequence.Status, sequence.StartTrigger, sequence.EndTrigger, sequence.TotalDays, 
+		sequence.IsActive, sequence.TimeSchedule, sequence.MinDelaySeconds, 
+		sequence.MaxDelaySeconds, sequence.UpdatedAt, sequence.ID)
 		
 	return err
 }
@@ -152,11 +163,11 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 	step.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO sequence_steps (id, sequence_id, day, message_type, content, media_url, caption, send_time, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO sequence_steps (id, sequence_id, day, trigger, message_type, content, media_url, caption, send_time, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	
-	_, err := r.db.Exec(query, step.ID, step.SequenceID, step.Day, step.MessageType,
+	_, err := r.db.Exec(query, step.ID, step.SequenceID, step.Day, step.Trigger, step.MessageType,
 		step.Content, step.MediaURL, step.Caption, step.SendTime, step.CreatedAt, step.UpdatedAt)
 		
 	return err
@@ -164,7 +175,7 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 // GetSequenceSteps gets all steps for a sequence
 func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.SequenceStep, error) {
 	query := `
-		SELECT id, sequence_id, day, message_type, content, media_url, caption, send_time, created_at, updated_at
+		SELECT id, sequence_id, day, COALESCE(trigger, '') as trigger, message_type, content, media_url, caption, send_time, created_at, updated_at
 		FROM sequence_steps
 		WHERE sequence_id = $1
 		ORDER BY day ASC
@@ -179,7 +190,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	var steps []models.SequenceStep
 	for rows.Next() {
 		var step models.SequenceStep
-		err := rows.Scan(&step.ID, &step.SequenceID, &step.Day, &step.MessageType,
+		err := rows.Scan(&step.ID, &step.SequenceID, &step.Day, &step.Trigger, &step.MessageType,
 			&step.Content, &step.MediaURL, &step.Caption, &step.SendTime, 
 			&step.CreatedAt, &step.UpdatedAt)
 		if err != nil {

@@ -31,6 +31,8 @@ type CreateSequenceRequest struct {
 	DeviceID        *string                     `json:"device_id"` // Optional - sequences use all user devices
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
+	StartTrigger    string                      `json:"start_trigger"`
+	EndTrigger      string                      `json:"end_trigger"`
 	IsActive        bool                        `json:"is_active"`
 	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
@@ -42,6 +44,7 @@ type CreateSequenceRequest struct {
 type CreateSequenceStepRequest struct {
 	Day             int    `json:"day"`
 	DayNumber       int    `json:"day_number" validate:"required,min=1"`
+	Trigger         string `json:"trigger"`
 	MessageType     string `json:"message_type"`
 	SendTime        string `json:"send_time"`
 	TimeSchedule    string `json:"time_schedule"`
@@ -59,6 +62,8 @@ type UpdateSequenceRequest struct {
 	Description     string                      `json:"description"`
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
+	StartTrigger    string                      `json:"start_trigger"`
+	EndTrigger      string                      `json:"end_trigger"`
 	IsActive        bool                        `json:"is_active"`
 	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
@@ -75,6 +80,8 @@ type SequenceResponse struct {
 	DeviceID        *string                `json:"device_id"` // Optional - sequences use all user devices
 	Niche           string                 `json:"niche"`
 	Status          string                 `json:"status"`
+	StartTrigger    string                 `json:"start_trigger"`
+	EndTrigger      string                 `json:"end_trigger"`
 	TotalSteps      int                    `json:"total_steps"`
 	TotalDays       int                    `json:"total_days"`
 	IsActive        bool                   `json:"is_active"`

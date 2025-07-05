@@ -296,6 +296,10 @@ func InitializeSchema() error {
 	
 	-- Make device_id nullable since sequences use all user devices
 	ALTER TABLE sequences ALTER COLUMN device_id DROP NOT NULL;
+	
+	-- Add trigger columns to sequences table
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS start_trigger VARCHAR(255);
+	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS end_trigger VARCHAR(255);
 
 	-- Add missing columns to sequence_steps table
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS day INTEGER;
@@ -305,6 +309,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS time_schedule TEXT;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger VARCHAR(255);
 
 	-- Add missing columns to sequence_contacts table  
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;

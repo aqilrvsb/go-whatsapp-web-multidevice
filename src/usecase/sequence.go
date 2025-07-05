@@ -36,6 +36,8 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		Name:            request.Name,
 		Description:     request.Description,
 		Niche:           request.Niche,
+		StartTrigger:    request.StartTrigger,
+		EndTrigger:      request.EndTrigger,
 		TimeSchedule:    request.TimeSchedule,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
@@ -55,6 +57,7 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 			SequenceID:      sequence.ID,
 			Day:             stepReq.Day,
 			DayNumber:       stepReq.DayNumber,
+			Trigger:         stepReq.Trigger,
 			MessageType:     stepReq.MessageType,
 			Content:         stepReq.Content,
 			MediaURL:        stepReq.MediaURL,
@@ -79,6 +82,8 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		DeviceID:        nil, // Sequences use all user devices
 		Niche:           sequence.Niche,
 		Status:          sequence.Status,
+		StartTrigger:    sequence.StartTrigger,
+		EndTrigger:      sequence.EndTrigger,
 		TotalSteps:      len(request.Steps),
 		TotalDays:       sequence.TotalDays,
 		IsActive:        sequence.IsActive,
@@ -117,6 +122,8 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			DeviceID:        seq.DeviceID,
 			Niche:           seq.Niche,
 			Status:          seq.Status,
+			StartTrigger:    seq.StartTrigger,
+			EndTrigger:      seq.EndTrigger,
 			TotalDays:       seq.TotalDays,
 			IsActive:        seq.IsActive,
 			TimeSchedule:    seq.TimeSchedule,
@@ -190,6 +197,8 @@ func (s *sequenceService) GetSequenceByID(sequenceID string) (domainSequence.Seq
 		DeviceID:        sequence.DeviceID,
 		Niche:           sequence.Niche,
 		Status:          sequence.Status,
+		StartTrigger:    sequence.StartTrigger,
+		EndTrigger:      sequence.EndTrigger,
 		TotalDays:       sequence.TotalDays,
 		TotalSteps:      len(steps),
 		IsActive:        sequence.IsActive,
@@ -252,6 +261,12 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	if request.Niche != "" {
 		sequence.Niche = request.Niche
 	}
+	if request.StartTrigger != "" {
+		sequence.StartTrigger = request.StartTrigger
+	}
+	if request.EndTrigger != "" {
+		sequence.EndTrigger = request.EndTrigger
+	}
 	if request.TimeSchedule != "" {
 		sequence.TimeSchedule = request.TimeSchedule
 	}
@@ -282,6 +297,7 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 				SequenceID:      sequenceID,
 				Day:             stepReq.Day,
 				DayNumber:       stepReq.DayNumber,
+				Trigger:         stepReq.Trigger,
 				MessageType:     stepReq.MessageType,
 				Content:         stepReq.Content,
 				MediaURL:        stepReq.MediaURL,

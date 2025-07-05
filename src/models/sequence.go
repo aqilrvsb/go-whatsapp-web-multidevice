@@ -14,6 +14,8 @@ type Sequence struct {
 	Niche           string         `json:"niche" db:"niche"`
 	TargetStatus    string         `json:"target_status" db:"target_status"` // prospect, customer, all
 	Status          string         `json:"status" db:"status"` // draft, active, paused
+	StartTrigger    string         `json:"start_trigger" db:"start_trigger"`
+	EndTrigger      string         `json:"end_trigger" db:"end_trigger"`
 	TotalDays       int            `json:"total_days" db:"total_days"` // Added
 	IsActive        bool           `json:"is_active" db:"is_active"`   // Added
 	TimeSchedule    string         `json:"time_schedule" db:"schedule_time"`
@@ -39,6 +41,7 @@ type SequenceStep struct {
 	SequenceID       string    `json:"sequence_id" db:"sequence_id"`
 	Day              int       `json:"day" db:"day"`
 	DayNumber        int       `json:"day_number" db:"day_number"`
+	Trigger          string    `json:"trigger" db:"trigger"`
 	MessageType      string    `json:"message_type" db:"message_type"`
 	SendTime         string    `json:"send_time" db:"send_time"`
 	TimeSchedule     string    `json:"time_schedule" db:"time_schedule"`
