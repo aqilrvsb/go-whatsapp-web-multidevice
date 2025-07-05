@@ -1,7 +1,7 @@
 @echo off
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 git add -A
-git commit -m "Fix: Dashboard improvements - Worker controls, Sequences display, Navigation, and Performance optimizations"
-git push origin main --force
+git commit -m "Fix dashboard: toggle passes status string and show schedule_time"
+git push origin main
 echo Done!
 pause
