@@ -255,12 +255,10 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	if request.TimeSchedule != "" {
 		sequence.TimeSchedule = request.TimeSchedule
 	}
-	if request.MinDelaySeconds > 0 {
-		sequence.MinDelaySeconds = request.MinDelaySeconds
-	}
-	if request.MaxDelaySeconds > 0 {
-		sequence.MaxDelaySeconds = request.MaxDelaySeconds
-	}
+	// Always update delay seconds (0 is a valid value)
+	sequence.MinDelaySeconds = request.MinDelaySeconds
+	sequence.MaxDelaySeconds = request.MaxDelaySeconds
+	
 	sequence.IsActive = request.IsActive
 	if request.Status != "" {
 		sequence.Status = request.Status
@@ -274,18 +272,25 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	// Update steps if provided
 	if len(request.Steps) > 0 {
 		// Delete existing steps
-		// TODO: Add DeleteSequenceSteps method
+		if err := repo.DeleteSequenceSteps(sequenceID); err != nil {
+			logrus.Errorf("Failed to delete existing steps: %v", err)
+		}
 		
 		// Create new steps
 		for _, stepReq := range request.Steps {
 			step := &models.SequenceStep{
-				SequenceID:  sequenceID,
-				Day:         stepReq.Day,
-				MessageType: stepReq.MessageType,
-				Content:     stepReq.Content,
-				MediaURL:    stepReq.MediaURL,
-				Caption:     stepReq.Caption,
-				SendTime:    stepReq.SendTime,
+				SequenceID:      sequenceID,
+				Day:             stepReq.Day,
+				DayNumber:       stepReq.DayNumber,
+				MessageType:     stepReq.MessageType,
+				Content:         stepReq.Content,
+				MediaURL:        stepReq.MediaURL,
+				ImageURL:        stepReq.ImageURL,
+				Caption:         stepReq.Caption,
+				SendTime:        stepReq.SendTime,
+				TimeSchedule:    stepReq.TimeSchedule,
+				MinDelaySeconds: stepReq.MinDelaySeconds,
+				MaxDelaySeconds: stepReq.MaxDelaySeconds,
 			}
 			
 			if err := repo.CreateSequenceStep(step); err != nil {

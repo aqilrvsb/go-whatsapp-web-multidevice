@@ -51,7 +51,10 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
 		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
-		       COALESCE(schedule_time, '09:00') as schedule_time, created_at, updated_at
+		       COALESCE(schedule_time, '09:00') as schedule_time, 
+		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+		       created_at, updated_at
 		FROM sequences
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -69,7 +72,8 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 		var seq models.Sequence
 		err := rows.Scan(&seq.ID, &seq.UserID, &seq.DeviceID, &seq.Name, 
 			&seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
-			&seq.TimeSchedule, &seq.CreatedAt, &seq.UpdatedAt)
+			&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
+			&seq.CreatedAt, &seq.UpdatedAt)
 		if err != nil {
 			logrus.Errorf("Failed to scan sequence row: %v", err)
 			continue
@@ -84,7 +88,10 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequence, error) {
 	query := `
 		SELECT id, user_id, device_id, name, description, niche, status, total_days, is_active, 
-		       COALESCE(schedule_time, '09:00') as schedule_time, created_at, updated_at
+		       COALESCE(schedule_time, '09:00') as schedule_time,
+		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+		       created_at, updated_at
 		FROM sequences
 		WHERE id = $1
 	`
@@ -92,7 +99,8 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 	var seq models.Sequence
 	err := r.db.QueryRow(query, sequenceID).Scan(&seq.ID, &seq.UserID, &seq.DeviceID, 
 		&seq.Name, &seq.Description, &seq.Niche, &seq.Status, &seq.TotalDays, &seq.IsActive, 
-		&seq.TimeSchedule, &seq.CreatedAt, &seq.UpdatedAt)
+		&seq.TimeSchedule, &seq.MinDelaySeconds, &seq.MaxDelaySeconds,
+		&seq.CreatedAt, &seq.UpdatedAt)
 	
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -125,6 +133,12 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 // DeleteSequence deletes a sequence
 func (r *sequenceRepository) DeleteSequence(sequenceID string) error {
 	_, err := r.db.Exec("DELETE FROM sequences WHERE id = $1", sequenceID)
+	return err
+}
+
+// DeleteSequenceSteps deletes all steps for a sequence
+func (r *sequenceRepository) DeleteSequenceSteps(sequenceID string) error {
+	_, err := r.db.Exec("DELETE FROM sequence_steps WHERE sequence_id = $1", sequenceID)
 	return err
 }
 
