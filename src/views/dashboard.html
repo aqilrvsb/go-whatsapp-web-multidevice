@@ -4166,6 +4166,8 @@
         }
         
         // Sequences Functions
+        let sequences = []; // Global variable to store sequences like campaigns
+        
         async function toggleSequence(id, currentStatus) {
             try {
                 const response = await fetch(`/api/sequences/${id}/toggle`, {
@@ -4224,6 +4226,7 @@
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
+                    sequences = data.results; // Store sequences globally like campaigns
                     displaySequences(data.results);
                 } else {
                     // Show empty state
@@ -4645,77 +4648,74 @@
         // View/Edit Sequence function
         let currentEditingSequenceId = null;
         async function viewEditSequence(sequenceId) {
-            try {
-                const response = await fetch(`/api/sequences/${sequenceId}`);
-                const data = await response.json();
-                
-                if (data.code === 'SUCCESS' && data.results) {
-                    const sequence = data.results;
-                    currentEditingSequenceId = sequenceId;
-                    
-                    // Populate form fields
-                    document.getElementById('sequenceName').value = sequence.name || '';
-                    document.getElementById('sequenceDescription').value = sequence.description || '';
-                    document.getElementById('sequenceNiche').value = sequence.niche || '';
-                    document.getElementById('sequenceScheduleTime').value = sequence.time_schedule || sequence.schedule_time || '09:00';
-                    document.getElementById('sequenceMinDelay').value = sequence.min_delay_seconds || 5;
-                    document.getElementById('sequenceMaxDelay').value = sequence.max_delay_seconds || 15;
-                    document.getElementById('sequenceTrigger').value = sequence.trigger || sequence.start_trigger || '';
-                    
-                    // Reset and populate days
-                    sequenceDays = {};
-                    if (sequence.steps && Array.isArray(sequence.steps)) {
-                        sequence.steps.forEach(step => {
-                            const dayNum = step.day_number || step.day;
-                            sequenceDays[dayNum] = {
-                                day: dayNum,
-                                day_number: dayNum,
-                                trigger: step.trigger || '',
-                                next_trigger: step.next_trigger || '',
-                                trigger_delay_hours: step.trigger_delay_hours || 24,
-                                is_entry_point: step.is_entry_point || false,
-                                content: step.content || '',
-                                image_url: step.image_url || step.media_url || '',
-                                media_url: step.media_url || step.image_url || '',
-                                message_type: step.message_type || 'text',
-                                send_time: step.send_time || '09:00',
-                                min_delay_seconds: step.min_delay_seconds || 5,
-                                max_delay_seconds: step.max_delay_seconds || 15
-                            };
-                        });
-                        
-                        // Set global delays from first step
-                        if (sequence.steps.length > 0) {
-                            document.getElementById('sequenceMinDelay').value = sequence.steps[0].min_delay_seconds || 5;
-                            document.getElementById('sequenceMaxDelay').value = sequence.steps[0].max_delay_seconds || 15;
-                        }
-                        
-                        // Set schedule time if available
-                        if (sequence.time_schedule) {
-                            document.getElementById('sequenceScheduleTime').value = sequence.time_schedule;
-                        }
-                    }
-                    
-                    // Change modal title and button text
-                    document.querySelector('#createSequenceModal .modal-title').textContent = 'Edit Sequence';
-                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Update Sequence';
-                    document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = () => updateSequence(sequenceId);
-                    
-                    // Initialize grid and show modal
-                    initializeSequenceDaysGrid();
-                    
-                    // Update day boxes to show which days have content
-                    Object.keys(sequenceDays).forEach(dayNumber => {
-                        updateDayBoxStatus(parseInt(dayNumber), true);
-                    });
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
-                    modal.show();
-                }
-            } catch (error) {
-                console.error('Error loading sequence:', error);
-                Swal.fire('Error', 'Failed to load sequence', 'error');
+            // Find the sequence in our global data (exactly like campaigns)
+            const sequence = sequences.find(s => s.id === sequenceId);
+            
+            if (!sequence) {
+                Swal.fire('Error', 'Sequence not found', 'error');
+                return;
             }
+            
+            currentEditingSequenceId = sequenceId;
+            
+            // Populate form fields
+            document.getElementById('sequenceName').value = sequence.name || '';
+            document.getElementById('sequenceDescription').value = sequence.description || '';
+            document.getElementById('sequenceNiche').value = sequence.niche || '';
+            document.getElementById('sequenceScheduleTime').value = sequence.time_schedule || sequence.schedule_time || '09:00';
+            document.getElementById('sequenceMinDelay').value = sequence.min_delay_seconds || 5;
+            document.getElementById('sequenceMaxDelay').value = sequence.max_delay_seconds || 15;
+            document.getElementById('sequenceTrigger').value = sequence.trigger || sequence.start_trigger || '';
+            
+            // Reset and populate days
+            sequenceDays = {};
+            if (sequence.steps && Array.isArray(sequence.steps)) {
+                sequence.steps.forEach(step => {
+                    const dayNum = step.day_number || step.day;
+                    sequenceDays[dayNum] = {
+                        day: dayNum,
+                        day_number: dayNum,
+                        trigger: step.trigger || '',
+                        next_trigger: step.next_trigger || '',
+                        trigger_delay_hours: step.trigger_delay_hours || 24,
+                        is_entry_point: step.is_entry_point || false,
+                        content: step.content || '',
+                        image_url: step.image_url || step.media_url || '',
+                        media_url: step.media_url || step.image_url || '',
+                        message_type: step.message_type || 'text',
+                        send_time: step.send_time || '09:00',
+                        min_delay_seconds: step.min_delay_seconds || 5,
+                        max_delay_seconds: step.max_delay_seconds || 15
+                    };
+                });
+                
+                // Set global delays from first step
+                if (sequence.steps.length > 0) {
+                    document.getElementById('sequenceMinDelay').value = sequence.steps[0].min_delay_seconds || 5;
+                    document.getElementById('sequenceMaxDelay').value = sequence.steps[0].max_delay_seconds || 15;
+                }
+                
+                // Set schedule time if available
+                if (sequence.time_schedule) {
+                    document.getElementById('sequenceScheduleTime').value = sequence.time_schedule;
+                }
+            }
+            
+            // Change modal title and button text
+            document.querySelector('#createSequenceModal .modal-title').textContent = 'Edit Sequence';
+            document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Update Sequence';
+            document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = () => updateSequence(sequenceId);
+            
+            // Initialize grid and show modal
+            initializeSequenceDaysGrid();
+            
+            // Update day boxes to show which days have content
+            Object.keys(sequenceDays).forEach(dayNumber => {
+                updateDayBoxStatus(parseInt(dayNumber), true);
+            });
+            
+            const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
+            modal.show();
         }
         
         // Update Sequence function
