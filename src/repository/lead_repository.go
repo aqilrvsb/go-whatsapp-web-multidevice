@@ -34,8 +34,8 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	lead.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id
 	`
 	
@@ -55,7 +55,7 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	
 	var id int
 	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Niche, journey, status, lead.TargetStatus, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
 	
 	if err == nil {
 		lead.ID = fmt.Sprintf("%d", id)
@@ -275,7 +275,7 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 	query := `
 		UPDATE leads 
 		SET device_id = $2, name = $3, phone = $4, niche = $5, 
-		    journey = $6, status = $7, target_status = $8, updated_at = $9
+		    journey = $6, status = $7, target_status = $8, trigger = $9, updated_at = $10
 		WHERE id = $1
 	`
 	
@@ -294,7 +294,7 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 	}
 	
 	result, err := r.db.Exec(query, id, lead.DeviceID, lead.Name, lead.Phone,
-		lead.Niche, journey, status, lead.TargetStatus, lead.UpdatedAt)
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt)
 	if err != nil {
 		return err
 	}
