@@ -697,6 +697,7 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		Niche    string `json:"niche"`
 		Journey  string `json:"journey"`
 		Status   string `json:"status"` // This will be target_status from frontend
+		Trigger  string `json:"trigger"` // Add trigger field
 	}
 	
 	if err := c.BodyParser(&request); err != nil {

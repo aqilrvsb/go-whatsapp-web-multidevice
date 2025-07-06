@@ -1,24 +1,38 @@
 package usecase
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 )
+
+// contactJob represents a job for processing a contact message
+type contactJob struct {
+	contactID        string
+	sequenceID       string
+	phone            string
+	name             string
+	currentTrigger   string
+	currentDay       int
+	messageText      string
+	messageType      string
+	mediaURL         sql.NullString
+	nextTrigger      sql.NullString
+	delayHours       int
+	preferredDevice  sql.NullString
+}
 
 // SequenceTriggerProcessor handles trigger-based sequence processing
 type SequenceTriggerProcessor struct {
 	db              *sql.DB
-	broadcastMgr    *broadcast.Manager
+	broadcastMgr    broadcast.BroadcastManagerInterface
 	isRunning       bool
 	stopChan        chan bool
 	ticker          *time.Ticker
@@ -31,7 +45,7 @@ type SequenceTriggerProcessor struct {
 func NewSequenceTriggerProcessor(db *sql.DB) *SequenceTriggerProcessor {
 	return &SequenceTriggerProcessor{
 		db:              db,
-		broadcastMgr:    broadcast.GetManager(),
+		broadcastMgr:    broadcast.GetBroadcastManager(),
 		stopChan:        make(chan bool),
 		batchSize:       1000,
 		processInterval: 30 * time.Second, // Process every 30 seconds
@@ -263,20 +277,6 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	defer rows.Close()
 
 	// Process in parallel with worker pool
-	type contactJob struct {
-		contactID        string
-		sequenceID       string
-		phone            string
-		name             string
-		currentTrigger   string
-		messageText      string
-		messageType      string
-		mediaURL         sql.NullString
-		nextTrigger      sql.NullString
-		delayHours       int
-		preferredDevice  sql.NullString
-	}
-
 	jobs := make(chan contactJob, s.batchSize)
 	results := make(chan bool, s.batchSize)
 	
@@ -354,20 +354,21 @@ func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads ma
 	}
 
 	// Queue message to broadcast system
-	msg := &models.BroadcastMessage{
-		DeviceID:    deviceID,
-		Phone:       job.phone,
-		MessageText: job.messageText,
-		MessageType: job.messageType,
-		Status:      "pending",
+	// Create broadcast message
+	broadcastMsg := domainBroadcast.BroadcastMessage{
+		DeviceID:       deviceID,
+		RecipientPhone: job.phone,
+		Message:        job.messageText,
+		Content:        job.messageText,
+		Type:           job.messageType,
 	}
 
 	if job.mediaURL.Valid && job.mediaURL.String != "" {
-		msg.MediaURL = &job.mediaURL.String
+		broadcastMsg.MediaURL = job.mediaURL.String
 	}
 
 	// Send to broadcast manager
-	if err := s.broadcastMgr.QueueMessage(msg); err != nil {
+	if err := s.broadcastMgr.SendMessage(broadcastMsg); err != nil {
 		logrus.Errorf("Failed to queue message for %s: %v", job.phone, err)
 		s.releaseContact(job.contactID)
 		return false
