@@ -163,22 +163,49 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 	step.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO sequence_steps (id, sequence_id, day, trigger, message_type, content, media_url, caption, send_time, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO sequence_steps (
+			id, sequence_id, day_number, message_type, content, 
+			media_url, caption, send_time, trigger, time_schedule,
+			created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	
-	_, err := r.db.Exec(query, step.ID, step.SequenceID, step.Day, step.Trigger, step.MessageType,
-		step.Content, step.MediaURL, step.Caption, step.SendTime, step.CreatedAt, step.UpdatedAt)
+	// Use DayNumber, fallback to Day if DayNumber is 0
+	dayNumber := step.DayNumber
+	if dayNumber == 0 && step.Day > 0 {
+		dayNumber = step.Day
+	}
+	
+	// Use TimeSchedule, fallback to SendTime
+	timeSchedule := step.TimeSchedule
+	if timeSchedule == "" && step.SendTime != "" {
+		timeSchedule = step.SendTime
+	}
+	
+	_, err := r.db.Exec(query, 
+		step.ID, step.SequenceID, dayNumber, step.MessageType, step.Content,
+		step.MediaURL, step.Caption, step.SendTime, step.Trigger, timeSchedule,
+		step.CreatedAt, step.UpdatedAt)
 		
 	return err
 }
 // GetSequenceSteps gets all steps for a sequence
 func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.SequenceStep, error) {
 	query := `
-		SELECT id, sequence_id, day, COALESCE(trigger, '') as trigger, message_type, content, media_url, caption, send_time, created_at, updated_at
+		SELECT 
+			id, sequence_id, day_number, 
+			COALESCE(trigger, '') as trigger, 
+			COALESCE(message_type, 'text') as message_type, 
+			COALESCE(content, '') as content, 
+			COALESCE(media_url, '') as media_url, 
+			COALESCE(caption, '') as caption, 
+			COALESCE(send_time, '') as send_time,
+			COALESCE(time_schedule, '') as time_schedule,
+			created_at, updated_at
 		FROM sequence_steps
 		WHERE sequence_id = $1
-		ORDER BY day ASC
+		ORDER BY day_number ASC
 	`
 	
 	rows, err := r.db.Query(query, sequenceID)
