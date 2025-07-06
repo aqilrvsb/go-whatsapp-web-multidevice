@@ -36,8 +36,9 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		Name:            request.Name,
 		Description:     request.Description,
 		Niche:           request.Niche,
-		StartTrigger:    request.StartTrigger,
-		EndTrigger:      request.EndTrigger,
+		Trigger:         request.Trigger,         // Use new trigger field
+		StartTrigger:    request.StartTrigger,    // Keep for backward compatibility
+		EndTrigger:      request.EndTrigger,      // Keep for backward compatibility
 		TimeSchedule:    request.TimeSchedule,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
@@ -260,6 +261,9 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	}
 	if request.Niche != "" {
 		sequence.Niche = request.Niche
+	}
+	if request.Trigger != "" {
+		sequence.Trigger = request.Trigger
 	}
 	if request.StartTrigger != "" {
 		sequence.StartTrigger = request.StartTrigger

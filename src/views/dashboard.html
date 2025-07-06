@@ -1678,16 +1678,11 @@
                                 </div>
                             </div>
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-12">
                                     <div class="mb-3">
-                                        <label class="form-label">Start Trigger</label>
-                                        <input type="text" class="form-control" id="sequenceStartTrigger" placeholder="e.g., signup, purchase">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">End Trigger</label>
-                                        <input type="text" class="form-control" id="sequenceEndTrigger" placeholder="e.g., converted, unsubscribed">
+                                        <label class="form-label">Sequence Trigger</label>
+                                        <input type="text" class="form-control" id="sequenceTrigger" placeholder="e.g., fitness_start, onboarding_begin">
+                                        <small class="text-muted">This trigger will be used to identify and enroll leads into this sequence</small>
                                     </div>
                                 </div>
                             </div>
@@ -4285,7 +4280,7 @@
                             </div>
                             <p class="text-muted small mb-2">
                                 Niche: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}<br>
-                                Start: ${seq.start_trigger || 'Not set'} | End: ${seq.end_trigger || 'Not set'}
+                                Trigger: ${seq.trigger || seq.start_trigger || 'Not set'}
                             </p>
                             <p class="card-text">${seq.description || 'No description'}</p>
                             <div class="progress mb-3" style="height: 5px;">
@@ -4340,7 +4335,7 @@
                                 <div class="mb-3">
                                     <small class="text-muted">
                                         Niche: ${seq.niche || 'Not set'} | Time: ${seq.time_schedule || seq.schedule_time || 'Not set'}<br>
-                                        Start: ${seq.start_trigger || 'Not set'} | End: ${seq.end_trigger || 'Not set'}
+                                        Trigger: ${seq.trigger || seq.start_trigger || 'Not set'}
                                     </small>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -4377,6 +4372,15 @@
         
         // Open Create Sequence Modal function
         function openCreateSequenceModal() {
+            // Clear form
+            document.getElementById('sequenceName').value = '';
+            document.getElementById('sequenceDescription').value = '';
+            document.getElementById('sequenceNiche').value = '';
+            document.getElementById('sequenceTrigger').value = '';
+            document.getElementById('sequenceScheduleTime').value = '09:00';
+            document.getElementById('sequenceMinDelay').value = '5';
+            document.getElementById('sequenceMaxDelay').value = '15';
+            
             // Initialize the days grid
             initializeSequenceDaysGrid();
             const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
@@ -4618,8 +4622,7 @@
                     document.getElementById('sequenceScheduleTime').value = sequence.time_schedule || sequence.schedule_time || '09:00';
                     document.getElementById('sequenceMinDelay').value = sequence.min_delay_seconds || 5;
                     document.getElementById('sequenceMaxDelay').value = sequence.max_delay_seconds || 15;
-                    document.getElementById('sequenceStartTrigger').value = sequence.start_trigger || '';
-                    document.getElementById('sequenceEndTrigger').value = sequence.end_trigger || '';
+                    document.getElementById('sequenceTrigger').value = sequence.trigger || sequence.start_trigger || '';
                     
                     // Reset and populate days
                     sequenceDays = {};
@@ -4704,8 +4707,8 @@
                 name: document.getElementById('sequenceName').value,
                 description: document.getElementById('sequenceDescription').value,
                 niche: document.getElementById('sequenceNiche').value,
-                start_trigger: document.getElementById('sequenceStartTrigger').value || '',
-                end_trigger: document.getElementById('sequenceEndTrigger').value || '',
+                start_trigger: document.getElementById('sequenceTrigger').value || '',
+                end_trigger: '', // Deprecated - using single trigger now
                 time_schedule: document.getElementById('sequenceScheduleTime').value || '09:00',
                 min_delay_seconds: minDelay,
                 max_delay_seconds: maxDelay,
@@ -4775,8 +4778,8 @@
                 name: document.getElementById('sequenceName').value,
                 description: document.getElementById('sequenceDescription').value,
                 niche: document.getElementById('sequenceNiche').value,
-                start_trigger: document.getElementById('sequenceStartTrigger').value || '',
-                end_trigger: document.getElementById('sequenceEndTrigger').value || '',
+                start_trigger: document.getElementById('sequenceTrigger').value || '',
+                end_trigger: '', // Deprecated - using single trigger now
                 time_schedule: document.getElementById('sequenceScheduleTime').value || '09:00',
                 min_delay_seconds: minDelay,
                 max_delay_seconds: maxDelay,

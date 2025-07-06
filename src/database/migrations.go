@@ -462,6 +462,21 @@ END $$;
 `,
 	})
 	
+	// Add trigger column to sequences
+	pendingMigrations = append(pendingMigrations, Migration{
+		Name: "Add trigger column to sequences",
+		SQL: `
+-- Add trigger column to sequences table
+ALTER TABLE sequences ADD COLUMN IF NOT EXISTS trigger VARCHAR(255);
+
+-- Migrate existing start_trigger values to trigger
+UPDATE sequences SET trigger = start_trigger WHERE trigger IS NULL AND start_trigger IS NOT NULL;
+
+-- Create index for trigger lookups
+CREATE INDEX IF NOT EXISTS idx_sequences_trigger ON sequences(trigger) WHERE trigger IS NOT NULL;
+`,
+	})
+	
 	return pendingMigrations
 }
 

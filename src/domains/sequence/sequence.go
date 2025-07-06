@@ -31,8 +31,9 @@ type CreateSequenceRequest struct {
 	DeviceID        *string                     `json:"device_id"` // Optional - sequences use all user devices
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
-	StartTrigger    string                      `json:"start_trigger"`
-	EndTrigger      string                      `json:"end_trigger"`
+	Trigger         string                      `json:"trigger"`     // Main trigger for the sequence
+	StartTrigger    string                      `json:"start_trigger"` // Deprecated
+	EndTrigger      string                      `json:"end_trigger"`   // Deprecated
 	IsActive        bool                        `json:"is_active"`
 	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
@@ -62,8 +63,9 @@ type UpdateSequenceRequest struct {
 	Description     string                      `json:"description"`
 	Niche           string                      `json:"niche"`
 	Status          string                      `json:"status"`
-	StartTrigger    string                      `json:"start_trigger"`
-	EndTrigger      string                      `json:"end_trigger"`
+	Trigger         string                      `json:"trigger"`     // Main trigger for the sequence
+	StartTrigger    string                      `json:"start_trigger"` // Deprecated
+	EndTrigger      string                      `json:"end_trigger"`   // Deprecated
 	IsActive        bool                        `json:"is_active"`
 	TimeSchedule    string                      `json:"time_schedule"`
 	MinDelaySeconds int                         `json:"min_delay_seconds"`
@@ -80,8 +82,9 @@ type SequenceResponse struct {
 	DeviceID        *string                `json:"device_id"` // Optional - sequences use all user devices
 	Niche           string                 `json:"niche"`
 	Status          string                 `json:"status"`
-	StartTrigger    string                 `json:"start_trigger"`
-	EndTrigger      string                 `json:"end_trigger"`
+	Trigger         string                 `json:"trigger"`      // Main trigger for the sequence
+	StartTrigger    string                 `json:"start_trigger"` // Deprecated
+	EndTrigger      string                 `json:"end_trigger"`   // Deprecated
 	TotalSteps      int                    `json:"total_steps"`
 	TotalDays       int                    `json:"total_days"`
 	IsActive        bool                   `json:"is_active"`

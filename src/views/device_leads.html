@@ -462,6 +462,7 @@
                                 <span class="text-muted small ms-3">Last interaction: ${lastInteraction}</span>
                             </div>
                             ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
+                            ${lead.trigger ? `<div class="mt-2"><span class="badge bg-info"><i class="bi bi-lightning"></i> Trigger: ${lead.trigger}</span></div>` : ''}
                         </div>
                         <div class="dropdown" onclick="event.stopPropagation()">
                             <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
