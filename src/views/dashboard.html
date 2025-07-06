@@ -1714,7 +1714,7 @@
 
                         <!-- Days Calendar Grid -->
                         <div class="mb-4">
-                            <h6 class="fw-bold mb-3">Sequence Days</h6>
+                            <h6 class="fw-bold mb-3">Sequence Flow</h6>
                             <div class="sequence-days-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;">
                                 <!-- Days 1-31 will be generated here -->
                             </div>
@@ -1729,12 +1729,12 @@
         </div>
     </div>
 
-    <!-- Day Message Modal -->
+    <!-- Flow Message Modal -->
     <div class="modal fade" id="dayMessageModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="dayMessageTitle">Day 1 Message</h5>
+                    <h5 class="modal-title" id="dayMessageTitle">Flow 1 Message</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -4422,14 +4422,18 @@
             modal.show();
         }
         
-        // Initialize sequence days grid
+        // Initialize sequence flow grid
         let sequenceDays = {};
-        function initializeSequenceDaysGrid() {
-            const grid = document.querySelector('.sequence-days-grid');
-            grid.innerHTML = '';
-            sequenceDays = {}; // Reset days data
+        function initializeSequenceDaysGrid(preserveData = false) {
+            const grid = document.getElementById('sequenceDaysGrid');
+            if (!grid) return;
             
-            // Create 31 day buttons
+            grid.innerHTML = '';
+            if (!preserveData) {
+                sequenceDays = {}; // Reset days data only if not preserving
+            }
+            
+            // Create 31 flow buttons
             for (let i = 1; i <= 31; i++) {
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'sequence-day-box';
@@ -4443,12 +4447,25 @@
                     background: white;
                     position: relative;
                 `;
-                dayDiv.innerHTML = `
-                    <div style="font-size: 18px; font-weight: bold; color: #666;">Day ${i}</div>
-                    <div class="day-status" style="font-size: 12px; color: #999; margin-top: 5px;">
-                        <i class="bi bi-plus-circle"></i> Add
-                    </div>
-                `;
+                
+                // Check if this day has content
+                if (sequenceDays[i]) {
+                    dayDiv.style.borderColor = '#25d366';
+                    dayDiv.style.background = '#f0fdf4';
+                    dayDiv.innerHTML = `
+                        <div style="font-size: 18px; font-weight: bold; color: #25d366;">Flow ${i}</div>
+                        <div class="day-status" style="font-size: 12px; color: #25d366; margin-top: 5px;">
+                            <i class="bi bi-check-circle-fill"></i> Set
+                        </div>
+                    `;
+                } else {
+                    dayDiv.innerHTML = `
+                        <div style="font-size: 18px; font-weight: bold; color: #666;">Flow ${i}</div>
+                        <div class="day-status" style="font-size: 12px; color: #999; margin-top: 5px;">
+                            <i class="bi bi-plus-circle"></i> Add
+                        </div>
+                    `;
+                }
                 dayDiv.onclick = () => openDayMessageModal(i);
                 
                 // Hover effect
@@ -4467,10 +4484,10 @@
             }
         }
         
-        // Open day message modal
+        // Open flow message modal
         function openDayMessageModal(dayNumber) {
             document.getElementById('currentDayNumber').value = dayNumber;
-            document.getElementById('dayMessageTitle').textContent = `Day ${dayNumber} Message`;
+            document.getElementById('dayMessageTitle').textContent = `Flow ${dayNumber} Message`;
             
             // Reset the file input
             const fileInput = document.getElementById('dayMessageImage');
@@ -4808,13 +4825,8 @@
             document.querySelector('#createSequenceModal .modal-footer .btn-primary').textContent = 'Update Sequence';
             document.querySelector('#createSequenceModal .modal-footer .btn-primary').onclick = () => updateSequence(sequenceId);
             
-            // Initialize grid and show modal
-            initializeSequenceDaysGrid();
-            
-            // Update day boxes to show which days have content
-            Object.keys(sequenceDays).forEach(dayNumber => {
-                updateDayBoxStatus(parseInt(dayNumber), true);
-            });
+            // Initialize grid with preserved data and show modal
+            initializeSequenceDaysGrid(true); // Pass true to preserve data
             
             const modal = new bootstrap.Modal(document.getElementById('createSequenceModal'));
             modal.show();
