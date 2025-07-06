@@ -34,14 +34,14 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 
 	query := `
 		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, 
-		                      start_trigger, end_trigger, total_days, is_active, schedule_time, 
+		                      trigger, start_trigger, end_trigger, total_days, is_active, time_schedule, 
 		                      min_delay_seconds, max_delay_seconds, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 	`
 	
 	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, nil, // device_id is NULL - sequences use all user devices
 		sequence.Name, sequence.Description, sequence.Niche, sequence.Status, 
-		sequence.StartTrigger, sequence.EndTrigger, sequence.TotalDays, 
+		sequence.Trigger, sequence.StartTrigger, sequence.EndTrigger, sequence.TotalDays, 
 		sequence.IsActive, sequence.TimeSchedule, sequence.MinDelaySeconds, sequence.MaxDelaySeconds,
 		sequence.CreatedAt, sequence.UpdatedAt)
 		

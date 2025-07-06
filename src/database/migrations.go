@@ -477,6 +477,24 @@ CREATE INDEX IF NOT EXISTS idx_sequences_trigger ON sequences(trigger) WHERE tri
 `,
 	})
 	
+	// Add missing columns to sequence_steps
+	pendingMigrations = append(pendingMigrations, Migration{
+		Name: "Add missing columns to sequence_steps table",
+		SQL: `
+-- Add missing columns to sequence_steps table
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS day INTEGER;
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger VARCHAR(255);
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS send_time VARCHAR(10);
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS media_url TEXT;
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Create index on sequence_id for better performance
+CREATE INDEX IF NOT EXISTS idx_sequence_steps_sequence_id ON sequence_steps(sequence_id);
+`,
+	})
+	
 	return pendingMigrations
 }
 
