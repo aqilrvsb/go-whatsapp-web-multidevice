@@ -52,8 +52,11 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		return response, err
 	}
 	
+	// Log steps
+	logrus.Infof("Creating %d steps for sequence %s", len(request.Steps), sequence.ID)
+	
 	// Create steps
-	for _, stepReq := range request.Steps {
+	for i, stepReq := range request.Steps {
 		step := &models.SequenceStep{
 			SequenceID:      sequence.ID,
 			Day:             stepReq.Day,
@@ -71,7 +74,10 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 		}
 		
 		if err := repo.CreateSequenceStep(step); err != nil {
-			logrus.Errorf("Failed to create step: %v", err)
+			logrus.Errorf("Failed to create step %d: %v", i+1, err)
+			logrus.Errorf("Step data: %+v", step)
+		} else {
+			logrus.Infof("Successfully created step %d for sequence %s", i+1, sequence.ID)
 		}
 	}
 	

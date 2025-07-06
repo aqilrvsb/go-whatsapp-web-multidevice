@@ -94,6 +94,10 @@ func (controller *Sequence) CreateSequence(c *fiber.Ctx) error {
 	}
 	request.UserID = userID
 	
+	// Log the request
+	logrus.Infof("CreateSequence request: %+v", request)
+	logrus.Infof("Number of steps: %d", len(request.Steps))
+	
 	response, err := controller.Service.CreateSequence(request)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{

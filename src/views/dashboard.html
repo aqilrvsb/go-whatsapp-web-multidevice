@@ -4801,6 +4801,9 @@
                 
                 const data = await response.json();
                 
+                console.log('Create sequence response:', data);
+                console.log('Response status:', response.status);
+                
                 if (response.ok && (data.code === 'CREATED' || data.code === 'SUCCESS')) {
                     Swal.fire('Success', 'Sequence created successfully!', 'success');
                     bootstrap.Modal.getInstance(document.getElementById('createSequenceModal')).hide();
