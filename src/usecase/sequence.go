@@ -58,19 +58,22 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	// Create steps
 	for i, stepReq := range request.Steps {
 		step := &models.SequenceStep{
-			SequenceID:      sequence.ID,
-			Day:             stepReq.Day,
-			DayNumber:       stepReq.DayNumber,
-			Trigger:         stepReq.Trigger,
-			MessageType:     stepReq.MessageType,
-			Content:         stepReq.Content,
-			MediaURL:        stepReq.MediaURL,
-			ImageURL:        stepReq.ImageURL,
-			Caption:         stepReq.Caption,
-			SendTime:        stepReq.SendTime,
-			TimeSchedule:    stepReq.TimeSchedule,
-			MinDelaySeconds: stepReq.MinDelaySeconds,
-			MaxDelaySeconds: stepReq.MaxDelaySeconds,
+			SequenceID:        sequence.ID,
+			Day:               stepReq.Day,
+			DayNumber:         stepReq.DayNumber,
+			Trigger:           stepReq.Trigger,
+			NextTrigger:       stepReq.NextTrigger,
+			TriggerDelayHours: stepReq.TriggerDelayHours,
+			IsEntryPoint:      stepReq.IsEntryPoint,
+			MessageType:       stepReq.MessageType,
+			Content:           stepReq.Content,
+			MediaURL:          stepReq.MediaURL,
+			ImageURL:          stepReq.ImageURL,
+			Caption:           stepReq.Caption,
+			SendTime:          stepReq.SendTime,
+			TimeSchedule:      stepReq.TimeSchedule,
+			MinDelaySeconds:   stepReq.MinDelaySeconds,
+			MaxDelaySeconds:   stepReq.MaxDelaySeconds,
 		}
 		
 		if err := repo.CreateSequenceStep(step); err != nil {
@@ -304,19 +307,22 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 		// Create new steps
 		for _, stepReq := range request.Steps {
 			step := &models.SequenceStep{
-				SequenceID:      sequenceID,
-				Day:             stepReq.Day,
-				DayNumber:       stepReq.DayNumber,
-				Trigger:         stepReq.Trigger,
-				MessageType:     stepReq.MessageType,
-				Content:         stepReq.Content,
-				MediaURL:        stepReq.MediaURL,
-				ImageURL:        stepReq.ImageURL,
-				Caption:         stepReq.Caption,
-				SendTime:        stepReq.SendTime,
-				TimeSchedule:    stepReq.TimeSchedule,
-				MinDelaySeconds: stepReq.MinDelaySeconds,
-				MaxDelaySeconds: stepReq.MaxDelaySeconds,
+				SequenceID:        sequenceID,
+				Day:               stepReq.Day,
+				DayNumber:         stepReq.DayNumber,
+				Trigger:           stepReq.Trigger,
+				NextTrigger:       stepReq.NextTrigger,
+				TriggerDelayHours: stepReq.TriggerDelayHours,
+				IsEntryPoint:      stepReq.IsEntryPoint,
+				MessageType:       stepReq.MessageType,
+				Content:           stepReq.Content,
+				MediaURL:          stepReq.MediaURL,
+				ImageURL:          stepReq.ImageURL,
+				Caption:           stepReq.Caption,
+				SendTime:          stepReq.SendTime,
+				TimeSchedule:      stepReq.TimeSchedule,
+				MinDelaySeconds:   stepReq.MinDelaySeconds,
+				MaxDelaySeconds:   stepReq.MaxDelaySeconds,
 			}
 			
 			if err := repo.CreateSequenceStep(step); err != nil {

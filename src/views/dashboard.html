@@ -1740,8 +1740,25 @@
                 <div class="modal-body">
                     <input type="hidden" id="currentDayNumber">
                     <div class="mb-3">
-                        <label class="form-label">Start Trigger</label>
-                        <input type="text" class="form-control" id="dayStartTrigger" placeholder="e.g., day1_start, welcome_message">
+                        <label class="form-label">Step Trigger <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="dayStartTrigger" placeholder="e.g., fitness_day1, welcome_message" required>
+                        <small class="text-muted">Unique identifier for this step</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Next Trigger</label>
+                                <input type="text" class="form-control" id="dayNextTrigger" placeholder="e.g., fitness_day2">
+                                <small class="text-muted">Leave empty for last step</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Delay Hours</label>
+                                <input type="number" class="form-control" id="dayTriggerDelayHours" value="24" min="1">
+                                <small class="text-muted">Hours to wait before next step</small>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Message</label>
@@ -4448,6 +4465,8 @@
                 document.getElementById('dayMessageContent').value = sequenceDays[dayNumber].content || '';
                 document.getElementById('dayMessageImageUrl').value = sequenceDays[dayNumber].image_url || '';
                 document.getElementById('dayStartTrigger').value = sequenceDays[dayNumber].trigger || '';
+                document.getElementById('dayNextTrigger').value = sequenceDays[dayNumber].next_trigger || '';
+                document.getElementById('dayTriggerDelayHours').value = sequenceDays[dayNumber].trigger_delay_hours || 24;
                 if (sequenceDays[dayNumber].image_url) {
                     document.getElementById('dayImagePreview').innerHTML = 
                         `<img src="${sequenceDays[dayNumber].image_url}" class="img-thumbnail" style="max-height: 150px;">`;
@@ -4459,7 +4478,16 @@
                 document.getElementById('dayMessageContent').value = '';
                 document.getElementById('dayMessageImageUrl').value = '';
                 document.getElementById('dayStartTrigger').value = '';
+                document.getElementById('dayNextTrigger').value = '';
+                document.getElementById('dayTriggerDelayHours').value = '24';
                 document.getElementById('dayImagePreview').innerHTML = '';
+                
+                // Auto-suggest trigger based on sequence trigger
+                const sequenceTrigger = document.getElementById('sequenceTrigger').value;
+                if (sequenceTrigger && dayNumber === 1) {
+                    document.getElementById('dayStartTrigger').value = sequenceTrigger;
+                    document.getElementById('dayNextTrigger').value = sequenceTrigger + '_day2';
+                }
             }
             
             updateSequenceLivePreview();
@@ -4475,6 +4503,13 @@
             const content = document.getElementById('dayMessageContent').value;
             const imageUrl = document.getElementById('dayMessageImageUrl').value;
             const trigger = document.getElementById('dayStartTrigger').value;
+            const nextTrigger = document.getElementById('dayNextTrigger').value;
+            const triggerDelayHours = parseInt(document.getElementById('dayTriggerDelayHours').value) || 24;
+            
+            if (!trigger) {
+                Swal.fire('Error', 'Please enter a trigger identifier for this step', 'error');
+                return;
+            }
             
             if (!content && !imageUrl) {
                 Swal.fire('Error', 'Please add a message or image', 'error');
@@ -4486,6 +4521,9 @@
                 day: dayNumber,
                 day_number: dayNumber,
                 trigger: trigger,
+                next_trigger: nextTrigger,
+                trigger_delay_hours: triggerDelayHours,
+                is_entry_point: dayNumber === 1, // First day is entry point
                 content: content,
                 image_url: imageUrl,
                 media_url: imageUrl,
@@ -4633,6 +4671,9 @@
                                 day: dayNum,
                                 day_number: dayNum,
                                 trigger: step.trigger || '',
+                                next_trigger: step.next_trigger || '',
+                                trigger_delay_hours: step.trigger_delay_hours || 24,
+                                is_entry_point: step.is_entry_point || false,
                                 content: step.content || '',
                                 image_url: step.image_url || step.media_url || '',
                                 media_url: step.media_url || step.image_url || '',

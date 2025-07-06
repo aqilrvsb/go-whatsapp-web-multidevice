@@ -166,9 +166,10 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 		INSERT INTO sequence_steps (
 			id, sequence_id, day_number, message_type, content, 
 			media_url, caption, send_time, trigger, time_schedule,
+			next_trigger, trigger_delay_hours, is_entry_point,
 			created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 	
 	// Use DayNumber, fallback to Day if DayNumber is 0
@@ -186,6 +187,7 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 	_, err := r.db.Exec(query, 
 		step.ID, step.SequenceID, dayNumber, step.MessageType, step.Content,
 		step.MediaURL, step.Caption, step.SendTime, step.Trigger, timeSchedule,
+		step.NextTrigger, step.TriggerDelayHours, step.IsEntryPoint,
 		step.CreatedAt, step.UpdatedAt)
 		
 	return err
@@ -196,6 +198,9 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 		SELECT 
 			id, sequence_id, day_number, 
 			COALESCE(trigger, '') as trigger, 
+			COALESCE(next_trigger, '') as next_trigger,
+			COALESCE(trigger_delay_hours, 24) as trigger_delay_hours,
+			COALESCE(is_entry_point, false) as is_entry_point,
 			COALESCE(message_type, 'text') as message_type, 
 			COALESCE(content, '') as content, 
 			COALESCE(media_url, '') as media_url, 
@@ -217,12 +222,16 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	var steps []models.SequenceStep
 	for rows.Next() {
 		var step models.SequenceStep
-		err := rows.Scan(&step.ID, &step.SequenceID, &step.Day, &step.Trigger, &step.MessageType,
-			&step.Content, &step.MediaURL, &step.Caption, &step.SendTime, 
+		err := rows.Scan(&step.ID, &step.SequenceID, &step.DayNumber, 
+			&step.Trigger, &step.NextTrigger, &step.TriggerDelayHours, &step.IsEntryPoint,
+			&step.MessageType, &step.Content, &step.MediaURL, &step.Caption, 
+			&step.SendTime, &step.TimeSchedule,
 			&step.CreatedAt, &step.UpdatedAt)
 		if err != nil {
 			continue
 		}
+		// Set Day to match DayNumber for backward compatibility
+		step.Day = step.DayNumber
 		steps = append(steps, step)
 	}
 	

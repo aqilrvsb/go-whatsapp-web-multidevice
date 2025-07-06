@@ -340,51 +340,184 @@ ALTER SYSTEM SET shared_buffers = '4GB';
 SELECT pg_reload_conf();
 ```
 
-## 🔄 Message Sequences (Drip Campaigns)
+## 🔄 Message Sequences (Trigger-Based Drip Campaigns)
 
-### Complete Sequence Management System
-Create automated drip campaigns that send messages over multiple days to nurture your leads.
+### 🚀 Advanced Trigger-Based Sequence System
 
-### ✅ Sequence Features
-1. **Visual Day Grid**: 31-day calendar grid to easily set up your sequence
-2. **Rich Message Editor**: 
-   - WhatsApp formatting support (*bold*, _italic_, ~strikethrough~)
-   - Live preview as you type
-   - Image attachments with compression
-   - Emoji support 😊
+Our sequence system uses a sophisticated **trigger-delay** architecture instead of simple day-based scheduling. This enables flexible, scalable automation for 3000+ devices.
 
-3. **Advanced Triggers**:
-   - **Start Trigger**: Define what initiates the sequence (e.g., signup, purchase)
-   - **End Trigger**: Define what completes the sequence (e.g., converted, unsubscribed)
-   - **Step Triggers**: Individual triggers for each day/step
+### ✅ How Trigger-Based Sequences Work
 
-4. **Flexible Scheduling**:
-   - Set global schedule time for all messages
-   - Configure min/max delays between messages
-   - Human-like random delays to avoid spam detection
+#### 1. **Trigger Flow Architecture**
+```
+Lead Trigger → Entry Point → Message → Delay → Next Trigger → Message → ... → Complete
+```
 
-5. **Status Management**:
-   - Toggle sequences between active/inactive
-   - Real-time status updates
-   - Color-coded status indicators (green=active, red=inactive)
+#### 2. **Key Components**
+- **Lead Trigger**: Comma-separated triggers on leads (e.g., `"fitness_start,crypto_welcome"`)
+- **Step Trigger**: Unique identifier for each sequence step
+- **Next Trigger**: Points to the next step in sequence
+- **Trigger Delay Hours**: Time to wait before processing next trigger
+- **Entry Point**: Marks where leads can enter the sequence
 
-6. **Sequence Summary Dashboard**:
-   - Overview of all sequences at a glance
-   - Contact counts and progress tracking
-   - Quick actions with modal editing (no page redirects)
+#### 3. **Example Sequence Setup**
+```javascript
+Step 1: {
+    trigger: "fitness_start",      // Entry trigger
+    next_trigger: "fitness_day2",   // Next step
+    trigger_delay_hours: 24,        // Wait 24 hours
+    is_entry_point: true,          // Can start here
+    content: "Welcome to your fitness journey!"
+}
 
-### 📊 Technical Implementation
-- **Database**: Properly normalized tables for sequences, steps, contacts, and logs
-- **Auto-save**: Changes are saved automatically when editing days
-- **Bulk Operations**: Enroll multiple contacts at once
-- **Progress Tracking**: Monitor completion rates and engagement
+Step 2: {
+    trigger: "fitness_day2",
+    next_trigger: "fitness_day3", 
+    trigger_delay_hours: 48,       // Wait 48 hours
+    content: "Here's your workout plan..."
+}
 
-### 🚀 Usage Example
-1. Create a sequence with a niche (e.g., "fitness")
-2. Set up your 7-day welcome series
-3. Define start trigger: "trial_signup"
-4. Add contacts manually or auto-enroll based on niche
-5. Monitor progress in the Sequence Summary tab
+Step 3: {
+    trigger: "fitness_day3",
+    next_trigger: null,            // Last step
+    trigger_delay_hours: 0,
+    content: "Congratulations on completing!"
+}
+```
+
+### 📊 Sequence Features
+
+#### **Visual Sequence Builder**
+- 31-day calendar grid interface
+- Drag-and-drop message creation
+- Rich text editor with WhatsApp formatting
+- Live message preview
+- Image attachments with auto-compression
+
+#### **Trigger Configuration**
+- **Step Trigger**: Unique identifier for each message
+- **Next Trigger**: Links to next message in sequence
+- **Delay Hours**: Flexible timing (1 hour to weeks)
+- **Entry Points**: Multiple starting points possible
+
+#### **Smart Automation**
+- Auto-enrollment based on lead triggers
+- Parallel processing across 3000 devices
+- Load balancing prevents overload
+- Human-like random delays
+- Automatic retry on failures
+
+### 🎯 Usage Example
+
+#### 1. **Create a Sequence**
+```sql
+-- Sequence with trigger-based flow
+Name: "30 Day Fitness Challenge"
+Trigger: "fitness_start"
+Niche: "fitness"
+
+Steps:
+- Day 1: trigger="fitness_start" → next="fitness_day2" (24hr delay)
+- Day 2: trigger="fitness_day2" → next="fitness_day3" (24hr delay)
+- Day 3: trigger="fitness_day3" → next="fitness_week1" (168hr delay)
+```
+
+#### 2. **Enroll Leads**
+```javascript
+// Edit lead and add trigger
+Lead: {
+    name: "John Doe",
+    phone: "60123456789",
+    trigger: "fitness_start"  // Automatically enters sequence
+}
+```
+
+#### 3. **Processing Flow**
+```
+Hour 0: Lead gets "fitness_start" trigger
+Hour 0: System sends Day 1 message
+Hour 24: System sends Day 2 message
+Hour 48: System sends Day 3 message
+Hour 216: System sends Week 1 message
+```
+
+### 🔧 Technical Implementation
+
+#### **Database Schema**
+```sql
+-- Sequence steps with trigger flow
+sequence_steps:
+- trigger (VARCHAR): Current step identifier
+- next_trigger (VARCHAR): Next step to process
+- trigger_delay_hours (INT): Hours before next step
+- is_entry_point (BOOLEAN): Can leads start here?
+
+-- Lead triggers
+leads:
+- trigger (VARCHAR): Comma-separated active triggers
+
+-- Contact progress tracking
+sequence_contacts:
+- current_trigger: Current position
+- next_trigger_time: When to process next
+```
+
+#### **Processing Logic**
+1. **Every 30 seconds**: Check for contacts ready to process
+2. **Find ready contacts**: `WHERE next_trigger_time <= NOW()`
+3. **Send messages**: Distribute across available devices
+4. **Update progress**: Set next trigger and time
+5. **Complete sequence**: Remove trigger when done
+
+### 📈 Performance Optimization
+
+#### **For 3000 Devices**
+- **Capacity**: 240,000 messages/hour
+- **Processing**: Parallel across 10 workers
+- **Load Balancing**: 80 messages/hour per device
+- **Database**: Indexed triggers for fast lookups
+- **Scaling**: Linear with device count
+
+#### **Why Trigger-Based is Better**
+1. **Flexible Timing**: Not locked to daily schedules
+2. **Multiple Paths**: Different flows for different leads
+3. **Smart Distribution**: Load spread across 24 hours
+4. **Easy Testing**: Change delays without recreating
+5. **Scalable**: Handles millions of leads efficiently
+
+### 🛡️ Anti-Ban Protection
+- Random delays between messages (min/max)
+- Device rotation and health monitoring
+- Rate limiting per device (80/hour)
+- Human-like message patterns
+- Automatic pause on errors
+
+### 🚀 Quick Start
+
+1. **Create Sequence**
+   - Go to Dashboard → Sequences
+   - Click "Create Sequence"
+   - Set trigger (e.g., "fitness_start")
+   - Add messages with triggers and delays
+
+2. **Configure Steps**
+   - Each step needs:
+     - Trigger identifier
+     - Message content
+     - Next trigger (unless last step)
+     - Delay hours to next step
+
+3. **Enroll Leads**
+   - Edit lead → Add trigger
+   - Or auto-enroll by niche
+   - System handles the rest!
+
+4. **Monitor Progress**
+   - Real-time progress tracking
+   - Success/failure rates
+   - Estimated completion times
+
+The trigger-based system is production-ready and optimized for massive scale with 3000+ devices!
 
 ## 🎉 What's Next?
 
