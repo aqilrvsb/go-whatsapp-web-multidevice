@@ -1128,7 +1128,7 @@
       fetch(`/api/devices/${deviceId}/messages/${chatId}`, { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
-          if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
+          if ((data.code === 'SUCCESS' || data.code === 'DEVICE_OFFLINE') && data.results && data.results.length > 0) {
             container.innerHTML = '';
             
             data.results.forEach(msg => {

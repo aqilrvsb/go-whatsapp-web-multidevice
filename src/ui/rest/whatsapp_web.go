@@ -199,11 +199,26 @@ func (handler *App) GetWhatsAppMessages(c *fiber.Ctx) error {
 	}
 	
 	if !isOnline {
+		// When offline, still get stored messages from database
+		// The GetWhatsAppWebMessages function already queries the database
+		limit := c.QueryInt("limit", 50)
+		if limit > 100 {
+			limit = 100
+		}
+		
+		// We need to bypass the client check in GetWhatsAppWebMessages for offline mode
+		// So let's get messages directly from database
+		messages, err := whatsapp.GetStoredMessagesFromDB(deviceId, chatId, limit)
+		if err != nil {
+			logrus.Warnf("Failed to get stored messages for offline device %s, chat %s: %v", deviceId, chatId, err)
+			messages = []map[string]interface{}{}
+		}
+		
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "DEVICE_OFFLINE",
-			Message: "Device is offline",
-			Results: []interface{}{},
+			Message: "Device is offline. Showing stored messages.",
+			Results: messages,
 		})
 	}
 	

@@ -24,6 +24,125 @@ func GetWhatsAppWebChats(deviceID string) ([]map[string]interface{}, error) {
 	return chats, nil
 }
 
+// GetStoredMessagesFromDB gets messages from database without requiring client connection
+func GetStoredMessagesFromDB(deviceID, chatJID string, limit int) ([]map[string]interface{}, error) {
+	logrus.Infof("=== GetStoredMessagesFromDB called for device: %s, chat: %s ===", deviceID, chatJID)
+	
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	// Ensure table exists
+	createTableQuery := `
+		CREATE TABLE IF NOT EXISTS whatsapp_messages (
+			id SERIAL PRIMARY KEY,
+			device_id TEXT NOT NULL,
+			chat_jid TEXT NOT NULL,
+			message_id TEXT NOT NULL,
+			sender_jid TEXT NOT NULL,
+			message_text TEXT,
+			message_type TEXT DEFAULT 'text',
+			timestamp BIGINT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(device_id, message_id)
+		);
+		
+		CREATE INDEX IF NOT EXISTS idx_device_chat_time ON whatsapp_messages(device_id, chat_jid, timestamp DESC);
+	`
+	
+	db.Exec(createTableQuery)
+	
+	// Query messages
+	query := `
+		SELECT 
+			message_id,
+			sender_jid,
+			message_text,
+			message_type,
+			message_secrets,
+			timestamp
+		FROM whatsapp_messages
+		WHERE device_id = $1 AND chat_jid = $2
+		ORDER BY timestamp DESC
+		LIMIT $3
+	`
+	
+	rows, err := db.Query(query, deviceID, chatJID, limit)
+	if err != nil {
+		logrus.Errorf("Failed to query messages: %v", err)
+		return []map[string]interface{}{}, nil
+	}
+	defer rows.Close()
+	
+	var messages []map[string]interface{}
+	
+	// Try to determine our JID from stored messages or device info
+	ourJID := ""
+	
+	// First, try to get device JID from user_devices table
+	var deviceJID sql.NullString
+	deviceQuery := `SELECT jid FROM user_devices WHERE id = $1`
+	db.QueryRow(deviceQuery, deviceID).Scan(&deviceJID)
+	if deviceJID.Valid && deviceJID.String != "" {
+		ourJID = deviceJID.String
+		logrus.Infof("Got device JID from database: %s", ourJID)
+	}
+	
+	for rows.Next() {
+		var messageID, senderJID, messageType string
+		var messageText, messageSecrets sql.NullString
+		var timestamp int64
+		
+		err := rows.Scan(&messageID, &senderJID, &messageText, &messageType, &messageSecrets, &timestamp)
+		if err != nil {
+			continue
+		}
+		
+		// Determine if sent or received
+		// If we have ourJID, use it. Otherwise, assume messages from the chat JID are received
+		sent := false
+		if ourJID != "" {
+			sent = senderJID == ourJID
+		} else {
+			// Heuristic: if sender is not the chat JID, it's probably sent by us
+			sent = senderJID != chatJID
+		}
+		
+		// Format time using Malaysia timezone
+		malaysiaTime := GetMalaysiaTime(timestamp)
+		timeStr := malaysiaTime.Format("15:04")
+		
+		text := ""
+		if messageText.Valid {
+			text = messageText.String
+		}
+		
+		message := map[string]interface{}{
+			"id":        messageID,
+			"text":      text,
+			"type":      messageType,
+			"sent":      sent,
+			"time":      timeStr,
+			"timestamp": timestamp,
+		}
+		
+		// Add image URL if it's an image message
+		if messageType == "image" && messageSecrets.Valid && messageSecrets.String != "" {
+			message["image"] = messageSecrets.String
+		}
+		
+		messages = append(messages, message)
+	}
+	
+	// Reverse to show oldest first
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+	
+	logrus.Infof("=== Found %d stored messages for chat %s ===", len(messages), chatJID)
+	
+	return messages, nil
+}
+
 // GetWhatsAppWebMessages gets messages for a specific chat
 func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]interface{}, error) {
 	logrus.Infof("=== GetWhatsAppWebMessages called for device: %s, chat: %s ===", deviceID, chatJID)
