@@ -99,11 +99,18 @@ func (handler *App) GetWhatsAppChats(c *fiber.Ctx) error {
 	}
 	
 	if !isOnline {
+		// When offline, return stored chats from database
+		storedChats, err := whatsapp.GetChatsFromDatabase(deviceId)
+		if err != nil {
+			logrus.Warnf("Failed to get stored chats for offline device %s: %v", deviceId, err)
+			storedChats = []map[string]interface{}{}
+		}
+		
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "DEVICE_OFFLINE",
-			Message: "Device is offline. Please ensure device is connected to WhatsApp.",
-			Results: []interface{}{},
+			Message: "Device is offline. Showing stored chat history.",
+			Results: storedChats,
 		})
 	}
 	

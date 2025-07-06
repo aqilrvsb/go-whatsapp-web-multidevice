@@ -928,6 +928,7 @@
     const deviceId = pathParts[2];
     let currentChat = null;
     let allChats = [];
+    let isDeviceOnline = true; // Track device status
     let selectedImageFile = null;
     let refreshTimer = null;
     let wsReconnectTimer = null;
@@ -958,13 +959,16 @@
             document.getElementById('devicePhone').textContent = device.phone || 'Not connected';
             
             if (device.status === 'online') {
+              isDeviceOnline = true;
               document.getElementById('deviceInfoBar').classList.remove('offline');
               document.getElementById('statusDot').classList.remove('offline');
               loadChats();
             } else {
+              isDeviceOnline = false;
               document.getElementById('deviceInfoBar').classList.add('offline');
               document.getElementById('statusDot').classList.add('offline');
-              showOfflineMessage();
+              // Load stored chats even when offline
+              loadChats();
             }
           }
         })
@@ -993,14 +997,23 @@
       fetch(`/api/devices/${deviceId}/chats`, { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
-          if (data.code === 'NOT_CONNECTED') {
+          // Handle different response codes
+          if ((data.code === 'NOT_CONNECTED' || data.code === 'DEVICE_OFFLINE') && (!data.results || data.results.length === 0)) {
             showOfflineMessage();
             return;
           }
           
-          if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
+          if ((data.code === 'SUCCESS' || data.code === 'DEVICE_OFFLINE') && data.results && data.results.length > 0) {
             allChats = data.results;
             displayChats(allChats);
+            
+            // Show offline indicator in chat list if device is offline
+            if (data.code === 'DEVICE_OFFLINE') {
+              const header = document.createElement('div');
+              header.style.cssText = 'background: #fef3c7; color: #92400e; padding: 8px 16px; font-size: 13px; text-align: center;';
+              header.innerHTML = '<i class="bi bi-info-circle"></i> Showing stored messages (Device offline)';
+              chatList.insertBefore(header, chatList.firstChild);
+            }
           } else {
             chatList.innerHTML = `
               <div style="text-align: center; padding: 40px; color: #667781;">
@@ -1076,7 +1089,9 @@
       
       // Update header
       document.getElementById('chatName').textContent = chat.name;
-      document.getElementById('chatStatus').textContent = chat.isGroup ? 'tap for group info' : 'tap for contact info';
+      document.getElementById('chatStatus').textContent = isDeviceOnline ? 
+        (chat.isGroup ? 'tap for group info' : 'tap for contact info') : 
+        'Viewing stored messages (offline)';
       
       const avatarContent = chat.isGroup ? '👥' : 
         `<svg viewBox="0 0 24 24">
@@ -1086,6 +1101,12 @@
       
       loadMessages(chat.id);
       document.getElementById('messageInput').focus();
+      
+      // Hide input area if device is offline
+      const inputArea = document.querySelector('.input-area');
+      if (inputArea) {
+        inputArea.style.display = isDeviceOnline ? 'flex' : 'none';
+      }
     }
 
     // Show chat list (mobile)
