@@ -380,9 +380,20 @@ func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads ma
 		return false
 	}
 
-	// Remove current trigger from lead if sequence is complete
+	// Handle sequence completion or continuation
 	if !job.nextTrigger.Valid || job.nextTrigger.String == "" {
+		// Sequence is complete - remove current trigger from lead
 		s.removeCompletedTriggerFromLead(job.phone, job.currentTrigger)
+		logrus.Infof("Sequence completed for lead %s, removed trigger: %s", job.phone, job.currentTrigger)
+	} else {
+		// Check if next trigger points to another sequence
+		if !strings.Contains(job.nextTrigger.String, "_day") {
+			// This looks like a sequence trigger, not a day trigger
+			// Update lead's trigger to the new sequence trigger
+			s.updateLeadTrigger(job.phone, job.currentTrigger, job.nextTrigger.String)
+			logrus.Infof("Lead %s transitioning from %s to new sequence trigger: %s", 
+				job.phone, job.currentTrigger, job.nextTrigger.String)
+		}
 	}
 
 	logrus.Debugf("Processed contact %s with trigger %s", job.phone, job.currentTrigger)
@@ -485,6 +496,40 @@ func (s *SequenceTriggerProcessor) removeCompletedTriggerFromLead(phone, trigger
 	}
 
 	s.db.Exec("UPDATE leads SET trigger = NULLIF($1, '') WHERE phone = $2", newTriggerStr, phone)
+}
+
+// updateLeadTrigger updates lead trigger from old to new (for sequence chaining)
+func (s *SequenceTriggerProcessor) updateLeadTrigger(phone, oldTrigger, newTrigger string) {
+	// Get current triggers
+	var currentTriggers sql.NullString
+	err := s.db.QueryRow("SELECT trigger FROM leads WHERE phone = $1", phone).Scan(&currentTriggers)
+	if err != nil {
+		return
+	}
+
+	var newTriggerStr string
+	if currentTriggers.Valid && currentTriggers.String != "" {
+		// Replace old trigger with new one
+		triggers := strings.Split(currentTriggers.String, ",")
+		for i, t := range triggers {
+			t = strings.TrimSpace(t)
+			if t == oldTrigger {
+				triggers[i] = newTrigger
+			}
+		}
+		newTriggerStr = strings.Join(triggers, ",")
+	} else {
+		// No existing triggers, just set the new one
+		newTriggerStr = newTrigger
+	}
+
+	// Update lead with new trigger
+	_, err = s.db.Exec("UPDATE leads SET trigger = $1 WHERE phone = $2", newTriggerStr, phone)
+	if err != nil {
+		logrus.Errorf("Failed to update lead trigger for %s: %v", phone, err)
+	} else {
+		logrus.Infof("Updated lead %s trigger from %s to %s", phone, oldTrigger, newTrigger)
+	}
 }
 
 // cleanupStuckProcessing releases contacts stuck in processing

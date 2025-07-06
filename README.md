@@ -344,23 +344,53 @@ SELECT pg_reload_conf();
 
 ### 🚀 Advanced Trigger-Based Sequence System
 
-Our sequence system uses a sophisticated **trigger-delay** architecture instead of simple day-based scheduling. This enables flexible, scalable automation for 3000+ devices.
+Our sequence system uses a sophisticated **trigger-delay** architecture with **automatic sequence chaining** and **lead trigger updates**. This enables flexible, scalable automation for 3000+ devices.
 
 ### ✅ How Trigger-Based Sequences Work
 
 #### 1. **Trigger Flow Architecture**
 ```
-Lead Trigger → Entry Point → Message → Delay → Next Trigger → Message → ... → Complete
+Lead Trigger → Entry Point → Message → Delay → Next Trigger → Message → ... → Complete/Chain
 ```
 
 #### 2. **Key Components**
 - **Lead Trigger**: Comma-separated triggers on leads (e.g., `"fitness_start,crypto_welcome"`)
 - **Step Trigger**: Unique identifier for each sequence step
-- **Next Trigger**: Points to the next step in sequence
-- **Trigger Delay Hours**: Time to wait before processing next trigger
+- **Next Trigger**: Points to the next step or another sequence
+- **Trigger Delay Hours**: Time to wait before processing next trigger (default: 24 hours)
 - **Entry Point**: Marks where leads can enter the sequence
+- **Auto-Generate**: Day 2+ automatically inherits triggers from previous day
 
-#### 3. **Example Sequence Setup**
+#### 3. **NEW: Sequence Chaining & Auto-Trigger Updates**
+
+##### **Automatic Trigger Generation**
+- Day 1: Uses main sequence trigger (e.g., `fitness_start` → `fitness_day2`)
+- Day 2-30: Auto-generates based on pattern (e.g., `fitness_day2` → `fitness_day3`)
+- No manual trigger entry needed for subsequent days!
+
+##### **Sequence Chaining**
+Mark any day as "end of sequence" and chain to another:
+- Check "This is the end of sequence"
+- Select next sequence from dropdown
+- Lead's trigger automatically updates when they complete
+
+##### **Two Approaches for Lead Flow**
+
+**Approach 1: Automatic Trigger Update**
+When sequence ends with chaining:
+```
+Lead completes Day 30 → next_trigger = "advanced_fitness_start" 
+→ System updates lead.trigger = "advanced_fitness_start"
+→ Lead auto-enrolls in Advanced Fitness sequence
+```
+
+**Approach 2: Manual Trigger Update**
+Direct lead editing:
+- Edit lead → Change trigger field
+- Remove old triggers, add new ones
+- Lead enrolls in matching sequences on next run
+
+#### 4. **Example Sequence Setup**
 ```javascript
 Step 1: {
     trigger: "fitness_start",      // Entry trigger
@@ -379,9 +409,17 @@ Step 2: {
 
 Step 3: {
     trigger: "fitness_day3",
-    next_trigger: null,            // Last step
+    next_trigger: null,            // Last step - sequence ends
     trigger_delay_hours: 0,
     content: "Congratulations on completing!"
+}
+
+// OR Chain to another sequence:
+Step 3: {
+    trigger: "fitness_day3",
+    next_trigger: "advanced_fitness_start",  // Chain to advanced sequence
+    trigger_delay_hours: 24,
+    content: "Ready for the next level? Starting advanced program tomorrow!"
 }
 ```
 
@@ -432,13 +470,39 @@ Lead: {
 }
 ```
 
-#### 3. **Processing Flow**
+#### 3. **Processing Flow with 3000 Device Support**
+```
+Worker runs every 60 seconds → Checks all sequences → Processes triggers → Updates leads
+```
+
+**Detailed Flow:**
 ```
 Hour 0: Lead gets "fitness_start" trigger
-Hour 0: System sends Day 1 message
-Hour 24: System sends Day 2 message
-Hour 48: System sends Day 3 message
-Hour 216: System sends Week 1 message
+Hour 0: System sends Day 1 message via available device
+Hour 24: System checks trigger_delay_hours, sends Day 2
+Hour 48: System sends Day 3
+...
+Final Day: Either completes OR chains to next sequence
+```
+
+**Load Balancing for 3000 Devices:**
+- Worker distributes messages across all online devices
+- Tracks device load (messages/hour)
+- Automatic failover if device goes offline
+- Respects rate limits per device
+- Parallel processing for maximum throughput
+
+**Sequence Completion Handling:**
+```
+IF next_trigger is empty:
+    → Mark sequence as completed
+    → Remove trigger from lead
+    → Lead exits sequence
+    
+IF next_trigger is another sequence (e.g., "advanced_start"):
+    → Update lead.trigger = "advanced_start"
+    → Lead automatically enrolls in new sequence
+    → Seamless continuation without manual intervention
 ```
 
 ### 🔧 Technical Implementation
