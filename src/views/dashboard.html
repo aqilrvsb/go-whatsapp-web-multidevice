@@ -1751,6 +1751,21 @@
                                 <input type="text" class="form-control" id="dayNextTrigger" placeholder="e.g., fitness_day2">
                                 <small class="text-muted">Leave empty for last step</small>
                             </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="isSequenceEnd" onchange="toggleSequenceChaining()">
+                                    <label class="form-check-label" for="isSequenceEnd">
+                                        This is the end of sequence
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mb-3" id="nextSequenceSection" style="display: none;">
+                                <label class="form-label">Continue to Sequence</label>
+                                <select class="form-select" id="nextSequenceSelect" onchange="updateNextTriggerFromSequence()">
+                                    <option value="">-- Select Next Sequence --</option>
+                                </select>
+                                <small class="text-muted">Chain this sequence to another sequence</small>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -4476,6 +4491,20 @@
                 } else {
                     document.getElementById('dayImagePreview').innerHTML = '';
                 }
+                
+                // Check if this is marked as sequence end
+                const nextTrigger = sequenceDays[dayNumber].next_trigger || '';
+                const isSequenceEnd = nextTrigger && !nextTrigger.includes('_day');
+                document.getElementById('isSequenceEnd').checked = isSequenceEnd;
+                
+                // Show/hide sequence chaining
+                if (isSequenceEnd) {
+                    document.getElementById('nextSequenceSection').style.display = 'block';
+                    // Populate and select the sequence
+                    toggleSequenceChaining();
+                } else {
+                    document.getElementById('nextSequenceSection').style.display = 'none';
+                }
             } else {
                 // Clear all fields for new day
                 document.getElementById('dayMessageContent').value = '';
@@ -4484,12 +4513,34 @@
                 document.getElementById('dayNextTrigger').value = '';
                 document.getElementById('dayTriggerDelayHours').value = '24';
                 document.getElementById('dayImagePreview').innerHTML = '';
+                document.getElementById('isSequenceEnd').checked = false;
+                document.getElementById('nextSequenceSection').style.display = 'none';
                 
-                // Auto-suggest trigger based on sequence trigger
-                const sequenceTrigger = document.getElementById('sequenceTrigger').value;
-                if (sequenceTrigger && dayNumber === 1) {
-                    document.getElementById('dayStartTrigger').value = sequenceTrigger;
-                    document.getElementById('dayNextTrigger').value = sequenceTrigger + '_day2';
+                // Auto-generate triggers based on previous day
+                if (dayNumber > 1) {
+                    // Check if previous day exists
+                    const previousDay = sequenceDays[dayNumber - 1];
+                    if (previousDay && previousDay.next_trigger) {
+                        // Use previous day's next_trigger as this day's trigger
+                        document.getElementById('dayStartTrigger').value = previousDay.next_trigger;
+                        
+                        // Generate next trigger if not the last day
+                        if (dayNumber < 31) {
+                            // Extract base trigger name and increment
+                            const baseTrigger = previousDay.next_trigger.replace(/_day\d+$/, '');
+                            document.getElementById('dayNextTrigger').value = baseTrigger + '_day' + (dayNumber + 1);
+                        } else {
+                            // Last day - leave next_trigger empty to indicate end
+                            document.getElementById('dayNextTrigger').value = '';
+                        }
+                    }
+                } else if (dayNumber === 1) {
+                    // For day 1, use sequence trigger
+                    const sequenceTrigger = document.getElementById('sequenceTrigger').value;
+                    if (sequenceTrigger) {
+                        document.getElementById('dayStartTrigger').value = sequenceTrigger;
+                        document.getElementById('dayNextTrigger').value = sequenceTrigger + '_day2';
+                    }
                 }
             }
             
@@ -4561,6 +4612,57 @@
                 dayBox.style.borderColor = '#e0e0e0';
                 dayBox.style.background = 'white';
                 dayBox.querySelector('.day-status').innerHTML = '<i class="bi bi-plus-circle"></i> Add';
+            }
+        }
+        
+        // Toggle sequence chaining UI
+        function toggleSequenceChaining() {
+            const isEnd = document.getElementById('isSequenceEnd').checked;
+            const nextSequenceSection = document.getElementById('nextSequenceSection');
+            const nextTriggerInput = document.getElementById('dayNextTrigger');
+            
+            if (isEnd) {
+                nextSequenceSection.style.display = 'block';
+                // Populate sequences dropdown
+                const select = document.getElementById('nextSequenceSelect');
+                select.innerHTML = '<option value="">-- Select Next Sequence --</option>';
+                
+                // Add all sequences except current one
+                sequences.forEach(seq => {
+                    if (seq.id !== currentEditingSequenceId) {
+                        select.innerHTML += `<option value="${seq.id}" data-trigger="${seq.trigger || seq.start_trigger || ''}">${seq.name}</option>`;
+                    }
+                });
+                
+                // Clear next trigger or set to END
+                if (!nextTriggerInput.value || nextTriggerInput.value.includes('_day')) {
+                    nextTriggerInput.value = '';
+                }
+            } else {
+                nextSequenceSection.style.display = 'none';
+                // Restore auto-generated next trigger if it was cleared
+                const dayNumber = parseInt(document.getElementById('currentDayNumber').value);
+                const trigger = document.getElementById('dayStartTrigger').value;
+                if (trigger && dayNumber < 31) {
+                    const baseTrigger = trigger.replace(/_day\d+$/, '');
+                    nextTriggerInput.value = baseTrigger + '_day' + (dayNumber + 1);
+                }
+            }
+        }
+        
+        // Update next trigger when sequence is selected
+        function updateNextTriggerFromSequence() {
+            const select = document.getElementById('nextSequenceSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            const nextTriggerInput = document.getElementById('dayNextTrigger');
+            
+            if (selectedOption && selectedOption.value) {
+                const nextSequenceTrigger = selectedOption.getAttribute('data-trigger');
+                if (nextSequenceTrigger) {
+                    nextTriggerInput.value = nextSequenceTrigger;
+                }
+            } else {
+                nextTriggerInput.value = '';
             }
         }
         
