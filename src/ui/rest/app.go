@@ -718,6 +718,7 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		Source:       "manual", // Set source as manual since it's added from UI
 		Status:       "", // Keep empty for backward compatibility
 		TargetStatus: request.Status, // Map status from frontend to target_status
+		Trigger:      request.Trigger, // Add trigger
 		Notes:        request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.CreateLead(lead)
@@ -768,6 +769,7 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		Niche    string `json:"niche"`
 		Journey  string `json:"journey"`
 		Status   string `json:"status"`
+		Trigger  string `json:"trigger"` // Add trigger field
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -789,6 +791,7 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		Source:       "manual", // Keep source as manual
 		Status:       "", // Keep empty for backward compatibility
 		TargetStatus: request.Status, // Map status from frontend to target_status
+		Trigger:      request.Trigger, // Add trigger
 		Notes:        request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.UpdateLead(leadId, lead)

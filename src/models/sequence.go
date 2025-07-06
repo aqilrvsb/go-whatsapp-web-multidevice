@@ -42,6 +42,9 @@ type SequenceStep struct {
 	Day              int       `json:"day" db:"day"`
 	DayNumber        int       `json:"day_number" db:"day_number"`
 	Trigger          string    `json:"trigger" db:"trigger"`
+	NextTrigger      string    `json:"next_trigger" db:"next_trigger"` // Next step trigger
+	TriggerDelayHours int      `json:"trigger_delay_hours" db:"trigger_delay_hours"` // Hours to wait
+	IsEntryPoint     bool      `json:"is_entry_point" db:"is_entry_point"` // Sequence start
 	MessageType      string    `json:"message_type" db:"message_type"`
 	SendTime         string    `json:"send_time" db:"send_time"`
 	TimeSchedule     string    `json:"time_schedule" db:"time_schedule"`

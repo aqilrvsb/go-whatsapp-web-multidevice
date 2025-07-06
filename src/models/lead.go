@@ -16,6 +16,7 @@ type Lead struct {
 	Source       string    `json:"source" db:"source"`
 	Status       string    `json:"status" db:"status"` // Keep for backward compatibility
 	TargetStatus string    `json:"target_status" db:"target_status"` // New column: prospect/customer
+	Trigger      string    `json:"trigger" db:"trigger"` // New column: comma-separated sequence triggers
 	Notes        string    `json:"notes" db:"notes"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
