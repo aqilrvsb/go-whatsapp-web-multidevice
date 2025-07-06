@@ -194,6 +194,7 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 }
 // GetSequenceSteps gets all steps for a sequence
 func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.SequenceStep, error) {
+	logrus.Infof("Getting steps for sequence: %s", sequenceID)
 	query := `
 		SELECT 
 			id, sequence_id, day_number, 
@@ -228,6 +229,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 			&step.SendTime, &step.TimeSchedule,
 			&step.CreatedAt, &step.UpdatedAt)
 		if err != nil {
+			logrus.Errorf("Error scanning sequence step: %v", err)
 			continue
 		}
 		// Set Day to match DayNumber for backward compatibility
@@ -235,6 +237,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 		steps = append(steps, step)
 	}
 	
+	logrus.Infof("Found %d steps for sequence %s", len(steps), sequenceID)
 	return steps, nil
 }
 

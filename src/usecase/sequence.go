@@ -120,7 +120,11 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		contacts, _ := repo.GetSequenceContacts(seq.ID)
 		
 		// Get steps
-		steps, _ := repo.GetSequenceSteps(seq.ID)
+		steps, err := repo.GetSequenceSteps(seq.ID)
+		if err != nil {
+			logrus.Errorf("Error getting steps for sequence %s: %v", seq.ID, err)
+		}
+		logrus.Infof("Retrieved %d steps for sequence %s", len(steps), seq.ID)
 		
 		logrus.Infof("Processing sequence: ID=%s, Name=%s, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
 		
