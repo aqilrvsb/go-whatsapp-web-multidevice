@@ -146,6 +146,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartTriggerProcessor()
 	logrus.Info("Campaign trigger processor started")
 	
+	// Start sequence trigger processor for trigger-based flow
+	go usecase.StartSequenceTriggerProcessor()
+	logrus.Info("Sequence trigger processor started")
+	
 	// Start campaign status monitor
 	go usecase.StartCampaignStatusMonitor()
 	logrus.Info("Campaign status monitor started")
