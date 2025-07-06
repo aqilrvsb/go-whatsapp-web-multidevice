@@ -74,7 +74,7 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	// - As last item: niche = 'OTHER,ITADRESS'
 	query := `
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
-		       COALESCE(target_status, 'prospect') as target_status, created_at, updated_at
+		       COALESCE(target_status, 'prospect') as target_status, trigger, created_at, updated_at
 		FROM leads
 		WHERE niche = $1 
 		   OR niche LIKE $2 
@@ -99,8 +99,9 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 	for rows.Next() {
 		var lead models.Lead
 		var journey sql.NullString
+		var trigger sql.NullString
 		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Niche, &journey, &lead.Status, &lead.TargetStatus,
+			&lead.Niche, &journey, &lead.Status, &lead.TargetStatus, &trigger,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			log.Printf("Error scanning lead in GetLeadsByNiche: %v", err)
@@ -109,6 +110,10 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 		// Map journey to Notes field
 		if journey.Valid {
 			lead.Notes = journey.String
+		}
+		// Map trigger
+		if trigger.Valid {
+			lead.Trigger = trigger.String
 		}
 		leads = append(leads, lead)
 	}
@@ -127,7 +132,7 @@ func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) (
 // GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
 func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
 	query := `
-		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, created_at, updated_at
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
 		FROM leads
 		WHERE device_id = $1
 		AND ($2 = '' OR niche LIKE '%' || $2 || '%')
@@ -146,9 +151,10 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 		var lead models.Lead
 		var journey sql.NullString
 		var targetStatus sql.NullString
+		var trigger sql.NullString
 		
 		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Niche, &journey, &lead.Status, &targetStatus,
+			&lead.Niche, &journey, &lead.Status, &targetStatus, &trigger,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			continue
@@ -158,6 +164,10 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 		
 		if targetStatus.Valid {
 			lead.TargetStatus = targetStatus.String
+		}
+		
+		if trigger.Valid {
+			lead.Trigger = trigger.String
 		}
 		
 		leads = append(leads, lead)
@@ -211,7 +221,7 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 // GetLeadsByDevice gets all leads for a specific user's device
 func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lead, error) {
 	query := `
-		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, created_at, updated_at
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
 		FROM leads
 		WHERE user_id = $1 AND device_id = $2
 		ORDER BY created_at DESC
@@ -228,9 +238,10 @@ func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lea
 		var lead models.Lead
 		var journey sql.NullString
 		var targetStatus sql.NullString
+		var trigger sql.NullString
 		
 		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
-			&lead.Niche, &journey, &lead.Status, &targetStatus,
+			&lead.Niche, &journey, &lead.Status, &targetStatus, &trigger,
 			&lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			continue
@@ -244,6 +255,11 @@ func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lea
 		// Map target_status
 		if targetStatus.Valid {
 			lead.TargetStatus = targetStatus.String
+		}
+		
+		// Map trigger
+		if trigger.Valid {
+			lead.Trigger = trigger.String
 		}
 		
 		leads = append(leads, lead)
