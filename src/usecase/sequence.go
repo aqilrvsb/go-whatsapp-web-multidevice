@@ -59,7 +59,6 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	for i, stepReq := range request.Steps {
 		step := &models.SequenceStep{
 			SequenceID:        sequence.ID,
-			Day:               stepReq.Day,
 			DayNumber:         stepReq.DayNumber,
 			Trigger:           stepReq.Trigger,
 			NextTrigger:       stepReq.NextTrigger,
@@ -68,9 +67,7 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 			MessageType:       stepReq.MessageType,
 			Content:           stepReq.Content,
 			MediaURL:          stepReq.MediaURL,
-			ImageURL:          stepReq.ImageURL,
 			Caption:           stepReq.Caption,
-			SendTime:          stepReq.SendTime,
 			TimeSchedule:      stepReq.TimeSchedule,
 			MinDelaySeconds:   stepReq.MinDelaySeconds,
 			MaxDelaySeconds:   stepReq.MaxDelaySeconds,
@@ -241,7 +238,6 @@ func (s *sequenceService) GetSequenceByID(sequenceID string) (domainSequence.Seq
 		response.Steps = append(response.Steps, domainSequence.SequenceStepResponse{
 			ID:                step.ID,
 			SequenceID:        step.SequenceID,
-			Day:               step.Day,
 			DayNumber:         step.DayNumber,
 			Trigger:           step.Trigger,
 			NextTrigger:       step.NextTrigger,
@@ -249,10 +245,8 @@ func (s *sequenceService) GetSequenceByID(sequenceID string) (domainSequence.Seq
 			IsEntryPoint:      step.IsEntryPoint,
 			MessageType:       step.MessageType,
 			Content:           step.Content,
-			ImageURL:          step.ImageURL,
 			MediaURL:          step.MediaURL,
 			Caption:           step.Caption,
-			SendTime:          step.SendTime,
 			TimeSchedule:      step.TimeSchedule,
 			MinDelaySeconds:   step.MinDelaySeconds,
 			MaxDelaySeconds:   step.MaxDelaySeconds,
@@ -326,7 +320,6 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 		for _, stepReq := range request.Steps {
 			step := &models.SequenceStep{
 				SequenceID:        sequenceID,
-				Day:               stepReq.Day,
 				DayNumber:         stepReq.DayNumber,
 				Trigger:           stepReq.Trigger,
 				NextTrigger:       stepReq.NextTrigger,
@@ -335,9 +328,7 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 				MessageType:       stepReq.MessageType,
 				Content:           stepReq.Content,
 				MediaURL:          stepReq.MediaURL,
-				ImageURL:          stepReq.ImageURL,
 				Caption:           stepReq.Caption,
-				SendTime:          stepReq.SendTime,
 				TimeSchedule:      stepReq.TimeSchedule,
 				MinDelaySeconds:   stepReq.MinDelaySeconds,
 				MaxDelaySeconds:   stepReq.MaxDelaySeconds,
@@ -449,7 +440,6 @@ func (s *sequenceService) ProcessSequences() error {
 	
 	repo := repository.GetSequenceRepository()
 	currentTime := time.Now()
-	currentHour := fmt.Sprintf("%02d:%02d", currentTime.Hour(), currentTime.Minute())
 	
 	// Get all active contacts ready for next message
 	contacts, err := repo.GetActiveSequenceContacts(currentTime)
@@ -496,7 +486,7 @@ func (s *sequenceService) ProcessSequences() error {
 				SequenceID:   contact.SequenceID,
 				ContactID:    contact.ID,
 				StepID:      nextStep.ID,
-				Day:         nextStep.Day,
+				Day:         nextStep.DayNumber,
 				Status:      "failed",
 				ErrorMessage: err.Error(),
 			}
@@ -516,7 +506,7 @@ func (s *sequenceService) ProcessSequences() error {
 				SequenceID: contact.SequenceID,
 				ContactID:  contact.ID,
 				StepID:    nextStep.ID,
-				Day:       nextStep.Day,
+				Day:       nextStep.DayNumber,
 				Status:    "sent",
 			}
 			repo.CreateSequenceLog(log)
@@ -562,10 +552,7 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 	messageOrder := 0
 	
 	// 1. First, send image if exists (without caption)
-	imageURL := step.ImageURL
-	if imageURL == "" && step.MediaURL != "" {
-		imageURL = step.MediaURL
-	}
+	imageURL := step.MediaURL
 	
 	if imageURL != "" {
 		messageOrder++
