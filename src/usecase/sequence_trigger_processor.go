@@ -145,11 +145,11 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 			WHERE s.is_active = true AND ss.is_entry_point = true
 		),
 		leads_to_process AS (
-			SELECT DISTINCT l.id, l.phone, l.name, l.device_id
+			SELECT DISTINCT l.id, l.phone, l.name, l.device_id, l.user_id
 			FROM leads l
 			WHERE l.trigger IS NOT NULL AND l.trigger != ''
 		)
-		SELECT l.*, a.id as sequence_id, a.entry_trigger
+		SELECT l.id, l.phone, l.name, l.device_id, l.user_id, a.id as sequence_id, a.entry_trigger
 		FROM leads_to_process l
 		CROSS JOIN active_sequences a
 		WHERE position(a.entry_trigger in l.trigger) > 0
@@ -171,7 +171,7 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 		var lead models.Lead
 		var sequenceID, entryTrigger string
 
-		if err := rows.Scan(&lead.ID, &lead.Phone, &lead.Name, &lead.DeviceID, 
+		if err := rows.Scan(&lead.ID, &lead.Phone, &lead.Name, &lead.DeviceID, &lead.UserID,
 			&sequenceID, &entryTrigger); err != nil {
 			logrus.Warnf("Error scanning lead: %v", err)
 			continue
@@ -255,7 +255,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 		SELECT 
 			sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
 			sc.current_trigger, sc.current_day,
-			ss.message_text, ss.message_type, ss.media_url,
+			ss.content, ss.message_type, ss.media_url,
 			ss.next_trigger, ss.trigger_delay_hours,
 			l.device_id as preferred_device_id
 		FROM sequence_contacts sc

@@ -323,9 +323,20 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS delay_days INTEGER DEFAULT 0;
 
 	-- Add missing columns to sequence_contacts table  
-	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;
-	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMP;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_trigger VARCHAR(255) DEFAULT '';
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS next_trigger_time TIMESTAMP;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS processing_device_id UUID;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS last_error TEXT;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+
+	-- Remove unnecessary columns from sequence_contacts
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS enrolled_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS last_sent_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS next_send_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS current_day CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS added_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS last_message_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS processing_started_at CASCADE;
 
 	-- Create sequence_logs table if not exists
 	CREATE TABLE IF NOT EXISTS sequence_logs (
