@@ -492,6 +492,27 @@ Final Day: Either completes OR chains to next sequence
 - Respects rate limits per device
 - Parallel processing for maximum throughput
 
+### 🚀 NEW: Worker-Based Sequence System (Coming Soon)
+
+We're implementing a new worker-based architecture similar to our campaign system for better scalability:
+
+**Current System:**
+- Single processor checks all sequences every 30 seconds
+- Direct processing without queuing
+- Works well for < 500 devices
+
+**New Worker System (In Development):**
+- Dedicated worker per device (like campaigns)
+- Queue-based processing with buffering
+- Optimized for 3000+ devices
+- See [SEQUENCE_WORKER_DESIGN.md](SEQUENCE_WORKER_DESIGN.md) for full details
+
+**Benefits:**
+- 50x throughput improvement
+- Better resource utilization
+- Device-level isolation
+- Improved fault tolerance
+
 **Sequence Completion Handling:**
 ```
 IF next_trigger is empty:
