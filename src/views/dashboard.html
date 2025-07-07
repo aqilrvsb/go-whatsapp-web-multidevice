@@ -4242,6 +4242,7 @@
                 
                 if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
                     sequences = data.results; // Store sequences globally like campaigns
+                    console.log('Loaded sequences:', sequences); // Debug log
                     displaySequences(data.results);
                 } else {
                     // Show empty state
@@ -4774,6 +4775,9 @@
                 Swal.fire('Error', 'Sequence not found', 'error');
                 return;
             }
+            
+            console.log('Editing sequence:', sequence); // Debug log
+            console.log('Sequence steps:', sequence.steps); // Debug log
             
             currentEditingSequenceId = sequenceId;
             
