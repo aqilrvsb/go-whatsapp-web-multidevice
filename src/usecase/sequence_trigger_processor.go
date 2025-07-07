@@ -47,8 +47,8 @@ func NewSequenceTriggerProcessor(db *sql.DB) *SequenceTriggerProcessor {
 		db:              db,
 		broadcastMgr:    broadcast.GetBroadcastManager(),
 		stopChan:        make(chan bool),
-		batchSize:       1000,
-		processInterval: 30 * time.Second, // Process every 30 seconds
+		batchSize:       5000,  // Increased for 3000 devices
+		processInterval: 15 * time.Second,  // Reduced from 30s for faster processing
 	}
 }
 
@@ -131,8 +131,25 @@ func (s *SequenceTriggerProcessor) processTriggers() {
 	}
 
 	duration := time.Since(startTime)
-	logrus.Infof("Trigger processing completed: enrolled=%d, processed=%d, duration=%v", 
-		enrolledCount, processedCount, duration)
+	
+	// Calculate metrics for monitoring
+	totalDevices := len(deviceLoads)
+	activeDevices := 0
+	for _, load := range deviceLoads {
+		if load.IsAvailable {
+			activeDevices++
+		}
+	}
+	
+	logrus.Infof("Sequence processing completed: enrolled=%d, processed=%d, devices=%d/%d, duration=%v", 
+		enrolledCount, processedCount, activeDevices, totalDevices, duration)
+	
+	// Log performance metrics
+	if processedCount > 0 {
+		avgTimePerMessage := duration / time.Duration(processedCount)
+		messagesPerMinute := float64(processedCount) / duration.Minutes()
+		logrus.Infof("Performance: %.2f msg/min, %v avg/msg", messagesPerMinute, avgTimePerMessage)
+	}
 }
 
 // enrollLeadsFromTriggers checks leads for matching sequence triggers
@@ -157,7 +174,7 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 				SELECT 1 FROM sequence_contacts sc
 				WHERE sc.sequence_id = a.id AND sc.contact_phone = l.phone
 			)
-		LIMIT 1000
+		LIMIT 5000
 	`
 
 	rows, err := s.db.Query(query)
@@ -280,8 +297,8 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	jobs := make(chan contactJob, s.batchSize)
 	results := make(chan bool, s.batchSize)
 	
-	// Start workers
-	numWorkers := 10
+	// Start workers - increase for 3000 devices
+	numWorkers := 50  // Increased from 10
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)

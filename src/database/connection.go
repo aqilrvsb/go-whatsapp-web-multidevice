@@ -29,9 +29,10 @@ func GetDB() *sql.DB {
 		}
 		
 		// Configure connection pool for 200+ users
-		db.SetMaxOpenConns(100)
-		db.SetMaxIdleConns(10)
-		db.SetConnMaxLifetime(time.Hour)
+		// Optimized for 3000 devices
+		db.SetMaxOpenConns(500)     // Increased from 100
+		db.SetMaxIdleConns(100)     // Increased from 10  
+		db.SetConnMaxLifetime(5 * time.Minute)  // Reduced from 1 hour
 		
 		// Test connection
 		if err := db.Ping(); err != nil {
@@ -326,6 +327,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_trigger VARCHAR(255) DEFAULT '';
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS next_trigger_time TIMESTAMP;
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS processing_device_id UUID;
+	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS assigned_device_id UUID;
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS last_error TEXT;
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
 
@@ -337,6 +339,19 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS added_at CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS last_message_at CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS processing_started_at CASCADE;
+
+	-- Add indexes for 3000 device optimization
+	CREATE INDEX IF NOT EXISTS idx_sc_active_trigger ON sequence_contacts(status, next_trigger_time) 
+	WHERE status = 'active' AND processing_device_id IS NULL;
+	
+	CREATE INDEX IF NOT EXISTS idx_sc_current_trigger ON sequence_contacts(current_trigger);
+	
+	CREATE INDEX IF NOT EXISTS idx_ss_sequence_trigger ON sequence_steps(sequence_id, trigger);
+	
+	CREATE INDEX IF NOT EXISTS idx_leads_phone_trigger ON leads(phone, trigger) WHERE trigger IS NOT NULL;
+	
+	-- Optimize sequences table for active sequences
+	CREATE INDEX IF NOT EXISTS idx_sequences_active ON sequences(status) WHERE status = 'active';
 
 	-- Create sequence_logs table if not exists
 	CREATE TABLE IF NOT EXISTS sequence_logs (
