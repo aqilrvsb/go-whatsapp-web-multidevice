@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -195,9 +196,27 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 // GetSequenceSteps gets all steps for a sequence
 func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.SequenceStep, error) {
 	logrus.Infof("Getting steps for sequence: %s", sequenceID)
+	
+	// First, let's check if there are any steps at all
+	var count int
+	countQuery := `SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = $1`
+	err := r.db.QueryRow(countQuery, sequenceID).Scan(&count)
+	if err != nil {
+		logrus.Errorf("Error counting sequence steps: %v", err)
+	} else {
+		logrus.Infof("Total steps in database for sequence %s: %d", sequenceID, count)
+	}
+	
+	// If no steps found, return empty slice instead of nil
+	if count == 0 {
+		logrus.Infof("No steps found for sequence %s, returning empty array", sequenceID)
+		return []models.SequenceStep{}, nil
+	}
+	
 	query := `
 		SELECT 
-			id, sequence_id, day_number, 
+			id, sequence_id, 
+			COALESCE(day_number, 1) as day_number,
 			COALESCE(trigger, '') as trigger, 
 			COALESCE(next_trigger, '') as next_trigger,
 			COALESCE(trigger_delay_hours, 24) as trigger_delay_hours,
@@ -216,6 +235,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	
 	rows, err := r.db.Query(query, sequenceID)
 	if err != nil {
+		logrus.Errorf("Error querying sequence steps: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -230,11 +250,21 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 			&step.CreatedAt, &step.UpdatedAt)
 		if err != nil {
 			logrus.Errorf("Error scanning sequence step: %v", err)
-			continue
+			logrus.Errorf("Failed on sequence_id: %s, error details: %+v", sequenceID, err)
+			// Try to get column info for debugging
+			cols, _ := rows.Columns()
+			logrus.Errorf("Column names: %v", cols)
+			// Don't skip, return the error to understand what's wrong
+			return nil, fmt.Errorf("failed to scan sequence step: %v", err)
 		}
 		// Set Day to match DayNumber for backward compatibility
 		step.Day = step.DayNumber
 		steps = append(steps, step)
+		logrus.Debugf("Successfully scanned step: day=%d, trigger=%s", step.DayNumber, step.Trigger)
+	}
+	
+	if err = rows.Err(); err != nil {
+		logrus.Errorf("Error iterating rows: %v", err)
 	}
 	
 	logrus.Infof("Found %d steps for sequence %s", len(steps), sequenceID)
