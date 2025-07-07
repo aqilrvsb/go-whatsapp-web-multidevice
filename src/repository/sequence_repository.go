@@ -160,36 +160,45 @@ func (r *sequenceRepository) DeleteSequenceSteps(sequenceID string) error {
 // CreateSequenceStep creates a step in sequence
 func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error {
 	step.ID = uuid.New().String()
-	step.CreatedAt = time.Now()
-	step.UpdatedAt = time.Now()
 
 	query := `
 		INSERT INTO sequence_steps (
 			id, sequence_id, day_number, message_type, content, 
-			media_url, caption, send_time, trigger, time_schedule,
+			media_url, caption, trigger, time_schedule,
 			next_trigger, trigger_delay_hours, is_entry_point,
-			created_at, updated_at
+			min_delay_seconds, max_delay_seconds, delay_days
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 	
-	// Use DayNumber, fallback to Day if DayNumber is 0
+	// Use DayNumber
 	dayNumber := step.DayNumber
-	if dayNumber == 0 && step.Day > 0 {
-		dayNumber = step.Day
+	if dayNumber == 0 {
+		dayNumber = 1
 	}
 	
-	// Use TimeSchedule, fallback to SendTime
-	timeSchedule := step.TimeSchedule
-	if timeSchedule == "" && step.SendTime != "" {
-		timeSchedule = step.SendTime
+	// Default values
+	if step.TimeSchedule == "" {
+		step.TimeSchedule = "10:00"
+	}
+	if step.MessageType == "" {
+		step.MessageType = "text"
+	}
+	if step.TriggerDelayHours == 0 {
+		step.TriggerDelayHours = 24
+	}
+	if step.MinDelaySeconds == 0 {
+		step.MinDelaySeconds = 10
+	}
+	if step.MaxDelaySeconds == 0 {
+		step.MaxDelaySeconds = 30
 	}
 	
 	_, err := r.db.Exec(query, 
 		step.ID, step.SequenceID, dayNumber, step.MessageType, step.Content,
-		step.MediaURL, step.Caption, step.SendTime, step.Trigger, timeSchedule,
+		step.MediaURL, step.Caption, step.Trigger, step.TimeSchedule,
 		step.NextTrigger, step.TriggerDelayHours, step.IsEntryPoint,
-		step.CreatedAt, step.UpdatedAt)
+		step.MinDelaySeconds, step.MaxDelaySeconds, step.DelayDays)
 		
 	return err
 }
@@ -226,9 +235,10 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 			COALESCE(content, '') as content, 
 			COALESCE(media_url, '') as media_url, 
 			COALESCE(caption, '') as caption, 
-			COALESCE(send_time, '') as send_time,
 			COALESCE(time_schedule, '') as time_schedule,
-			created_at, updated_at
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			COALESCE(delay_days, 0) as delay_days
 		FROM sequence_steps
 		WHERE sequence_id = $1
 		ORDER BY day_number ASC
@@ -247,8 +257,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 		err := rows.Scan(&step.ID, &step.SequenceID, &step.DayNumber, 
 			&step.Trigger, &step.NextTrigger, &step.TriggerDelayHours, &step.IsEntryPoint,
 			&step.MessageType, &step.Content, &step.MediaURL, &step.Caption, 
-			&step.SendTime, &step.TimeSchedule,
-			&step.CreatedAt, &step.UpdatedAt)
+			&step.TimeSchedule, &step.MinDelaySeconds, &step.MaxDelaySeconds, &step.DelayDays)
 		if err != nil {
 			logrus.Errorf("Error scanning sequence step: %v", err)
 			logrus.Errorf("Failed on sequence_id: %s, error details: %+v", sequenceID, err)
@@ -258,8 +267,6 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 			// Don't skip, return the error to understand what's wrong
 			return nil, fmt.Errorf("failed to scan sequence step: %v", err)
 		}
-		// Set Day to match DayNumber for backward compatibility
-		step.Day = step.DayNumber
 		steps = append(steps, step)
 		logrus.Debugf("Successfully scanned step: day=%d, trigger=%s", step.DayNumber, step.Trigger)
 	}

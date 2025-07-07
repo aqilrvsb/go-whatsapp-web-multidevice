@@ -301,15 +301,24 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS start_trigger VARCHAR(255);
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS end_trigger VARCHAR(255);
 
+	-- Fix sequence_steps table by removing timestamp columns
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS send_time;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS created_at;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS updated_at;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS day;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS schedule_time;
+
 	-- Add missing columns to sequence_steps table
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS day INTEGER;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS send_time VARCHAR(10);
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS media_url TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS time_schedule TEXT;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger VARCHAR(255);
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger VARCHAR(255) DEFAULT '';
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS next_trigger VARCHAR(255) DEFAULT '';
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger_delay_hours INTEGER DEFAULT 24;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point BOOLEAN DEFAULT false;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS delay_days INTEGER DEFAULT 0;
 
 	-- Add missing columns to sequence_contacts table  
 	ALTER TABLE sequence_contacts ADD COLUMN IF NOT EXISTS current_day INTEGER DEFAULT 0;

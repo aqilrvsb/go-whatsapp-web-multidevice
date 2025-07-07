@@ -40,23 +40,19 @@ type Sequence struct {
 type SequenceStep struct {
 	ID               string    `json:"id" db:"id"`
 	SequenceID       string    `json:"sequence_id" db:"sequence_id"`
-	Day              int       `json:"day" db:"day"`
 	DayNumber        int       `json:"day_number" db:"day_number"`
 	Trigger          string    `json:"trigger" db:"trigger"`
 	NextTrigger      string    `json:"next_trigger" db:"next_trigger"` // Next step trigger
 	TriggerDelayHours int      `json:"trigger_delay_hours" db:"trigger_delay_hours"` // Hours to wait
 	IsEntryPoint     bool      `json:"is_entry_point" db:"is_entry_point"` // Sequence start
 	MessageType      string    `json:"message_type" db:"message_type"`
-	SendTime         string    `json:"send_time" db:"send_time"`
 	TimeSchedule     string    `json:"time_schedule" db:"time_schedule"`
 	Content          string    `json:"content" db:"content"`
 	MediaURL         string    `json:"media_url" db:"media_url"`
-	ImageURL         string    `json:"image_url" db:"image_url"`
 	Caption          string    `json:"caption" db:"caption"`
 	MinDelaySeconds  int       `json:"min_delay_seconds" db:"min_delay_seconds"`
 	MaxDelaySeconds  int       `json:"max_delay_seconds" db:"max_delay_seconds"`
-	CreatedAt        time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
+	DelayDays        int       `json:"delay_days" db:"delay_days"`
 }
 
 // SequenceContact model for tracking individual progress

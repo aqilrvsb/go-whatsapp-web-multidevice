@@ -274,7 +274,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			
 			var nextStep *models.SequenceStep
 			for _, step := range steps {
-				if step.Day == nextDay {
+				if step.DayNumber == nextDay {
 					nextStep = &step
 					break
 				}

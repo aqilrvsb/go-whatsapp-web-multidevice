@@ -168,17 +168,14 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			stepResp := domainSequence.SequenceStepResponse{
 				ID:                step.ID,
 				SequenceID:        step.SequenceID,
-				Day:               step.Day,
 				DayNumber:         step.DayNumber,
 				Trigger:           step.Trigger,
 				NextTrigger:       step.NextTrigger,
 				TriggerDelayHours: step.TriggerDelayHours,
 				IsEntryPoint:      step.IsEntryPoint,
 				MessageType:       step.MessageType,
-				SendTime:          step.SendTime,
 				TimeSchedule:      step.TimeSchedule,
 				Content:           step.Content,
-				ImageURL:          step.ImageURL,
 				MediaURL:          step.MediaURL,
 				Caption:           step.Caption,
 				MinDelaySeconds:   step.MinDelaySeconds,
@@ -480,7 +477,7 @@ func (s *sequenceService) ProcessSequences() error {
 		var nextStep *models.SequenceStep
 		
 		for _, step := range steps {
-			if step.Day == nextDay && step.SendTime <= currentHour {
+			if step.DayNumber == nextDay {
 				nextStep = &step
 				break
 			}

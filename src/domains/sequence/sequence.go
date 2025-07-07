@@ -106,21 +106,18 @@ type SequenceResponse struct {
 type SequenceStepResponse struct {
 	ID                string `json:"id"`
 	SequenceID        string `json:"sequence_id"`
-	Day               int    `json:"day"`
 	DayNumber         int    `json:"day_number"`
 	Trigger           string `json:"trigger"`
 	NextTrigger       string `json:"next_trigger"`
 	TriggerDelayHours int    `json:"trigger_delay_hours"`
 	IsEntryPoint      bool   `json:"is_entry_point"`
 	MessageType       string `json:"message_type"`
-	SendTime          string `json:"send_time"`
 	TimeSchedule      string `json:"time_schedule"`
 	Content           string `json:"content"`
-	ImageURL          string `json:"image_url"`
 	MediaURL          string `json:"media_url"`
-	Caption         string `json:"caption"`
-	MinDelaySeconds int    `json:"min_delay_seconds"`
-	MaxDelaySeconds int    `json:"max_delay_seconds"`
+	Caption           string `json:"caption"`
+	MinDelaySeconds   int    `json:"min_delay_seconds"`
+	MaxDelaySeconds   int    `json:"max_delay_seconds"`
 }
 
 // SequenceStats statistics for a sequence
