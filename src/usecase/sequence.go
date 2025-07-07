@@ -123,12 +123,13 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		steps, err := repo.GetSequenceSteps(seq.ID)
 		if err != nil {
 			logrus.Errorf("Error getting steps for sequence %s: %v", seq.ID, err)
+			steps = []models.SequenceStep{} // Initialize empty slice to prevent nil
 		}
 		logrus.Infof("Retrieved %d steps for sequence %s", len(steps), seq.ID)
 		
 		// Debug log the steps
 		for i, step := range steps {
-			logrus.Infof("Step %d: Day=%d, Content=%s, Trigger=%s", i+1, step.DayNumber, step.Content, step.Trigger)
+			logrus.Infof("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
 		}
 		
 		logrus.Infof("Processing sequence: ID=%s, Name=%s, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)

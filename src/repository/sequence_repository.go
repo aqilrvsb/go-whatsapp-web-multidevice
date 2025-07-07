@@ -203,6 +203,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	err := r.db.QueryRow(countQuery, sequenceID).Scan(&count)
 	if err != nil {
 		logrus.Errorf("Error counting sequence steps: %v", err)
+		return nil, fmt.Errorf("failed to count steps: %v", err)
 	} else {
 		logrus.Infof("Total steps in database for sequence %s: %d", sequenceID, count)
 	}
