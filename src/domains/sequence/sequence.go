@@ -99,7 +99,7 @@ type SequenceResponse struct {
 	StepCount       int                    `json:"step_count"`
 	CreatedAt       time.Time              `json:"created_at"`
 	UpdatedAt       time.Time              `json:"updated_at"`
-	Steps           []SequenceStepResponse `json:"steps,omitempty"`
+	Steps           []SequenceStepResponse `json:"steps"`
 }
 
 // SequenceStepResponse for each step

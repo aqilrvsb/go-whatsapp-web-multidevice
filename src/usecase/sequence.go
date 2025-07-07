@@ -126,6 +126,11 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		}
 		logrus.Infof("Retrieved %d steps for sequence %s", len(steps), seq.ID)
 		
+		// Debug log the steps
+		for i, step := range steps {
+			logrus.Infof("Step %d: Day=%d, Content=%s, Trigger=%s", i+1, step.DayNumber, step.Content, step.Trigger)
+		}
+		
 		logrus.Infof("Processing sequence: ID=%s, Name=%s, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
 		
 		response := domainSequence.SequenceResponse{
@@ -149,6 +154,7 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			StepCount:       len(steps),
 			CreatedAt:       seq.CreatedAt,
 			UpdatedAt:       seq.UpdatedAt,
+			Steps:           []domainSequence.SequenceStepResponse{}, // Initialize steps array
 		}
 		
 		// Set default status if empty
