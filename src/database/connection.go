@@ -301,12 +301,14 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS start_trigger VARCHAR(255);
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS end_trigger VARCHAR(255);
 
-	-- Fix sequence_steps table by removing timestamp columns
-	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS send_time;
-	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS created_at;
-	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS updated_at;
-	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS day;
-	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS schedule_time;
+	-- Remove specific columns from sequence_steps table
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS day CASCADE;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS send_time CASCADE;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS updated_at CASCADE;
+
+	-- Fix sequence_steps table by removing other timestamp columns
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS created_at CASCADE;
+	ALTER TABLE sequence_steps DROP COLUMN IF EXISTS schedule_time CASCADE;
 
 	-- Add missing columns to sequence_steps table
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
