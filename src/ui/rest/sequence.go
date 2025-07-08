@@ -354,7 +354,7 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 	// Get user's devices count
 	userRepo := repository.GetUserRepository()
 	devices, _ := userRepo.GetUserDevices(userID)
-	totalUserDevices := len(devices)
+	_ = len(devices) // We're not using device count in summary anymore
 	
 	sequences, err := controller.Service.GetSequences(userID)
 	if err != nil {
@@ -365,6 +365,67 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get all sequence contacts for statistics
+	sequenceRepo := repository.GetSequenceRepository()
+	
+	// Calculate overall summary statistics
+	totalFlows := 0
+	totalShouldSend := 0
+	totalDoneSend := 0
+	totalFailedSend := 0
+	totalRemainingSend := 0
+	
+	// Process each sequence to get detailed stats
+	detailSequences := make([]interface{}, 0)
+	
+	for _, seq := range sequences {
+		// Get steps for this sequence
+		steps, _ := sequenceRepo.GetSequenceSteps(seq.ID)
+		flowCount := len(steps)
+		totalFlows += flowCount
+		
+		// Get leads matching this sequence trigger
+		// For now, use contacts count as shouldSend
+		shouldSend := seq.ContactsCount
+		totalShouldSend += shouldSend
+		
+		// Get sequence contacts for done/failed counts
+		contacts, _ := sequenceRepo.GetSequenceContacts(seq.ID)
+		doneSend := 0
+		failedSend := 0
+		
+		for _, contact := range contacts {
+			if contact.Status == "sent" || contact.Status == "completed" {
+				doneSend++
+			} else if contact.Status == "failed" {
+				failedSend++
+			}
+		}
+		
+		totalDoneSend += doneSend
+		totalFailedSend += failedSend
+		
+		remainingSend := shouldSend - doneSend - failedSend
+		if remainingSend < 0 {
+			remainingSend = 0
+		}
+		totalRemainingSend += remainingSend
+		
+		// Add to detail sequences
+		detailSequences = append(detailSequences, map[string]interface{}{
+			"id":             seq.ID,
+			"name":           seq.Name,
+			"niche":          seq.Niche,
+			"trigger":        seq.Trigger,
+			"status":         seq.Status,
+			"total_flows":    flowCount,
+			"should_send":    shouldSend,
+			"done_send":      doneSend,
+			"failed_send":    failedSend,
+			"remaining_send": remainingSend,
+		})
+	}
+	
 	// Calculate summary
 	summary := map[string]interface{}{
 		"sequences": map[string]int{
@@ -372,66 +433,22 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 			"active":   0,
 			"inactive": 0,
 		},
-		"contacts": map[string]interface{}{
-			"total":                0,
-			"average_per_sequence": 0.0,
-			"total_success":        0,
-			"total_remaining":      0,
-		},
-		"recent_sequences": []interface{}{},
-		"total_devices":    totalUserDevices,
+		"total_flows":          totalFlows,
+		"total_should_send":    totalShouldSend,
+		"total_done_send":      totalDoneSend,
+		"total_failed_send":    totalFailedSend,
+		"total_remaining_send": totalRemainingSend,
+		"recent_sequences":     detailSequences,
 	}
 	
-	// Count statuses and contacts
-	totalContacts := 0
-	totalSuccess := 0
-	totalRemaining := 0
-	activeCount := 0
-	
+	// Count active/inactive
 	for _, seq := range sequences {
 		if seq.Status == "active" {
-			activeCount++
+			summary["sequences"].(map[string]int)["active"]++
+		} else {
+			summary["sequences"].(map[string]int)["inactive"]++
 		}
-		totalContacts += seq.ContactsCount
-		// For now, we'll just use the total contacts as remaining
-		// since we don't have completed counts in SequenceResponse
-		totalRemaining += seq.ContactsCount
 	}
-	
-	// Set the counts
-	summary["sequences"].(map[string]int)["active"] = activeCount
-	summary["sequences"].(map[string]int)["inactive"] = len(sequences) - activeCount
-	
-	// Update contact statistics
-	summary["contacts"].(map[string]interface{})["total"] = totalContacts
-	summary["contacts"].(map[string]interface{})["total_success"] = totalSuccess
-	summary["contacts"].(map[string]interface{})["total_remaining"] = totalRemaining
-	if len(sequences) > 0 {
-		summary["contacts"].(map[string]interface{})["average_per_sequence"] = float64(totalContacts) / float64(len(sequences))
-	}
-	
-	// Get recent sequences (up to 5)
-	recentCount := 5
-	if len(sequences) < recentCount {
-		recentCount = len(sequences)
-	}
-	
-	recentSequences := make([]interface{}, 0, recentCount)
-	for i := 0; i < recentCount; i++ {
-		seq := sequences[i]
-		
-		recentSequences = append(recentSequences, map[string]interface{}{
-			"id":                  seq.ID,
-			"name":                seq.Name,
-			"niche":               seq.Niche,
-			"status":              seq.Status,
-			"contacts_count":      seq.ContactsCount,
-			"total_devices":       totalUserDevices,
-			"completed_contacts":  0, // TODO: Add this to SequenceResponse
-			"remaining_contacts":  seq.ContactsCount,
-		})
-	}
-	summary["recent_sequences"] = recentSequences
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
