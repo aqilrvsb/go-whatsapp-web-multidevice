@@ -5311,7 +5311,7 @@
             
             const html = `
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-primary">${summary.sequences.total}</h3>
@@ -5319,7 +5319,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-success">${summary.sequences.active}</h3>
@@ -5327,19 +5327,11 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-warning">${summary.sequences.paused}</h3>
-                                <p class="text-muted mb-0">Paused</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-secondary">${summary.sequences.draft}</h3>
-                                <p class="text-muted mb-0">Draft</p>
+                                <h3 class="text-warning">${summary.sequences.inactive}</h3>
+                                <p class="text-muted mb-0">Inactive</p>
                             </div>
                         </div>
                     </div>
@@ -5379,7 +5371,8 @@
                                                 <tr>
                                                     <th>Name</th>
                                                     <th>Niche</th>
-                                                    <th>Contacts</th>
+                                                    <th>Total Devices</th>
+                                                    <th>Total Contacts</th>
                                                     <th>Status</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -5389,6 +5382,7 @@
                                                     <tr>
                                                         <td>${sequence.name}</td>
                                                         <td>${sequence.niche || '-'}</td>
+                                                        <td>${sequence.total_devices || 0}</td>
                                                         <td>${sequence.contacts_count}</td>
                                                         <td>
                                                             <span class="badge bg-${getStatusColor(sequence.status)}">

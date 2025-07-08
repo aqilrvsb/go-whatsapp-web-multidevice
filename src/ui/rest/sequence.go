@@ -341,6 +341,11 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get user's devices count
+	userRepo := repository.GetUserRepository()
+	devices, _ := userRepo.GetUserDevices(userID)
+	totalUserDevices := len(devices)
+	
 	sequences, err := controller.Service.GetSequences(userID)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
@@ -353,10 +358,9 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 	// Calculate summary
 	summary := map[string]interface{}{
 		"sequences": map[string]int{
-			"total":  len(sequences),
-			"active": 0,
-			"paused": 0,
-			"draft":  0,
+			"total":    len(sequences),
+			"active":   0,
+			"inactive": 0,
 		},
 		"contacts": map[string]interface{}{
 			"total":                0,
@@ -371,10 +375,8 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 		switch seq.Status {
 		case "active":
 			summary["sequences"].(map[string]int)["active"]++
-		case "paused":
-			summary["sequences"].(map[string]int)["paused"]++
-		case "draft", "inactive":
-			summary["sequences"].(map[string]int)["draft"]++
+		case "paused", "draft", "inactive":
+			summary["sequences"].(map[string]int)["inactive"]++
 		}
 		totalContacts += seq.ContactsCount
 	}
@@ -394,12 +396,14 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 	recentSequences := make([]interface{}, 0, recentCount)
 	for i := 0; i < recentCount; i++ {
 		seq := sequences[i]
+		// Since sequences use all user devices, show total user devices
 		recentSequences = append(recentSequences, map[string]interface{}{
 			"id":             seq.ID,
 			"name":           seq.Name,
 			"niche":          seq.Niche,
 			"status":         seq.Status,
 			"contacts_count": seq.ContactsCount,
+			"total_devices":  totalUserDevices,
 		})
 	}
 	summary["recent_sequences"] = recentSequences
