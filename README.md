@@ -1,10 +1,24 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 7, 2025 - Multi-Device Architecture Refactor**  
+**Last Updated: January 8, 2025 - Schema & Query Optimization Fix**  
 **Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface**
 **Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync for 3000 devices**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🎯 LATEST UPDATE: Complete Device Management Fix (January 7, 2025)
+## 🎯 LATEST UPDATE: Schema & Query Optimization (January 8, 2025)
+
+### ✅ Fixed Database Schema Mismatches
+- **Column Name Fixes**: Resolved `next_send_at` → `next_trigger_time` mismatch
+- **Model Updates**: Updated Go models to match actual database columns
+- **Query Optimization**: Simplified CTE queries to avoid column reference errors
+- **Sequence Processing**: Fixed `current_day` → `current_step` throughout codebase
+
+### 🔧 What Was Fixed:
+1. **Sequence Trigger Query** → Simplified to avoid "column l.trigger does not exist" errors
+2. **Removed Non-existent Columns** → Removed references to `s.priority` in ORDER BY
+3. **Model Alignment** → All Go structs now match actual database schema
+4. **Direct JOINs** → Replaced complex CTEs with simple JOINs for better compatibility
+
+## 🎯 Previous Update: Complete Device Management Fix (January 7, 2025)
 
 ### ✅ All Device Management Issues Fixed
 - **Real-time Updates**: Device status updates instantly via WebSocket - no refresh needed
@@ -175,6 +189,12 @@ NotifyMessageUpdate(deviceID, chatJID, message) // WebSocket broadcast
 5. **Browser Updates** → Auto-refresh UI
 
 ## 🛠️ Fixed Issues
+
+### January 8, 2025 Sequence Trigger System Working
+1. **Trigger Processing**: Sequence trigger processor now successfully enrolls leads based on triggers
+2. **Query Optimization**: Removed problematic CTEs, using direct JOINs for better compatibility
+3. **Column Matching**: All queries now reference correct column names matching actual database
+4. **Smooth Operation**: No more "column does not exist" errors during sequence processing
 
 ### January 7, 2025 Complete Device Management Fix
 1. **Manual Logout Perfected**: Calls client.Logout() to remove from WhatsApp linked devices
