@@ -5298,16 +5298,18 @@
             // Handle null or undefined summary
             if (!summary) {
                 summary = {
-                    sequences: { total: 0, active: 0, paused: 0, draft: 0 },
-                    contacts: { total: 0, average_per_sequence: 0 },
-                    recent_sequences: []
+                    sequences: { total: 0, active: 0, inactive: 0 },
+                    contacts: { total: 0, average_per_sequence: 0, total_success: 0, total_remaining: 0 },
+                    recent_sequences: [],
+                    total_devices: 0
                 };
             }
             
             // Ensure all properties exist
-            summary.sequences = summary.sequences || { total: 0, active: 0, paused: 0, draft: 0 };
-            summary.contacts = summary.contacts || { total: 0, average_per_sequence: 0 };
+            summary.sequences = summary.sequences || { total: 0, active: 0, inactive: 0 };
+            summary.contacts = summary.contacts || { total: 0, average_per_sequence: 0, total_success: 0, total_remaining: 0 };
             summary.recent_sequences = summary.recent_sequences || [];
+            summary.total_devices = summary.total_devices || 0;
             
             const html = `
                 <div class="row mb-4">
@@ -5850,8 +5852,7 @@
                         filteredResults.sequences = {
                             total: filteredSequences.length,
                             active: filteredSequences.filter(s => s.status === 'active').length,
-                            paused: filteredSequences.filter(s => s.status === 'paused').length,
-                            draft: filteredSequences.filter(s => s.status === 'draft').length
+                            inactive: filteredSequences.length - filteredSequences.filter(s => s.status === 'active').length
                         };
                         
                         displaySequenceSummary(filteredResults);
