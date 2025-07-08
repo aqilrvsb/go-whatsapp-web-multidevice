@@ -393,57 +393,224 @@ ALTER SYSTEM SET shared_buffers = '4GB';
 SELECT pg_reload_conf();
 ```
 
-## 📊 Sequence Progress Tracking
+## 📊 Sequence Progress Tracking & Summary
 
 ### Overview
-The sequence detail page provides comprehensive progress tracking for your sequences with real-time statistics and filtering capabilities.
+The sequence system provides comprehensive progress tracking with real-time statistics, filtering capabilities, and detailed analytics for each sequence flow.
 
-### Key Features
+### Sequence Summary Page Features
 
-#### 1. **Main Statistics Boxes**
-- **Total Flows**: Number of steps/flows in the sequence
-- **Total Contacts Should Send**: Leads whose trigger matches the sequence trigger
-- **Contacts Done Send Message**: Contacts with status='sent' in sequence_contacts
-- **Contacts Failed Send Message**: Contacts with status='failed' in sequence_contacts
+#### 1. **Main Statistics Boxes (6 Total)**
+- **Total Sequences**: Count of all sequences
+- **Total Flows**: Sum of all flows across all sequences
+- **Total Contacts Should Send**: Leads whose trigger matches sequence triggers
+- **Contacts Done Send Message**: Total contacts with status='sent' 
+- **Contacts Failed Send Message**: Total contacts with status='failed'
 - **Contacts Remaining Send Message**: Should Send - Done Send - Failed Send
 
+#### 2. **Detail Sequences Table**
+Shows comprehensive information for each sequence:
+- Name
+- Niche
+- Trigger
+- Total Flows
+- Total Contacts Should Send
+- Contacts Done Send Message
+- Contacts Failed Send Message
+- Contacts Remaining Send Message
+- Status
+- Actions (View Details)
+
+### Sequence Detail Page Features
+
+#### 1. **Progress Overview**
+Same 6 metric boxes as summary but for specific sequence:
+- Total Flows
+- Total Contacts Should Send
+- Contacts Done Send Message
+- Contacts Failed Send Message
+- Contacts Remaining Send Message
+
 #### 2. **Per-Flow Statistics**
-Each flow shows individual statistics:
-- Should Send: Total leads that should receive this flow
-- Done Send: Contacts who successfully received (status='sent')
-- Failed Send: Contacts where sending failed (status='failed')
-- Remaining: Contacts yet to receive this flow
+Each flow shows:
+- Should Send: Total leads for this flow
+- Done Send: Successfully sent (status='sent')
+- Failed Send: Failed sends (status='failed')
+- Remaining: Yet to be sent
 
 #### 3. **Date Filtering**
-- Filter Done Send and Failed Send by date range
-- Uses `completed_at` column from sequence_contacts table
-- Remaining count adjusts based on filtered results
+- Filter by date range using `completed_at` column
+- Affects Done Send and Failed Send counts
+- Remaining adjusts based on filtered results
 
-#### 4. **Data Calculation Logic**
+### Database Schema & Logic
+
+#### Current Implementation
 ```sql
--- Total Should Send
-SELECT COUNT(*) FROM leads WHERE trigger LIKE '%sequence_trigger%'
+-- Tables involved
+leads: 
+  - trigger: Comma-separated triggers (e.g., "fitness_start,welcome")
+  
+sequences:
+  - trigger: Main sequence trigger
+  - status: active/inactive
+  
+sequence_steps:
+  - id: Unique step identifier
+  - trigger: Step trigger name
+  - day_number: Step sequence
+  
+sequence_contacts:
+  - sequence_id: Link to sequence
+  - sequence_stepid: Link to specific step (NEW)
+  - status: sent/failed/active/pending
+  - completed_at: Timestamp when processed
+  - processing_device_id: Device that processed this
+```
+
+#### Calculation Logic
+```sql
+-- Total Should Send (matches trigger)
+SELECT COUNT(*) FROM leads 
+WHERE trigger LIKE '%sequence_trigger%' AND user_id = ?
 
 -- Done Send (per flow)
 SELECT COUNT(*) FROM sequence_contacts 
-WHERE sequence_id = ? AND sequence_stepid = ? AND status = 'sent'
+WHERE sequence_id = ? 
+  AND sequence_stepid = ? 
+  AND status = 'sent'
 
 -- Failed Send (per flow)
 SELECT COUNT(*) FROM sequence_contacts 
-WHERE sequence_id = ? AND sequence_stepid = ? AND status = 'failed'
+WHERE sequence_id = ? 
+  AND sequence_stepid = ? 
+  AND status = 'failed'
 
--- With Date Filter
-SELECT COUNT(*) FROM sequence_contacts 
-WHERE sequence_id = ? AND status IN ('sent', 'failed') 
-AND completed_at BETWEEN ? AND ?
+-- Remaining
+Should Send - Done Send - Failed Send
 ```
 
-### Database Schema Used
-- **leads**: `trigger` column to match sequence trigger
-- **sequence_contacts**: 
-  - `status`: Track message status (sent/failed)
-  - `sequence_stepid`: Link to specific flow
-  - `completed_at`: Timestamp for filtering
+### Future Improvements (Trigger Flow System)
+
+#### Enhanced Trigger Processing
+When the sequence trigger processor runs, it will:
+
+1. **Create Individual Records per Flow**
+   ```sql
+   -- When lead enters sequence, create record for EACH flow
+   FOR each sequence_step:
+     INSERT INTO sequence_contacts (
+       sequence_id,
+       sequence_stepid,      -- Links to specific flow
+       contact_phone,
+       status,              -- 'pending' initially
+       created_at
+     )
+   ```
+
+2. **Track Flow Progress**
+   ```sql
+   -- When flow is processed
+   UPDATE sequence_contacts 
+   SET 
+     status = 'sent',              -- or 'failed'
+     completed_at = NOW(),         -- Track when processed
+     processing_device_id = ?      -- Track which device sent
+   WHERE 
+     sequence_id = ? 
+     AND sequence_stepid = ?
+     AND contact_phone = ?
+   ```
+
+3. **Benefits of This Approach**
+   - **Accurate Tracking**: Each flow has its own record
+   - **Device Attribution**: Know which device processed each message
+   - **Timeline Analysis**: Track when each flow was sent via `completed_at`
+   - **Retry Logic**: Easy to identify and retry failed flows
+   - **Reporting**: Accurate per-flow statistics
+
+#### Example Flow
+```
+Lead with trigger "fitness_start" enters sequence:
+
+1. System creates 5 records (if sequence has 5 flows):
+   - Flow 1: sequence_stepid = 'abc123', status = 'pending'
+   - Flow 2: sequence_stepid = 'def456', status = 'pending'
+   - Flow 3: sequence_stepid = 'ghi789', status = 'pending'
+   - Flow 4: sequence_stepid = 'jkl012', status = 'pending'
+   - Flow 5: sequence_stepid = 'mno345', status = 'pending'
+
+2. As each flow is processed:
+   - Flow 1 sent → status='sent', completed_at='2024-01-15 10:00:00'
+   - Flow 2 sent → status='sent', completed_at='2024-01-16 10:00:00'
+   - Flow 3 failed → status='failed', completed_at='2024-01-17 10:00:00'
+   - etc.
+
+3. Statistics show:
+   - Should Send: 5 (one for each flow)
+   - Done Send: 2 (flows 1 & 2)
+   - Failed: 1 (flow 3)
+   - Remaining: 2 (flows 4 & 5)
+```
+
+### API Endpoints
+
+#### Sequence Summary
+```
+GET /api/sequences/summary
+
+Response:
+{
+  "sequences": {
+    "total": 2,
+    "active": 1,
+    "inactive": 1
+  },
+  "total_flows": 10,
+  "total_should_send": 150,
+  "total_done_send": 75,
+  "total_failed_send": 5,
+  "total_remaining_send": 70,
+  "recent_sequences": [
+    {
+      "id": "uuid",
+      "name": "Welcome Sequence",
+      "trigger": "welcome_new",
+      "total_flows": 5,
+      "should_send": 100,
+      "done_send": 50,
+      "failed_send": 2,
+      "remaining_send": 48
+    }
+  ]
+}
+```
+
+#### Sequence Contacts
+```
+GET /api/sequences/:id/contacts
+
+Response includes all contacts with their flow assignments
+```
+
+### Performance Considerations
+
+1. **Indexing Strategy**
+   ```sql
+   CREATE INDEX idx_sc_sequence_step ON sequence_contacts(sequence_id, sequence_stepid);
+   CREATE INDEX idx_sc_status_completed ON sequence_contacts(status, completed_at);
+   CREATE INDEX idx_leads_trigger ON leads(trigger);
+   ```
+
+2. **Query Optimization**
+   - Use batched inserts for flow records
+   - Aggregate statistics in database, not application
+   - Cache sequence step data
+
+3. **Scalability**
+   - Partition sequence_contacts by date if needed
+   - Archive old completed sequences
+   - Use read replicas for reporting
 
 ## 🔄 Message Sequences (Trigger-Based Drip Campaigns)
 
