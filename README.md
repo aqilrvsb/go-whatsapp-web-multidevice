@@ -393,6 +393,58 @@ ALTER SYSTEM SET shared_buffers = '4GB';
 SELECT pg_reload_conf();
 ```
 
+## 📊 Sequence Progress Tracking
+
+### Overview
+The sequence detail page provides comprehensive progress tracking for your sequences with real-time statistics and filtering capabilities.
+
+### Key Features
+
+#### 1. **Main Statistics Boxes**
+- **Total Flows**: Number of steps/flows in the sequence
+- **Total Contacts Should Send**: Leads whose trigger matches the sequence trigger
+- **Contacts Done Send Message**: Contacts with status='sent' in sequence_contacts
+- **Contacts Failed Send Message**: Contacts with status='failed' in sequence_contacts
+- **Contacts Remaining Send Message**: Should Send - Done Send - Failed Send
+
+#### 2. **Per-Flow Statistics**
+Each flow shows individual statistics:
+- Should Send: Total leads that should receive this flow
+- Done Send: Contacts who successfully received (status='sent')
+- Failed Send: Contacts where sending failed (status='failed')
+- Remaining: Contacts yet to receive this flow
+
+#### 3. **Date Filtering**
+- Filter Done Send and Failed Send by date range
+- Uses `completed_at` column from sequence_contacts table
+- Remaining count adjusts based on filtered results
+
+#### 4. **Data Calculation Logic**
+```sql
+-- Total Should Send
+SELECT COUNT(*) FROM leads WHERE trigger LIKE '%sequence_trigger%'
+
+-- Done Send (per flow)
+SELECT COUNT(*) FROM sequence_contacts 
+WHERE sequence_id = ? AND sequence_stepid = ? AND status = 'sent'
+
+-- Failed Send (per flow)
+SELECT COUNT(*) FROM sequence_contacts 
+WHERE sequence_id = ? AND sequence_stepid = ? AND status = 'failed'
+
+-- With Date Filter
+SELECT COUNT(*) FROM sequence_contacts 
+WHERE sequence_id = ? AND status IN ('sent', 'failed') 
+AND completed_at BETWEEN ? AND ?
+```
+
+### Database Schema Used
+- **leads**: `trigger` column to match sequence trigger
+- **sequence_contacts**: 
+  - `status`: Track message status (sent/failed)
+  - `sequence_stepid`: Link to specific flow
+  - `completed_at`: Timestamp for filtering
+
 ## 🔄 Message Sequences (Trigger-Based Drip Campaigns)
 
 ### 🚀 Advanced Trigger-Based Sequence System
@@ -692,6 +744,11 @@ The trigger-based system is production-ready and optimized for massive scale wit
 - **Manual device reconnection without QR scan** 🎉
 - **Direct JID-based session restoration** 🚀
 - **Persistent WhatsApp sessions across restarts** 💪
+- **Sequence Detail Progress Tracking** 📊
+  - Real-time statistics for each sequence flow
+  - Track leads by trigger matching
+  - Monitor sent, failed, and remaining contacts
+  - Date filtering based on completed_at timestamp
 
 ### Future Enhancements
 - Message search

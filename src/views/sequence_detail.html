@@ -196,6 +196,40 @@
             font-weight: 700;
             font-size: 18px;
         }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .filter-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 20px;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-weight: 500;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -233,6 +267,22 @@
 
     <!-- Main Content -->
     <div class="container-fluid">
+        <!-- Date Filter Section -->
+        <div class="filter-section">
+            <div class="filter-controls">
+                <span class="filter-label">Filter by Date:</span>
+                <input type="date" id="filterStartDate" class="form-control" style="width: auto;">
+                <span>to</span>
+                <input type="date" id="filterEndDate" class="form-control" style="width: auto;">
+                <button class="btn btn-primary btn-sm" onclick="applyDateFilter()">
+                    <i class="bi bi-funnel"></i> Apply Filter
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearDateFilter()">
+                    <i class="bi bi-x-circle"></i> Clear
+                </button>
+            </div>
+        </div>
+
         <!-- Metric Cards Row -->
         <div class="row mb-4">
             <!-- Total Flow Box -->
@@ -246,7 +296,9 @@
             <!-- Total Contacts (Should Send) Box -->
             <div class="col-6 col-md-3 col-lg-2 mb-3">
                 <div class="metric-card">
-                    <div class="metric-value text-info" id="totalShouldSend">0</div>
+                    <div class="metric-value text-info" id="totalShouldSend">
+                        <div class="loading-spinner"></div>
+                    </div>
                     <div class="metric-label">Total Contacts Should Send</div>
                 </div>
             </div>
@@ -294,8 +346,11 @@
     <script>
         const sequenceId = '{{ .Sequence.ID }}';
         const sequenceTrigger = '{{ .Sequence.Trigger }}';
+        const userId = '{{ .User.ID }}';
         let sequenceData = null;
         let contactsData = null;
+        let allContactsData = null; // Store unfiltered data
+        let flowStats = {}; // Store stats per flow
         let totalFlows = 0;
         let totalShouldSend = 0;
         let totalDoneSend = 0;
@@ -304,19 +359,94 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            // Set today's date as default end date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filterEndDate').value = today;
+            document.getElementById('filterEndDate').max = today;
+            document.getElementById('filterStartDate').max = today;
+            
             loadSequenceDetails();
-            loadSequenceContacts();
         });
 
+        function applyDateFilter() {
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+            
+            if (!allContactsData) {
+                return;
+            }
+            
+            // Filter contacts based on completed_at date
+            if (startDate || endDate) {
+                contactsData = allContactsData.filter(contact => {
+                    if (!contact.completed_at) {
+                        // If no completed_at, don't include in filtered results for done/failed
+                        return false;
+                    }
+                    
+                    const completedDate = contact.completed_at.split('T')[0];
+                    
+                    if (startDate && endDate) {
+                        return completedDate >= startDate && completedDate <= endDate;
+                    } else if (startDate) {
+                        return completedDate >= startDate;
+                    } else if (endDate) {
+                        return completedDate <= endDate;
+                    }
+                    
+                    return true;
+                });
+            } else {
+                contactsData = [...allContactsData];
+            }
+            
+            // Recalculate stats with filtered data
+            calculateContactStats(true); // Pass true to indicate filtering
+            displayFlowCards();
+            displayTimeline();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            
+            // Reset to unfiltered data
+            contactsData = allContactsData ? [...allContactsData] : [];
+            calculateContactStats(false);
+            displayFlowCards();
+            displayTimeline();
+        }
+
         function loadSequenceDetails() {
+            // First load sequence details
             fetch(`/api/sequences/${sequenceId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
                         sequenceData = data.results;
-                        calculateTotals();
-                        displayFlowCards();
-                        displayTimeline();
+                        totalFlows = sequenceData.steps ? sequenceData.steps.length : 0;
+                        document.getElementById('totalFlows').textContent = totalFlows;
+                        
+                        // Initialize flow stats
+                        if (sequenceData.steps) {
+                            sequenceData.steps.forEach(step => {
+                                flowStats[step.id] = {
+                                    shouldSend: 0,
+                                    doneSend: 0,
+                                    failedSend: 0,
+                                    remaining: 0
+                                };
+                            });
+                        }
+                        
+                        // Load all data in parallel
+                        Promise.all([
+                            loadLeadsCount(),
+                            loadSequenceContacts()
+                        ]).then(() => {
+                            displayFlowCards();
+                            displayTimeline();
+                        });
                     }
                 })
                 .catch(error => {
@@ -324,13 +454,39 @@
                 });
         }
 
+        function loadLeadsCount() {
+            // We need to get leads that match the sequence trigger
+            // This would require a new API endpoint to get leads by trigger
+            // For now, we'll simulate with a fetch to a hypothetical endpoint
+            
+            // TODO: Replace with actual API endpoint that returns leads matching trigger
+            return fetch(`/api/leads?trigger=${encodeURIComponent(sequenceTrigger)}&user_id=${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        totalShouldSend = data.results.length || 0;
+                    } else {
+                        // Fallback to sequence contacts count
+                        totalShouldSend = sequenceData.contacts_count || 0;
+                    }
+                    document.getElementById('totalShouldSend').textContent = totalShouldSend;
+                })
+                .catch(error => {
+                    console.error('Error loading leads count:', error);
+                    // Fallback to sequence contacts count
+                    totalShouldSend = sequenceData.contacts_count || 0;
+                    document.getElementById('totalShouldSend').textContent = totalShouldSend;
+                });
+        }
+
         function loadSequenceContacts() {
-            fetch(`/api/sequences/${sequenceId}/contacts`)
+            return fetch(`/api/sequences/${sequenceId}/contacts`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
-                        contactsData = data.results || [];
-                        calculateContactStats();
+                        allContactsData = data.results || [];
+                        contactsData = [...allContactsData]; // Create a copy
+                        calculateContactStats(false);
                     }
                 })
                 .catch(error => {
@@ -338,22 +494,67 @@
                 });
         }
 
-        function calculateContactStats() {
+        function calculateContactStats(isFiltered) {
             if (!contactsData) return;
             
             // Reset counters
             totalDoneSend = 0;
             totalFailedSend = 0;
-            totalRemainingSend = 0;
             
-            // Count by status
+            // Reset flow stats
+            Object.keys(flowStats).forEach(stepId => {
+                flowStats[stepId] = {
+                    shouldSend: totalShouldSend, // Each flow should send to all leads
+                    doneSend: 0,
+                    failedSend: 0,
+                    remaining: 0
+                };
+            });
+            
+            // Count by status and group by sequence_stepid
+            // When filtered, only count contacts with completed_at in the date range
             contactsData.forEach(contact => {
-                if (contact.status === 'sent' || contact.status === 'completed') {
+                if (contact.status === 'sent') {
                     totalDoneSend++;
+                    if (contact.sequence_stepid && flowStats[contact.sequence_stepid]) {
+                        flowStats[contact.sequence_stepid].doneSend++;
+                    }
                 } else if (contact.status === 'failed') {
                     totalFailedSend++;
-                } else if (contact.status === 'active' || contact.status === 'pending') {
-                    totalRemainingSend++;
+                    if (contact.sequence_stepid && flowStats[contact.sequence_stepid]) {
+                        flowStats[contact.sequence_stepid].failedSend++;
+                    }
+                }
+            });
+            
+            // When not filtered, calculate remaining normally
+            // When filtered, remaining is based on what's left after filtering
+            if (!isFiltered) {
+                // Normal calculation: total should send minus done and failed from all contacts
+                const allDone = allContactsData.filter(c => c.status === 'sent').length;
+                const allFailed = allContactsData.filter(c => c.status === 'failed').length;
+                totalRemainingSend = totalShouldSend - allDone - allFailed;
+            } else {
+                // When filtered, show remaining as total minus what's shown in the filter
+                totalRemainingSend = totalShouldSend - totalDoneSend - totalFailedSend;
+            }
+            
+            // Calculate remaining for each flow
+            Object.keys(flowStats).forEach(stepId => {
+                if (!isFiltered) {
+                    // Count all done/failed for this step from unfiltered data
+                    const allStepDone = allContactsData.filter(c => 
+                        c.sequence_stepid === stepId && c.status === 'sent'
+                    ).length;
+                    const allStepFailed = allContactsData.filter(c => 
+                        c.sequence_stepid === stepId && c.status === 'failed'
+                    ).length;
+                    flowStats[stepId].remaining = flowStats[stepId].shouldSend - allStepDone - allStepFailed;
+                } else {
+                    // When filtered, use filtered counts
+                    flowStats[stepId].remaining = flowStats[stepId].shouldSend - 
+                                                  flowStats[stepId].doneSend - 
+                                                  flowStats[stepId].failedSend;
                 }
             });
             
@@ -361,17 +562,6 @@
             document.getElementById('totalDoneSend').textContent = totalDoneSend;
             document.getElementById('totalFailedSend').textContent = totalFailedSend;
             document.getElementById('totalRemainingSend').textContent = totalRemainingSend;
-        }
-
-        function calculateTotals() {
-            if (!sequenceData.steps) return;
-            
-            totalFlows = sequenceData.steps.length;
-            // Total should send is the number of contacts enrolled
-            totalShouldSend = sequenceData.contacts_count || 0;
-            
-            document.getElementById('totalFlows').textContent = totalFlows;
-            document.getElementById('totalShouldSend').textContent = totalShouldSend;
         }
 
         function displayFlowCards() {
@@ -389,10 +579,12 @@
 
             // Create a card for each flow
             sequenceData.steps.forEach((step, index) => {
-                const shouldSend = sequenceData.contacts_count || 0;
-                const doneSend = 0; // This would come from actual send data per flow
-                const failedSend = 0; // This would come from actual send data per flow
-                const remainingSend = shouldSend - doneSend - failedSend;
+                const stats = flowStats[step.id] || {
+                    shouldSend: totalShouldSend,
+                    doneSend: 0,
+                    failedSend: 0,
+                    remaining: totalShouldSend
+                };
                 
                 const flowCard = document.createElement('div');
                 flowCard.className = 'col-md-6 col-lg-4 mb-3';
@@ -402,19 +594,19 @@
                         <div class="flow-header">Flow ${index + 1}</div>
                         <div class="flow-stats">
                             <div class="stat-item">
-                                <div class="stat-value text-info">${shouldSend}</div>
+                                <div class="stat-value text-info">${stats.shouldSend}</div>
                                 <div class="stat-label">Should Send</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-value text-success">${doneSend}</div>
+                                <div class="stat-value text-success">${stats.doneSend}</div>
                                 <div class="stat-label">Done Send</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-value text-danger">${failedSend}</div>
+                                <div class="stat-value text-danger">${stats.failedSend}</div>
                                 <div class="stat-label">Failed Send</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-value text-warning">${remainingSend}</div>
+                                <div class="stat-value text-warning">${stats.remaining}</div>
                                 <div class="stat-label">Remaining</div>
                             </div>
                         </div>
@@ -437,10 +629,12 @@
             }
 
             sequenceData.steps.forEach((step, index) => {
-                const shouldSend = sequenceData.contacts_count || 0;
-                const doneSend = 0; // This would come from actual send data per flow
-                const failedSend = 0; // This would come from actual send data per flow
-                const remainingSend = shouldSend - doneSend - failedSend;
+                const stats = flowStats[step.id] || {
+                    shouldSend: totalShouldSend,
+                    doneSend: 0,
+                    failedSend: 0,
+                    remaining: totalShouldSend
+                };
                 
                 const timelineFlow = document.createElement('div');
                 timelineFlow.className = 'timeline-flow';
@@ -464,19 +658,19 @@
                     <div class="timeline-stats">
                         <div class="timeline-stat">
                             <span class="timeline-stat-label">Total Lead Should Sent</span>
-                            <span class="timeline-stat-value text-info">${shouldSend}</span>
+                            <span class="timeline-stat-value text-info">${stats.shouldSend}</span>
                         </div>
                         <div class="timeline-stat">
                             <span class="timeline-stat-label">Total Lead Done Sent</span>
-                            <span class="timeline-stat-value text-success">${doneSend}</span>
+                            <span class="timeline-stat-value text-success">${stats.doneSend}</span>
                         </div>
                         <div class="timeline-stat">
                             <span class="timeline-stat-label">Total Lead Failed Sent</span>
-                            <span class="timeline-stat-value text-danger">${failedSend}</span>
+                            <span class="timeline-stat-value text-danger">${stats.failedSend}</span>
                         </div>
                         <div class="timeline-stat">
                             <span class="timeline-stat-label">Total Lead Remaining</span>
-                            <span class="timeline-stat-value text-warning">${remainingSend}</span>
+                            <span class="timeline-stat-value text-warning">${stats.remaining}</span>
                         </div>
                     </div>
                 `;
