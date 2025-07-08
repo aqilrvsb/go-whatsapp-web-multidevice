@@ -37,52 +37,57 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        .sequence-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: var(--card-shadow);
-            border: none;
-            margin-bottom: 20px;
-        }
-
         .metric-card {
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 25px;
             box-shadow: var(--card-shadow);
             border: none;
             text-align: center;
+            height: 100%;
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .metric-value {
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: 700;
             line-height: 1;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
         }
 
         .metric-label {
             color: #667781;
             font-size: 14px;
+            font-weight: 500;
         }
 
-        .btn-primary {
-            background-color: var(--primary);
-            border-color: var(--primary);
+        .btn-back {
+            background-color: #f0f2f5;
+            border: none;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-            border-color: var(--primary-dark);
+        .btn-back:hover {
+            background-color: #e4e6eb;
+            color: #333;
         }
 
         .flow-card {
-            background: #f8f9fa;
+            background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 25px;
+            box-shadow: var(--card-shadow);
+            border: none;
             margin-bottom: 20px;
-            border: 1px solid #e9ecef;
         }
 
         .flow-header {
@@ -90,35 +95,98 @@
             color: white;
             padding: 15px 20px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin: -25px -25px 20px -25px;
+            font-weight: 600;
         }
 
-        .timeline-card {
+        .flow-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: #667781;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+
+        .sequence-timeline {
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 25px;
             box-shadow: var(--card-shadow);
             border: none;
+            margin-top: 30px;
+        }
+
+        .timeline-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #333;
+        }
+
+        .timeline-flow {
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 20px;
-            transition: transform 0.2s;
+            background: #fafbfc;
         }
 
-        .timeline-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        .timeline-flow-header {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
         }
 
-        .btn-back {
-            background-color: #f0f2f5;
-            border: none;
-            color: #333;
-            padding: 8px 16px;
-            margin-right: 10px;
+        .timeline-content {
+            margin-bottom: 15px;
         }
 
-        .btn-back:hover {
-            background-color: #e4e6eb;
-            color: #333;
+        .timeline-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .timeline-stats {
+            display: flex;
+            gap: 30px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .timeline-stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timeline-stat-label {
+            color: #667781;
+            font-size: 14px;
+        }
+
+        .timeline-stat-value {
+            font-weight: 700;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -144,20 +212,11 @@
             <div class="row align-items-center">
                 <div class="col">
                     <h2 class="mb-0">{{ .Sequence.Name }}</h2>
-                    <p class="text-muted mb-0">View and manage sequence progress</p>
+                    <p class="text-muted mb-0">Sequence Progress Overview</p>
                 </div>
                 <div class="col-auto">
                     <button class="btn btn-back" onclick="window.location.href='/sequences'">
-                        <i class="bi bi-arrow-left"></i> Back
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="editSequence()">
-                        <i class="bi bi-pencil"></i> Edit
-                    </button>
-                    <button class="btn btn-success" onclick="toggleSequence()">
-                        <i class="bi bi-play-circle"></i> Start
-                    </button>
-                    <button class="btn btn-danger" onclick="deleteSequence()">
-                        <i class="bi bi-trash"></i> Delete
+                        <i class="bi bi-arrow-left"></i> Back to Sequences
                     </button>
                 </div>
             </div>
@@ -166,31 +225,41 @@
 
     <!-- Main Content -->
     <div class="container-fluid">
-        <!-- Flow Overview -->
-        <div class="sequence-card">
-            <h5 class="mb-4">Sequence Overview</h5>
-            
-            <!-- Total Count for Sequence -->
-            <div class="alert alert-info mb-4">
-                <div class="row align-items-center">
-                    <div class="col">
-                        <strong>Total Leads with Trigger "{{ .Sequence.Trigger }}":</strong>
-                    </div>
-                    <div class="col-auto">
-                        <h4 class="mb-0" id="totalTriggerLeads">0</h4>
-                    </div>
+        <!-- Metric Cards Row -->
+        <div class="row mb-4">
+            <!-- Total Flow Box -->
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value text-primary" id="totalFlows">0</div>
+                    <div class="metric-label">Total Flows</div>
                 </div>
             </div>
-
-            <!-- Flow Cards -->
-            <div id="flowCards">
-                <!-- Flow cards will be dynamically generated -->
+            
+            <!-- Total Contacts (Should Send) Box -->
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value text-info" id="totalShouldSend">0</div>
+                    <div class="metric-label">Total Contacts Should Send</div>
+                </div>
+            </div>
+            
+            <!-- Contacts Done Send Message Box -->
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value text-success" id="totalDoneSend">0</div>
+                    <div class="metric-label">Contacts Done Send Message</div>
+                </div>
             </div>
         </div>
 
+        <!-- Flow Cards -->
+        <div id="flowCards">
+            <!-- Flow cards will be dynamically generated -->
+        </div>
+
         <!-- Sequence Timeline -->
-        <div class="sequence-card">
-            <h5 class="mb-4">Sequence Timeline</h5>
+        <div class="sequence-timeline">
+            <h4 class="timeline-header">Sequence Timeline</h4>
             <div id="sequenceTimeline">
                 <!-- Timeline will be dynamically generated -->
             </div>
@@ -198,11 +267,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         const sequenceId = '{{ .Sequence.ID }}';
         const sequenceTrigger = '{{ .Sequence.Trigger }}';
         let sequenceData = null;
+        let totalFlows = 0;
+        let totalShouldSend = 0;
+        let totalDoneSend = 0;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -215,21 +286,27 @@
                 .then(data => {
                     if (data.code === 'SUCCESS') {
                         sequenceData = data.results;
+                        calculateTotals();
                         displayFlowCards();
                         displayTimeline();
-                        loadTriggerLeadsCount();
                     }
                 })
                 .catch(error => {
                     console.error('Error loading sequence details:', error);
-                    Swal.fire('Error', 'Failed to load sequence details', 'error');
                 });
         }
 
-        function loadTriggerLeadsCount() {
-            // This would need a new API endpoint to get leads by trigger
-            // For now, using the contacts count from sequence
-            document.getElementById('totalTriggerLeads').textContent = sequenceData.contacts_count || 0;
+        function calculateTotals() {
+            if (!sequenceData.steps) return;
+            
+            totalFlows = sequenceData.steps.length;
+            // For now, using contacts_count as should send for each flow
+            totalShouldSend = sequenceData.contacts_count * totalFlows;
+            totalDoneSend = 0; // This would come from actual send data
+            
+            document.getElementById('totalFlows').textContent = totalFlows;
+            document.getElementById('totalShouldSend').textContent = totalShouldSend;
+            document.getElementById('totalDoneSend').textContent = totalDoneSend;
         }
 
         function displayFlowCards() {
@@ -237,33 +314,43 @@
             container.innerHTML = '';
 
             if (!sequenceData.steps || sequenceData.steps.length === 0) {
-                container.innerHTML = '<p class="text-muted">No steps defined for this sequence.</p>';
+                container.innerHTML = '<div class="alert alert-info">No flows defined for this sequence.</div>';
                 return;
             }
 
-            // Group steps by flow (for now, each step is a flow)
+            // Create a card for each flow
             sequenceData.steps.forEach((step, index) => {
+                const shouldSend = sequenceData.contacts_count || 0;
+                const doneSend = 0; // This would come from actual send data
+                
                 const flowCard = document.createElement('div');
-                flowCard.className = 'flow-card';
+                flowCard.className = 'col-md-3 mb-3';
                 
                 flowCard.innerHTML = `
-                    <div class="flow-header">
-                        <h6 class="mb-0">Flow ${index + 1} - ${step.trigger || `Day ${step.day_number}`}</h6>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Total Contacts Should Send:</strong> <span class="badge bg-primary">${sequenceData.contacts_count || 0}</span></p>
+                    <div class="metric-card">
+                        <div class="metric-label mb-3">Flow ${index + 1}</div>
+                        <div class="flow-stats">
+                            <div class="stat-item">
+                                <div class="stat-value text-info">${shouldSend}</div>
+                                <div class="stat-label">Should Send</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-success">${doneSend}</div>
+                                <div class="stat-label">Done Send</div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <p class="mb-1"><strong>Total Contacts Done Send:</strong> <span class="badge bg-success">0</span></p>
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">Message Type: ${step.message_type || 'text'}</small>
                     </div>
                 `;
                 
-                container.appendChild(flowCard);
+                // Add to row
+                if (index % 4 === 0) {
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    container.appendChild(row);
+                }
+                
+                const currentRow = container.lastElementChild;
+                currentRow.appendChild(flowCard);
             });
         }
 
@@ -276,102 +363,42 @@
                 return;
             }
 
-            const timeline = document.createElement('div');
-            timeline.className = 'row';
-
             sequenceData.steps.forEach((step, index) => {
-                const timelineCard = document.createElement('div');
-                timelineCard.className = 'col-md-6 mb-3';
+                const shouldSend = sequenceData.contacts_count || 0;
+                const doneSend = 0; // This would come from actual send data
                 
-                timelineCard.innerHTML = `
-                    <div class="timeline-card">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <h6 class="mb-0">Flow ${index + 1}</h6>
-                            <span class="badge bg-primary">${step.trigger || `Day ${step.day_number}`}</span>
-                        </div>
-                        
+                const timelineFlow = document.createElement('div');
+                timelineFlow.className = 'timeline-flow';
+                
+                timelineFlow.innerHTML = `
+                    <div class="timeline-flow-header">
+                        Flow ${index + 1} - ${step.trigger || `Day ${step.day_number}`}
+                    </div>
+                    
+                    <div class="timeline-content">
                         ${step.media_url ? `
-                            <div class="mb-3">
-                                <img src="${step.media_url}" class="img-fluid rounded" style="max-height: 200px;">
-                            </div>
+                            <img src="${step.media_url}" class="timeline-image" alt="Flow ${index + 1} Image">
                         ` : ''}
                         
-                        <p class="mb-3">${step.content || 'No content'}</p>
-                        
-                        <div class="row text-center">
-                            <div class="col-6">
-                                <small class="text-muted">Should Send</small>
-                                <div class="fw-bold">${sequenceData.contacts_count || 0}</div>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">Done Send</small>
-                                <div class="fw-bold text-success">0</div>
-                            </div>
+                        <div class="mt-2">
+                            <strong>Description:</strong><br>
+                            ${step.content || 'No description available'}
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-stats">
+                        <div class="timeline-stat">
+                            <span class="timeline-stat-label">Total Lead Should Sent:</span>
+                            <span class="timeline-stat-value text-info">${shouldSend}</span>
+                        </div>
+                        <div class="timeline-stat">
+                            <span class="timeline-stat-label">Total Lead Done Sent:</span>
+                            <span class="timeline-stat-value text-success">${doneSend}</span>
                         </div>
                     </div>
                 `;
                 
-                timeline.appendChild(timelineCard);
-            });
-
-            container.appendChild(timeline);
-        }
-
-        function editSequence() {
-            window.location.href = `/sequences/${sequenceId}/edit`;
-        }
-
-        function toggleSequence() {
-            fetch(`/api/sequences/${sequenceId}/toggle`, {
-                method: 'POST',
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 'SUCCESS') {
-                    Swal.fire('Success', data.message, 'success').then(() => {
-                        location.reload();
-                    });
-                } else {
-                    Swal.fire('Error', data.message || 'Failed to toggle sequence', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                Swal.fire('Error', 'Failed to toggle sequence', 'error');
-            });
-        }
-
-        function deleteSequence() {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "You won't be able to revert this!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch(`/api/sequences/${sequenceId}`, {
-                        method: 'DELETE',
-                        credentials: 'include'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.code === 'SUCCESS') {
-                            Swal.fire('Deleted!', 'Your sequence has been deleted.', 'success').then(() => {
-                                window.location.href = '/sequences';
-                            });
-                        } else {
-                            Swal.fire('Error', data.message || 'Failed to delete sequence', 'error');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        Swal.fire('Error', 'Failed to delete sequence', 'error');
-                    });
-                }
+                container.appendChild(timelineFlow);
             });
         }
     </script>
