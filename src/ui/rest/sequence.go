@@ -319,6 +319,15 @@ func (controller *Sequence) SequencesPage(c *fiber.Ctx) error {
 func (controller *Sequence) SequenceDetailPage(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
 	
+	userID, err := getUserID(c)
+	if err != nil {
+		return c.Redirect("/login")
+	}
+	
+	// Get user info
+	userRepo := repository.GetUserRepository()
+	user, _ := userRepo.GetUserByID(userID)
+	
 	sequence, err := controller.Service.GetSequenceByID(sequenceID)
 	if err != nil {
 		return c.Redirect("/sequences")
@@ -327,6 +336,7 @@ func (controller *Sequence) SequenceDetailPage(c *fiber.Ctx) error {
 	return c.Render("views/sequence_detail", fiber.Map{
 		"Title":    "Sequence Detail",
 		"Sequence": sequence,
+		"User":     user,
 	})
 }
 
