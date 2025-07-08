@@ -5345,11 +5345,17 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Total Devices: <strong>${summary.total_devices || 0}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
                                         <p class="mb-1">Total Contacts: <strong>${summary.contacts.total}</strong></p>
                                     </div>
-                                    <div class="col-md-6">
-                                        <p class="mb-1">Average per Sequence: <strong>${summary.contacts.average_per_sequence.toFixed(1)}</strong></p>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Success: <strong>${summary.contacts.total_success || 0}</strong></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1">Remaining: <strong>${summary.contacts.total_remaining || 0}</strong></p>
                                     </div>
                                 </div>
                             </div>
@@ -5373,6 +5379,8 @@
                                                     <th>Niche</th>
                                                     <th>Total Devices</th>
                                                     <th>Total Contacts</th>
+                                                    <th>Success</th>
+                                                    <th>Remaining</th>
                                                     <th>Status</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -5383,7 +5391,9 @@
                                                         <td>${sequence.name}</td>
                                                         <td>${sequence.niche || '-'}</td>
                                                         <td>${sequence.total_devices || 0}</td>
-                                                        <td>${sequence.contacts_count}</td>
+                                                        <td>${sequence.contacts_count || 0}</td>
+                                                        <td>${sequence.completed_contacts || 0}</td>
+                                                        <td>${sequence.remaining_contacts || 0}</td>
                                                         <td>
                                                             <span class="badge bg-${getStatusColor(sequence.status)}">
                                                                 ${sequence.status}

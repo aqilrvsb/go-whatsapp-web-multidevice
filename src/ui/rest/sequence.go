@@ -365,24 +365,35 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 		"contacts": map[string]interface{}{
 			"total":                0,
 			"average_per_sequence": 0.0,
+			"total_success":        0,
+			"total_remaining":      0,
 		},
 		"recent_sequences": []interface{}{},
+		"total_devices":    totalUserDevices,
 	}
 	
 	// Count statuses and contacts
 	totalContacts := 0
+	totalSuccess := 0
+	totalRemaining := 0
+	
 	for _, seq := range sequences {
 		switch seq.Status {
 		case "active":
 			summary["sequences"].(map[string]int)["active"]++
-		case "paused", "draft", "inactive":
+		default:
 			summary["sequences"].(map[string]int)["inactive"]++
 		}
 		totalContacts += seq.ContactsCount
+		// For now, we'll just use the total contacts as remaining
+		// since we don't have completed counts in SequenceResponse
+		totalRemaining += seq.ContactsCount
 	}
 	
-	// Calculate averages
+	// Update contact statistics
 	summary["contacts"].(map[string]interface{})["total"] = totalContacts
+	summary["contacts"].(map[string]interface{})["total_success"] = totalSuccess
+	summary["contacts"].(map[string]interface{})["total_remaining"] = totalRemaining
 	if len(sequences) > 0 {
 		summary["contacts"].(map[string]interface{})["average_per_sequence"] = float64(totalContacts) / float64(len(sequences))
 	}
@@ -396,14 +407,16 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 	recentSequences := make([]interface{}, 0, recentCount)
 	for i := 0; i < recentCount; i++ {
 		seq := sequences[i]
-		// Since sequences use all user devices, show total user devices
+		
 		recentSequences = append(recentSequences, map[string]interface{}{
-			"id":             seq.ID,
-			"name":           seq.Name,
-			"niche":          seq.Niche,
-			"status":         seq.Status,
-			"contacts_count": seq.ContactsCount,
-			"total_devices":  totalUserDevices,
+			"id":                  seq.ID,
+			"name":                seq.Name,
+			"niche":               seq.Niche,
+			"status":              seq.Status,
+			"contacts_count":      seq.ContactsCount,
+			"total_devices":       totalUserDevices,
+			"completed_contacts":  0, // TODO: Add this to SequenceResponse
+			"remaining_contacts":  seq.ContactsCount,
 		})
 	}
 	summary["recent_sequences"] = recentSequences
