@@ -68,7 +68,7 @@ type SequenceContact struct {
 	LastMessageAt  *time.Time `json:"last_message_at" db:"last_message_at"`
 	EnrolledAt     time.Time  `json:"enrolled_at" db:"enrolled_at"`
 	LastSentAt     *time.Time `json:"last_sent_at" db:"last_sent_at"`
-	NextSendAt     *time.Time `json:"next_send_at" db:"next_send_at"`
+	NextSendAt     *time.Time `json:"next_send_at" db:"next_trigger_time"`
 	CompletedAt    *time.Time `json:"completed_at" db:"completed_at"`
 }
 

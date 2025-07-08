@@ -228,7 +228,7 @@ func InitializeSchema() error {
 		status VARCHAR(50) DEFAULT 'active',
 		enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		last_sent_at TIMESTAMP,
-		next_send_at TIMESTAMP,
+		next_trigger_time TIMESTAMP,
 		completed_at TIMESTAMP,
 		UNIQUE(sequence_id, contact_phone)
 	);
@@ -272,7 +272,7 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_sequences_status ON sequences(status);
 	CREATE INDEX IF NOT EXISTS idx_sequence_steps_sequence_id ON sequence_steps(sequence_id);
 	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_sequence_id ON sequence_contacts(sequence_id);
-	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_next_send ON sequence_contacts(next_send_at);
+	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_next_send ON sequence_contacts(next_trigger_time);
 	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_status ON broadcast_messages(status);
 	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_scheduled ON broadcast_messages(scheduled_at);
 	`
@@ -334,7 +334,7 @@ func InitializeSchema() error {
 	-- Remove unnecessary columns from sequence_contacts
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS enrolled_at CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS last_sent_at CASCADE;
-	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS next_send_at CASCADE;
+	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS next_trigger_time CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS current_day CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS added_at CASCADE;
 	ALTER TABLE sequence_contacts DROP COLUMN IF EXISTS last_message_at CASCADE;
