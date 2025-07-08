@@ -376,19 +376,21 @@ func (controller *Sequence) GetSequencesSummary(c *fiber.Ctx) error {
 	totalContacts := 0
 	totalSuccess := 0
 	totalRemaining := 0
+	activeCount := 0
 	
 	for _, seq := range sequences {
-		switch seq.Status {
-		case "active":
-			summary["sequences"].(map[string]int)["active"]++
-		default:
-			summary["sequences"].(map[string]int)["inactive"]++
+		if seq.Status == "active" {
+			activeCount++
 		}
 		totalContacts += seq.ContactsCount
 		// For now, we'll just use the total contacts as remaining
 		// since we don't have completed counts in SequenceResponse
 		totalRemaining += seq.ContactsCount
 	}
+	
+	// Set the counts
+	summary["sequences"].(map[string]int)["active"] = activeCount
+	summary["sequences"].(map[string]int)["inactive"] = len(sequences) - activeCount
 	
 	// Update contact statistics
 	summary["contacts"].(map[string]interface{})["total"] = totalContacts
