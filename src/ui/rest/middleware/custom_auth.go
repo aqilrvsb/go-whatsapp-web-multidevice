@@ -58,11 +58,11 @@ func CustomAuth() fiber.Handler {
 			token = c.Get("X-Auth-Token")
 		}
 		
-		// Debug logging (remove in production)
-		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/app/") {
-			fmt.Printf("API Auth Debug - Path: %s, Token: %s, Method: %s, Cookie: %s\n", 
-				path, token, c.Method(), c.Cookies("session_token"))
-		}
+		// Debug logging - commented out for production
+		// if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/app/") {
+		// 	fmt.Printf("API Auth Debug - Path: %s, Token: %s, Method: %s, Cookie: %s\n", 
+		// 		path, token, c.Method(), c.Cookies("session_token"))
+		// }
 		
 		// If no token found
 		if token == "" {
@@ -98,7 +98,7 @@ func CustomAuth() fiber.Handler {
 		}
 		
 		// Session is valid - set user context
-		fmt.Printf("Session validated for user: %s on path: %s\n", session.UserID, path)
+		// fmt.Printf("Session validated for user: %s on path: %s\n", session.UserID, path)
 		
 		// Store user info in context for use in handlers
 		c.Locals("userID", session.UserID)

@@ -348,7 +348,7 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
-	log.Printf("Login attempt for email: %s", loginReq.Email)
+	// log.Printf("Login attempt for email: %s", loginReq.Email)
 	
 	// Get user repository
 	userRepo := repository.GetUserRepository()
@@ -362,7 +362,7 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
-	log.Printf("Login successful for user: %s", user.Email)
+	// log.Printf("Login successful for user: %s", user.Email)
 	
 	// Create session
 	session, err := userRepo.CreateSession(user.ID)
