@@ -404,6 +404,9 @@ func InitializeSchema() error {
 		log.Printf("Created default admin user: admin@whatsapp.com / changeme123 (encoded: %s)\n", encodedPassword)
 	}
 	
+	// SKIP AUTO-MIGRATIONS - Database schema is already set up correctly
+	// Commented out on January 8, 2025 - All tables and columns exist as needed
+	/*
 	// Run auto-migrations for time_schedule and other updates
 	log.Println("Running database migrations...")
 	migrations := GetMigrations() // Use the new migration system
@@ -419,6 +422,9 @@ func InitializeSchema() error {
 	}
 	
 	log.Println("All migrations completed")
+	*/
+	
+	log.Println("Skipping auto-migrations - database schema already configured")
 	
 	// Run cleanup for expired sessions
 	go func() {
