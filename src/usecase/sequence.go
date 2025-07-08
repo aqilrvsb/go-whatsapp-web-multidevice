@@ -393,7 +393,7 @@ func (s *sequenceService) GetSequenceContacts(sequenceID string) ([]domainSequen
 			ID:            contact.ID,
 			ContactPhone:  contact.ContactPhone,
 			ContactName:   contact.ContactName,
-			CurrentDay:    contact.CurrentDay,
+			CurrentStep:   contact.CurrentStep,
 			Status:        contact.Status,
 			AddedAt:       contact.AddedAt,
 		}
@@ -463,7 +463,7 @@ func (s *sequenceService) ProcessSequences() error {
 		}
 		
 		// Find the step for current day + 1
-		nextDay := contact.CurrentDay + 1
+		nextDay := contact.CurrentStep + 1
 		var nextStep *models.SequenceStep
 		
 		for _, step := range steps {

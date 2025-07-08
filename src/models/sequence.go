@@ -62,7 +62,6 @@ type SequenceContact struct {
 	ContactPhone   string     `json:"contact_phone" db:"contact_phone"`
 	ContactName    string     `json:"contact_name" db:"contact_name"`
 	CurrentStep    int        `json:"current_step" db:"current_step"`
-	CurrentDay     int        `json:"current_day" db:"current_day"`
 	Status         string     `json:"status" db:"status"` // active, completed, paused
 	AddedAt        time.Time  `json:"added_at" db:"added_at"`
 	LastMessageAt  *time.Time `json:"last_message_at" db:"last_message_at"`

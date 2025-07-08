@@ -259,7 +259,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			}
 			
 			// Get the next step for this contact
-			nextDay := contact.CurrentDay + 1
+			nextDay := contact.CurrentStep + 1
 			if nextDay > sequence.TotalDays {
 				// Contact has completed the sequence
 				sequenceRepo.MarkContactCompleted(contact.ID)

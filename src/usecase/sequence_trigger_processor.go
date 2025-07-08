@@ -20,7 +20,7 @@ type contactJob struct {
 	phone            string
 	name             string
 	currentTrigger   string
-	currentDay       int
+	currentStep      int
 	messageText      string
 	messageType      string
 	mediaURL         sql.NullString
@@ -271,7 +271,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	query := `
 		SELECT 
 			sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
-			sc.current_trigger, sc.current_day,
+			sc.current_trigger, sc.current_step,
 			ss.content, ss.message_type, ss.media_url,
 			ss.next_trigger, ss.trigger_delay_hours,
 			l.device_id as preferred_device_id
@@ -316,7 +316,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 		for rows.Next() {
 			var job contactJob
 			if err := rows.Scan(&job.contactID, &job.sequenceID, &job.phone, &job.name,
-				&job.currentTrigger, &job.currentDay, &job.messageText, &job.messageType,
+				&job.currentTrigger, &job.currentStep, &job.messageText, &job.messageType,
 				&job.mediaURL, &job.nextTrigger, &job.delayHours, &job.preferredDevice); err != nil {
 				continue
 			}

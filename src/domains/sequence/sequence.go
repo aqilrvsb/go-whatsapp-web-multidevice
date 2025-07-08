@@ -144,7 +144,6 @@ type SequenceContactResponse struct {
 	ContactPhone string     `json:"contact_phone"`
 	ContactName  string     `json:"contact_name"`
 	CurrentStep  int        `json:"current_step"`
-	CurrentDay   int        `json:"current_day"`
 	Status       string     `json:"status"`
 	AddedAt      time.Time  `json:"added_at"`
 	EnrolledAt   time.Time  `json:"enrolled_at"`
