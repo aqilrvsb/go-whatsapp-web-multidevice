@@ -282,6 +282,9 @@ func InitializeSchema() error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 	
+	// SKIP ALTER SCHEMA - Database already has correct structure
+	// Commented out on January 8, 2025 - Prevents conflicting ADD/DROP column operations
+	/*
 	// Add missing columns for sequences (simplified version compatibility)
 	alterSchema := `
 	-- Add missing columns to sequences table
@@ -382,6 +385,9 @@ func InitializeSchema() error {
 		log.Printf("Warning: Failed to add sequence columns: %v", err)
 		// Don't fail initialization, just log the warning
 	}
+	*/
+	
+	log.Println("Skipping alter schema - database structure already correct")
 	
 	// Create default admin user if not exists
 	var adminExists bool
