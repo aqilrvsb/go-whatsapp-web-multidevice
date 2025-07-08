@@ -5280,6 +5280,7 @@
             fetch('/api/sequences/summary')
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Sequence Summary Response:', data); // Debug log
                     if (data.code === 'SUCCESS') {
                         displaySequenceSummary(data.results);
                     } else {
@@ -5295,6 +5296,8 @@
         }
         
         function displaySequenceSummary(summary) {
+            console.log('DisplaySequenceSummary called with:', summary); // Debug log
+            
             // Handle null or undefined summary
             if (!summary) {
                 summary = {
@@ -5310,6 +5313,8 @@
             summary.contacts = summary.contacts || { total: 0, average_per_sequence: 0, total_success: 0, total_remaining: 0 };
             summary.recent_sequences = summary.recent_sequences || [];
             summary.total_devices = summary.total_devices || 0;
+            
+            console.log('Summary sequences object:', summary.sequences); // Debug log
             
             const html = `
                 <div class="row mb-4">
@@ -5332,7 +5337,7 @@
                     <div class="col-md-4">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h3 class="text-warning">${summary.sequences.inactive}</h3>
+                                <h3 class="text-warning">${summary.sequences.inactive || 0}</h3>
                                 <p class="text-muted mb-0">Inactive</p>
                             </div>
                         </div>
