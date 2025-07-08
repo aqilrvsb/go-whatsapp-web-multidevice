@@ -154,25 +154,22 @@ func (s *SequenceTriggerProcessor) processTriggers() {
 
 // enrollLeadsFromTriggers checks leads for matching sequence triggers
 func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
+	// Simplified query without CTEs to avoid column reference issues
 	query := `
-		WITH active_sequences AS (
-			SELECT s.id, ss.trigger as entry_trigger
-			FROM sequences s
-			JOIN sequence_steps ss ON ss.sequence_id = s.id
-			WHERE s.is_active = true AND ss.is_entry_point = true
-		),
-		leads_to_process AS (
-			SELECT DISTINCT l.id, l.phone, l.name, l.device_id, l.user_id
-			FROM leads l
-			WHERE l.trigger IS NOT NULL AND l.trigger != ''
-		)
-		SELECT l.id, l.phone, l.name, l.device_id, l.user_id, a.id as sequence_id, a.entry_trigger
-		FROM leads_to_process l
-		CROSS JOIN active_sequences a
-		WHERE position(a.entry_trigger in l.trigger) > 0
+		SELECT DISTINCT 
+			l.id, l.phone, l.name, l.device_id, l.user_id, 
+			s.id as sequence_id, ss.trigger as entry_trigger
+		FROM leads l
+		CROSS JOIN sequences s
+		INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
+		WHERE s.is_active = true 
+			AND ss.is_entry_point = true
+			AND l.trigger IS NOT NULL 
+			AND l.trigger != ''
+			AND position(ss.trigger in l.trigger) > 0
 			AND NOT EXISTS (
 				SELECT 1 FROM sequence_contacts sc
-				WHERE sc.sequence_id = a.id AND sc.contact_phone = l.phone
+				WHERE sc.sequence_id = s.id AND sc.contact_phone = l.phone
 			)
 		LIMIT 5000
 	`
