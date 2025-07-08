@@ -1,34 +1,39 @@
 @echo off
-echo Fixing unused device variable on line 1736...
+echo Fixing build errors in auto_connection_monitor_15min.go...
 
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 
-REM Use sed-like replacement with PowerShell targeting specific line
-powershell -Command "(Get-Content src\ui\rest\app.go) | ForEach-Object { if ($_.Trim() -eq 'for _, device := range devices {' -and $MyInvocation.ScriptLineNumber -eq 1736) { $_ -replace 'for _, device := range devices', 'for range devices' } else { $_ } } | Set-Content src\ui\rest\app.go.tmp"
+echo.
+echo Fixing imports and interface issues...
 
-REM Check if temp file was created
-if exist src\ui\rest\app.go.tmp (
-    move /Y src\ui\rest\app.go.tmp src\ui\rest\app.go
-    echo Fixed successfully!
-) else (
-    echo Fix failed - using simpler approach
-    REM Simple global replacement as fallback
-    powershell -Command "$content = Get-Content 'src\ui\rest\app.go' -Raw; $count = 0; $content = [regex]::Replace($content, 'for _, device := range devices \{', { param($m); $global:count++; if ($global:count -eq 2) { 'for range devices {' } else { $m.Value } }); Set-Content 'src\ui\rest\app.go' -Value $content -NoNewline"
-)
+REM Fix the imports and interface
+powershell -Command "$content = Get-Content 'src\infrastructure\whatsapp\auto_connection_monitor_15min.go'; $content = $content -replace 'repository.UserRepositoryInterface', '*repository.UserRepository'; $content = $content -replace 'import \(', 'import ('; $content | Set-Content 'src\infrastructure\whatsapp\auto_connection_monitor_15min.go'"
 
+REM Remove unused import if whatsmeow is not used
+powershell -Command "$content = Get-Content 'src\infrastructure\whatsapp\auto_connection_monitor_15min.go'; $hasWhatsmeowUsage = $content | Select-String -Pattern 'whatsmeow\.' -Quiet; if (-not $hasWhatsmeowUsage) { $content = $content -replace '.*go.mau.fi/whatsmeow.*\n', '' }; $content | Set-Content 'src\infrastructure\whatsapp\auto_connection_monitor_15min.go'"
+
+echo.
 echo Building to test...
-cd src
-go build .
-cd ..
+go build -o whatsapp.exe src/main.go
 
 if %ERRORLEVEL% EQU 0 (
-    echo Build successful! Committing and pushing...
-    git add -A
-    git commit -m "Fix: Remove unused device variable in StopAllWorkers function"
-    git push origin main --force
-    echo Done!
+    echo.
+    echo Build successful! Committing and pushing fix...
+    
+    git add src/infrastructure/whatsapp/auto_connection_monitor_15min.go
+    git commit -m "fix: Fix build errors in auto_connection_monitor_15min.go
+
+- Remove unused whatsmeow import
+- Fix repository interface type to use pointer
+- Ensure proper type definitions"
+    
+    git push origin main
+    
+    echo.
+    echo ✅ Fix pushed successfully!
 ) else (
-    echo Build failed. Please check the error above.
+    echo.
+    echo ❌ Build still failing. Let me check the exact issue...
 )
 
 pause

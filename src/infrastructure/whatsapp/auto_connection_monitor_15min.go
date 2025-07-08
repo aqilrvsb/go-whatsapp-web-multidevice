@@ -6,7 +6,6 @@ import (
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
 )
 
 // AutoConnectionMonitor monitors and reconnects devices every 15 minutes
@@ -16,7 +15,7 @@ type AutoConnectionMonitor struct {
 	checkInterval   time.Duration
 	ctx             context.Context
 	cancel          context.CancelFunc
-	userRepo        repository.UserRepositoryInterface
+	userRepo        *repository.UserRepository
 	clientManager   *ClientManager
 }
 
