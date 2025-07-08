@@ -283,7 +283,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			AND s.is_active = true
 			AND sc.next_trigger_time <= $1
 			AND sc.processing_device_id IS NULL
-		ORDER BY s.priority DESC, sc.next_trigger_time ASC
+		ORDER BY sc.next_trigger_time ASC
 		LIMIT $2
 	`
 
