@@ -1873,6 +1873,11 @@
             setDefaultDates();
             updateDateTime();
             setInterval(updateDateTime, 1000);
+            
+            // Load dashboard data after a short delay to ensure dates are set
+            setTimeout(() => {
+                updateDashboard();
+            }, 100);
         });
 
         // Initialize Dashboard
@@ -1951,8 +1956,7 @@
                 }
             });
 
-            // Load initial data
-            updateDashboard();
+            // Don't load data yet - wait for dates to be set
         }
 
         // Update DateTime
@@ -2008,9 +2012,25 @@
         // Update Dashboard
         async function updateDashboard() {
             const deviceFilter = document.getElementById('deviceFilter').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
+            let startDate = document.getElementById('startDate').value;
+            let endDate = document.getElementById('endDate').value;
             const nicheFilter = document.getElementById('nicheFilter').value;
+
+            // If dates are not set, use defaults
+            if (!startDate || !endDate) {
+                const today = new Date();
+                const lastMonth = new Date(today);
+                lastMonth.setMonth(lastMonth.getMonth() - 1);
+                
+                if (!startDate) {
+                    startDate = lastMonth.toISOString().split('T')[0];
+                    document.getElementById('startDate').value = startDate;
+                }
+                if (!endDate) {
+                    endDate = today.toISOString().split('T')[0];
+                    document.getElementById('endDate').value = endDate;
+                }
+            }
 
             // Update all three sections
             await updateDeviceAnalytics(deviceFilter);
@@ -2026,16 +2046,29 @@
                 });
                 
                 if (response.ok) {
-                    const devices = await response.json();
+                    const data = await response.json();
+                    let devicesData = [];
+                    
+                    // Handle different response structures
+                    if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
+                        devicesData = data.results;
+                    } else if (Array.isArray(data)) {
+                        devicesData = data;
+                    } else if (data.results && Array.isArray(data.results.devices)) {
+                        devicesData = data.results.devices;
+                    } else {
+                        console.error('Unexpected devices response structure:', data);
+                        return;
+                    }
                     
                     let totalDevices = 0;
                     let activeDevices = 0;
                     let offlineDevices = 0;
                     
-                    devices.forEach(device => {
+                    devicesData.forEach(device => {
                         if (deviceFilter === 'all' || device.id === deviceFilter) {
                             totalDevices++;
-                            if (device.status === 'online') {
+                            if (device.status === 'online' || device.status === 'connected') {
                                 activeDevices++;
                             } else {
                                 offlineDevices++;
@@ -2046,9 +2079,17 @@
                     document.getElementById('totalDevices').textContent = totalDevices;
                     document.getElementById('totalActiveDevices').textContent = activeDevices;
                     document.getElementById('totalOfflineDevices').textContent = offlineDevices;
+                    
+                    // Update global devices array if needed
+                    devices = devicesData;
+                    updateDeviceFilter();
                 }
             } catch (error) {
                 console.error('Failed to load device analytics:', error);
+                // Set default values on error
+                document.getElementById('totalDevices').textContent = 0;
+                document.getElementById('totalActiveDevices').textContent = 0;
+                document.getElementById('totalOfflineDevices').textContent = 0;
             }
         }
 
@@ -2417,10 +2458,15 @@
                     return response.json();
                 })
                 .then(data => {
+                    // Handle different response structures
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
                         devices = data.results;
+                    } else if (Array.isArray(data)) {
+                        devices = data;
+                    } else if (data.results && Array.isArray(data.results.devices)) {
+                        devices = data.results.devices;
                     } else {
-                        // Initialize with empty array instead of mock device
+                        console.log('Unexpected devices response structure:', data);
                         devices = [];
                     }
                     renderDevices();
