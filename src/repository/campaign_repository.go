@@ -361,7 +361,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	
 	// Get total leads that should receive the campaign based on target_status and niche
 	shouldSendQuery := `
-		SELECT COUNT(DISTINCT l.phone) 
+		SELECT COUNT(l.phone) 
 		FROM leads l
 		WHERE l.user_id = $1 
 		AND l.niche = $2
@@ -372,6 +372,10 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	if err != nil {
 		return 0, 0, 0, err
 	}
+	
+	// Debug logging
+	log.Printf("Campaign %d - UserID: %s, Niche: %s, TargetStatus: %s, ShouldSend: %d", 
+		campaignID, campaign.UserID, campaign.Niche, campaign.TargetStatus, shouldSend)
 	
 	// Get done and failed counts from broadcast_messages
 	statsQuery := `

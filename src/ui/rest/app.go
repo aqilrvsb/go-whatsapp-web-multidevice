@@ -2478,7 +2478,12 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	// Calculate per-device should send (distribute evenly among devices)
 	perDeviceShouldSend := 0
 	if len(devices) > 0 && shouldSend > 0 {
-		perDeviceShouldSend = int(math.Ceil(float64(shouldSend) / float64(len(devices))))
+		// For single device, assign full count; for multiple devices, distribute evenly
+		if len(devices) == 1 {
+			perDeviceShouldSend = shouldSend
+		} else {
+			perDeviceShouldSend = int(math.Ceil(float64(shouldSend) / float64(len(devices))))
+		}
 	}
 	
 	// Convert map to slice and calculate totals
@@ -2493,12 +2498,36 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	// Debug: Log device reports
 	log.Printf("Device Report - Processing %d devices", len(deviceMap))
 	
+	// Get campaign details to know target criteria
+	campaign, _ := campaignRepo.GetCampaignByID(campaignId)
+	
+	// Calculate per-device statistics based on actual leads
+	
 	for deviceId, report := range deviceMap {
-		// Set per-device statistics
-		report.ShouldSend = perDeviceShouldSend
+		// Count leads for this device matching campaign criteria
+		deviceLeadQuery := `
+			SELECT COUNT(l.phone) 
+			FROM leads l
+			WHERE l.device_id = $1 
+			AND l.niche = $2
+			AND ($3 = 'all' OR l.target_status = $3)
+		`
+		var deviceShouldSend int
+		err := db.QueryRow(deviceLeadQuery, deviceId, campaign.Niche, campaign.TargetStatus).Scan(&deviceShouldSend)
+		if err == nil {
+			report.ShouldSend = deviceShouldSend
+		} else {
+			// Fallback to even distribution
+			report.ShouldSend = perDeviceShouldSend
+		}
+		
+		// Set other statistics
 		report.DoneSend = report.SuccessLeads
 		report.FailedSend = report.FailedLeads
-		report.RemainingSend = report.PendingLeads
+		report.RemainingSend = report.ShouldSend - report.DoneSend - report.FailedSend
+		if report.RemainingSend < 0 {
+			report.RemainingSend = 0
+		}
 		
 		log.Printf("Device %s (%s): Total=%d, Pending=%d, Success=%d, Failed=%d", 
 			deviceId, report.Name, report.TotalLeads, report.PendingLeads, 
