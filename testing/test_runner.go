@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -237,9 +236,9 @@ func (r *TestRunner) simulateBroadcast(campaignID string, totalLeads int) {
 		go func(workerID int) {
 			defer wg.Done()
 			
-			for leadIdx := range leadChan {
-				// Pick random device
-				device := devices[rand.Intn(len(devices))]
+			for range leadChan {
+				// Pick random device (just for simulation, not actually used)
+				_ = devices[rand.Intn(len(devices))]
 				
 				// Simulate delay
 				if r.simulateDelay {
