@@ -258,8 +258,8 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	failedData := []int{}
 	pendingData := []int{}
 
-	// Get total sequences with error handling
-	sequenceQuery := `SELECT COUNT(DISTINCT s.id) FROM sequences s WHERE s.created_at BETWEEN $1 AND $2`
+	// Get total sequences with error handling (only active sequences)
+	sequenceQuery := `SELECT COUNT(DISTINCT s.id) FROM sequences s WHERE s.status = 'active' AND s.created_at BETWEEN $1 AND $2`
 	args := []interface{}{start, end}
 
 	if nicheFilter != "all" && nicheFilter != "" {
@@ -272,8 +272,8 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		fmt.Printf("Error counting sequences: %v\n", err)
 	}
 
-	// Get total flows
-	flowQuery := `SELECT COUNT(*) FROM sequence_steps ss INNER JOIN sequences s ON ss.sequence_id = s.id WHERE s.created_at BETWEEN $1 AND $2`
+	// Get total flows (only from active sequences)
+	flowQuery := `SELECT COUNT(*) FROM sequence_steps ss INNER JOIN sequences s ON ss.sequence_id = s.id WHERE s.status = 'active' AND s.created_at BETWEEN $1 AND $2`
 	args = []interface{}{start, end}
 
 	if nicheFilter != "all" && nicheFilter != "" {
@@ -286,15 +286,15 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		fmt.Printf("Error counting flows: %v\n", err)
 	}
 
-	// Get sequence contact statistics
+	// Get sequence contact statistics (only from active sequences)
 	contactQuery := `
 		SELECT 
 			COALESCE(COUNT(*), 0) as total,
-			COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent,
-			COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed
+			COALESCE(COUNT(CASE WHEN sc.status = 'sent' THEN 1 END), 0) as sent,
+			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE sc.created_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.created_at BETWEEN $1 AND $2`
 
 	args = []interface{}{start, end}
 	argCount := 3
@@ -320,16 +320,16 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		contactsRemainingSend = 0
 	}
 
-	// Get chart data
+	// Get chart data (only from active sequences)
 	chartQuery := `
 		SELECT 
 			DATE(COALESCE(sc.completed_at, sc.created_at)) as date,
-			COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as completed,
-			COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed,
-			COALESCE(COUNT(CASE WHEN status IN ('pending', 'active') THEN 1 END), 0) as pending
+			COALESCE(COUNT(CASE WHEN sc.status = 'sent' THEN 1 END), 0) as completed,
+			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed,
+			COALESCE(COUNT(CASE WHEN sc.status IN ('pending', 'active') THEN 1 END), 0) as pending
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE sc.created_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.created_at BETWEEN $1 AND $2`
 
 	args = []interface{}{start, end}
 	argCount = 3

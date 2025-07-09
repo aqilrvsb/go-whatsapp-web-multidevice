@@ -1977,10 +1977,9 @@
         // Set default dates
         function setDefaultDates() {
             const today = new Date();
-            const lastMonth = new Date(today);
-            lastMonth.setMonth(lastMonth.getMonth() - 1);
             
-            document.getElementById('startDate').value = lastMonth.toISOString().split('T')[0];
+            // Set both start and end date to today by default
+            document.getElementById('startDate').value = today.toISOString().split('T')[0];
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
             document.getElementById('startDate').max = today.toISOString().split('T')[0];
             document.getElementById('endDate').max = today.toISOString().split('T')[0];
@@ -2061,18 +2060,16 @@
                         return;
                     }
                     
-                    let totalDevices = 0;
+                    // Don't filter by date - show all devices
+                    let totalDevices = devicesData.length;
                     let activeDevices = 0;
                     let offlineDevices = 0;
                     
                     devicesData.forEach(device => {
-                        if (deviceFilter === 'all' || device.id === deviceFilter) {
-                            totalDevices++;
-                            if (device.status === 'online' || device.status === 'connected') {
-                                activeDevices++;
-                            } else {
-                                offlineDevices++;
-                            }
+                        if (device.status === 'online' || device.status === 'connected') {
+                            activeDevices++;
+                        } else {
+                            offlineDevices++;
                         }
                     });
                     

@@ -1806,6 +1806,26 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	pausedSequences := 0
 	draftSequences := 0
 	totalContacts := 0
+	totalFlows := 0
+	
+	// Get total flows from database
+	db, err := sql.Open("postgres", config.DBURI)
+	if err == nil {
+		defer db.Close()
+		
+		// Count total flows from sequence_steps for active sequences only
+		var flowCount int
+		err = db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM sequence_steps ss
+			JOIN sequences s ON ss.sequence_id = s.id
+			WHERE s.user_id = $1 AND s.status = 'active'
+		`, session.UserID).Scan(&flowCount)
+		
+		if err == nil {
+			totalFlows = flowCount
+		}
+	}
 	
 	for _, sequence := range sequences {
 		switch sequence.Status {
@@ -1826,6 +1846,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			"paused": pausedSequences,
 			"draft": draftSequences,
 		},
+		"total_flows": totalFlows,
 		"contacts": map[string]interface{}{
 			"total": totalContacts,
 			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
