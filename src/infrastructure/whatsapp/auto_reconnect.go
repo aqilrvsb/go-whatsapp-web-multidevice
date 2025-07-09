@@ -27,9 +27,9 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 		logrus.Warnf("Failed to reset device statuses: %v", err)
 	}
 	
-	// Find all devices that have a JID (were previously connected)
+	// Find all devices that have a JID and were online (previously connected)
 	rows, err := db.Query(`
-		SELECT id, name, phone, jid 
+		SELECT id, device_name, phone, jid, user_id
 		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
 		ORDER BY last_seen DESC
@@ -44,8 +44,8 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	attemptCount := 0
 	
 	for rows.Next() {
-		var deviceID, name, phone, jid string
-		err := rows.Scan(&deviceID, &name, &phone, &jid)
+		var deviceID, name, phone, jid, userID string
+		err := rows.Scan(&deviceID, &name, &phone, &jid, &userID)
 		if err != nil {
 			logrus.Warnf("Failed to scan device row: %v", err)
 			continue

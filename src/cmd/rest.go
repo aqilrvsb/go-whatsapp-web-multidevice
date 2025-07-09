@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
@@ -161,6 +162,13 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start broadcast coordinator
 	go usecase.StartBroadcastCoordinator()
 	logrus.Info("Broadcast coordinator started")
+	
+	// Auto-reconnect devices on startup
+	go func() {
+		time.Sleep(5 * time.Second) // Wait a bit for services to initialize
+		logrus.Info("Starting auto-reconnect for online devices...")
+		whatsapp.AutoReconnectOnlineDevices()
+	}()
 
 	if err := app.Listen(":" + config.AppPort); err != nil {
 		log.Fatalln("Failed to start: ", err.Error())
