@@ -365,7 +365,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		FROM leads l
 		WHERE l.user_id = $1 
 		AND l.niche = $2
-		AND ($3 = 'all' OR l.status = $3)
+		AND ($3 = 'all' OR l.target_status = $3)
 	`
 	
 	err = r.db.QueryRow(shouldSendQuery, campaign.UserID, campaign.Niche, campaign.TargetStatus).Scan(&shouldSend)
