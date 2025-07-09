@@ -217,8 +217,8 @@ func initApp() {
 	// infrastructure.InitDeviceAutoRefresh()
 	
 	// Initialize error monitor for auto device refresh
-	// DISABLED: Using auto-reconnect on startup instead
-	// whatsapp.MonitorDeviceErrors()
+	// This will monitor errors and reconnect devices automatically
+	whatsapp.MonitorDeviceErrors()
 	
 	// Start device status normalizer to ensure all devices are online/offline
 	whatsapp.StartDeviceStatusNormalizer()
