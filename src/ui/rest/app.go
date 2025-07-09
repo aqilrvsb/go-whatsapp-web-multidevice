@@ -1868,6 +1868,60 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		totalContacts += sequence.ContactsCount
 	}
 	
+	// Add flow counts to each sequence
+	sequencesWithFlows := []map[string]interface{}{}
+	if db != nil {
+		for i, sequence := range sequences {
+			if i >= 5 { // Only process first 5 sequences for recent_sequences
+				break
+			}
+			
+			sequenceData := map[string]interface{}{
+				"id":         sequence.ID,
+				"name":       sequence.Name,
+				"niche":      sequence.Niche,
+				"trigger":    sequence.Trigger,
+				"status":     sequence.Status,
+				"created_at": sequence.CreatedAt,
+			}
+			
+			// Get flow count for this sequence
+			var flowCount int
+			err := db.QueryRow(`
+				SELECT COUNT(*) 
+				FROM sequence_steps 
+				WHERE sequence_id = $1
+			`, sequence.ID).Scan(&flowCount)
+			
+			if err != nil {
+				flowCount = 0
+			}
+			sequenceData["total_flows"] = flowCount
+			
+			// Get contact statistics for this sequence
+			var shouldSend, doneSend, failedSend int
+			err = db.QueryRow(`
+				SELECT 
+					COALESCE(COUNT(*), 0) as total,
+					COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent,
+					COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed
+				FROM sequence_contacts
+				WHERE sequence_id = $1
+			`, sequence.ID).Scan(&shouldSend, &doneSend, &failedSend)
+			
+			if err != nil {
+				shouldSend, doneSend, failedSend = 0, 0, 0
+			}
+			
+			sequenceData["should_send"] = shouldSend
+			sequenceData["done_send"] = doneSend
+			sequenceData["failed_send"] = failedSend
+			sequenceData["remaining_send"] = shouldSend - doneSend - failedSend
+			
+			sequencesWithFlows = append(sequencesWithFlows, sequenceData)
+		}
+	}
+	
 	summary := map[string]interface{}{
 		"sequences": map[string]interface{}{
 			"total": totalSequences,
@@ -1880,7 +1934,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			"total": totalContacts,
 			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
 		},
-		"recent_sequences": sequences[:min(5, len(sequences))],
+		"recent_sequences": sequencesWithFlows,
 	}
 	
 	return c.JSON(utils.ResponseData{
