@@ -58,6 +58,9 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Analytics API endpoints
 	app.Get("/api/analytics/:days", rest.GetAnalyticsData)
 	app.Get("/api/analytics/custom", rest.GetCustomAnalyticsData)
+	app.Get("/api/campaigns/analytics", rest.GetCampaignAnalytics)
+	app.Get("/api/sequences/analytics", rest.GetSequenceAnalytics)
+	app.Get("/api/niches", rest.GetNiches)
 	app.Get("/api/devices", rest.GetConnectedDevices)
 	app.Post("/api/devices", rest.CreateDevice)
 	app.Get("/api/devices/:id", rest.GetDevice)
