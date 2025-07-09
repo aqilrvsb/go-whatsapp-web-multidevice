@@ -1380,36 +1380,44 @@
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="card bg-primary text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('all'); return false;">
+                                    <div class="card bg-primary text-white">
                                         <div class="card-body">
-                                            <h4 id="totalLeads">0</h4>
-                                            <p class="mb-0">Total Leads</p>
+                                            <h4 id="contactsShouldSend">0</h4>
+                                            <p class="mb-0">Contacts Should Send</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="row text-center mt-3">
-                                <div class="col-md-4">
-                                    <div class="card bg-warning" style="cursor: pointer;" onclick="showAllCampaignLeads('pending'); return false;">
+                                <div class="col-md-3">
+                                    <div class="card bg-success text-white">
                                         <div class="card-body">
-                                            <h4 id="pendingLeads">0</h4>
-                                            <p class="mb-0">Pending</p>
+                                            <h4 id="contactsDoneSend">0</h4>
+                                            <p class="mb-0">Contacts Done Send Message</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="card bg-success text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('success'); return false;">
+                                <div class="col-md-3">
+                                    <div class="card bg-danger text-white">
                                         <div class="card-body">
-                                            <h4 id="successLeads">0</h4>
-                                            <p class="mb-0">Success</p>
+                                            <h4 id="contactsFailedSend">0</h4>
+                                            <p class="mb-0">Contacts Failed Send Message</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="card bg-danger text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('failed'); return false;">
+                                <div class="col-md-3">
+                                    <div class="card bg-warning">
                                         <div class="card-body">
-                                            <h4 id="failedLeads">0</h4>
-                                            <p class="mb-0">Failed</p>
+                                            <h4 id="contactsRemainingSend">0</h4>
+                                            <p class="mb-0">Contacts Remaining Send Message</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-info text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('all'); return false;">
+                                        <div class="card-body">
+                                            <h4 id="totalLeads">0</h4>
+                                            <p class="mb-0">Total Broadcast Messages</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1429,9 +1437,9 @@
                                         <tr>
                                             <th>Device Name</th>
                                             <th>Status</th>
-                                            <th>Total Leads</th>
+                                            <th>Broadcast Messages</th>
                                             <th>Pending</th>
-                                            <th>Success</th>
+                                            <th>Sent</th>
                                             <th>Failed</th>
                                             <th>Success Rate</th>
                                             <th>Actions</th>
@@ -5922,6 +5930,14 @@
             document.getElementById('totalDevices').textContent = report.totalDevices || 0;
             document.getElementById('activeDevices').textContent = report.activeDevices || 0;
             document.getElementById('disconnectedDevices').textContent = report.disconnectedDevices || 0;
+            
+            // Update the new statistics
+            document.getElementById('contactsShouldSend').textContent = report.shouldSend || 0;
+            document.getElementById('contactsDoneSend').textContent = report.doneSend || 0;
+            document.getElementById('contactsFailedSend').textContent = report.failedSend || 0;
+            document.getElementById('contactsRemainingSend').textContent = report.remainingSend || 0;
+            
+            // Update broadcast message statistics (old format kept for compatibility)
             document.getElementById('totalLeads').textContent = report.totalLeads || 0;
             document.getElementById('pendingLeads').textContent = report.pendingLeads || 0;
             document.getElementById('successLeads').textContent = report.successLeads || 0;

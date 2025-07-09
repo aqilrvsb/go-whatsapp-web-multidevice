@@ -2361,6 +2361,14 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get campaign broadcast statistics
+	campaignRepo := repository.GetCampaignRepository()
+	shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaignId)
+	remainingSend := shouldSend - doneSend - failedSend
+	if remainingSend < 0 {
+		remainingSend = 0
+	}
+	
 	// Get user devices - use direct query
 	db := database.GetDB()
 	query := `
@@ -2515,6 +2523,11 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		"successLeads":        successLeads,
 		"failedLeads":         failedLeads,
 		"devices":             deviceReports,
+		// Add the new statistics
+		"shouldSend":          shouldSend,
+		"doneSend":            doneSend,
+		"failedSend":          failedSend,
+		"remainingSend":       remainingSend,
 	}
 	
 	return c.JSON(utils.ResponseData{
