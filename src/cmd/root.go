@@ -15,6 +15,7 @@ import (
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	domainSequence "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/sequence"
 	domainUser "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/user"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
@@ -211,6 +212,14 @@ func initApp() {
 	
 	// Initialize real-time sync for WhatsApp Web
 	whatsapp.InitializeRealtimeSync()
+	
+	// Initialize device auto-refresh system
+	infrastructure.InitDeviceAutoRefresh()
+	
+	// Initialize error monitor for auto device refresh
+	whatsapp.MonitorDeviceErrors()
+	
+	logrus.Info("Device auto-refresh system initialized - will automatically refresh devices on connection errors")
 
 	// Usecase
 	appUsecase = usecase.NewAppService(whatsappCli, whatsappDB)
