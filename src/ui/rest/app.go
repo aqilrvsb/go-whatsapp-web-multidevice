@@ -1813,17 +1813,46 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	if err == nil {
 		defer db.Close()
 		
-		// Count total flows from sequence_steps for active sequences only
+		// Count total flows - simple direct count
 		var flowCount int
 		err = db.QueryRow(`
 			SELECT COUNT(*) 
-			FROM sequence_steps ss
-			JOIN sequences s ON ss.sequence_id = s.id
-			WHERE s.user_id = $1 AND s.status = 'active'
-		`, session.UserID).Scan(&flowCount)
+			FROM sequence_steps
+		`).Scan(&flowCount)
 		
-		if err == nil {
-			totalFlows = flowCount
+		if err != nil {
+			fmt.Printf("Error counting all sequence flows: %v\n", err)
+		} else {
+			// Now count only flows for this user's sequences
+			err = db.QueryRow(`
+				SELECT COUNT(*) 
+				FROM sequence_steps ss
+				WHERE EXISTS (
+					SELECT 1 FROM sequences s 
+					WHERE s.id = ss.sequence_id 
+					AND s.user_id = $1
+				)
+			`, session.UserID).Scan(&flowCount)
+			
+			if err != nil {
+				fmt.Printf("Error counting user sequence flows: %v\n", err)
+				// Try with UUID casting
+				err = db.QueryRow(`
+					SELECT COUNT(*) 
+					FROM sequence_steps ss
+					WHERE sequence_id::text IN (
+						SELECT id::text FROM sequences WHERE user_id = $1
+					)
+				`, session.UserID).Scan(&flowCount)
+				
+				if err != nil {
+					fmt.Printf("Error with UUID cast query: %v\n", err)
+				} else {
+					totalFlows = flowCount
+				}
+			} else {
+				totalFlows = flowCount
+			}
 		}
 	}
 	
