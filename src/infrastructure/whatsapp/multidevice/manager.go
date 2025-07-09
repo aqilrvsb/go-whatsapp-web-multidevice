@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"strings"
-	"time"
 	
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
@@ -13,7 +12,6 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -134,22 +132,14 @@ func (dm *DeviceManager) GetDeviceConnection(deviceID string) (*DeviceConnection
 	
 	conn, exists := dm.devices[deviceID]
 	if !exists {
-		// Trigger auto-refresh for this device
-		log.Warnf("No device connection found for %s, triggering auto-refresh...", deviceID)
+		// Auto-refresh disabled - using auto-reconnect on startup instead
+		log.Warnf("No device connection found for %s", deviceID)
 		
-		// Trigger refresh using the infrastructure handler
-		infrastructure.TriggerDeviceRefresh(deviceID)
+		// Don't trigger auto-refresh anymore
+		// infrastructure.TriggerDeviceRefresh(deviceID)
 		
-		// Wait a moment for refresh to start
-		time.Sleep(2 * time.Second)
-		
-		// Try once more after refresh trigger
-		conn, exists = dm.devices[deviceID]
-		if exists {
-			return conn, nil
-		}
-		
-		return nil, fmt.Errorf("no device connection found for device %s (auto-refresh initiated)", deviceID)
+		// Return error immediately
+		return nil, fmt.Errorf("no device connection found for device %s", deviceID)
 	}
 	
 	return conn, nil
