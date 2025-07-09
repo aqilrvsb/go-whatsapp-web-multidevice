@@ -368,6 +368,26 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		AND ($3 = 'all' OR l.target_status = $3)
 	`
 	
+	// Debug: Let's also get the actual leads to see what's being counted
+	debugQuery := `
+		SELECT l.phone, l.device_id, l.niche, l.target_status 
+		FROM leads l
+		WHERE l.user_id = $1 
+		AND l.niche = $2
+		AND ($3 = 'all' OR l.target_status = $3)
+	`
+	
+	rows, _ := r.db.Query(debugQuery, campaign.UserID, campaign.Niche, campaign.TargetStatus)
+	if rows != nil {
+		defer rows.Close()
+		log.Printf("Campaign %d - Matching leads:", campaignID)
+		for rows.Next() {
+			var phone, deviceID, niche, targetStatus string
+			rows.Scan(&phone, &deviceID, &niche, &targetStatus)
+			log.Printf("  - Phone: %s, Device: %s, Niche: %s, TargetStatus: %s", phone, deviceID, niche, targetStatus)
+		}
+	}
+	
 	err = r.db.QueryRow(shouldSendQuery, campaign.UserID, campaign.Niche, campaign.TargetStatus).Scan(&shouldSend)
 	if err != nil {
 		return 0, 0, 0, err
@@ -406,7 +426,7 @@ func (r *campaignRepository) GetUserCampaignBroadcastStats(userID string) (shoul
 	totalDoneSend := 0
 	totalFailedSend := 0
 	
-	// Calculate stats for each campaign
+	// Calculate stats for each campaign and sum them up
 	for _, campaign := range campaigns {
 		should, done, failed, err := r.GetCampaignBroadcastStats(campaign.ID)
 		if err != nil {
@@ -415,10 +435,17 @@ func (r *campaignRepository) GetUserCampaignBroadcastStats(userID string) (shoul
 			continue
 		}
 		
+		// Sum up the totals
 		totalShouldSend += should
 		totalDoneSend += done
 		totalFailedSend += failed
+		
+		log.Printf("Campaign %d (%s): Should=%d, Done=%d, Failed=%d", 
+			campaign.ID, campaign.Title, should, done, failed)
 	}
+	
+	log.Printf("User %s Total Stats: Should=%d, Done=%d, Failed=%d", 
+		userID, totalShouldSend, totalDoneSend, totalFailedSend)
 	
 	return totalShouldSend, totalDoneSend, totalFailedSend, nil
 }
