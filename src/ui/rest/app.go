@@ -2475,12 +2475,6 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Get campaign info for calculating per-device should send
-	campaign, err := campaignRepo.GetCampaignByID(campaignId)
-	if err != nil {
-		log.Printf("Error getting campaign details: %v", err)
-	}
-	
 	// Calculate per-device should send (distribute evenly among devices)
 	perDeviceShouldSend := 0
 	if len(devices) > 0 && shouldSend > 0 {
