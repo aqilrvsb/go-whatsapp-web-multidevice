@@ -37,6 +37,9 @@ type CampaignRepository interface {
 	UpdateCampaign(campaign *models.Campaign) error
 	DeleteCampaign(id int) error
 	GetCampaignsByUser(userID string) ([]models.Campaign, error)
+	// New methods for broadcast statistics
+	GetCampaignBroadcastStats(campaignID int) (shouldSend, doneSend, failedSend int, err error)
+	GetUserCampaignBroadcastStats(userID string) (shouldSend, doneSend, failedSend int, err error)
 }
 
 type campaignRepository struct {
@@ -346,4 +349,72 @@ func (r *campaignRepository) DeleteCampaign(id int) error {
 	}
 	
 	return nil
+}
+
+// GetCampaignBroadcastStats gets broadcast statistics for a specific campaign
+func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSend, doneSend, failedSend int, err error) {
+	// Get campaign details first
+	campaign, err := r.GetCampaignByID(campaignID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	
+	// Get total leads that should receive the campaign based on target_status and niche
+	shouldSendQuery := `
+		SELECT COUNT(DISTINCT l.phone) 
+		FROM leads l
+		WHERE l.user_id = $1 
+		AND l.niche = $2
+		AND ($3 = 'all' OR l.status = $3)
+	`
+	
+	err = r.db.QueryRow(shouldSendQuery, campaign.UserID, campaign.Niche, campaign.TargetStatus).Scan(&shouldSend)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	
+	// Get done and failed counts from broadcast_messages
+	statsQuery := `
+		SELECT 
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) as done_send,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_send
+		FROM broadcast_messages
+		WHERE campaign_id = $1
+	`
+	
+	err = r.db.QueryRow(statsQuery, campaignID).Scan(&doneSend, &failedSend)
+	if err != nil {
+		return shouldSend, 0, 0, err
+	}
+	
+	return shouldSend, doneSend, failedSend, nil
+}
+
+// GetUserCampaignBroadcastStats gets broadcast statistics for all campaigns of a user
+func (r *campaignRepository) GetUserCampaignBroadcastStats(userID string) (shouldSend, doneSend, failedSend int, err error) {
+	// Get all campaigns for the user
+	campaigns, err := r.GetAllCampaigns(userID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	
+	totalShouldSend := 0
+	totalDoneSend := 0
+	totalFailedSend := 0
+	
+	// Calculate stats for each campaign
+	for _, campaign := range campaigns {
+		should, done, failed, err := r.GetCampaignBroadcastStats(campaign.ID)
+		if err != nil {
+			// Log error but continue with other campaigns
+			log.Printf("Error getting stats for campaign %d: %v", campaign.ID, err)
+			continue
+		}
+		
+		totalShouldSend += should
+		totalDoneSend += done
+		totalFailedSend += failed
+	}
+	
+	return totalShouldSend, totalDoneSend, totalFailedSend, nil
 }

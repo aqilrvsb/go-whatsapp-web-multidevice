@@ -1699,23 +1699,45 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Get broadcast message statistics
-	broadcastRepo := repository.GetBroadcastRepository()
-	broadcastStats, err := broadcastRepo.GetUserBroadcastStats(session.UserID)
-	if err != nil {
-		broadcastStats = map[string]interface{}{
-			"total_messages": 0,
-			"sent_messages": 0,
-			"failed_messages": 0,
-			"pending_messages": 0,
-		}
+	// Get overall broadcast statistics
+	totalShouldSend, totalDoneSend, totalFailedSend, _ := campaignRepo.GetUserCampaignBroadcastStats(session.UserID)
+	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
+	if totalRemainingSend < 0 {
+		totalRemainingSend = 0
 	}
 	
-	// Get recent campaigns (up to 5)
-	recentCampaigns := []models.Campaign{}
+	// Get recent campaigns with their broadcast stats
+	recentCampaigns := []map[string]interface{}{}
 	if len(campaigns) > 0 {
 		limit := min(5, len(campaigns))
-		recentCampaigns = campaigns[:limit]
+		for i := 0; i < limit; i++ {
+			campaign := campaigns[i]
+			
+			// Get broadcast stats for this campaign
+			shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaign.ID)
+			remainingSend := shouldSend - doneSend - failedSend
+			if remainingSend < 0 {
+				remainingSend = 0
+			}
+			
+			campaignData := map[string]interface{}{
+				"id":               campaign.ID,
+				"title":            campaign.Title,
+				"campaign_date":    campaign.CampaignDate,
+				"time_schedule":    campaign.TimeSchedule,
+				"niche":            campaign.Niche,
+				"target_status":    campaign.TargetStatus,
+				"status":           campaign.Status,
+				"message":          campaign.Message,
+				"image_url":        campaign.ImageURL,
+				"should_send":      shouldSend,
+				"done_send":        doneSend,
+				"failed_send":      failedSend,
+				"remaining_send":   remainingSend,
+			}
+			
+			recentCampaigns = append(recentCampaigns, campaignData)
+		}
 	}
 	
 	summary := map[string]interface{}{
@@ -1727,7 +1749,12 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 			"sent": sentCampaigns,
 			"failed": failedCampaigns,
 		},
-		"messages": broadcastStats,
+		"broadcast_stats": map[string]interface{}{
+			"total_should_send":    totalShouldSend,
+			"total_done_send":      totalDoneSend,
+			"total_failed_send":    totalFailedSend,
+			"total_remaining_send": totalRemainingSend,
+		},
 		"recent_campaigns": recentCampaigns,
 	}
 	
