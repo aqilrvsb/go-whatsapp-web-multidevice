@@ -56,20 +56,26 @@ func TriggerDeviceRefresh(deviceID string) {
 		// Log the refresh attempt
 		logrus.Infof("Attempting to refresh device %s (%s)", device.DeviceName, device.JID)
 		
-		// Mark device as refreshing in database (optional)
-		globalRefreshHandler.userRepo.UpdateDeviceStatus(deviceID, "refreshing", device.Phone, device.JID)
+		// The actual reconnection will be handled by the connection logic
+		// We just need to ensure the device ends up with proper status
 		
-		// The actual reconnection will be handled by the main connection logic
-		// when it detects the "refreshing" status
+		// Wait for reconnection attempt
+		time.Sleep(10 * time.Second)
 		
-		// After a delay, if still offline, mark as offline
-		time.Sleep(30 * time.Second)
-		
-		// Check if device is now online
+		// Check final status and ensure it's either online or offline
 		updatedDevice, err := globalRefreshHandler.userRepo.GetDeviceByID(deviceID)
-		if err == nil && updatedDevice.Status != "online" {
+		if err != nil {
+			logrus.Errorf("Failed to check device status after refresh: %v", err)
 			globalRefreshHandler.userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
-			logrus.Warnf("Auto-refresh timeout for device %s - marked as offline", device.DeviceName)
+			return
+		}
+		
+		// If status is still "refreshing" or anything other than online/offline, set to offline
+		if updatedDevice.Status != "online" && updatedDevice.Status != "offline" {
+			logrus.Warnf("Device %s refresh completed - setting status to offline", device.DeviceName)
+			globalRefreshHandler.userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
+		} else {
+			logrus.Infof("Device %s refresh completed - status: %s", device.DeviceName, updatedDevice.Status)
 		}
 	}()
 }

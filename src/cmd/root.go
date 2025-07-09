@@ -219,7 +219,11 @@ func initApp() {
 	// Initialize error monitor for auto device refresh
 	whatsapp.MonitorDeviceErrors()
 	
+	// Start device status normalizer to ensure all devices are online/offline
+	whatsapp.StartDeviceStatusNormalizer()
+	
 	logrus.Info("Device auto-refresh system initialized - will automatically refresh devices on connection errors")
+	logrus.Info("Device status normalizer started - ensures all devices have online/offline status")
 
 	// Usecase
 	appUsecase = usecase.NewAppService(whatsappCli, whatsappDB)
