@@ -2121,46 +2121,6 @@
                 console.error('Failed to load sequence analytics:', error);
             }
         }
-                        backgroundColor: 'rgba(52, 183, 241, 0.1)',
-                        tension: 0.4
-                    }, {
-                        label: 'Leads Replied',
-                        data: [],
-                        borderColor: '#00a884',
-                        backgroundColor: 'rgba(0, 168, 132, 0.1)',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
-                        title: {
-                            display: true,
-                            text: 'Lead Activity Trends'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Leads'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Date'
-                            }
-                        }
-                    }
-                }
-            });
-        }
 
         // Load Dashboard Data
         function loadDashboardData(days, silent = false) {
