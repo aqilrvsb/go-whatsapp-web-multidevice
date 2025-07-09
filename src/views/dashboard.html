@@ -5106,6 +5106,24 @@
                                 finished: filteredCampaigns.filter(c => c.status === 'finished' || c.status === 'sent').length,
                                 failed: filteredCampaigns.filter(c => c.status === 'failed').length
                             };
+                            
+                            // Recalculate broadcast stats for filtered campaigns only
+                            let filteredShouldSend = 0;
+                            let filteredDoneSend = 0;
+                            let filteredFailedSend = 0;
+                            
+                            filteredCampaigns.forEach(campaign => {
+                                filteredShouldSend += campaign.should_send || 0;
+                                filteredDoneSend += campaign.done_send || 0;
+                                filteredFailedSend += campaign.failed_send || 0;
+                            });
+                            
+                            filteredResults.broadcast_stats = {
+                                total_should_send: filteredShouldSend,
+                                total_done_send: filteredDoneSend,
+                                total_failed_send: filteredFailedSend,
+                                total_remaining_send: filteredShouldSend - filteredDoneSend - filteredFailedSend
+                            };
                         }
                         
                         displayCampaignSummary(filteredResults);
