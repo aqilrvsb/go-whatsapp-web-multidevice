@@ -11,9 +11,9 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Railway deployment configuration
-RAILWAY_URL = "https://go-whatsapp-web-multidevice-production.up.railway.app"  # Standard Railway URL format
+RAILWAY_URL = "https://web-production-b777.up.railway.app"  # Your Railway URL
 API_BASE = f"{RAILWAY_URL}/api/v1"
-AUTH = ("admin", "changeme123")
+AUTH = ("admin", "changeme123")  # Using APP_BASIC_AUTH from env vars
 
 class WhatsAppSystemTester:
     def __init__(self):
