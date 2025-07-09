@@ -61,6 +61,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/campaigns/analytics", rest.GetCampaignAnalytics)
 	app.Get("/api/sequences/analytics", rest.GetSequenceAnalytics)
 	app.Get("/api/niches", rest.GetNiches)
+	app.Get("/api/test-db", rest.TestDatabaseConnection)
 	app.Get("/api/devices", rest.GetConnectedDevices)
 	app.Post("/api/devices", rest.CreateDevice)
 	app.Get("/api/devices/:id", rest.GetDevice)
