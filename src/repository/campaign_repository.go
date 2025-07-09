@@ -330,11 +330,26 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 	return nil
 }
 
-// DeleteCampaign deletes a campaign by ID
+// DeleteCampaign deletes a campaign by ID and its related broadcast messages
 func (r *campaignRepository) DeleteCampaign(id int) error {
-	query := `DELETE FROM campaigns WHERE id = $1`
+	// Start a transaction to ensure both deletes happen together
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	
-	result, err := r.db.Exec(query, id)
+	// First, delete all broadcast messages for this campaign
+	deleteMessagesQuery := `DELETE FROM broadcast_messages WHERE campaign_id = $1`
+	_, err = tx.Exec(deleteMessagesQuery, id)
+	if err != nil {
+		log.Printf("Error deleting broadcast messages for campaign %d: %v", id, err)
+		return err
+	}
+	
+	// Then delete the campaign itself
+	deleteCampaignQuery := `DELETE FROM campaigns WHERE id = $1`
+	result, err := tx.Exec(deleteCampaignQuery, id)
 	if err != nil {
 		return err
 	}
@@ -348,6 +363,12 @@ func (r *campaignRepository) DeleteCampaign(id int) error {
 		return sql.ErrNoRows
 	}
 	
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	
+	log.Printf("Successfully deleted campaign %d and its broadcast messages", id)
 	return nil
 }
 
