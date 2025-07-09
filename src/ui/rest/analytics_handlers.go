@@ -3,6 +3,7 @@ package rest
 import (
 	"time"
 	"database/sql"
+	"fmt"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
@@ -91,13 +92,13 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	argCount := 3
 	
 	if deviceFilter != "all" {
-		broadcastQuery += " AND bm.device_id = $" + string(rune('0'+argCount))
+		broadcastQuery += fmt.Sprintf(" AND bm.device_id = $%d", argCount)
 		args = append(args, deviceFilter)
 		argCount++
 	}
 	
 	if nicheFilter != "all" {
-		broadcastQuery += " AND c.niche = $" + string(rune('0'+argCount))
+		broadcastQuery += fmt.Sprintf(" AND c.niche = $%d", argCount)
 		args = append(args, nicheFilter)
 	}
 	
@@ -124,13 +125,13 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	argCount = 3
 	
 	if deviceFilter != "all" {
-		chartQuery += " AND bm.device_id = $" + string(rune('0'+argCount))
+		chartQuery += fmt.Sprintf(" AND bm.device_id = $%d", argCount)
 		args = append(args, deviceFilter)
 		argCount++
 	}
 	
 	if nicheFilter != "all" {
-		chartQuery += " AND c.niche = $" + string(rune('0'+argCount))
+		chartQuery += fmt.Sprintf(" AND c.niche = $%d", argCount)
 		args = append(args, nicheFilter)
 	}
 	
@@ -274,13 +275,13 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	argCount := 3
 	
 	if deviceFilter != "all" {
-		contactQuery += " AND sc.processing_device_id = $" + string(rune('0'+argCount))
+		contactQuery += fmt.Sprintf(" AND sc.processing_device_id = $%d", argCount)
 		args = append(args, deviceFilter)
 		argCount++
 	}
 	
 	if nicheFilter != "all" {
-		contactQuery += " AND s.niche = $" + string(rune('0'+argCount))
+		contactQuery += fmt.Sprintf(" AND s.niche = $%d", argCount)
 		args = append(args, nicheFilter)
 	}
 	
@@ -308,13 +309,13 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	argCount = 3
 	
 	if deviceFilter != "all" {
-		chartQuery += " AND sc.processing_device_id = $" + string(rune('0'+argCount))
+		chartQuery += fmt.Sprintf(" AND sc.processing_device_id = $%d", argCount)
 		args = append(args, deviceFilter)
 		argCount++
 	}
 	
 	if nicheFilter != "all" {
-		chartQuery += " AND s.niche = $" + string(rune('0'+argCount))
+		chartQuery += fmt.Sprintf(" AND s.niche = $%d", argCount)
 		args = append(args, nicheFilter)
 	}
 	
