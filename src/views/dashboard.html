@@ -1367,7 +1367,7 @@
                                     <div class="card bg-success text-white">
                                         <div class="card-body">
                                             <h4 id="activeDevices">0</h4>
-                                            <p class="mb-0">Active Devices</p>
+                                            <p class="mb-0">Online Devices</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1375,7 +1375,7 @@
                                     <div class="card bg-danger text-white">
                                         <div class="card-body">
                                             <h4 id="disconnectedDevices">0</h4>
-                                            <p class="mb-0">Disconnected</p>
+                                            <p class="mb-0">Offline Devices</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1389,7 +1389,7 @@
                                 </div>
                             </div>
                             <div class="row text-center mt-3">
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="card bg-success text-white">
                                         <div class="card-body">
                                             <h4 id="contactsDoneSend">0</h4>
@@ -1397,7 +1397,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="card bg-danger text-white">
                                         <div class="card-body">
                                             <h4 id="contactsFailedSend">0</h4>
@@ -1405,19 +1405,11 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="card bg-warning">
                                         <div class="card-body">
                                             <h4 id="contactsRemainingSend">0</h4>
                                             <p class="mb-0">Contacts Remaining Send Message</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-info text-white" style="cursor: pointer;" onclick="showAllCampaignLeads('all'); return false;">
-                                        <div class="card-body">
-                                            <h4 id="totalLeads">0</h4>
-                                            <p class="mb-0">Total Broadcast Messages</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1436,11 +1428,11 @@
                                     <thead>
                                         <tr>
                                             <th>Device Name</th>
-                                            <th>Status</th>
-                                            <th>Broadcast Messages</th>
-                                            <th>Pending</th>
-                                            <th>Sent</th>
-                                            <th>Failed</th>
+                                            <th>Status Campaign</th>
+                                            <th>Contacts Should Send</th>
+                                            <th>Contacts Done Send Message</th>
+                                            <th>Contacts Failed Send Message</th>
+                                            <th>Contacts Remaining Send Message</th>
                                             <th>Success Rate</th>
                                             <th>Actions</th>
                                         </tr>
@@ -5937,12 +5929,6 @@
             document.getElementById('contactsFailedSend').textContent = report.failedSend || 0;
             document.getElementById('contactsRemainingSend').textContent = report.remainingSend || 0;
             
-            // Update broadcast message statistics (old format kept for compatibility)
-            document.getElementById('totalLeads').textContent = report.totalLeads || 0;
-            document.getElementById('pendingLeads').textContent = report.pendingLeads || 0;
-            document.getElementById('successLeads').textContent = report.successLeads || 0;
-            document.getElementById('failedLeads').textContent = report.failedLeads || 0;
-            
             // Update device table
             const tbody = document.getElementById('deviceReportTableBody');
             tbody.innerHTML = '';
@@ -5955,36 +5941,42 @@
                     // Debug log
                     console.log('Device Report - Device:', device);
                     
-                    const successRate = device.totalLeads > 0 
-                        ? ((device.successLeads / device.totalLeads) * 100).toFixed(1) 
+                    // Calculate per-device statistics
+                    const deviceShouldSend = device.shouldSend || 0;
+                    const deviceDoneSend = device.doneSend || 0;
+                    const deviceFailedSend = device.failedSend || 0;
+                    const deviceRemainingSend = device.remainingSend || 0;
+                    
+                    // Determine campaign status for this device
+                    const campaignStatus = deviceRemainingSend === 0 && deviceShouldSend > 0 ? 'Completed' : 'In Progress';
+                    const statusColor = deviceRemainingSend === 0 && deviceShouldSend > 0 ? 'success' : 'warning';
+                    
+                    const successRate = deviceDoneSend > 0 && deviceShouldSend > 0
+                        ? ((deviceDoneSend / deviceShouldSend) * 100).toFixed(1) 
                         : 0;
                     
                     const row = `
                         <tr>
                             <td>${device.name || 'Unknown Device'}</td>
                             <td>
-                                <span class="badge bg-${device.status === 'online' || device.status === 'connected' ? 'success' : 'danger'}">
-                                    ${device.status === 'online' || device.status === 'connected' ? 'Active' : 'Disconnected'}
+                                <span class="badge bg-${statusColor}">
+                                    ${campaignStatus}
                                 </span>
                             </td>
-                            <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'all', '${campaignId}'); return false;">
-                                    ${device.totalLeads || 0}
-                                </a>
-                            </td>
-                            <td>
-                                <a href="#" onclick="showLeadDetails('${device.id}', 'pending', '${campaignId}'); return false;" class="text-warning">
-                                    ${device.pendingLeads || 0}
-                                </a>
-                            </td>
+                            <td>${deviceShouldSend}</td>
                             <td>
                                 <a href="#" onclick="showLeadDetails('${device.id}', 'success', '${campaignId}'); return false;" class="text-success">
-                                    ${device.successLeads || 0}
+                                    ${deviceDoneSend}
                                 </a>
                             </td>
                             <td>
                                 <a href="#" onclick="showLeadDetails('${device.id}', 'failed', '${campaignId}'); return false;" class="text-danger">
-                                    ${device.failedLeads || 0}
+                                    ${deviceFailedSend}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="#" onclick="showLeadDetails('${device.id}', 'pending', '${campaignId}'); return false;" class="text-warning">
+                                    ${deviceRemainingSend}
                                 </a>
                             </td>
                             <td>
@@ -5995,12 +5987,12 @@
                                 </div>
                             </td>
                             <td>
-                                ${device.failedLeads > 0 ? `
+                                ${deviceFailedSend > 0 ? `
                                     <button class="btn btn-sm btn-outline-danger" onclick="retryFailedMessages('${device.id}', '${campaignId}'); return false;" title="Retry Failed Messages">
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                 ` : ''}
-                                ${(currentCampaignForReport && currentCampaignForReport.ai === 'ai' && device.successLeads > 0 && (device.status === 'online' || device.status === 'connected' || device.status === 'active')) ? `
+                                ${(currentCampaignForReport && currentCampaignForReport.ai === 'ai' && deviceDoneSend > 0 && (device.status === 'online' || device.status === 'connected' || device.status === 'active')) ? `
                                     <button class="btn btn-sm btn-outline-success ms-1" onclick="transferAILeadsToDevice('${device.id}', '${campaignId}'); return false;" title="Transfer successful AI leads to device">
                                         <i class="bi bi-arrow-right-square"></i>
                                     </button>

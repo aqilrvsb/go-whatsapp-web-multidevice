@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -2474,6 +2475,18 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
+	// Get campaign info for calculating per-device should send
+	campaign, err := campaignRepo.GetCampaignByID(campaignId)
+	if err != nil {
+		log.Printf("Error getting campaign details: %v", err)
+	}
+	
+	// Calculate per-device should send (distribute evenly among devices)
+	perDeviceShouldSend := 0
+	if len(devices) > 0 && shouldSend > 0 {
+		perDeviceShouldSend = int(math.Ceil(float64(shouldSend) / float64(len(devices))))
+	}
+	
 	// Convert map to slice and calculate totals
 	deviceReports := make([]DeviceReport, 0, len(deviceMap))
 	totalLeads := 0
@@ -2487,6 +2500,12 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	log.Printf("Device Report - Processing %d devices", len(deviceMap))
 	
 	for deviceId, report := range deviceMap {
+		// Set per-device statistics
+		report.ShouldSend = perDeviceShouldSend
+		report.DoneSend = report.SuccessLeads
+		report.FailedSend = report.FailedLeads
+		report.RemainingSend = report.PendingLeads
+		
 		log.Printf("Device %s (%s): Total=%d, Pending=%d, Success=%d, Failed=%d", 
 			deviceId, report.Name, report.TotalLeads, report.PendingLeads, 
 			report.SuccessLeads, report.FailedLeads)
@@ -2675,6 +2694,11 @@ type DeviceReport struct {
 	PendingLeads int    `json:"pendingLeads"`
 	SuccessLeads int    `json:"successLeads"`
 	FailedLeads  int    `json:"failedLeads"`
+	// New fields for contact statistics
+	ShouldSend     int `json:"shouldSend"`
+	DoneSend       int `json:"doneSend"`
+	FailedSend     int `json:"failedSend"`
+	RemainingSend  int `json:"remainingSend"`
 }
 
 // RetryCampaignFailedMessages retries failed messages for a specific device
