@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
@@ -98,7 +99,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestMonitoring(app) // Add monitoring endpoints
 	rest.InitWorkerControlAPI(app) // Add worker control endpoints
 	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
-	// Team member routes are now in app.go
+	rest.InitRestTeamMember(app, database.GetDB()) // Initialize team member routes
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
