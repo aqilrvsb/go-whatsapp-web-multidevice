@@ -12,6 +12,7 @@ import (
 var PublicRoutes = []string{
 	"/",
 	"/login",
+	"/api/login",         // Add API login endpoint
 	"/register",
 	"/logout",
 	"/dashboard",         // Allow dashboard access
