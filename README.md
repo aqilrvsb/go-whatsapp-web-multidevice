@@ -1,10 +1,41 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 10, 2025 - Auto Device Refresh & Testing Suite Added**  
-**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface**
-**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh for reliability**
+**Last Updated: January 15, 2025 - Team Member Management System Added**  
+**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management**
+**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATES: Auto Device Refresh & Comprehensive Testing (January 10, 2025)
+## 🚀 LATEST UPDATE: Team Member Management System (January 15, 2025)
+
+### ✅ NEW: Complete Team Member Management
+- **Hierarchical Access Control**: Admin/Leader with full access, Team Members with read-only access
+- **User Management Tab**: Create, edit, delete team members from admin dashboard
+- **Automatic Device Assignment**: Team members automatically access devices matching their username
+- **Separate Login System**: Team members login at `/team-login` with their credentials
+- **Filtered Dashboard**: Team members see only their assigned devices and related data
+- **No Duplicate Processing**: Background workers run only from admin account
+
+### 🔧 How Team Management Works:
+1. **Admin Creates Team Member** → Username matches device name (e.g., "Sales Team")
+2. **Automatic Access** → Team member "Sales Team" sees all devices named "Sales Team"
+3. **Read-Only Views** → Dashboard, Devices, Campaign Summary, Sequence Summary
+4. **Real-time Updates** → When new devices are added with matching names
+
+### 📊 Team Member Features:
+- **Login**: `/team-login` - Separate authentication system
+- **Dashboard**: Overview of assigned devices with statistics
+- **Device View**: List of devices they manage (read-only)
+- **Campaign Summary**: Campaign performance for their devices
+- **Sequence Summary**: Sequence performance for their devices
+- **Auto-Logout**: Secure session management with expiration
+
+### 🛡️ Security & Architecture:
+- **Separate Auth System**: Team members use different authentication from admin
+- **Password Visibility**: Admin can view/reset team member passwords
+- **Session Management**: 24-hour sessions with automatic cleanup
+- **No Admin Access**: Team members cannot access admin functions
+- **Filtered Data**: All queries automatically filtered by device ownership
+
+## 🚀 Previous Update: Auto Device Refresh & Comprehensive Testing (January 10, 2025)
 
 ### ✅ NEW: Auto Device Refresh System
 - **Automatic Recovery**: When "no device connection found" error occurs, system auto-refreshes
@@ -352,6 +383,13 @@ PORT=3000
 
 ## 🎯 Production Deployment
 
+### Access URLs
+- **Admin Login**: `/login` or `/` - Full admin access
+- **Team Login**: `/team-login` - Team member access
+- **Admin Dashboard**: `/dashboard` - Full control panel
+- **Team Dashboard**: `/team-dashboard` - Read-only dashboard
+- **User Management**: Available in admin dashboard tabs
+
 ### Railway Deployment
 1. Connect GitHub repository
 2. Set DATABASE_URL environment variable
@@ -402,6 +440,17 @@ if device.Status == "online" { }
 - Minimal resource usage
 
 ## 📋 Feature Summary
+
+### ✅ Team Member Management (NEW)
+- [x] User Management tab in admin dashboard
+- [x] Create team members with username/password
+- [x] Automatic device assignment by name matching
+- [x] Separate login at `/team-login`
+- [x] Read-only team dashboard at `/team-dashboard`
+- [x] Filtered views (devices, campaigns, sequences)
+- [x] Session management with 24-hour expiration
+- [x] Password visibility for admins
+- [x] No duplicate background processing
 
 ### ✅ WhatsApp Web (COMPLETE)
 - [x] View recent chats (30 days)

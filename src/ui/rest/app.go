@@ -50,7 +50,14 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	})
 	app.Get("/login", rest.AppLoginView)
 	app.Get("/register", rest.RegisterView)
-	app.Get("/dashboard", rest.DashboardView)	
+	app.Get("/dashboard", rest.DashboardView)
+	
+	// Team member pages
+	app.Get("/team-login", rest.TeamLoginView)
+	app.Post("/team-login", rest.HandleTeamLogin)
+	app.Get("/team-dashboard", rest.TeamDashboardView)
+	app.Post("/api/team-logout", rest.HandleTeamLogout)
+	app.Get("/api/team-member/info", rest.GetTeamMemberInfo)	
 	// Auth API endpoints
 	app.Post("/api/login", rest.HandleLogin)
 	app.Post("/api/register", rest.HandleRegister)
@@ -3541,5 +3548,165 @@ func (a App) DeleteTeamMember(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Team member deleted successfully",
+	})
+}
+
+// TeamLoginView renders the team login page
+func (a App) TeamLoginView(c *fiber.Ctx) error {
+	return c.Render("views/team_login", fiber.Map{
+		"Title": "Team Member Login",
+	})
+}
+
+// TeamDashboardView renders the team dashboard page
+func (a App) TeamDashboardView(c *fiber.Ctx) error {
+	// Check if team member is authenticated
+	sessionToken := c.Cookies("team_session")
+	if sessionToken == "" {
+		return c.Redirect("/team-login")
+	}
+	
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	session, err := repo.GetSessionByToken(context.Background(), sessionToken)
+	if err != nil || session == nil {
+		return c.Redirect("/team-login")
+	}
+	
+	return c.Render("views/team_dashboard", fiber.Map{
+		"Title": "Team Dashboard",
+	})
+}
+
+// HandleTeamLogin handles team member login
+func (a App) HandleTeamLogin(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+	
+	// Find team member
+	member, err := repo.GetByUsername(ctx, req.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check credentials",
+		})
+	}
+	
+	if member == nil || member.Password != req.Password || !member.IsActive {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid credentials or account inactive",
+		})
+	}
+	
+	// Create session
+	session, err := repo.CreateSession(ctx, member.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create session",
+		})
+	}
+	
+	// Set cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "team_session",
+		Value:    session.Token,
+		Expires:  session.ExpiresAt,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+	})
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"member": member,
+			"token":  session.Token,
+		},
+	})
+}
+
+// HandleTeamLogout handles team member logout
+func (a App) HandleTeamLogout(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	// Get token from cookie
+	token := c.Cookies("team_session")
+	if token != "" {
+		// Delete session
+		repo.DeleteSession(ctx, token)
+	}
+	
+	// Clear cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "team_session",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		HTTPOnly: true,
+		Secure:   false,
+		SameSite: "Lax",
+	})
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Logged out successfully",
+	})
+}
+
+// GetTeamMemberInfo returns the current team member info
+func (a App) GetTeamMemberInfo(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	// Get token from cookie
+	token := c.Cookies("team_session")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get session
+	session, err := repo.GetSessionByToken(ctx, token)
+	if err != nil || session == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid session",
+		})
+	}
+	
+	// Get team member
+	member, err := repo.GetByID(ctx, session.TeamMemberID)
+	if err != nil || member == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Team member not found",
+		})
+	}
+	
+	// Get device IDs for this team member
+	deviceIDs, err := repo.GetDeviceIDsForMember(ctx, member.Username)
+	if err != nil {
+		deviceIDs = []string{}
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"member": fiber.Map{
+			"id":       member.ID,
+			"username": member.Username,
+		},
+		"device_ids": deviceIDs,
 	})
 }
