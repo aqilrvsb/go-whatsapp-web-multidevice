@@ -5356,22 +5356,6 @@
                         '<div class="alert alert-danger">Error loading data</div>';
                 });
         }
-                                total_remaining_send: filteredShouldSend - filteredDoneSend - filteredFailedSend
-                            };
-                        }
-                        
-                        displayCampaignSummary(filteredResults);
-                    } else {
-                        document.getElementById('campaignSummaryContent').innerHTML = 
-                            '<div class="alert alert-danger">Failed to load campaign summary</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading campaign summary:', error);
-                    document.getElementById('campaignSummaryContent').innerHTML = 
-                        '<div class="alert alert-danger">Error loading data</div>';
-                });
-        }
         
         function displayCampaignSummary(summary) {
             // Ensure broadcast_stats exists
