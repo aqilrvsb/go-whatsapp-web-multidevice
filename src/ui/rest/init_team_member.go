@@ -37,7 +37,8 @@ func InitRestTeamMember(app *fiber.App, db *sql.DB) {
 	// Protected routes (admin only)
 	api := app.Group("/api")
 	
-	// Team member management (admin only)
+	// Team member management (admin only) - these routes need admin authentication
+	// The CustomAuth middleware should already be applied at the app level
 	api.Get("/team-members", handlers.GetAllTeamMembers)
 	api.Post("/team-members", handlers.CreateTeamMember)
 	api.Put("/team-members/:id", handlers.UpdateTeamMember)

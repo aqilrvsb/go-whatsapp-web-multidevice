@@ -22,6 +22,13 @@ func NewTeamMemberHandlers(repo *repository.TeamMemberRepository) *TeamMemberHan
 
 // GetAllTeamMembers returns all team members with device counts
 func (h *TeamMemberHandlers) GetAllTeamMembers(c *fiber.Ctx) error {
+	// Check if user is admin
+	if !isAdminUser(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+	
 	ctx := context.Background()
 	
 	members, err := h.repo.GetAllWithDeviceCount(ctx)
@@ -39,6 +46,13 @@ func (h *TeamMemberHandlers) GetAllTeamMembers(c *fiber.Ctx) error {
 
 // CreateTeamMember creates a new team member
 func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
+	// Check if user is admin
+	if !isAdminUser(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+	
 	ctx := context.Background()
 	
 	// Get current user ID (admin)
@@ -105,6 +119,13 @@ func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
 
 // UpdateTeamMember updates an existing team member
 func (h *TeamMemberHandlers) UpdateTeamMember(c *fiber.Ctx) error {
+	// Check if user is admin
+	if !isAdminUser(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+	
 	ctx := context.Background()
 	
 	// Get team member ID from params
@@ -164,6 +185,13 @@ func (h *TeamMemberHandlers) UpdateTeamMember(c *fiber.Ctx) error {
 
 // DeleteTeamMember deletes a team member
 func (h *TeamMemberHandlers) DeleteTeamMember(c *fiber.Ctx) error {
+	// Check if user is admin
+	if !isAdminUser(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+	
 	ctx := context.Background()
 	
 	// Get team member ID from params
@@ -332,4 +360,25 @@ func (h *TeamMemberHandlers) GetTeamMemberInfo(c *fiber.Ctx) error {
 		},
 		"device_ids": deviceIDs,
 	})
+}
+// isAdminUser checks if the current user is an admin (not a team member)
+func isAdminUser(c *fiber.Ctx) bool {
+	// Check if user is authenticated as team member
+	if c.Locals("isTeamMember") == true {
+		return false
+	}
+	
+	// Check if user has a valid user session (admin)
+	userID := c.Locals("userId")
+	return userID != nil
+}
+
+// adminOnly middleware ensures only admin users can access
+func adminOnly(c *fiber.Ctx) error {
+	if !isAdminUser(c) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+	return c.Next()
 }
