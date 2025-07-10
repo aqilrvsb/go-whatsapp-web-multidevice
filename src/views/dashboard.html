@@ -3635,27 +3635,37 @@
             // Clear existing options (except "All Devices")
             deviceFilter.innerHTML = '<option value="all">All Devices</option>';
             
-            // Add device options
+            // Group devices by name
+            const deviceGroups = {};
             devices.forEach(device => {
+                const name = device.name || 'Unnamed Device';
+                if (!deviceGroups[name]) {
+                    deviceGroups[name] = [];
+                }
+                deviceGroups[name].push(device.id);
+            });
+            
+            // Add grouped device options
+            Object.keys(deviceGroups).sort().forEach(name => {
+                const deviceIds = deviceGroups[name];
                 const option = document.createElement('option');
-                option.value = device.id;
-                option.textContent = `${device.name} (${device.phone})`;
+                // Store all device IDs as comma-separated value
+                option.value = deviceIds.join(',');
+                // Show name with count if more than 1 device
+                if (deviceIds.length > 1) {
+                    option.textContent = `${name} (${deviceIds.length} devices)`;
+                } else {
+                    option.textContent = name;
+                }
                 deviceFilter.appendChild(option);
             });
             
-            // If no device is selected and we have devices, select the latest one
-            if (currentDeviceFilter === 'all' && devices.length > 0) {
-                // Find the latest device by created_at or just use the first one
-                const latestDevice = devices.reduce((latest, device) => {
-                    const latestTime = new Date(latest.created_at || 0).getTime();
-                    const deviceTime = new Date(device.created_at || 0).getTime();
-                    return deviceTime > latestTime ? device : latest;
-                }, devices[0]);
-                
-                currentDeviceFilter = latestDevice.id;
-                deviceFilter.value = currentDeviceFilter;
+            // Default to "All Devices" - don't auto-select latest device
+            if (!currentDeviceFilter || currentDeviceFilter === 'all') {
+                deviceFilter.value = 'all';
+                currentDeviceFilter = 'all';
             } else {
-                // Restore selected value
+                // Restore selected value if it exists
                 deviceFilter.value = currentDeviceFilter;
             }
         }
@@ -3745,27 +3755,37 @@
             // Clear existing options (except "All Devices")
             deviceFilter.innerHTML = '<option value="all">All Devices</option>';
             
-            // Add device options
+            // Group devices by name
+            const deviceGroups = {};
             devices.forEach(device => {
+                const name = device.name || 'Unnamed Device';
+                if (!deviceGroups[name]) {
+                    deviceGroups[name] = [];
+                }
+                deviceGroups[name].push(device.id);
+            });
+            
+            // Add grouped device options
+            Object.keys(deviceGroups).sort().forEach(name => {
+                const deviceIds = deviceGroups[name];
                 const option = document.createElement('option');
-                option.value = device.id;
-                option.textContent = `${device.name} (${device.phone})`;
+                // Store all device IDs as comma-separated value
+                option.value = deviceIds.join(',');
+                // Show name with count if more than 1 device
+                if (deviceIds.length > 1) {
+                    option.textContent = `${name} (${deviceIds.length} devices)`;
+                } else {
+                    option.textContent = name;
+                }
                 deviceFilter.appendChild(option);
             });
             
-            // If no device is selected and we have devices, select the latest one
-            if (currentDeviceFilter === 'all' && devices.length > 0) {
-                // Find the latest device by created_at or just use the first one
-                const latestDevice = devices.reduce((latest, device) => {
-                    const latestTime = new Date(latest.created_at || 0).getTime();
-                    const deviceTime = new Date(device.created_at || 0).getTime();
-                    return deviceTime > latestTime ? device : latest;
-                }, devices[0]);
-                
-                currentDeviceFilter = latestDevice.id;
-                deviceFilter.value = currentDeviceFilter;
+            // Default to "All Devices" - don't auto-select latest device
+            if (!currentDeviceFilter || currentDeviceFilter === 'all') {
+                deviceFilter.value = 'all';
+                currentDeviceFilter = 'all';
             } else {
-                // Restore selected value
+                // Restore selected value if it exists
                 deviceFilter.value = currentDeviceFilter;
             }
         }
