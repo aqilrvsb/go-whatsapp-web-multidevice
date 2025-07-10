@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Dashboard - WhatsApp Multi-Device</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary: #25D366;
+            --primary-dark: #1DA855;
+            --secondary: #128C7E;
+            --light-bg: #f0f2f5;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .navbar {
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar-brand {
+            color: var(--primary) !important;
+            font-weight: 600;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin: 16px 0 8px;
+        }
+        
+        .metric-label {
+            color: #667781;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .metric-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 24px;
+        }
+        
+        .nav-tabs {
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .nav-tabs .nav-link {
+            border: none;
+            color: #667781;
+            font-weight: 500;
+            padding: 12px 24px;
+            background: transparent;
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .table {
+            font-size: 0.875rem;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-whatsapp"></i> Team Dashboard
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span class="text-muted">Welcome, <strong id="teamMemberName">Loading...</strong></span>
+                <button class="btn btn-outline-danger btn-sm" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs" id="mainTabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#devices">
+                    <i class="bi bi-phone"></i> Devices
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#campaigns">
+                    <i class="bi bi-megaphone"></i> Campaign Summary
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sequences">
+                    <i class="bi bi-collection"></i> Sequence Summary
+                </button>
+            </li>
+        </ul>
+        
+        <!-- Tab Content -->
+        <div class="tab-content mt-4">
+            <!-- Dashboard Tab -->
+            <div class="tab-pane fade show active" id="dashboard">
+                <h5 class="mb-4">Analytics Overview</h5>
+                
+                <!-- Device Analytics -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-phone"></i>
+                            </div>
+                            <div class="metric-value" id="totalDevices">0</div>
+                            <div class="metric-label">Total Devices</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-circle-fill"></i>
+                            </div>
+                            <div class="metric-value" id="activeDevices">0</div>
+                            <div class="metric-label">Active Devices</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-circle"></i>
+                            </div>
+                            <div class="metric-value" id="offlineDevices">0</div>
+                            <div class="metric-label">Offline Devices</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Campaign & Sequence Summary -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Campaign Summary</h6>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <span>Total Campaigns</span>
+                                    <span class="badge bg-primary" id="totalCampaigns">0</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <span>Messages Sent</span>
+                                    <span class="badge bg-success" id="campaignsSent">0</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <span>Failed</span>
+                                    <span class="badge bg-danger" id="campaignsFailed">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Sequence Summary</h6>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <span>Total Sequences</span>
+                                    <span class="badge bg-primary" id="totalSequences">0</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <span>Messages Sent</span>
+                                    <span class="badge bg-success" id="sequencesSent">0</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <span>Failed</span>
+                                    <span class="badge bg-danger" id="sequencesFailed">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Devices Tab -->
+            <div class="tab-pane fade" id="devices">
+                <h5 class="mb-4">Your Devices</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Device Name</th>
+                                        <th>Phone</th>
+                                        <th>Status</th>
+                                        <th>Last Seen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="devicesTableBody">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campaigns Tab -->
+            <div class="tab-pane fade" id="campaigns">
+                <h5 class="mb-4">Campaign Summary</h5>
+                <div id="campaignSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sequences Tab -->
+            <div class="tab-pane fade" id="sequences">
+                <h5 class="mb-4">Sequence Summary</h5>
+                <div id="sequenceSummaryContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let teamMember = null;
+        let teamDeviceIds = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTeamMemberInfo();
+            loadDashboard();
+            
+            // Tab change handlers
+            document.querySelector('[data-bs-target="#devices"]').addEventListener('shown.bs.tab', loadDevices);
+            document.querySelector('[data-bs-target="#campaigns"]').addEventListener('shown.bs.tab', loadCampaignSummary);
+            document.querySelector('[data-bs-target="#sequences"]').addEventListener('shown.bs.tab', loadSequenceSummary);
+        });
+        
+        function loadTeamMemberInfo() {
+            fetch('/api/team-member/info', {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    teamMember = data.member;
+                    teamDeviceIds = data.device_ids || [];
+                    document.getElementById('teamMemberName').textContent = teamMember.username;
+                } else {
+                    window.location.href = '/team-login';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading team member info:', error);
+                window.location.href = '/team-login';
+            });
+        }
+        
+        function loadDashboard() {
+            // Load device statistics
+            fetch('/api/devices', {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const devices = data.results || data || [];
+                const filteredDevices = devices.filter(d => teamDeviceIds.includes(d.id));
+                
+                let active = 0;
+                let offline = 0;
+                
+                filteredDevices.forEach(device => {
+                    if (device.status === 'online') {
+                        active++;
+                    } else {
+                        offline++;
+                    }
+                });
+                
+                document.getElementById('totalDevices').textContent = filteredDevices.length;
+                document.getElementById('activeDevices').textContent = active;
+                document.getElementById('offlineDevices').textContent = offline;
+            });
+            
+            // Load campaign summary
+            fetch(`/api/campaigns/analytics?device=${teamDeviceIds.join(',')}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalCampaigns').textContent = data.totalCampaigns || 0;
+                document.getElementById('campaignsSent').textContent = data.contactsDoneSend || 0;
+                document.getElementById('campaignsFailed').textContent = data.contactsFailedSend || 0;
+            });
+            
+            // Load sequence summary
+            fetch(`/api/sequences/analytics?device=${teamDeviceIds.join(',')}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalSequences').textContent = data.totalSequences || 0;
+                document.getElementById('sequencesSent').textContent = data.contactsDoneSend || 0;
+                document.getElementById('sequencesFailed').textContent = data.contactsFailedSend || 0;
+            });
+        }
+        
+        function loadDevices() {
+            fetch('/api/devices', {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const devices = data.results || data || [];
+                const filteredDevices = devices.filter(d => d.device_name === teamMember.username);
+                displayDevices(filteredDevices);
+            });
+        }
+        
+        function displayDevices(devices) {
+            const tbody = document.getElementById('devicesTableBody');
+            tbody.innerHTML = '';
+            
+            if (devices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No devices found</td></tr>';
+                return;
+            }
+            
+            devices.forEach(device => {
+                const statusBadge = device.status === 'online' 
+                    ? '<span class="badge bg-success">Online</span>'
+                    : '<span class="badge bg-danger">Offline</span>';
+                
+                const row = `
+                    <tr>
+                        <td>${device.device_name}</td>
+                        <td>${device.phone || 'Not connected'}</td>
+                        <td>${statusBadge}</td>
+                        <td>${device.last_seen || 'Never'}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+        
+        function loadCampaignSummary() {
+            fetch(`/api/campaigns/summary?device=${teamDeviceIds.join(',')}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    displayCampaignSummary(data.results);
+                }
+            });
+        }
+        
+        function displayCampaignSummary(data) {
+            // Simplified campaign summary display
+            const content = document.getElementById('campaignSummaryContent');
+            content.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <p>Campaign summary for your devices will be displayed here.</p>
+                        <p>Total Campaigns: ${data.total_campaigns || 0}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function loadSequenceSummary() {
+            fetch(`/api/sequences/summary?device=${teamDeviceIds.join(',')}`, {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    displaySequenceSummary(data.results);
+                }
+            });
+        }
+        
+        function displaySequenceSummary(data) {
+            // Simplified sequence summary display
+            const content = document.getElementById('sequenceSummaryContent');
+            content.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <p>Sequence summary for your devices will be displayed here.</p>
+                        <p>Total Sequences: ${data.sequences?.total || 0}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function logout() {
+            fetch('/api/team-logout', {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(() => {
+                window.location.href = '/team-login';
+            });
+        }
+    </script>
+</body>
+</html>

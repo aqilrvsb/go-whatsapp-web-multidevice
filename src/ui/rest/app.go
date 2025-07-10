@@ -2632,8 +2632,19 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	activeDevices := 0
 	disconnectedDevices := 0
 	
-	// Debug: Log device reports
-	log.Printf("Device Report - Processing %d devices", len(deviceMap))
+	// Count active and disconnected devices from ALL devices first
+	for _, device := range devices {
+		if device.Status == "online" {
+			activeDevices++
+		} else {
+			disconnectedDevices++
+		}
+	}
+	
+	// Debug: Log device counts
+	log.Printf("Device Report - Total devices from DB: %d (Active: %d, Disconnected: %d)", 
+		len(devices), activeDevices, disconnectedDevices)
+	log.Printf("Device Report - Processing %d devices with messages", len(deviceMap))
 	
 	// Get campaign details to know target criteria
 	campaign, _ := campaignRepo.GetCampaignByID(campaignId)

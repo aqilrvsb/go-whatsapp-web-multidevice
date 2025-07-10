@@ -432,6 +432,11 @@ func InitializeSchema() error {
 	
 	log.Println("Skipping auto-migrations - database schema already configured")
 	
+	// Run team members migration
+	if err := runTeamMembersMigration(db); err != nil {
+		log.Printf("Warning: Team members migration failed: %v", err)
+	}
+	
 	// Run cleanup for expired sessions
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -439,6 +444,89 @@ func InitializeSchema() error {
 		
 		for range ticker.C {
 			db.Exec("DELETE FROM user_sessions WHERE expires_at < CURRENT_TIMESTAMP")
+		}
+	}()
+	
+	return nil
+}
+// runTeamMembersMigration runs the migration for team members functionality
+func runTeamMembersMigration(db *sql.DB) error {
+	log.Println("Running team members migration...")
+	
+	// Check if team_members table exists
+	var tableExists bool
+	err := db.QueryRow(`
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables 
+			WHERE table_schema = 'public' 
+			AND table_name = 'team_members'
+		)
+	`).Scan(&tableExists)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check if team_members table exists: %w", err)
+	}
+	
+	if tableExists {
+		log.Println("Team members tables already exist, skipping migration")
+		return nil
+	}
+	
+	// Run the migration
+	migrationSQL := `
+		-- Create team members table
+		CREATE TABLE IF NOT EXISTS team_members (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			username VARCHAR(255) UNIQUE NOT NULL,
+			password VARCHAR(255) NOT NULL,
+			created_by UUID,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			is_active BOOLEAN DEFAULT true
+		);
+
+		-- Create team sessions table
+		CREATE TABLE IF NOT EXISTS team_sessions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			team_member_id UUID REFERENCES team_members(id) ON DELETE CASCADE,
+			token VARCHAR(255) UNIQUE NOT NULL,
+			expires_at TIMESTAMP NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- Create indexes
+		CREATE INDEX IF NOT EXISTS idx_team_members_username ON team_members(username);
+		CREATE INDEX IF NOT EXISTS idx_team_members_created_by ON team_members(created_by);
+		CREATE INDEX IF NOT EXISTS idx_team_sessions_token ON team_sessions(token);
+		CREATE INDEX IF NOT EXISTS idx_team_sessions_expires_at ON team_sessions(expires_at);
+
+		-- Add trigger to update updated_at timestamp
+		CREATE OR REPLACE FUNCTION update_updated_at_column()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			NEW.updated_at = CURRENT_TIMESTAMP;
+			RETURN NEW;
+		END;
+		$$ language 'plpgsql';
+
+		CREATE TRIGGER update_team_members_updated_at BEFORE UPDATE
+			ON team_members FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+	`
+	
+	_, err = db.Exec(migrationSQL)
+	if err != nil {
+		return fmt.Errorf("failed to run team members migration: %w", err)
+	}
+	
+	log.Println("✓ Team members migration completed successfully")
+	
+	// Run cleanup for expired team sessions
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		
+		for range ticker.C {
+			db.Exec("DELETE FROM team_sessions WHERE expires_at < CURRENT_TIMESTAMP")
 		}
 	}()
 	

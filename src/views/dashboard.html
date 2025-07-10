@@ -622,6 +622,11 @@
                     <i class="bi bi-robot"></i> Manage AI
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="user-management-tab" data-bs-toggle="tab" data-bs-target="#user-management" type="button">
+                    <i class="bi bi-people"></i> User Management
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -1146,6 +1151,44 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- User Management Tab -->
+    <div class="tab-pane fade" id="user-management" role="tabpanel">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Team Member Management</h5>
+                    <button class="btn btn-primary" onclick="showAddTeamMemberModal()">
+                        <i class="bi bi-person-plus"></i> Add Team Member
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Team Members Table -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="teamMembersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Device Group</th>
+                                <th>Password</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teamMembersTableBody">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 
     <!-- QR Code Modal -->
@@ -1849,6 +1892,39 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="saveDayMessage()">Finish</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Team Member Modal -->
+    <div class="modal fade" id="teamMemberModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="teamMemberModalTitle">Add Team Member</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="teamMemberForm">
+                        <input type="hidden" id="teamMemberId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Username <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="teamMemberUsername" required>
+                            <small class="text-muted">Username should match device name for automatic access</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Password <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="teamMemberPassword" required>
+                            <small class="text-muted">Password will be visible to admin</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTeamMember()">Save</button>
                 </div>
             </div>
         </div>
@@ -3626,6 +3702,148 @@
 
         // Initialize WebSocket on load
         connectWebSocket();
+        
+        // Team Member Management Functions
+        function loadTeamMembers() {
+            fetch('/api/team-members', {
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayTeamMembers(data.data);
+                } else {
+                    showToast('Failed to load team members', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading team members:', error);
+                showToast('Failed to load team members', 'error');
+            });
+        }
+        
+        function displayTeamMembers(members) {
+            const tbody = document.getElementById('teamMembersTableBody');
+            tbody.innerHTML = '';
+            
+            if (!members || members.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No team members found</td></tr>';
+                return;
+            }
+            
+            members.forEach(member => {
+                const row = document.createElement('tr');
+                const createdAt = new Date(member.created_at).toLocaleString();
+                const statusBadge = member.is_active 
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-danger">Inactive</span>';
+                
+                row.innerHTML = `
+                    <td>${member.username}</td>
+                    <td>${member.username} (${member.device_count} devices)</td>
+                    <td>${member.password}</td>
+                    <td>${statusBadge}</td>
+                    <td>${createdAt}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editTeamMember('${member.id}', '${member.username}', '${member.password}', ${member.is_active})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteTeamMember('${member.id}', '${member.username}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function showAddTeamMemberModal() {
+            document.getElementById('teamMemberModalTitle').textContent = 'Add Team Member';
+            document.getElementById('teamMemberForm').reset();
+            document.getElementById('teamMemberId').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('teamMemberModal'));
+            modal.show();
+        }
+        
+        function editTeamMember(id, username, password, isActive) {
+            document.getElementById('teamMemberModalTitle').textContent = 'Edit Team Member';
+            document.getElementById('teamMemberId').value = id;
+            document.getElementById('teamMemberUsername').value = username;
+            document.getElementById('teamMemberPassword').value = password;
+            const modal = new bootstrap.Modal(document.getElementById('teamMemberModal'));
+            modal.show();
+        }
+        
+        function saveTeamMember() {
+            const id = document.getElementById('teamMemberId').value;
+            const username = document.getElementById('teamMemberUsername').value.trim();
+            const password = document.getElementById('teamMemberPassword').value.trim();
+            
+            if (!username || !password) {
+                showToast('Username and password are required', 'error');
+                return;
+            }
+            
+            const url = id ? `/api/team-members/${id}` : '/api/team-members';
+            const method = id ? 'PUT' : 'POST';
+            const body = { username, password };
+            
+            if (id) {
+                body.is_active = true; // Default to active when editing
+            }
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(body)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(id ? 'Team member updated' : 'Team member created', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('teamMemberModal')).hide();
+                    loadTeamMembers();
+                } else {
+                    showToast(data.error || 'Failed to save team member', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving team member:', error);
+                showToast('Failed to save team member', 'error');
+            });
+        }
+        
+        function deleteTeamMember(id, username) {
+            if (!confirm(`Are you sure you want to delete team member "${username}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/team-members/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Team member deleted', 'success');
+                    loadTeamMembers();
+                } else {
+                    showToast(data.error || 'Failed to delete team member', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting team member:', error);
+                showToast('Failed to delete team member', 'error');
+            });
+        }
+        
+        // Load team members when user management tab is shown
+        document.getElementById('user-management-tab').addEventListener('shown.bs.tab', function() {
+            loadTeamMembers();
+        });
         // Filter by Device
         function filterByDevice() {
             currentDeviceFilter = document.getElementById('deviceFilter').value;
