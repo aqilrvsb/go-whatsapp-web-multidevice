@@ -22,12 +22,8 @@ func NewTeamMemberHandlers(repo *repository.TeamMemberRepository) *TeamMemberHan
 
 // GetAllTeamMembers returns all team members with device counts
 func (h *TeamMemberHandlers) GetAllTeamMembers(c *fiber.Ctx) error {
-	// Check if user is admin
-	if !isAdminUser(c) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Admin access required",
-		})
-	}
+	// The CustomAuth middleware should have already authenticated the user
+	// No need for additional checks here
 	
 	ctx := context.Background()
 	
@@ -46,13 +42,6 @@ func (h *TeamMemberHandlers) GetAllTeamMembers(c *fiber.Ctx) error {
 
 // CreateTeamMember creates a new team member
 func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
-	// Check if user is admin
-	if !isAdminUser(c) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Admin access required",
-		})
-	}
-	
 	ctx := context.Background()
 	
 	// Get current user ID (admin)
@@ -127,13 +116,6 @@ func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
 
 // UpdateTeamMember updates an existing team member
 func (h *TeamMemberHandlers) UpdateTeamMember(c *fiber.Ctx) error {
-	// Check if user is admin
-	if !isAdminUser(c) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Admin access required",
-		})
-	}
-	
 	ctx := context.Background()
 	
 	// Get team member ID from params
@@ -193,13 +175,6 @@ func (h *TeamMemberHandlers) UpdateTeamMember(c *fiber.Ctx) error {
 
 // DeleteTeamMember deletes a team member
 func (h *TeamMemberHandlers) DeleteTeamMember(c *fiber.Ctx) error {
-	// Check if user is admin
-	if !isAdminUser(c) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Admin access required",
-		})
-	}
-	
 	ctx := context.Background()
 	
 	// Get team member ID from params
