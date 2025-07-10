@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -40,6 +41,8 @@ type CampaignRepository interface {
 	// New methods for broadcast statistics
 	GetCampaignBroadcastStats(campaignID int) (shouldSend, doneSend, failedSend int, err error)
 	GetUserCampaignBroadcastStats(userID string) (shouldSend, doneSend, failedSend int, err error)
+	// New method for date range filtering
+	GetCampaignsByUserAndDateRange(userID string, startDate string, endDate string) ([]models.Campaign, error)
 }
 
 type campaignRepository struct {
@@ -469,4 +472,65 @@ func (r *campaignRepository) GetUserCampaignBroadcastStats(userID string) (shoul
 		userID, totalShouldSend, totalDoneSend, totalFailedSend)
 	
 	return totalShouldSend, totalDoneSend, totalFailedSend, nil
+}
+
+
+// GetCampaignsByUserAndDateRange gets campaigns within a specific date range
+func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, startDate string, endDate string) ([]models.Campaign, error) {
+	query := `
+		SELECT 
+			id, user_id, title, niche, 
+			COALESCE(target_status, 'all') as target_status,
+			message, image_url, campaign_date, 
+			COALESCE(time_schedule, '') as time_schedule,
+			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
+		FROM campaigns
+		WHERE user_id = $1
+	`
+	
+	args := []interface{}{userID}
+	argCount := 1
+	
+	// Add date filters
+	if startDate != "" && endDate != "" {
+		argCount++
+		query += fmt.Sprintf(" AND campaign_date >= $%d", argCount)
+		args = append(args, startDate)
+		
+		argCount++
+		query += fmt.Sprintf(" AND campaign_date <= $%d", argCount)
+		args = append(args, endDate)
+	} else if startDate != "" {
+		argCount++
+		query += fmt.Sprintf(" AND campaign_date >= $%d", argCount)
+		args = append(args, startDate)
+	} else if endDate != "" {
+		argCount++
+		query += fmt.Sprintf(" AND campaign_date <= $%d", argCount)
+		args = append(args, endDate)
+	}
+	
+	query += " ORDER BY campaign_date DESC, time_schedule DESC"
+	
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var campaigns []models.Campaign
+	for rows.Next() {
+		var c models.Campaign
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Title, &c.Niche, 
+			&c.TargetStatus, &c.Message, &c.ImageURL, &c.CampaignDate, 
+			&c.TimeSchedule, &c.MinDelaySeconds, &c.MaxDelaySeconds,
+			&c.Status, &c.AI, &c.Limit, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		campaigns = append(campaigns, c)
+	}
+	
+	return campaigns, nil
 }

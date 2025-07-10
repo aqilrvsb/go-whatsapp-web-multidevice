@@ -5326,56 +5326,36 @@
         }
         
         function loadCampaignSummary(showAll = false) {
-            fetch('/api/campaigns/summary')
+            let url = '/api/campaigns/summary';
+            
+            // If not showing all, filter to today and tomorrow by default
+            if (!showAll) {
+                const today = new Date();
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                const todayStr = today.toISOString().split('T')[0];
+                const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                
+                url += `?start_date=${todayStr}&end_date=${tomorrowStr}`;
+            }
+            
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
-                        let filteredResults = data.results;
-                        
-                        // Filter to show only today and tomorrow by default
-                        if (!showAll) {
-                            const today = new Date();
-                            const tomorrow = new Date(today);
-                            tomorrow.setDate(tomorrow.getDate() + 1);
-                            
-                            const todayStr = today.toISOString().split('T')[0];
-                            const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                            
-                            filteredResults = {
-                                ...data.results,
-                                recent_campaigns: (data.results.recent_campaigns || []).filter(campaign => {
-                                    if (!campaign.campaign_date) return false;
-                                    const campaignDate = campaign.campaign_date.split('T')[0];
-                                    return campaignDate === todayStr || campaignDate === tomorrowStr;
-                                })
-                            };
-                            
-                            // Update counts for filtered data
-                            const filteredCampaigns = filteredResults.recent_campaigns;
-                            filteredResults.campaigns = {
-                                total: filteredCampaigns.length,
-                                pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
-                                triggered: filteredCampaigns.filter(c => c.status === 'triggered').length,
-                                processing: filteredCampaigns.filter(c => c.status === 'processing').length,
-                                finished: filteredCampaigns.filter(c => c.status === 'finished' || c.status === 'sent').length,
-                                failed: filteredCampaigns.filter(c => c.status === 'failed').length
-                            };
-                            
-                            // Recalculate broadcast stats for filtered campaigns only
-                            let filteredShouldSend = 0;
-                            let filteredDoneSend = 0;
-                            let filteredFailedSend = 0;
-                            
-                            filteredCampaigns.forEach(campaign => {
-                                filteredShouldSend += campaign.should_send || 0;
-                                filteredDoneSend += campaign.done_send || 0;
-                                filteredFailedSend += campaign.failed_send || 0;
-                            });
-                            
-                            filteredResults.broadcast_stats = {
-                                total_should_send: filteredShouldSend,
-                                total_done_send: filteredDoneSend,
-                                total_failed_send: filteredFailedSend,
+                        displayCampaignSummary(data.results);
+                    } else {
+                        document.getElementById('campaignSummaryContent').innerHTML = 
+                            '<div class="alert alert-danger">Failed to load campaign summary</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading campaign summary:', error);
+                    document.getElementById('campaignSummaryContent').innerHTML = 
+                        '<div class="alert alert-danger">Error loading data</div>';
+                });
+        }
                                 total_remaining_send: filteredShouldSend - filteredDoneSend - filteredFailedSend
                             };
                         }
@@ -5941,31 +5921,12 @@
             document.getElementById('campaignRangeStart').value = '';
             document.getElementById('campaignRangeEnd').value = '';
             
-            // Filter the existing campaigns data client-side
-            fetch('/api/campaigns/summary')
+            // Send date filter to backend
+            fetch(`/api/campaigns/summary?start_date=${filterDate}&end_date=${filterDate}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
-                        // Filter campaigns by date
-                        const filteredResults = {
-                            ...data.results,
-                            recent_campaigns: data.results.recent_campaigns.filter(campaign => {
-                                if (!campaign.campaign_date) return false;
-                                const campaignDate = campaign.campaign_date.split('T')[0];
-                                return campaignDate === filterDate;
-                            })
-                        };
-                        
-                        // Update counts
-                        const filteredCampaigns = filteredResults.recent_campaigns;
-                        filteredResults.campaigns = {
-                            total: filteredCampaigns.length,
-                            pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
-                            sent: filteredCampaigns.filter(c => c.status === 'sent').length,
-                            failed: filteredCampaigns.filter(c => c.status === 'failed').length
-                        };
-                        
-                        displayCampaignSummary(filteredResults);
+                        displayCampaignSummary(data.results);
                     }
                 })
                 .catch(error => {
@@ -6004,28 +5965,19 @@
             // Clear single date filter
             document.getElementById('campaignFilterDate').value = '';
             
-            fetch('/api/campaigns/summary')
+            // Send date range to backend
+            fetch(`/api/campaigns/summary?start_date=${startDate}&end_date=${endDate}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
-                        // Filter campaigns by date range
-                        const filteredResults = {
-                            ...data.results,
-                            recent_campaigns: data.results.recent_campaigns.filter(campaign => {
-                                if (!campaign.campaign_date) return false;
-                                const campaignDate = campaign.campaign_date.split('T')[0];
-                                return campaignDate >= startDate && campaignDate <= endDate;
-                            })
-                        };
-                        
-                        // Update counts
-                        const filteredCampaigns = filteredResults.recent_campaigns;
-                        filteredResults.campaigns = {
-                            total: filteredCampaigns.length,
-                            pending: filteredCampaigns.filter(c => c.status === 'scheduled' || c.status === 'pending').length,
-                            sent: filteredCampaigns.filter(c => c.status === 'sent').length,
-                            failed: filteredCampaigns.filter(c => c.status === 'failed').length
-                        };
+                        displayCampaignSummary(data.results);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error filtering campaigns by range:', error);
+                    showAlert('danger', 'Error filtering campaigns');
+                });
+        }
                         
                         displayCampaignSummary(filteredResults);
                     }

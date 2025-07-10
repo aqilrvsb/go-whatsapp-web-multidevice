@@ -1674,9 +1674,21 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Get date filter from query parameters
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	
 	// Get campaign statistics
 	campaignRepo := repository.GetCampaignRepository()
-	campaigns, err := campaignRepo.GetCampaignsByUser(session.UserID)
+	
+	// Get campaigns filtered by date if provided
+	var campaigns []models.Campaign
+	if startDate != "" || endDate != "" {
+		campaigns, err = campaignRepo.GetCampaignsByUserAndDateRange(session.UserID, startDate, endDate)
+	} else {
+		campaigns, err = campaignRepo.GetCampaignsByUser(session.UserID)
+	}
+	
 	if err != nil {
 		campaigns = []models.Campaign{}
 	}
@@ -1704,8 +1716,20 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Get overall broadcast statistics
-	totalShouldSend, totalDoneSend, totalFailedSend, _ := campaignRepo.GetUserCampaignBroadcastStats(session.UserID)
+	
+	// Initialize totals
+	totalShouldSend := 0
+	totalDoneSend := 0
+	totalFailedSend := 0
+	
+	// Get broadcast statistics only for filtered campaigns
+	for _, campaign := range campaigns {
+		shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaign.ID)
+		totalShouldSend += shouldSend
+		totalDoneSend += doneSend
+		totalFailedSend += failedSend
+	}
+	
 	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
 	if totalRemainingSend < 0 {
 		totalRemainingSend = 0
