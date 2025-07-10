@@ -2067,7 +2067,19 @@
                     let activeDevices = 0;
                     let offlineDevices = 0;
                     
-                    devicesData.forEach(device => {
+                    // Filter devices if specific devices are selected
+                    let filteredDevices = devicesData;
+                    if (deviceFilter && deviceFilter !== 'all') {
+                        const selectedDeviceIds = deviceFilter.split(',');
+                        filteredDevices = devicesData.filter(device => selectedDeviceIds.includes(device.id));
+                    }
+                    
+                    // Calculate statistics based on filtered devices
+                    totalDevices = filteredDevices.length;
+                    activeDevices = 0;
+                    offlineDevices = 0;
+                    
+                    filteredDevices.forEach(device => {
                         if (device.status === 'online' || device.status === 'connected') {
                             activeDevices++;
                         } else {
@@ -3618,14 +3630,8 @@
         function filterByDevice() {
             currentDeviceFilter = document.getElementById('deviceFilter').value;
             
-            // Reload data with current time range and device filter
-            if (currentTimeRange === 'custom') {
-                const startDate = document.getElementById('startDate').value;
-                const endDate = document.getElementById('endDate').value;
-                loadDashboardDataCustomRange(startDate, endDate);
-            } else {
-                loadDashboardData(currentTimeRange);
-            }
+            // Call updateDashboard to refresh all analytics sections
+            updateDashboard();
         }
 
         // Update Device Filter Dropdown
@@ -3738,14 +3744,8 @@
         function filterByDevice() {
             currentDeviceFilter = document.getElementById('deviceFilter').value;
             
-            // Reload data with current time range and device filter
-            if (currentTimeRange === 'custom') {
-                const startDate = document.getElementById('startDate').value;
-                const endDate = document.getElementById('endDate').value;
-                loadDashboardDataCustomRange(startDate, endDate);
-            } else {
-                loadDashboardData(currentTimeRange);
-            }
+            // Call updateDashboard to refresh all analytics sections
+            updateDashboard();
         }
 
         // Update Device Filter Dropdown
