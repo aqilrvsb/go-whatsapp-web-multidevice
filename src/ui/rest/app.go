@@ -25,6 +25,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -116,6 +117,12 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/campaigns/summary", rest.GetCampaignSummary)
 	app.Get("/api/campaigns/:id/device-report", rest.GetCampaignDeviceReport)
 	app.Get("/api/campaigns/:id/device/:deviceId/leads", rest.GetCampaignDeviceLeads)
+	
+	// Team Member Management endpoints
+	app.Get("/api/team-members", rest.GetAllTeamMembers)
+	app.Post("/api/team-members", rest.CreateTeamMember)
+	app.Put("/api/team-members/:id", rest.UpdateTeamMember)
+	app.Delete("/api/team-members/:id", rest.DeleteTeamMember)
 	app.Post("/api/campaigns/:id/device/:deviceId/retry-failed", rest.RetryCampaignFailedMessages)
 	
 	// AI Lead Management Routes
@@ -3370,5 +3377,169 @@ func (handler *App) TriggerAICampaign(c *fiber.Ctx) error {
 			"campaign_id": campaignID,
 			"status":      "triggered",
 		},
+	})
+}// GetAllTeamMembers returns all team members with device counts
+func (a App) GetAllTeamMembers(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	members, err := repo.GetAllWithDeviceCount(ctx)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get team members",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    members,
+	})
+}
+
+// CreateTeamMember creates a new team member
+func (a App) CreateTeamMember(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+	
+	// Validate inputs
+	req.Username = strings.TrimSpace(req.Username)
+	req.Password = strings.TrimSpace(req.Password)
+	
+	if req.Username == "" || req.Password == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Username and password are required",
+		})
+	}
+	
+	// Check if username already exists
+	existing, err := repo.GetByUsername(ctx, req.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check existing username",
+		})
+	}
+	if existing != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Username already exists",
+		})
+	}
+	
+	// Create team member
+	member := &models.TeamMember{
+		Username:  req.Username,
+		Password:  req.Password,
+		IsActive:  true,
+	}
+	
+	if err := repo.Create(ctx, member); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create team member",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    member,
+	})
+}
+
+// UpdateTeamMember updates an existing team member
+func (a App) UpdateTeamMember(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	// Get team member ID from params
+	memberID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid team member ID",
+		})
+	}
+	
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		IsActive bool   `json:"is_active"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+	
+	// Get existing member
+	member, err := repo.GetByID(ctx, memberID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get team member",
+		})
+	}
+	if member == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Team member not found",
+		})
+	}
+	
+	// Update fields
+	if req.Username != "" {
+		member.Username = strings.TrimSpace(req.Username)
+	}
+	if req.Password != "" {
+		member.Password = strings.TrimSpace(req.Password)
+	}
+	member.IsActive = req.IsActive
+	
+	// Save updates
+	if err := repo.Update(ctx, member); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update team member",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    member,
+	})
+}
+
+// DeleteTeamMember deletes a team member
+func (a App) DeleteTeamMember(c *fiber.Ctx) error {
+	ctx := context.Background()
+	db := database.GetDB()
+	repo := repository.NewTeamMemberRepository(db)
+	
+	// Get team member ID from params
+	memberID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid team member ID",
+		})
+	}
+	
+	// Delete team member
+	if err := repo.Delete(ctx, memberID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete team member",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Team member deleted successfully",
 	})
 }
