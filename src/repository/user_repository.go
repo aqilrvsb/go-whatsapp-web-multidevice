@@ -153,25 +153,25 @@ func (r *UserRepository) ValidatePassword(email, password string) (*models.User,
 		return nil, fmt.Errorf("user account is disabled")
 	}
 	
-	// Debug logging - commented out for production
-	// fmt.Printf("Debug: Validating password for email: %s\n", email)
-	// fmt.Printf("Debug: Password provided: %s\n", password)
-	// fmt.Printf("Debug: Encoded password from DB: %s\n", user.PasswordHash)
+	// Debug logging - temporarily enabled
+	fmt.Printf("Debug: Validating password for email: %s\n", email)
+	fmt.Printf("Debug: Password provided: %s\n", password)
+	fmt.Printf("Debug: Encoded password from DB: %s\n", user.PasswordHash)
 	
 	// Decode the stored password
 	decodedPassword, err := base64.StdEncoding.DecodeString(user.PasswordHash)
 	if err != nil {
-		// fmt.Printf("Debug: Failed to decode password: %v\n", err)
+		fmt.Printf("Debug: Failed to decode password: %v\n", err)
 		return nil, fmt.Errorf("invalid password format")
 	}
 	
 	// Compare passwords
 	if string(decodedPassword) != password {
-		// fmt.Printf("Debug: Password mismatch - Stored: '%s', Provided: '%s'\n", string(decodedPassword), password)
+		fmt.Printf("Debug: Password mismatch - Stored: '%s', Provided: '%s'\n", string(decodedPassword), password)
 		return nil, fmt.Errorf("invalid password")
 	}
 	
-	// fmt.Printf("Debug: Password validation successful\n")
+	fmt.Printf("Debug: Password validation successful\n")
 	
 	// Update last login
 	_, err = r.db.Exec("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1", user.ID)
