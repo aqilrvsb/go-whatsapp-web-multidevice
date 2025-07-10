@@ -52,12 +52,6 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/register", rest.RegisterView)
 	app.Get("/dashboard", rest.DashboardView)
 	
-	// Team member pages
-	app.Get("/team-login", rest.TeamLoginView)
-	app.Post("/team-login", rest.HandleTeamLogin)
-	app.Get("/team-dashboard", rest.TeamDashboardView)
-	app.Post("/api/team-logout", rest.HandleTeamLogout)
-	app.Get("/api/team-member/info", rest.GetTeamMemberInfo)	
 	// Auth API endpoints
 	app.Post("/api/login", rest.HandleLogin)
 	app.Post("/api/register", rest.HandleRegister)
