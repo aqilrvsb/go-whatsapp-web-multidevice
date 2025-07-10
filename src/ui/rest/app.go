@@ -353,7 +353,7 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 	
-	// log.Printf("Login attempt for email: %s", loginReq.Email)
+	log.Printf("Login attempt for email: %s", loginReq.Email)
 	
 	// Get user repository
 	userRepo := repository.GetUserRepository()
@@ -362,12 +362,17 @@ func (handler *App) HandleLogin(c *fiber.Ctx) error {
 	user, err := userRepo.ValidatePassword(loginReq.Email, loginReq.Password)
 	if err != nil {
 		log.Printf("Login failed for %s: %v", loginReq.Email, err)
+		// Also log if it's a database error
+		if err.Error() == "user not found" {
+			log.Printf("User %s does not exist in database", loginReq.Email)
+		}
 		return c.Status(401).JSON(fiber.Map{
 			"error": "Invalid email or password",
+			"debug": err.Error(), // Temporarily add debug info
 		})
 	}
 	
-	// log.Printf("Login successful for user: %s", user.Email)
+	log.Printf("Login successful for user: %s", user.Email)
 	
 	// Create session
 	session, err := userRepo.CreateSession(user.ID)
