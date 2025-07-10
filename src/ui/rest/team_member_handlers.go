@@ -56,10 +56,18 @@ func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
 	ctx := context.Background()
 	
 	// Get current user ID (admin)
-	userID := c.Locals("userId")
-	if userID == nil {
+	userIDInterface := c.Locals("UserID")
+	if userIDInterface == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
+		})
+	}
+	
+	// Convert to UUID
+	userID, err := uuid.Parse(userIDInterface.(string))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Invalid user ID format",
 		})
 	}
 	
@@ -101,7 +109,7 @@ func (h *TeamMemberHandlers) CreateTeamMember(c *fiber.Ctx) error {
 	member := &models.TeamMember{
 		Username:  req.Username,
 		Password:  req.Password,
-		CreatedBy: userID.(uuid.UUID),
+		CreatedBy: userID,
 		IsActive:  true,
 	}
 	
@@ -369,7 +377,8 @@ func isAdminUser(c *fiber.Ctx) bool {
 	}
 	
 	// Check if user has a valid user session (admin)
-	userID := c.Locals("userId")
+	// Note: The middleware sets "UserID" with capital U
+	userID := c.Locals("UserID")
 	return userID != nil
 }
 
