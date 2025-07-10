@@ -6111,8 +6111,16 @@
         }
         
         function displayDeviceReport(report) {
+            // Debug: Log what we receive from backend
+            console.log('Device Report received:', report);
+            console.log('totalDevices from backend:', report.totalDevices);
+            console.log('activeDevices:', report.activeDevices, 'disconnectedDevices:', report.disconnectedDevices);
+            
+            // Calculate total devices as sum of online + offline
+            const totalDevices = (report.activeDevices || 0) + (report.disconnectedDevices || 0);
+            
             // Update overall statistics
-            document.getElementById('totalDevices').textContent = report.totalDevices || 0;
+            document.getElementById('totalDevices').textContent = totalDevices;
             document.getElementById('activeDevices').textContent = report.activeDevices || 0;
             document.getElementById('disconnectedDevices').textContent = report.disconnectedDevices || 0;
             
