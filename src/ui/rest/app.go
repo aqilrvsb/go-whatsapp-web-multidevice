@@ -2694,7 +2694,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	}
 	
 	result := map[string]interface{}{
-		"totalDevices":        len(devices),
+		"totalDevices":        activeDevices + disconnectedDevices,  // Total = Online + Offline
 		"activeDevices":       activeDevices,
 		"disconnectedDevices": disconnectedDevices,
 		"totalLeads":          totalLeads,
