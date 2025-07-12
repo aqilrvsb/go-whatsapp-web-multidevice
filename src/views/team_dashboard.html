@@ -1057,17 +1057,29 @@
                 const response = await fetch('/api/devices', {
                     credentials: 'include'
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Authentication error - redirecting to login');
+                        window.location.href = '/team-login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const devices = await response.json();
                 
                 const deviceFilter = document.getElementById('deviceFilter');
                 deviceFilter.innerHTML = '<option value="all">All Devices</option>';
                 
-                devices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.id;
-                    option.textContent = device.device_name || device.phone || 'Unknown Device';
-                    deviceFilter.appendChild(option);
-                });
+                if (Array.isArray(devices)) {
+                    devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.id;
+                        option.textContent = device.device_name || device.phone || 'Unknown Device';
+                        deviceFilter.appendChild(option);
+                    });
+                }
             } catch (error) {
                 console.error('Error loading devices:', error);
             }
@@ -1079,12 +1091,21 @@
                 const response = await fetch('/api/leads/niches', {
                     credentials: 'include'
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Silently fail for niche filter - not critical
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const niches = await response.json();
                 
                 const nicheFilter = document.getElementById('nicheFilter');
                 nicheFilter.innerHTML = '<option value="all">All Niches</option>';
                 
-                if (niches && niches.length > 0) {
+                if (niches && Array.isArray(niches) && niches.length > 0) {
                     niches.forEach(niche => {
                         if (niche) {
                             const option = document.createElement('option');
@@ -1246,8 +1267,20 @@
             fetch('/api/devices', {
                 credentials: 'include'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Authentication error - redirecting to login');
+                        window.location.href = '/team-login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(devices => {
+                if (!devices) return;
+                
                 devicesData = devices;
                 displayDevices(devices);
                 if (!silent) hideLoading();
@@ -1266,7 +1299,7 @@
             const devicesGrid = document.getElementById('devicesGrid');
             const emptyState = document.getElementById('emptyDeviceState');
             
-            if (!devices || devices.length === 0) {
+            if (!devices || !Array.isArray(devices) || devices.length === 0) {
                 devicesGrid.innerHTML = '';
                 emptyState.style.display = 'block';
                 return;
@@ -1568,7 +1601,17 @@
             fetch('/api/campaigns', {
                 credentials: 'include'
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Authentication error - redirecting to login');
+                        window.location.href = '/team-login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data && Array.isArray(data)) {
                     currentCampaigns = data;
@@ -1747,9 +1790,23 @@
                 const response = await fetch('/api/sequences', {
                     credentials: 'include'
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Authentication error - redirecting to login');
+                        window.location.href = '/team-login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
-                displaySequences(data);
+                if (Array.isArray(data)) {
+                    displaySequences(data);
+                } else {
+                    displaySequences([]);
+                }
             } catch (error) {
                 console.error('Error loading sequences:', error);
                 showAlert('danger', 'Failed to load sequences');
@@ -1760,7 +1817,7 @@
         function displaySequences(sequences) {
             const sequencesList = document.getElementById('sequencesList');
             
-            if (!sequences || sequences.length === 0) {
+            if (!sequences || !Array.isArray(sequences) || sequences.length === 0) {
                 sequencesList.innerHTML = `
                     <div class="col-12">
                         <div class="card">
