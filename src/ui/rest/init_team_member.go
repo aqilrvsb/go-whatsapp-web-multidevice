@@ -18,10 +18,6 @@ func InitRestTeamMember(app *fiber.App, db *sql.DB) {
 	
 	// Team login page
 	app.Get("/team-login", func(c *fiber.Ctx) error {
-		// Check if admin is logged in
-		if c.Cookies("session_token") != "" {
-			return c.Redirect("/login")
-		}
 		// Check if team member is already logged in
 		if c.Cookies("team_session") != "" {
 			return c.Redirect("/team-dashboard")
@@ -61,6 +57,4 @@ func InitRestTeamMember(app *fiber.App, db *sql.DB) {
 	api.Post("/team-members", handlers.CreateTeamMember)
 	api.Put("/team-members/:id", handlers.UpdateTeamMember)
 	api.Delete("/team-members/:id", handlers.DeleteTeamMember)
-	api.Get("/team-members/:id/devices", handlers.GetTeamMemberWithDevices)
-	api.Post("/team-members/:id/devices", handlers.AssignDevicesToTeamMember)
 }
