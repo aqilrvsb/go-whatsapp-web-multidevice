@@ -144,6 +144,7 @@ func isTeamAccessibleEndpoint(path string) bool {
 		"/api/team-member/info",
 		"/api/analytics/dashboard",
 		"/api/leads/niches",
+		"/api/niches",
 		"/api/team-logout",
 	}
 	
