@@ -22,8 +22,8 @@ var PublicRoutes = []string{
 	"/components",
 	"/favicon.ico",
 	"/robots.txt",
-	"/team-login",        // Team member login page
-	"/api/team-logout",   // Team member logout
+	"/team/login",        // Team member login page
+	"/api/team/login",    // Team member login API
 }
 
 // CustomAuth middleware for session-based authentication
@@ -143,19 +143,10 @@ func GetUserFromContext(c *fiber.Ctx) (userID string, ok bool) {
 // isTeamAccessibleEndpoint checks if the endpoint should be accessible to team members
 func isTeamAccessibleEndpoint(path string) bool {
 	teamEndpoints := []string{
-		"/team-dashboard",
-		"/api/devices",
-		"/api/campaigns",
-		"/api/campaigns/summary",
-		"/api/campaigns/analytics",
-		"/api/sequences",
-		"/api/sequences/summary",
-		"/api/sequences/analytics",
-		"/api/team-member/info",
-		"/api/analytics/dashboard",
-		"/api/leads/niches",
-		"/api/niches",
-		"/api/team-logout",
+		"/team/dashboard",
+		"/api/team/",  // All team API endpoints
+		"/app/whatsapp/", // WhatsApp web access
+		"/app/device/", // Device leads access
 	}
 	
 	for _, endpoint := range teamEndpoints {

@@ -98,6 +98,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestSequence(app, sequenceUsecase)
 	rest.InitRestMonitoring(app) // Add monitoring endpoints
 	rest.InitWorkerControlAPI(app) // Add worker control endpoints
+	rest.InitTeamRoutes(app, database.GetDB()) // Add team member routes
 	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
 	rest.InitRestTeamMember(app, database.GetDB()) // Initialize team member routes
 
