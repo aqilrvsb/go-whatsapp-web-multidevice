@@ -1648,16 +1648,67 @@
                     <div class="alert alert-danger">Failed to load campaign summary</div>
                 `;
             });
-        }d>
-                                    <td>${campaign.failed_count || 0}</td>
-                                    <td>${campaign.pending_count || 0}</td>
-                                    <td>${campaign.success_rate || '0'}%</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+        }
+        
+        // Display campaign summary
+        function displayCampaignSummary(data) {
+            if (!data || !data.campaigns) {
+                document.getElementById('campaignSummaryContent').innerHTML = `
+                    <div class="alert alert-info">No campaign data available</div>
+                `;
+                return;
+            }
+            
+            const html = `
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.campaigns.total || 0}</div>
+                            <div class="metric-label">Total Campaigns</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.total_messages_sent || 0}</div>
+                            <div class="metric-label">Messages Sent</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.total_messages_failed || 0}</div>
+                            <div class="metric-label">Messages Failed</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">${data.total_messages_pending || 0}</div>
+                            <div class="metric-label">Messages Pending</div>
+                        </div>
+                    </div>
                 </div>
-            `;
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Campaign Name</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Recipients</th>
+                                <th>Sent</th>
+                                <th>Failed</th>
+                                <th>Pending</th>
+                                <th>Success Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.recent_campaigns.map(campaign => `
+                                <tr>
+                                    <td>${campaign.name}</td>
+                                    <td>${campaign.campaign_date}</td>
+                                    <td><span class="badge bg-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></td>
+                                    <td>${campaign.recipients_count || 0}</td>
+                                    <td>${campaign.sent_count || 0}</td>
             
             document.getElementById('campaignSummaryContent').innerHTML = html;
         }
