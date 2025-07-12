@@ -932,7 +932,7 @@
             initializeDashboard();
             
             // Load initial data
-            loadDashboardData();
+            loadDashboardData();();
             
             // Setup tab listeners
             setupTabListeners();
@@ -1137,6 +1137,7 @@
                 console.error('Error loading niches:', error);
             }
         }
+        
         // Load dashboard data
         async function loadDashboardData() {
             const deviceFilter = document.getElementById('deviceFilter').value;
@@ -1155,6 +1156,16 @@
                 const response = await fetch(`/api/analytics/dashboard?${params}`, {
                     credentials: 'include'
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Dashboard data: Authentication error');
+                        // Don't redirect here, as loadTeamMemberInfo already handles auth
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data) {
