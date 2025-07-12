@@ -922,6 +922,7 @@
         let campaignChart = null;
         let sequenceChart = null;
         let autoRefreshInterval = null;
+        let isRedirecting = false;
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -930,21 +931,8 @@
                 sessionStorage.removeItem('redirecting');
             }
             
-            // Load team member info
+            // Load team member info - this will initialize everything else after auth
             loadTeamMemberInfo();
-            
-            // Initialize dashboard
-            initializeDashboard();
-            
-            // Load initial data
-            loadDashboardData();
-            
-            // Setup tab listeners
-            setupTabListeners();
-            
-            // Update current time
-            updateCurrentTime();
-            setInterval(updateCurrentTime, 60000);
         });
         
         // Update current time
@@ -971,7 +959,8 @@
                 if (!response.ok) {
                     if (response.status === 401) {
                         // Prevent infinite redirect loop
-                        if (!sessionStorage.getItem('redirecting')) {
+                        if (!isRedirecting && !sessionStorage.getItem('redirecting')) {
+                            isRedirecting = true;
                             sessionStorage.setItem('redirecting', 'true');
                             console.error('Authentication error - redirecting to login');
                             window.location.href = '/team-login';
@@ -987,6 +976,13 @@
                 const data = await response.json();
                 if (data.member) {
                     document.getElementById('teamMemberName').textContent = data.member.username;
+                    
+                    // Now that we're authenticated, initialize everything
+                    initializeDashboard();
+                    loadDashboardData();
+                    setupTabListeners();
+                    updateCurrentTime();
+                    setInterval(updateCurrentTime, 60000);
                 }
             } catch (error) {
                 console.error('Error loading team member info:', error);
