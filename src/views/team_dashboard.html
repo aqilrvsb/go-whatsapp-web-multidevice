@@ -25,11 +25,13 @@
         .navbar {
             background-color: white !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            padding: 0.5rem 0;
         }
 
         .navbar-brand {
             color: var(--primary) !important;
             font-weight: 600;
+            font-size: 1.25rem;
         }
 
         .metric-card {
@@ -69,21 +71,27 @@
             font-size: 14px;
         }
 
-        .nav-tabs {
-            border-bottom: 2px solid #e9ecef;
+        .time-toggle {
+            background: white;
+            border-radius: 24px;
+            padding: 4px;
+            display: inline-flex;
+            box-shadow: var(--card-shadow);
         }
 
-        .nav-tabs .nav-link {
+        .time-toggle .btn {
+            border-radius: 20px;
             border: none;
-            color: #667781;
+            padding: 8px 20px;
+            font-size: 14px;
             font-weight: 500;
-            padding: 12px 24px;
             background: transparent;
+            color: #667781;
         }
 
-        .nav-tabs .nav-link.active {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
+        .time-toggle .btn.active {
+            background: var(--primary);
+            color: white;
         }
 
         .chart-container {
@@ -101,22 +109,120 @@
             box-shadow: var(--card-shadow);
             border: 1px solid #e9ecef;
             transition: all 0.3s;
+            height: 100%;
+        }
+
+        .device-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .device-status {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 6px;
+            margin-right: 8px;
         }
 
         .device-status.online {
             background-color: var(--success);
+            box-shadow: 0 0 10px rgba(37, 211, 102, 0.5);
         }
 
         .device-status.offline {
             background-color: #e74c3c;
+        }
+
+        .nav-tabs {
+            border-bottom: 2px solid #e9ecef;
+            background: white;
+            padding: 0 20px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: #667781;
+            font-weight: 500;
+            padding: 16px 24px;
+            background: transparent;
+            position: relative;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--primary);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary);
+            background: transparent;
+        }
+
+        .nav-tabs .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .tab-content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 12px 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .table {
+            font-size: 14px;
+        }
+
+        .table th {
+            border-bottom: 2px solid #e9ecef;
+            color: #1f2937;
+            font-weight: 600;
+            padding: 12px;
+        }
+
+        .table td {
+            padding: 12px;
+            vertical-align: middle;
+        }
+
+        .badge {
+            padding: 6px 12px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .form-select, .form-control {
+            border: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        .form-select:focus, .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.2rem rgba(18, 140, 126, 0.25);
+        }
+
+        .dropdown-menu {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
         }
 
         .section-title {
@@ -129,11 +235,167 @@
             gap: 8px;
         }
 
-        .table-container {
+        /* Calendar Styles */
+        .calendar-container {
             background: white;
             border-radius: 12px;
             padding: 20px;
             box-shadow: var(--card-shadow);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .calendar-day:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .calendar-day.has-campaign {
+            background: linear-gradient(135deg, #128c7e15, #25d36615);
+            border-color: var(--primary);
+        }
+
+        .calendar-day-number {
+            font-weight: 600;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        .calendar-day-label {
+            font-size: 10px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .calendar-campaign-indicator {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            background: var(--primary);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Sequence Calendar Styles */
+        .sequence-calendar {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .sequence-day-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            min-height: 120px;
+        }
+
+        .sequence-day-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .sequence-day-card.has-content {
+            background: linear-gradient(135deg, #128c7e10, #25d36610);
+            border-color: var(--primary);
+        }
+
+        .sequence-day-number {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .sequence-status-icon {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 16px;
+        }
+
+        .sequence-message-preview {
+            font-size: 12px;
+            color: #6b7280;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            margin-top: 8px;
+        }
+
+        /* Modal Styles */
+        .modal-content {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 20px 24px;
+        }
+
+        .modal-title {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #e5e7eb;
+            padding: 16px 24px;
+        }
+
+        /* Loading States */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .metric-value { font-size: 24px; }
+            .nav-tabs .nav-link { padding: 12px 16px; font-size: 14px; }
+            .calendar-grid { grid-template-columns: repeat(4, 1fr); }
+            .sequence-calendar { grid-template-columns: repeat(3, 1fr); }
         }
     </style>
 </head>
@@ -142,10 +404,10 @@
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-whatsapp"></i> WhatsApp Analytics
+                <i class="bi bi-whatsapp"></i> WhatsApp Multi-Device System
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
-                <span class="text-muted">Team Member</span>
+                <span class="text-muted">Team Member Dashboard</span>
                 <div class="dropdown">
                     <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle"></i> <span id="teamMemberName">Team Member</span>
@@ -158,428 +420,207 @@
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <div class="container-fluid p-4">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb" class="mb-4">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/team-dashboard">Home</a></li>
-                <li class="breadcrumb-item active">Dashboard</li>
-            </ol>
-        </nav>
-
+    <!-- Main Container -->
+    <div class="container mt-4">
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
-            <li class="nav-item">
+            <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </button>
             </li>
-            <li class="nav-item">
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devices" type="button">
                     <i class="bi bi-phone"></i> Devices
                 </button>
             </li>
-            <li class="nav-item">
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="campaign-tab" data-bs-toggle="tab" data-bs-target="#campaign" type="button">
-                    <i class="bi bi-megaphone"></i> Campaign Summary
+                    <i class="bi bi-calendar3"></i> Campaign
                 </button>
             </li>
-            <li class="nav-item">
-                <button class="nav-link" id="sequence-tab" data-bs-toggle="tab" data-bs-target="#sequence" type="button">
-                    <i class="bi bi-diagram-3"></i> Sequence Summary
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="campaign-summary-tab" data-bs-toggle="tab" data-bs-target="#campaign-summary" type="button">
+                    <i class="bi bi-graph-up"></i> Campaign Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sequences-tab" data-bs-toggle="tab" data-bs-target="#sequences" type="button">
+                    <i class="bi bi-collection"></i> Sequences
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sequence-summary-tab" data-bs-toggle="tab" data-bs-target="#sequence-summary" type="button">
+                    <i class="bi bi-bar-chart"></i> Sequence Summary
                 </button>
             </li>
         </ul>
 
         <!-- Tab Content -->
-        <div class="tab-content">
+        <div class="tab-content" id="mainTabContent">
             <!-- Dashboard Tab -->
-            <div class="tab-pane fade show active" id="dashboard">
-                <h2 class="section-title mb-4">Analytics Dashboard</h2>
-                
-                <!-- Device Analytics -->
-                <div class="section-title">
-                    <i class="bi bi-phone text-primary"></i> Device Analytics
-                </div>
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
-                                <i class="bi bi-phone"></i>
-                            </div>
-                            <div class="metric-value" id="totalDevices">0</div>
-                            <div class="metric-label">Total Devices</div>
-                        </div>
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                <!-- Filters Section -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h5 class="mb-0">Analytics Dashboard</h5>
+                        <small class="text-muted" id="currentDateTime">Loading...</small>
                     </div>
-                    <div class="col-md-4">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-circle-fill"></i>
-                            </div>
-                            <div class="metric-value text-success" id="totalActiveDevices">0</div>
-                            <div class="metric-label">Total Active Devices</div>
+                    <div class="d-flex gap-3 align-items-center">
+                        <!-- Device Filter - Only show team member's devices -->
+                        <div>
+                            <label class="form-label mb-1 small">Filter by Device</label>
+                            <select class="form-select form-select-sm" id="deviceFilter" onchange="updateDashboard()" style="width: 200px;">
+                                <option value="all">All My Devices</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
-                                <i class="bi bi-circle"></i>
-                            </div>
-                            <div class="metric-value text-danger" id="totalOfflineDevices">0</div>
-                            <div class="metric-label">Total Offline Devices</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Campaign Analytics -->
-                <div class="section-title">
-                    <i class="bi bi-megaphone text-info"></i> Campaign Analytics
-                </div>
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-info bg-opacity-10 text-info">
-                                <i class="bi bi-megaphone"></i>
-                            </div>
-                            <div class="metric-value" id="totalCampaigns">0</div>
-                            <div class="metric-label">Total Campaigns</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
-                                <i class="bi bi-people"></i>
-                            </div>
-                            <div class="metric-value" id="totalContactsShouldSend">0</div>
-                            <div class="metric-label">Total Contacts Should Send</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-check-circle"></i>
-                            </div>
-                            <div class="metric-value text-success" id="totalContactsDoneSend">0</div>
-                            <div class="metric-label">Contacts Done Send</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
-                                <i class="bi bi-x-circle"></i>
-                            </div>
-                            <div class="metric-value text-danger" id="totalContactsFailedSend">0</div>
-                            <div class="metric-label">Contacts Failed Send</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sequence Analytics -->
-                <div class="section-title">
-                    <i class="bi bi-diagram-3 text-purple"></i> Sequence Analytics
-                </div>
-                <div class="row mb-4">
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-purple bg-opacity-10 text-purple">
-                                <i class="bi bi-diagram-3"></i>
-                            </div>
-                            <div class="metric-value" id="totalSequences">0</div>
-                            <div class="metric-label">Total Sequences</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
-                                <i class="bi bi-layers"></i>
-                            </div>
-                            <div class="metric-value" id="totalFlows">0</div>
-                            <div class="metric-label">Total Flows</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
-                                <i class="bi bi-people"></i>
-                            </div>
-                            <div class="metric-value" id="seqTotalContactsShouldSend">0</div>
-                            <div class="metric-label">Total Contacts Should Send</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-check2-circle"></i>
-                            </div>
-                            <div class="metric-value text-success" id="seqContactsDoneSend">0</div>
-                            <div class="metric-label">Contacts Done Send</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
-                                <i class="bi bi-exclamation-circle"></i>
-                            </div>
-                            <div class="metric-value text-danger" id="seqContactsFailedSend">0</div>
-                            <div class="metric-label">Contacts Failed Send</div>
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="metric-card">
-                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
-                                <i class="bi bi-clock"></i>
-                            </div>
-                            <div class="metric-value text-warning" id="seqContactsRemainingSend">0</div>
-                            <div class="metric-label">Contacts Remaining Send</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Charts Row -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h6 class="mb-3">Campaign Performance (broadcast_messages)</h6>
-                            <canvas id="campaignChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h6 class="mb-3">Sequence Performance (sequence_contacts)</h6>
-                            <canvas id="sequenceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Devices Tab -->
-            <div class="tab-pane fade" id="devices">
-                <h2 class="section-title mb-4">Your Assigned Devices</h2>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Device Name</th>
-                                <th>Phone</th>
-                                <th>Status</th>
-                                <th>Created At</th>
-                            </tr>
-                        </thead>
-                        <tbody id="devicesTableBody">
-                            <!-- Dynamic content -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Campaign Summary Tab -->
-            <div class="tab-pane fade" id="campaign">
-                <h2 class="section-title mb-4">Campaign Summary</h2>
-                <div id="campaignSummaryContent">
-                    <!-- Dynamic content -->
-                </div>
-            </div>
-
-            <!-- Sequence Summary Tab -->
-            <div class="tab-pane fade" id="sequence">
-                <h2 class="section-title mb-4">Sequence Summary</h2>
-                <div id="sequenceSummaryContent">
-                    <!-- Dynamic content -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Initialize charts
-        let campaignChart, sequenceChart;
-
-        // Load team member info
-        async function loadTeamMemberInfo() {
-            try {
-                const response = await fetch('/api/team-member/info');
-                const data = await response.json();
-                if (data.member) {
-                    document.getElementById('teamMemberName').textContent = data.member.username;
-                }
-            } catch (error) {
-                console.error('Error loading team member info:', error);
-            }
-        }
-
-        // Load dashboard data
-        async function loadDashboard() {
-            try {
-                // Load devices
-                const devicesResponse = await fetch('/api/devices');
-                const devices = await devicesResponse.json();
-                
-                // Update device metrics
-                const totalDevices = devices.length;
-                const activeDevices = devices.filter(d => d.status === 'online').length;
-                const offlineDevices = devices.filter(d => d.status === 'offline').length;
-                
-                document.getElementById('totalDevices').textContent = totalDevices;
-                document.getElementById('totalActiveDevices').textContent = activeDevices;
-                document.getElementById('totalOfflineDevices').textContent = offlineDevices;
-
-                // Load campaign summary
-                const campaignResponse = await fetch('/api/campaigns/summary');
-                const campaignData = await campaignResponse.json();
-                
-                if (campaignData.code === 'SUCCESS' && campaignData.results) {
-                    const results = campaignData.results;
-                    document.getElementById('totalCampaigns').textContent = results.campaigns?.total || 0;
-                    document.getElementById('totalContactsShouldSend').textContent = results.broadcast_stats?.total_should_send || 0;
-                    document.getElementById('totalContactsDoneSend').textContent = results.broadcast_stats?.total_done_send || 0;
-                    document.getElementById('totalContactsFailedSend').textContent = results.broadcast_stats?.total_failed_send || 0;
-                }
-
-                // Load sequence summary
-                const sequenceResponse = await fetch('/api/sequences/summary');
-                const sequenceData = await sequenceResponse.json();
-                
-                document.getElementById('totalSequences').textContent = sequenceData.sequences?.total || 0;
-                document.getElementById('totalFlows').textContent = sequenceData.total_flows || 0;
-                document.getElementById('seqTotalContactsShouldSend').textContent = sequenceData.total_should_send || 0;
-                document.getElementById('seqContactsDoneSend').textContent = sequenceData.total_done_send || 0;
-                document.getElementById('seqContactsFailedSend').textContent = sequenceData.total_failed_send || 0;
-                document.getElementById('seqContactsRemainingSend').textContent = sequenceData.total_remaining_send || 0;
-
-                // Update charts
-                updateCharts();
-
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-            }
-        }
-
-        // Load devices
-        async function loadDevices() {
-            try {
-                const response = await fetch('/api/devices');
-                const devices = await response.json();
-                
-                const tbody = document.getElementById('devicesTableBody');
-                tbody.innerHTML = '';
-                
-                devices.forEach(device => {
-                    const statusClass = device.status === 'online' ? 'online' : 'offline';
-                    const row = `
-                        <tr>
-                            <td>${device.device_name}</td>
-                            <td>${device.phone || '-'}</td>
-                            <td><span class="device-status ${statusClass}"></span> ${device.status}</td>
-                            <td>${new Date(device.created_at).toLocaleString()}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-            } catch (error) {
-                console.error('Error loading devices:', error);
-            }
-        }
-
-        // Load campaign summary
-        async function loadCampaignSummary() {
-            try {
-                const response = await fetch('/api/campaigns/summary');
-                const data = await response.json();
-                
-                const content = document.getElementById('campaignSummaryContent');
-                if (data.code === 'SUCCESS' && data.results) {
-                    const results = data.results;
-                    content.innerHTML = `
-                        <div class="row mb-4">
-                            <div class="col-md-3">
-                                <div class="metric-card">
-                                    <div class="metric-icon bg-primary bg-opacity-10 text-primary">
-                                        <i class="bi bi-megaphone"></i>
-                                    </div>
-                                    <div class="metric-value">${results.campaigns?.total || 0}</div>
-                                    <div class="metric-label">Total Campaigns</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="metric-card">
-                                    <div class="metric-icon bg-info bg-opacity-10 text-info">
-                                        <i class="bi bi-send"></i>
-                                    </div>
-                                    <div class="metric-value">${results.broadcast_stats?.total_should_send || 0}</div>
-                                    <div class="metric-label">Should Send</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="metric-card">
-                                    <div class="metric-icon bg-success bg-opacity-10 text-success">
-                                        <i class="bi bi-check-circle"></i>
-                                    </div>
-                                    <div class="metric-value text-success">${results.broadcast_stats?.total_done_send || 0}</div>
-                                    <div class="metric-label">Done Send</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="metric-card">
-                                    <div class="metric-icon bg-danger bg-opacity-10 text-danger">
-                                        <i class="bi bi-x-circle"></i>
-                                    </div>
-                                    <div class="metric-value text-danger">${results.broadcast_stats?.total_failed_send || 0}</div>
-                                    <div class="metric-label">Failed Send</div>
-                                </div>
+                        
+                        <!-- Date Range -->
+                        <div>
+                            <label class="form-label mb-1 small">Date Range</label>
+                            <div class="d-flex gap-2">
+                                <input type="date" class="form-control form-control-sm" id="startDate" onchange="updateDashboard()">
+                                <input type="date" class="form-control form-control-sm" id="endDate" onchange="updateDashboard()">
                             </div>
                         </div>
                         
-                        <div class="table-container">
-                            <h6 class="mb-3">Recent Campaigns</h6>
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                        <th>Should Send</th>
-                                        <th>Done</th>
-                                        <th>Failed</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${results.recent_campaigns?.map(campaign => `
-                                        <tr>
-                                            <td>${campaign.title}</td>
-                                            <td>${campaign.campaign_date}</td>
-                                            <td><span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span></td>
-                                            <td>${campaign.should_send}</td>
-                                            <td>${campaign.done_send}</td>
-                                            <td>${campaign.failed_send}</td>
-                                        </tr>
-                                    `).join('') || '<tr><td colspan="6" class="text-center">No campaigns found</td></tr>'}
-                                </tbody>
-                            </table>
+                        <!-- Niche Filter -->
+                        <div>
+                            <label class="form-label mb-1 small">Filter by Niche</label>
+                            <select class="form-select form-select-sm" id="nicheFilter" onchange="updateDashboard()" style="width: 150px;">
+                                <option value="all">All Niches</option>
+                            </select>
                         </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading campaign summary:', error);
-            }
-        }
+                    </div>
+                </div>
 
-        // Load sequence summary
-        async function loadSequenceSummary() {
-            try {
-                const response = await fetch('/api/sequences/summary');
-                const data = await response.json();
-                
-                const content = document.getElementById('sequenceSummaryContent');
-                content.innerHTML = `
-                    <div class="row mb-4">
+                <!-- Section 1: Analytics Device -->
+                <div class="mb-5">
+                    <h6 class="mb-3 fw-bold text-primary">
+                        <i class="bi bi-phone-fill me-2"></i>Device Analytics
+                    </h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-phone"></i>
+                                </div>
+                                <div class="metric-value" id="totalDevices">0</div>
+                                <div class="metric-label">Total Devices</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-circle-fill"></i>
+                                </div>
+                                <div class="metric-value" id="totalActiveDevices">0</div>
+                                <div class="metric-label">Total Active Devices</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                    <i class="bi bi-circle"></i>
+                                </div>
+                                <div class="metric-value" id="totalOfflineDevices">0</div>
+                                <div class="metric-label">Total Offline Devices</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Analytics Campaign -->
+                <div class="mb-5">
+                    <h6 class="mb-3 fw-bold text-success">
+                        <i class="bi bi-megaphone-fill me-2"></i>Campaign Analytics
+                    </h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                    <i class="bi bi-collection"></i>
+                                </div>
+                                <div class="metric-value" id="totalCampaigns">0</div>
+                                <div class="metric-label">Total Campaigns</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <div class="metric-value" id="campaignShouldSend">0</div>
+                                <div class="metric-label">Total Contacts Should Send</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-check-circle"></i>
+                                </div>
+                                <div class="metric-value" id="campaignDoneSend">0</div>
+                                <div class="metric-label">Contacts Done Send Message</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                    <i class="bi bi-x-circle"></i>
+                                </div>
+                                <div class="metric-value" id="campaignFailedSend">0</div>
+                                <div class="metric-label">Contacts Failed Send Message</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                    <i class="bi bi-clock"></i>
+                                </div>
+                                <div class="metric-value" id="campaignRemainingSend">0</div>
+                                <div class="metric-label">Contacts Remaining Send Message</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                    <i class="bi bi-percent"></i>
+                                </div>
+                                <div class="metric-value" id="campaignSuccessRate">0%</div>
+                                <div class="metric-label">Success Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Campaign Charts -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="chart-container">
+                                <h6 class="mb-3">Campaign Performance (broadcast_messages)</h6>
+                                <canvas id="campaignChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-container">
+                                <h6 class="mb-3">Time-Based Performance</h6>
+                                <canvas id="timeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Analytics Sequence -->
+                <div class="mb-5">
+                    <h6 class="mb-3 fw-bold" style="color: #7c3aed;">
+                        <i class="bi bi-diagram-3-fill me-2"></i>Sequence Analytics
+                    </h6>
+                    <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <div class="metric-card">
                                 <div class="metric-icon bg-purple bg-opacity-10 text-purple">
                                     <i class="bi bi-diagram-3"></i>
                                 </div>
-                                <div class="metric-value">${data.sequences?.total || 0}</div>
+                                <div class="metric-value" id="totalSequences">0</div>
                                 <div class="metric-label">Total Sequences</div>
                             </div>
                         </div>
@@ -588,17 +629,17 @@
                                 <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
                                     <i class="bi bi-layers"></i>
                                 </div>
-                                <div class="metric-value">${data.total_flows || 0}</div>
+                                <div class="metric-value" id="totalFlows">0</div>
                                 <div class="metric-label">Total Flows</div>
                             </div>
                         </div>
                         <div class="col-md-2">
                             <div class="metric-card">
-                                <div class="metric-icon bg-info bg-opacity-10 text-info">
-                                    <i class="bi bi-send"></i>
+                                <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-people"></i>
                                 </div>
-                                <div class="metric-value">${data.total_should_send || 0}</div>
-                                <div class="metric-label">Should Send</div>
+                                <div class="metric-value" id="sequenceShouldSend">0</div>
+                                <div class="metric-label">Total Contacts Should Send</div>
                             </div>
                         </div>
                         <div class="col-md-2">
@@ -606,8 +647,8 @@
                                 <div class="metric-icon bg-success bg-opacity-10 text-success">
                                     <i class="bi bi-check2-circle"></i>
                                 </div>
-                                <div class="metric-value text-success">${data.total_done_send || 0}</div>
-                                <div class="metric-label">Done Send</div>
+                                <div class="metric-value" id="sequenceDoneSend">0</div>
+                                <div class="metric-label">Contacts Done Send Message</div>
                             </div>
                         </div>
                         <div class="col-md-2">
@@ -615,8 +656,8 @@
                                 <div class="metric-icon bg-danger bg-opacity-10 text-danger">
                                     <i class="bi bi-exclamation-circle"></i>
                                 </div>
-                                <div class="metric-value text-danger">${data.total_failed_send || 0}</div>
-                                <div class="metric-label">Failed Send</div>
+                                <div class="metric-value" id="sequenceFailedSend">0</div>
+                                <div class="metric-label">Contacts Failed Send Message</div>
                             </div>
                         </div>
                         <div class="col-md-2">
@@ -624,112 +665,766 @@
                                 <div class="metric-icon bg-warning bg-opacity-10 text-warning">
                                     <i class="bi bi-clock"></i>
                                 </div>
-                                <div class="metric-value text-warning">${data.total_remaining_send || 0}</div>
-                                <div class="metric-label">Remaining</div>
+                                <div class="metric-value" id="sequenceRemainingSend">0</div>
+                                <div class="metric-label">Contacts Remaining Send Message</div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="table-container">
-                        <h6 class="mb-3">Recent Sequences</h6>
-                        <table class="table">
+                    <!-- Sequence Chart -->
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="chart-container">
+                                <h6 class="mb-3">Sequence Performance (sequence_contacts)</h6>
+                                <canvas id="sequenceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Analytics AI Campaign -->
+                <div class="mb-5">
+                    <h6 class="mb-3 fw-bold text-info">
+                        <i class="bi bi-robot me-2"></i>AI Campaign Analytics
+                    </h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                                <div class="metric-value" id="totalAICampaigns">0</div>
+                                <div class="metric-label">Total AI Campaigns</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-bullseye"></i>
+                                </div>
+                                <div class="metric-value" id="aiTotalLeads">0</div>
+                                <div class="metric-label">Total Leads Distributed</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-send-check"></i>
+                                </div>
+                                <div class="metric-value" id="aiSuccessfulSends">0</div>
+                                <div class="metric-label">Successful Sends</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                    <i class="bi bi-hourglass-split"></i>
+                                </div>
+                                <div class="metric-value" id="aiPendingLeads">0</div>
+                                <div class="metric-label">Pending Distribution</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Devices Tab -->
+            <div class="tab-pane fade" id="devices" role="tabpanel">
+                <!-- Devices Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">WhatsApp Devices</h4>
+                        <p class="text-muted mb-0">View your assigned WhatsApp accounts</p>
+                    </div>
+                    <!-- No add device button for team members - read only -->
+                </div>
+
+                <!-- Devices Grid -->
+                <div class="row g-4" id="devicesGrid">
+                    <!-- Device cards will be dynamically added here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyDeviceState" class="text-center py-5" style="display: none;">
+                    <i class="bi bi-phone" style="font-size: 64px; color: #dee2e6;"></i>
+                    <h5 class="mt-3 text-muted">No devices assigned</h5>
+                    <p class="text-muted">Please contact your administrator to assign devices to your account</p>
+                </div>
+            </div>
+
+            <!-- Campaign Tab -->
+            <div class="tab-pane fade" id="campaign" role="tabpanel">
+                <!-- Campaign Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Campaign Calendar</h4>
+                        <p class="text-muted mb-0">View your scheduled WhatsApp broadcast campaigns</p>
+                    </div>
+                    <!-- No create campaign button for team members -->
+                </div>
+                
+                <!-- Calendar Container -->
+                <div class="card">
+                    <div class="card-body">
+                        <!-- Calendar controls will be added here by JavaScript -->
+                        <div id="campaignCalendar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campaign Summary Tab -->
+            <div class="tab-pane fade" id="campaign-summary" role="tabpanel">
+                <!-- Campaign Summary Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Campaign Summary</h4>
+                        <p class="text-muted mb-0">Track campaign performance and analytics</p>
+                    </div>
+                </div>
+
+                <!-- Campaign Summary Statistics -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-megaphone"></i>
+                            </div>
+                            <div class="metric-value" id="summaryTotalCampaigns">0</div>
+                            <div class="metric-label">Total Campaigns</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="metric-value" id="summaryShouldSend">0</div>
+                            <div class="metric-label">Total Contacts Should Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="metric-value" id="summaryDoneSend">0</div>
+                            <div class="metric-label">Contacts Done Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="metric-value" id="summaryFailedSend">0</div>
+                            <div class="metric-label">Contacts Failed Send</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campaign Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="mb-3">Detail Campaigns</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Date</th>
+                                        <th>Time Schedule</th>
+                                        <th>Status</th>
+                                        <th>Total Contacts Should Send</th>
+                                        <th>Contacts Done Send</th>
+                                        <th>Contacts Failed Send</th>
+                                        <th>Contacts Remaining Send</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="campaignSummaryTableBody">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sequences Tab -->
+            <div class="tab-pane fade" id="sequences" role="tabpanel">
+                <!-- Sequences Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Message Sequences</h4>
+                        <p class="text-muted mb-0">View automated drip campaigns for your contacts</p>
+                    </div>
+                    <!-- No create sequence button for team members -->
+                </div>
+
+                <!-- Sequences List -->
+                <div class="row g-4" id="sequencesList">
+                    <!-- Sequence cards will be dynamically added here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptySequenceState" class="text-center py-5" style="display: none;">
+                    <i class="bi bi-collection" style="font-size: 64px; color: #dee2e6;"></i>
+                    <h5 class="mt-3 text-muted">No sequences found</h5>
+                    <p class="text-muted">No sequences have been created yet</p>
+                </div>
+            </div>
+
+            <!-- Sequence Summary Tab -->
+            <div class="tab-pane fade" id="sequence-summary" role="tabpanel">
+                <!-- Sequence Summary Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">Sequence Summary</h4>
+                        <p class="text-muted mb-0">Track sequence performance and analytics</p>
+                    </div>
+                </div>
+
+                <!-- Sequence Summary Statistics -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-purple bg-opacity-10 text-purple">
+                                <i class="bi bi-diagram-3"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryTotalSequences">0</div>
+                            <div class="metric-label">Total Sequences</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-layers"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryTotalFlows">0</div>
+                            <div class="metric-label">Total Flows</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryShouldSend">0</div>
+                            <div class="metric-label">Total Contacts Should Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check2-circle"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryDoneSend">0</div>
+                            <div class="metric-label">Contacts Done Send Message</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-exclamation-circle"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryFailedSend">0</div>
+                            <div class="metric-label">Contacts Failed Send Message</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-clock"></i>
+                            </div>
+                            <div class="metric-value" id="seqSummaryRemainingSend">0</div>
+                            <div class="metric-label">Contacts Remaining Send Message</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sequence Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="mb-3">Detail Sequences</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Niche</th>
+                                        <th>Trigger</th>
+                                        <th>Total Flows</th>
+                                        <th>Total Contacts Should Send</th>
+                                        <th>Contacts Done Send Message</th>
+                                        <th>Contacts Failed Send Message</th>
+                                        <th>Contacts Remaining Send Message</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sequenceSummaryTableBody">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+d((data.campaign_analytics.total_done_send / totalSent) * 100) : 0;
+                document.getElementById('campaignSuccessRate').textContent = successRate + '%';
+                
+                // Update sequence analytics
+                document.getElementById('totalSequences').textContent = data.sequence_analytics.total_sequences || 0;
+                document.getElementById('totalFlows').textContent = data.sequence_analytics.total_flows || 0;
+                document.getElementById('sequenceShouldSend').textContent = data.sequence_analytics.total_should_send || 0;
+                document.getElementById('sequenceDoneSend').textContent = data.sequence_analytics.total_done_send || 0;
+                document.getElementById('sequenceFailedSend').textContent = data.sequence_analytics.total_failed_send || 0;
+                document.getElementById('sequenceRemainingSend').textContent = data.sequence_analytics.total_remaining_send || 0;
+                
+                // Update AI campaign analytics
+                document.getElementById('totalAICampaigns').textContent = data.ai_campaign_analytics.total_campaigns || 0;
+                document.getElementById('aiTotalLeads').textContent = data.ai_campaign_analytics.total_leads || 0;
+                document.getElementById('aiSuccessfulSends').textContent = data.ai_campaign_analytics.successful_sends || 0;
+                document.getElementById('aiPendingLeads').textContent = data.ai_campaign_analytics.pending_leads || 0;
+                
+                // Update charts
+                updateCharts(data);
+                
+            } catch (error) {
+                console.error('Error updating dashboard:', error);
+            }
+        }
+
+        // Update charts
+        function updateCharts(data) {
+            // Update campaign chart
+            if (data.campaign_chart) {
+                window.campaignChart.data.labels = data.campaign_chart.labels;
+                window.campaignChart.data.datasets[0].data = data.campaign_chart.sent;
+                window.campaignChart.data.datasets[1].data = data.campaign_chart.failed;
+                window.campaignChart.update();
+            }
+            
+            // Update time chart
+            if (data.time_chart) {
+                window.timeChart.data.labels = data.time_chart.labels;
+                window.timeChart.data.datasets[0].data = data.time_chart.data;
+                window.timeChart.update();
+            }
+            
+            // Update sequence chart
+            if (data.sequence_analytics) {
+                window.sequenceChart.data.datasets[0].data = [
+                    data.sequence_analytics.total_done_send || 0,
+                    data.sequence_analytics.total_failed_send || 0,
+                    data.sequence_analytics.total_remaining_send || 0
+                ];
+                window.sequenceChart.update();
+            }
+        }
+
+        // Campaign Calendar functionality
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let campaigns = [];
+
+        // Load campaign calendar
+        async function loadCampaignCalendar() {
+            try {
+                const response = await fetch('/api/campaigns');
+                if (!response.ok) throw new Error('Failed to fetch campaigns');
+                
+                campaigns = await response.json();
+                renderCampaignCalendar();
+            } catch (error) {
+                console.error('Error loading campaigns:', error);
+            }
+        }
+
+        // Render campaign calendar
+        function renderCampaignCalendar() {
+            const calendar = document.getElementById('campaignCalendar');
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            // Calendar header
+            const header = `
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">${monthNames[currentMonth]} ${currentYear}</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="previousMonth()">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="nextMonth()">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Calendar grid
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            let grid = '<div class="calendar-grid">';
+            
+            // Day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                grid += `<div class="text-center fw-bold small text-muted">${day}</div>`;
+            });
+            
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                grid += '<div></div>';
+            }
+            
+            // Days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const campaignsOnDay = campaigns.filter(c => c.campaign_date === dateStr);
+                
+                let dayClass = 'calendar-day';
+                if (campaignsOnDay.length > 0) {
+                    dayClass += ' has-campaign';
+                }
+                
+                grid += `
+                    <div class="${dayClass}" onclick="viewCampaignsOnDate('${dateStr}')">
+                        <div class="calendar-day-number">${day}</div>
+                        ${campaignsOnDay.length > 0 ? `<div class="calendar-campaign-indicator">${campaignsOnDay.length}</div>` : ''}
+                    </div>
+                `;
+            }
+            
+            grid += '</div>';
+            
+            calendar.innerHTML = header + grid;
+        }
+
+        // Navigate calendar
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCampaignCalendar();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCampaignCalendar();
+        }
+
+        // View campaigns on specific date
+        function viewCampaignsOnDate(date) {
+            const campaignsOnDay = campaigns.filter(c => c.campaign_date === date);
+            if (campaignsOnDay.length === 0) return;
+            
+            let content = `<h6>Campaigns on ${date}</h6><div class="list-group">`;
+            
+            campaignsOnDay.forEach(campaign => {
+                content += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">${campaign.title}</h6>
+                                <small class="text-muted">Status: ${campaign.status}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewCampaignDetails('${campaign.id}')">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            content += '</div>';
+            
+            document.getElementById('campaignDetailContent').innerHTML = content;
+            new bootstrap.Modal(document.getElementById('campaignDetailModal')).show();
+        }
+
+        // View campaign details
+        async function viewCampaignDetails(campaignId) {
+            try {
+                const response = await fetch(`/api/campaigns/${campaignId}`);
+                if (!response.ok) throw new Error('Failed to fetch campaign details');
+                
+                const campaign = await response.json();
+                
+                const content = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Title:</strong> ${campaign.title}</p>
+                            <p><strong>Date:</strong> ${campaign.campaign_date}</p>
+                            <p><strong>Time Schedule:</strong> ${campaign.time_schedule || 'Not set'}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Total Recipients:</strong> ${campaign.total_recipients || 0}</p>
+                            <p><strong>Messages Sent:</strong> ${campaign.messages_sent || 0}</p>
+                            <p><strong>Failed:</strong> ${campaign.messages_failed || 0}</p>
+                            <p><strong>Success Rate:</strong> ${campaign.success_rate || 0}%</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div>
+                        <h6>Message Content:</h6>
+                        <div class="border p-3 rounded bg-light">
+                            <pre style="white-space: pre-wrap;">${campaign.content || 'No content'}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('campaignDetailContent').innerHTML = content;
+            } catch (error) {
+                console.error('Error loading campaign details:', error);
+                document.getElementById('campaignDetailContent').innerHTML = '<p class="text-danger">Error loading campaign details</p>';
+            }
+        }
+
+        // Campaign Summary functions
+        async function loadCampaignSummary() {
+            try {
+                const response = await fetch('/api/campaigns/summary');
+                if (!response.ok) throw new Error('Failed to fetch campaign summary');
+                
+                const data = await response.json();
+                
+                if (data.code === 'SUCCESS' && data.results) {
+                    const results = data.results;
+                    
+                    // Update statistics
+                    document.getElementById('summaryTotalCampaigns').textContent = results.campaigns?.total || 0;
+                    document.getElementById('summaryShouldSend').textContent = results.broadcast_stats?.total_should_send || 0;
+                    document.getElementById('summaryDoneSend').textContent = results.broadcast_stats?.total_done_send || 0;
+                    document.getElementById('summaryFailedSend').textContent = results.broadcast_stats?.total_failed_send || 0;
+                    
+                    // Update table
+                    const tbody = document.getElementById('campaignSummaryTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (results.recent_campaigns && results.recent_campaigns.length > 0) {
+                        results.recent_campaigns.forEach(campaign => {
+                            const remaining = campaign.should_send - campaign.done_send - campaign.failed_send;
+                            const row = `
+                                <tr>
+                                    <td>${campaign.title}</td>
+                                    <td>${campaign.campaign_date}</td>
+                                    <td>${campaign.time_schedule || '-'}</td>
+                                    <td><span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span></td>
+                                    <td>${campaign.should_send}</td>
+                                    <td>${campaign.done_send}</td>
+                                    <td>${campaign.failed_send}</td>
+                                    <td>${remaining}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewCampaignDetails('${campaign.id}')">
+                                            <i class="bi bi-eye"></i> View
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                            tbody.innerHTML += row;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="9" class="text-center">No campaigns found</td></tr>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading campaign summary:', error);
+            }
+        }
+
+        // Sequences functions
+        async function loadSequences() {
+            try {
+                const response = await fetch('/api/sequences');
+                if (!response.ok) throw new Error('Failed to fetch sequences');
+                
+                const sequences = await response.json();
+                const sequencesList = document.getElementById('sequencesList');
+                const emptyState = document.getElementById('emptySequenceState');
+                
+                if (sequences.length === 0) {
+                    sequencesList.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                
+                sequencesList.style.display = 'flex';
+                emptyState.style.display = 'none';
+                sequencesList.innerHTML = '';
+                
+                sequences.forEach(sequence => {
+                    const card = `
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div>
+                                            <h5 class="card-title">${sequence.name}</h5>
+                                            <p class="text-muted mb-1">Trigger: ${sequence.trigger}</p>
+                                            <p class="text-muted mb-0">Niche: ${sequence.niche || 'Not set'}</p>
+                                        </div>
+                                        <span class="badge bg-${sequence.status === 'active' ? 'success' : 'secondary'}">
+                                            ${sequence.status}
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">Created: ${new Date(sequence.created_at).toLocaleDateString()}</small>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewSequenceDetails('${sequence.id}')">
+                                            <i class="bi bi-eye"></i> View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    sequencesList.innerHTML += card;
+                });
+            } catch (error) {
+                console.error('Error loading sequences:', error);
+            }
+        }
+
+        // View sequence details
+        async function viewSequenceDetails(sequenceId) {
+            try {
+                const response = await fetch(`/api/sequences/${sequenceId}/summary`);
+                if (!response.ok) throw new Error('Failed to fetch sequence details');
+                
+                const data = await response.json();
+                
+                let content = `
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6>Sequence Information</h6>
+                            <p><strong>Name:</strong> ${data.name}</p>
+                            <p><strong>Trigger:</strong> ${data.trigger}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-${data.status === 'active' ? 'success' : 'secondary'}">${data.status}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Statistics</h6>
+                            <p><strong>Total Flows:</strong> ${data.total_flows || 0}</p>
+                            <p><strong>Should Send:</strong> ${data.total_should_send || 0}</p>
+                            <p><strong>Done Send:</strong> ${data.total_done_send || 0}</p>
+                            <p><strong>Failed Send:</strong> ${data.total_failed_send || 0}</p>
+                        </div>
+                    </div>
+                    
+                    <h6>Flow Details</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Trigger</th>
-                                    <th>Status</th>
+                                    <th>Day</th>
                                     <th>Should Send</th>
-                                    <th>Done</th>
-                                    <th>Failed</th>
+                                    <th>Done Send</th>
+                                    <th>Failed Send</th>
+                                    <th>Remaining</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${data.recent_sequences?.map(seq => `
-                                    <tr>
-                                        <td>${seq.name}</td>
-                                        <td>${seq.trigger}</td>
-                                        <td><span class="badge bg-${seq.status === 'active' ? 'success' : 'secondary'}">${seq.status}</span></td>
-                                        <td>${seq.should_send}</td>
-                                        <td>${seq.done_send}</td>
-                                        <td>${seq.failed_send}</td>
-                                    </tr>
-                                `).join('') || '<tr><td colspan="6" class="text-center">No sequences found</td></tr>'}
+                `;
+                
+                if (data.flows && data.flows.length > 0) {
+                    data.flows.forEach(flow => {
+                        content += `
+                            <tr>
+                                <td>Day ${flow.day_number}</td>
+                                <td>${flow.should_send}</td>
+                                <td>${flow.done_send}</td>
+                                <td>${flow.failed_send}</td>
+                                <td>${flow.remaining_send}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    content += '<tr><td colspan="5" class="text-center">No flow data available</td></tr>';
+                }
+                
+                content += `
                             </tbody>
                         </table>
                     </div>
                 `;
+                
+                document.getElementById('sequenceDetailContent').innerHTML = content;
+                new bootstrap.Modal(document.getElementById('sequenceDetailModal')).show();
+            } catch (error) {
+                console.error('Error loading sequence details:', error);
+                document.getElementById('sequenceDetailContent').innerHTML = '<p class="text-danger">Error loading sequence details</p>';
+            }
+        }
+
+        // Sequence Summary functions
+        async function loadSequenceSummary() {
+            try {
+                const response = await fetch('/api/sequences/summary');
+                if (!response.ok) throw new Error('Failed to fetch sequence summary');
+                
+                const data = await response.json();
+                
+                // Update statistics
+                document.getElementById('seqSummaryTotalSequences').textContent = data.sequences?.total || 0;
+                document.getElementById('seqSummaryTotalFlows').textContent = data.total_flows || 0;
+                document.getElementById('seqSummaryShouldSend').textContent = data.total_should_send || 0;
+                document.getElementById('seqSummaryDoneSend').textContent = data.total_done_send || 0;
+                document.getElementById('seqSummaryFailedSend').textContent = data.total_failed_send || 0;
+                document.getElementById('seqSummaryRemainingSend').textContent = data.total_remaining_send || 0;
+                
+                // Update table
+                const tbody = document.getElementById('sequenceSummaryTableBody');
+                tbody.innerHTML = '';
+                
+                if (data.recent_sequences && data.recent_sequences.length > 0) {
+                    data.recent_sequences.forEach(seq => {
+                        const row = `
+                            <tr>
+                                <td>${seq.name}</td>
+                                <td>${seq.niche || '-'}</td>
+                                <td>${seq.trigger}</td>
+                                <td>${seq.total_flows}</td>
+                                <td>${seq.should_send}</td>
+                                <td>${seq.done_send}</td>
+                                <td>${seq.failed_send}</td>
+                                <td>${seq.remaining_send}</td>
+                                <td><span class="badge bg-${seq.status === 'active' ? 'success' : 'secondary'}">${seq.status}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewSequenceDetails('${seq.id}')">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center">No sequences found</td></tr>';
+                }
             } catch (error) {
                 console.error('Error loading sequence summary:', error);
             }
         }
 
-        // Update charts
-        function updateCharts() {
-            // Campaign Chart
-            const campaignCtx = document.getElementById('campaignChart').getContext('2d');
-            if (campaignChart) campaignChart.destroy();
-            
-            campaignChart = new Chart(campaignCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Messages Sent', 'Failed Messages'],
-                    datasets: [{
-                        data: [
-                            parseInt(document.getElementById('totalContactsDoneSend').textContent) || 0,
-                            parseInt(document.getElementById('totalContactsFailedSend').textContent) || 0
-                        ],
-                        backgroundColor: ['#25d366', '#e74c3c']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-
-            // Sequence Chart
-            const sequenceCtx = document.getElementById('sequenceChart').getContext('2d');
-            if (sequenceChart) sequenceChart.destroy();
-            
-            sequenceChart = new Chart(sequenceCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Completed', 'Failed', 'Pending'],
-                    datasets: [{
-                        label: 'Contacts',
-                        data: [
-                            parseInt(document.getElementById('seqContactsDoneSend').textContent) || 0,
-                            parseInt(document.getElementById('seqContactsFailedSend').textContent) || 0,
-                            parseInt(document.getElementById('seqContactsRemainingSend').textContent) || 0
-                        ],
-                        backgroundColor: ['#25d366', '#e74c3c', '#f39c12']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-
-        // Helper function to get status color
+        // Helper functions
         function getStatusColor(status) {
             const colors = {
                 'pending': 'warning',
                 'processing': 'info',
                 'sent': 'success',
                 'finished': 'success',
-                'failed': 'danger'
+                'failed': 'danger',
+                'active': 'success',
+                'inactive': 'secondary'
             };
             return colors[status] || 'secondary';
         }
@@ -741,19 +1436,15 @@
                 window.location.href = '/team-login';
             } catch (error) {
                 console.error('Logout error:', error);
+                window.location.href = '/team-login';
             }
         }
 
-        // Tab change handlers
-        document.getElementById('devices-tab').addEventListener('shown.bs.tab', loadDevices);
-        document.getElementById('campaign-tab').addEventListener('shown.bs.tab', loadCampaignSummary);
-        document.getElementById('sequence-tab').addEventListener('shown.bs.tab', loadSequenceSummary);
-
-        // Initialize on load
-        document.addEventListener('DOMContentLoaded', () => {
-            loadTeamMemberInfo();
-            loadDashboard();
-        });
+        // Tab change event listeners
+        document.getElementById('campaign-tab').addEventListener('shown.bs.tab', loadCampaignCalendar);
+        document.getElementById('campaign-summary-tab').addEventListener('shown.bs.tab', loadCampaignSummary);
+        document.getElementById('sequences-tab').addEventListener('shown.bs.tab', loadSequences);
+        document.getElementById('sequence-summary-tab').addEventListener('shown.bs.tab', loadSequenceSummary);
 
         // Add custom styles for purple color
         const style = document.createElement('style');
@@ -763,41 +1454,6 @@
             .bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.1) !important; }
         `;
         document.head.appendChild(style);
-    </script>
-</body>
-</html>
-    
-    // Logout function
-    function logout() {
-        fetch('/api/team-logout', { method: 'POST' })
-            .then(() => {
-                window.location.href = '/team-login';
-            })
-            .catch(error => {
-                console.error('Logout error:', error);
-                window.location.href = '/team-login';
-            });
-    }
-    
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        formatDateTime();
-        setDefaultDates();
-        loadTeamMemberInfo();
-        updateDashboard();
-        
-        // Update time every minute
-        setInterval(formatDateTime, 60000);
-    });
-    
-    // Add custom styles for purple color
-    const style = document.createElement('style');
-    style.textContent = `
-        .bg-purple { background-color: #6f42c1 !important; }
-        .text-purple { color: #6f42c1 !important; }
-        .bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.1) !important; }
-    `;
-    document.head.appendChild(style);
     </script>
 </body>
 </html>

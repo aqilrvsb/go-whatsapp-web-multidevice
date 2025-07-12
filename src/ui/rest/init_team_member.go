@@ -40,10 +40,14 @@ func InitRestTeamMember(app *fiber.App, db *sql.DB) {
 	
 	// Team accessible endpoints (read-only)
 	teamAPI.Get("/devices", handlers.GetTeamDevices)
+	teamAPI.Get("/campaigns", handlers.GetTeamCampaigns)
+	teamAPI.Get("/campaigns/:id", handlers.GetTeamCampaignDetails)
 	teamAPI.Get("/campaigns/summary", handlers.GetTeamCampaignsSummary)
-	teamAPI.Get("/campaigns/analytics", handlers.GetTeamCampaignsAnalytics)
+	teamAPI.Get("/sequences", handlers.GetTeamSequences)
+	teamAPI.Get("/sequences/:id/summary", handlers.GetTeamSequenceDetails)
 	teamAPI.Get("/sequences/summary", handlers.GetTeamSequencesSummary)
-	teamAPI.Get("/sequences/analytics", handlers.GetTeamSequencesAnalytics)
+	teamAPI.Get("/analytics/dashboard", handlers.GetTeamDashboardAnalytics)
+	teamAPI.Get("/leads/niches", handlers.GetTeamNiches)
 	
 	// Team member logout (public route but checks for team session)
 	app.Post("/api/team-logout", handlers.LogoutTeamMember)

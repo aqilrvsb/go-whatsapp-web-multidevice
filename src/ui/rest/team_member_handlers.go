@@ -2,6 +2,7 @@ package rest
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -785,3 +786,569 @@ func getCampaignDeviceStats(campaignID int64, deviceID string) (shouldSend, done
 }
 
 
+
+
+// GetTeamCampaigns returns campaigns visible to team member
+func (h *TeamMemberHandlers) GetTeamCampaigns(c *fiber.Ctx) error {
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get member's devices - use username instead of ID
+	devices, err := h.repo.GetTeamMemberDevices(context.Background(), member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get devices",
+		})
+	}
+	
+	deviceIDs := make([]string, len(devices))
+	for i, device := range devices {
+		deviceIDs[i] = device["id"].(string)
+	}
+	
+	// Get campaigns that use these devices
+	db := database.GetDB()
+	query := `
+		SELECT DISTINCT c.* 
+		FROM campaigns c
+		INNER JOIN broadcast_messages bm ON c.id = bm.campaign_id
+		WHERE bm.device_id = ANY($1)
+		ORDER BY c.created_at DESC
+	`
+	
+	rows, err := db.Query(query, pq.Array(deviceIDs))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get campaigns",
+		})
+	}
+	defer rows.Close()
+	
+	campaigns := []fiber.Map{}
+	for rows.Next() {
+		var campaign models.Campaign
+		if err := rows.Scan(
+			&campaign.ID,
+			&campaign.UserID,
+			&campaign.DeviceID,
+			&campaign.Title,
+			&campaign.Niche,
+			&campaign.TargetStatus,
+			&campaign.Message,
+			&campaign.ImageURL,
+			&campaign.CampaignDate,
+			&campaign.ScheduledDate,
+			&campaign.TimeSchedule,
+			&campaign.MinDelaySeconds,
+			&campaign.MaxDelaySeconds,
+			&campaign.Status,
+			&campaign.AI,
+			&campaign.Limit,
+			&campaign.CreatedAt,
+			&campaign.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		
+		campaigns = append(campaigns, fiber.Map{
+			"id": campaign.ID,
+			"title": campaign.Title,
+			"campaign_date": campaign.CampaignDate,
+			"time_schedule": campaign.TimeSchedule,
+			"status": campaign.Status,
+			"created_at": campaign.CreatedAt,
+		})
+	}
+	
+	return c.JSON(campaigns)
+}
+
+// GetTeamCampaignDetails returns campaign details for team member
+func (h *TeamMemberHandlers) GetTeamCampaignDetails(c *fiber.Ctx) error {
+	campaignID := c.Params("id")
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get member's devices - use username instead of ID
+	devices, err := h.repo.GetTeamMemberDevices(context.Background(), member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get devices",
+		})
+	}
+	
+	deviceIDs := make([]string, len(devices))
+	for i, device := range devices {
+		deviceIDs[i] = device["id"].(string)
+	}
+	
+	// Get campaign details with stats
+	db := database.GetDB()
+	var campaign models.Campaign
+	query := `SELECT * FROM campaigns WHERE id = $1`
+	err = db.QueryRow(query, campaignID).Scan(
+		&campaign.ID,
+		&campaign.UserID,
+		&campaign.DeviceID,
+		&campaign.Title,
+		&campaign.Niche,
+		&campaign.TargetStatus,
+		&campaign.Message,
+		&campaign.ImageURL,
+		&campaign.CampaignDate,
+		&campaign.ScheduledDate,
+		&campaign.TimeSchedule,
+		&campaign.MinDelaySeconds,
+		&campaign.MaxDelaySeconds,
+		&campaign.Status,
+		&campaign.AI,
+		&campaign.Limit,
+		&campaign.CreatedAt,
+		&campaign.UpdatedAt,
+	)
+	
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Campaign not found",
+		})
+	}
+	
+	// Get stats for member's devices only
+	var totalRecipients, messagesSent, messagesFailed int
+	statsQuery := `
+		SELECT 
+			COUNT(*) as total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+		FROM broadcast_messages 
+		WHERE campaign_id = $1 AND device_id = ANY($2)
+	`
+	db.QueryRow(statsQuery, campaignID, pq.Array(deviceIDs)).Scan(&totalRecipients, &messagesSent, &messagesFailed)
+	
+	successRate := 0
+	if totalRecipients > 0 {
+		successRate = (messagesSent * 100) / totalRecipients
+	}
+	
+	return c.JSON(fiber.Map{
+		"id": campaign.ID,
+		"title": campaign.Title,
+		"content": campaign.Message,
+		"campaign_date": campaign.CampaignDate,
+		"time_schedule": campaign.TimeSchedule,
+		"status": campaign.Status,
+		"total_recipients": totalRecipients,
+		"messages_sent": messagesSent,
+		"messages_failed": messagesFailed,
+		"success_rate": successRate,
+		"created_at": campaign.CreatedAt,
+	})
+}
+
+// GetTeamSequences returns sequences visible to team member
+func (h *TeamMemberHandlers) GetTeamSequences(c *fiber.Ctx) error {
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get sequences that have data for member's devices
+	db := database.GetDB()
+	query := `
+		SELECT DISTINCT s.* 
+		FROM sequences s
+		INNER JOIN sequence_contacts sc ON s.id = sc.sequence_id
+		INNER JOIN user_devices ud ON sc.processing_device_id = ud.id
+		WHERE ud.device_name = $1
+		ORDER BY s.created_at DESC
+	`
+	
+	rows, err := db.Query(query, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get sequences",
+		})
+	}
+	defer rows.Close()
+	
+	sequences := []fiber.Map{}
+	for rows.Next() {
+		var sequence models.Sequence
+		if err := rows.Scan(
+			&sequence.ID,
+			&sequence.UserID,
+			&sequence.Name,
+			&sequence.Trigger,
+			&sequence.Niche,
+			&sequence.Status,
+			&sequence.CreatedAt,
+			&sequence.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		
+		sequences = append(sequences, fiber.Map{
+			"id": sequence.ID,
+			"name": sequence.Name,
+			"trigger": sequence.Trigger,
+			"niche": sequence.Niche,
+			"status": sequence.Status,
+			"created_at": sequence.CreatedAt,
+		})
+	}
+	
+	return c.JSON(sequences)
+}
+
+// GetTeamSequenceDetails returns sequence details for team member
+func (h *TeamMemberHandlers) GetTeamSequenceDetails(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get sequence details with stats for member's devices
+	db := database.GetDB()
+	var sequence models.Sequence
+	query := `SELECT * FROM sequences WHERE id = $1`
+	err := db.QueryRow(query, sequenceID).Scan(
+		&sequence.ID,
+		&sequence.UserID,
+		&sequence.Name,
+		&sequence.Trigger,
+		&sequence.Niche,
+		&sequence.Status,
+		&sequence.CreatedAt,
+		&sequence.UpdatedAt,
+	)
+	
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Sequence not found",
+		})
+	}
+	
+	// Get total flows
+	var totalFlows int
+	db.QueryRow("SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = $1", sequenceID).Scan(&totalFlows)
+	
+	// Get stats for member's devices
+	statsQuery := `
+		SELECT 
+			COUNT(DISTINCT l.id) as should_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as done_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as failed_send
+		FROM leads l
+		LEFT JOIN sequence_contacts sc ON sc.contact_phone = l.phone AND sc.sequence_id = $1
+		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
+		WHERE l.trigger LIKE '%' || $2 || '%' 
+		AND (ud.device_name = $3 OR ud.device_name IS NULL)
+	`
+	
+	var shouldSend, doneSend, failedSend int
+	db.QueryRow(statsQuery, sequenceID, sequence.Trigger, member.Username).Scan(&shouldSend, &doneSend, &failedSend)
+	
+	// Get flow details
+	flowQuery := `
+		SELECT 
+			ss.day_number,
+			COUNT(DISTINCT l.id) as should_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as done_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as failed_send
+		FROM sequence_steps ss
+		LEFT JOIN sequence_contacts sc ON sc.sequence_stepid = ss.id
+		LEFT JOIN leads l ON l.trigger LIKE '%' || $2 || '%'
+		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
+		WHERE ss.sequence_id = $1 
+		AND (ud.device_name = $3 OR ud.device_name IS NULL)
+		GROUP BY ss.day_number
+		ORDER BY ss.day_number
+	`
+	
+	flowRows, err := db.Query(flowQuery, sequenceID, sequence.Trigger, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get flow details",
+		})
+	}
+	defer flowRows.Close()
+	
+	flows := []fiber.Map{}
+	for flowRows.Next() {
+		var dayNumber, flowShouldSend, flowDoneSend, flowFailedSend int
+		if err := flowRows.Scan(&dayNumber, &flowShouldSend, &flowDoneSend, &flowFailedSend); err != nil {
+			continue
+		}
+		
+		flows = append(flows, fiber.Map{
+			"day_number": dayNumber,
+			"should_send": flowShouldSend,
+			"done_send": flowDoneSend,
+			"failed_send": flowFailedSend,
+			"remaining_send": flowShouldSend - flowDoneSend - flowFailedSend,
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"id": sequence.ID,
+		"name": sequence.Name,
+		"trigger": sequence.Trigger,
+		"niche": sequence.Niche,
+		"status": sequence.Status,
+		"total_flows": totalFlows,
+		"total_should_send": shouldSend,
+		"total_done_send": doneSend,
+		"total_failed_send": failedSend,
+		"flows": flows,
+	})
+}
+
+// GetTeamDashboardAnalytics returns dashboard analytics for team member
+func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get query parameters
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	deviceID := c.Query("device_id", "")
+	// niche := c.Query("niche", "") // Reserved for future use
+	
+	// Get member's devices - use username instead of ID
+	devices, err := h.repo.GetTeamMemberDevices(context.Background(), member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get devices",
+		})
+	}
+	
+	// Device analytics
+	totalDevices := len(devices)
+	activeDevices := 0
+	offlineDevices := 0
+	
+	for _, device := range devices {
+		if device["status"].(string) == "online" {
+			activeDevices++
+		} else {
+			offlineDevices++
+		}
+	}
+	
+	deviceAnalytics := fiber.Map{
+		"total": totalDevices,
+		"active": activeDevices,
+		"offline": offlineDevices,
+	}
+	
+	// Campaign analytics (filtered by member's devices)
+	deviceIDs := make([]string, len(devices))
+	for i, device := range devices {
+		deviceIDs[i] = device["id"].(string)
+	}
+	
+	db := database.GetDB()
+	campaignQuery := `
+		SELECT 
+			COUNT(DISTINCT c.id) as total_campaigns,
+			COUNT(bm.id) as total_should_send,
+			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) as total_done_send,
+			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as total_failed_send
+		FROM campaigns c
+		LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id
+		WHERE bm.device_id = ANY($1)
+	`
+	
+	args := []interface{}{pq.Array(deviceIDs)}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		campaignQuery += " AND c.campaign_date BETWEEN $2 AND $3"
+		args = append(args, startDate, endDate)
+	}
+	
+	// Add device filter if specific device selected
+	if deviceID != "" && deviceID != "all" {
+		campaignQuery += " AND bm.device_id = $" + fmt.Sprintf("%d", len(args)+1)
+		args = append(args, deviceID)
+	}
+	
+	var totalCampaigns, totalShouldSend, totalDoneSend, totalFailedSend int
+	db.QueryRow(campaignQuery, args...).Scan(&totalCampaigns, &totalShouldSend, &totalDoneSend, &totalFailedSend)
+	
+	campaignAnalytics := fiber.Map{
+		"total_campaigns": totalCampaigns,
+		"total_should_send": totalShouldSend,
+		"total_done_send": totalDoneSend,
+		"total_failed_send": totalFailedSend,
+		"total_remaining_send": totalShouldSend - totalDoneSend - totalFailedSend,
+	}
+	
+	// Sequence analytics (filtered by member's devices)
+	sequenceQuery := `
+		SELECT 
+			COUNT(DISTINCT s.id) as total_sequences,
+			COUNT(DISTINCT ss.id) as total_flows,
+			COUNT(DISTINCT l.id) as total_should_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as total_done_send,
+			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as total_failed_send
+		FROM sequences s
+		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
+		LEFT JOIN leads l ON l.trigger LIKE '%' || s.trigger || '%'
+		LEFT JOIN sequence_contacts sc ON sc.sequence_id = s.id AND sc.contact_phone = l.phone
+		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
+		WHERE ud.device_name = $1
+	`
+	
+	var totalSequences, totalFlows, seqShouldSend, seqDoneSend, seqFailedSend int
+	db.QueryRow(sequenceQuery, member.Username).Scan(&totalSequences, &totalFlows, &seqShouldSend, &seqDoneSend, &seqFailedSend)
+	
+	sequenceAnalytics := fiber.Map{
+		"total_sequences": totalSequences,
+		"total_flows": totalFlows,
+		"total_should_send": seqShouldSend,
+		"total_done_send": seqDoneSend,
+		"total_failed_send": seqFailedSend,
+		"total_remaining_send": seqShouldSend - seqDoneSend - seqFailedSend,
+	}
+	
+	// AI Campaign analytics (simplified for team members)
+	aiCampaignAnalytics := fiber.Map{
+		"total_campaigns": 0,
+		"total_leads": 0,
+		"successful_sends": 0,
+		"pending_leads": 0,
+	}
+	
+	// Chart data - Campaign performance over time
+	chartQuery := `
+		SELECT 
+			DATE(bm.created_at) as date,
+			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) as sent,
+			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed
+		FROM broadcast_messages bm
+		WHERE bm.device_id = ANY($1)
+		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
+		GROUP BY DATE(bm.created_at)
+		ORDER BY date
+	`
+	
+	chartRows, _ := db.Query(chartQuery, pq.Array(deviceIDs))
+	defer chartRows.Close()
+	
+	campaignChartLabels := []string{}
+	campaignChartSent := []int{}
+	campaignChartFailed := []int{}
+	
+	for chartRows.Next() {
+		var date time.Time
+		var sent, failed int
+		if err := chartRows.Scan(&date, &sent, &failed); err == nil {
+			campaignChartLabels = append(campaignChartLabels, date.Format("Jan 2"))
+			campaignChartSent = append(campaignChartSent, sent)
+			campaignChartFailed = append(campaignChartFailed, failed)
+		}
+	}
+	
+	campaignChart := fiber.Map{
+		"labels": campaignChartLabels,
+		"sent": campaignChartSent,
+		"failed": campaignChartFailed,
+	}
+	
+	// Time-based chart (hourly distribution)
+	timeChartQuery := `
+		SELECT 
+			EXTRACT(HOUR FROM bm.created_at) as hour,
+			COUNT(*) as count
+		FROM broadcast_messages bm
+		WHERE bm.device_id = ANY($1)
+		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
+		GROUP BY EXTRACT(HOUR FROM bm.created_at)
+		ORDER BY hour
+	`
+	
+	timeRows, _ := db.Query(timeChartQuery, pq.Array(deviceIDs))
+	defer timeRows.Close()
+	
+	timeChartLabels := []string{}
+	timeChartData := []int{}
+	
+	for timeRows.Next() {
+		var hour, count int
+		if err := timeRows.Scan(&hour, &count); err == nil {
+			timeChartLabels = append(timeChartLabels, fmt.Sprintf("%02d:00", hour))
+			timeChartData = append(timeChartData, count)
+		}
+	}
+	
+	timeChart := fiber.Map{
+		"labels": timeChartLabels,
+		"data": timeChartData,
+	}
+	
+	return c.JSON(fiber.Map{
+		"device_analytics": deviceAnalytics,
+		"campaign_analytics": campaignAnalytics,
+		"sequence_analytics": sequenceAnalytics,
+		"ai_campaign_analytics": aiCampaignAnalytics,
+		"campaign_chart": campaignChart,
+		"time_chart": timeChart,
+	})
+}
+
+// GetTeamNiches returns niches for team member's leads
+func (h *TeamMemberHandlers) GetTeamNiches(c *fiber.Ctx) error {
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get niches from leads that are associated with member's devices
+	db := database.GetDB()
+	query := `
+		SELECT DISTINCT l.niche 
+		FROM leads l
+		INNER JOIN broadcast_messages bm ON bm.phone = l.phone
+		INNER JOIN user_devices ud ON bm.device_id = ud.id::text
+		WHERE ud.device_name = $1 AND l.niche IS NOT NULL AND l.niche != ''
+		ORDER BY l.niche
+	`
+	
+	rows, err := db.Query(query, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get niches",
+		})
+	}
+	defer rows.Close()
+	
+	niches := []string{}
+	for rows.Next() {
+		var niche string
+		if err := rows.Scan(&niche); err == nil {
+			niches = append(niches, niche)
+		}
+	}
+	
+	return c.JSON(niches)
+}
