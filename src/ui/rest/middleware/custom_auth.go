@@ -23,9 +23,7 @@ var PublicRoutes = []string{
 	"/favicon.ico",
 	"/robots.txt",
 	"/team-login",        // Team member login page
-	"/team-dashboard",    // Team member dashboard (protected by team middleware)
 	"/api/team-logout",   // Team member logout
-	"/api/team-member/info", // Team member info endpoint
 }
 
 // CustomAuth middleware for session-based authentication

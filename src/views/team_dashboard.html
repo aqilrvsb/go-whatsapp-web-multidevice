@@ -1068,8 +1068,7 @@
                 
                 if (!response.ok) {
                     if (response.status === 401) {
-                        console.error('Authentication error - redirecting to login');
-                        window.location.href = '/team-login';
+                        console.error('401 error - not redirecting');
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -1284,8 +1283,7 @@
             .then(response => {
                 if (!response.ok) {
                     if (response.status === 401) {
-                        console.error('Authentication error - redirecting to login');
-                        window.location.href = '/team-login';
+                        console.error('401 error - not redirecting');
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -1618,8 +1616,7 @@
             .then(response => {
                 if (!response.ok) {
                     if (response.status === 401) {
-                        console.error('Authentication error - redirecting to login');
-                        window.location.href = '/team-login';
+                        console.error('401 error - not redirecting');
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -1807,8 +1804,7 @@
                 
                 if (!response.ok) {
                     if (response.status === 401) {
-                        console.error('Authentication error - redirecting to login');
-                        window.location.href = '/team-login';
+                        console.error('401 error - not redirecting');
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
