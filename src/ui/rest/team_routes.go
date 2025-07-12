@@ -30,16 +30,44 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 		}
 
-		// Check credentials
+		// Check credentials - also check is_active
 		var memberID int
 		var username string
+		var isActive bool
 		err := db.QueryRow(`
-			SELECT id, username FROM team_members 
+			SELECT id, username, is_active FROM team_members 
 			WHERE username = ? AND password = ?
-		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username)
+		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username, &isActive)
 
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
+			// Log for debugging
+			if err == sql.ErrNoRows {
+				// Check if user exists
+				var count int
+				db.QueryRow("SELECT COUNT(*) FROM team_members WHERE username = ?", loginReq.Username).Scan(&count)
+				if count > 0 {
+					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+						"error": "Invalid credentials - password mismatch",
+						"debug": "User exists but password doesn't match",
+					})
+				}
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Invalid credentials - user not found",
+					"debug": "No user with username: " + loginReq.Username,
+				})
+			}
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Invalid credentials", 
+				"debug": err.Error(),
+			})
+		}
+
+		// Check if active
+		if !isActive {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Account is inactive",
+				"debug": "User exists but is_active = false",
+			})
 		}
 
 		// Create session
