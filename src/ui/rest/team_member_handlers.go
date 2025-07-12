@@ -7,8 +7,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 )
 
 // TeamMemberHandlers contains all team member related handlers
@@ -395,28 +398,184 @@ func (h *TeamMemberHandlers) GetTeamDevices(c *fiber.Ctx) error {
 
 // GetTeamCampaignsSummary returns campaign summary for team member's devices
 func (h *TeamMemberHandlers) GetTeamCampaignsSummary(c *fiber.Ctx) error {
+	ctx := context.Background()
+	
 	// Get team member from context
-	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Not authenticated",
 		})
 	}
 	
-	// Return data structure that frontend expects
-	return c.JSON(fiber.Map{
-		"campaigns": fiber.Map{
-			"total": 0,
-			"active": 0,
-			"completed": 0,
+	// Get team member's devices
+	devices, err := h.repo.GetTeamMemberDevices(ctx, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch devices",
+		})
+	}
+	
+	// Extract device IDs
+	deviceIDs := []string{}
+	for _, device := range devices {
+		if deviceID, ok := device["id"].(uuid.UUID); ok {
+			deviceIDs = append(deviceIDs, deviceID.String())
+		}
+	}
+	
+	// Get date filter from query parameters
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	
+	// Get campaigns that use these devices
+	campaignRepo := repository.GetCampaignRepository()
+	campaigns := []models.Campaign{}
+	
+	// Get all campaigns for the user (team members see all campaigns but filtered data)
+	allCampaigns, err := campaignRepo.GetCampaignsByUser("")
+	if err == nil {
+		for _, campaign := range allCampaigns {
+			// Check if campaign uses any of team member's devices
+			hasDevice := false
+			for _, deviceID := range deviceIDs {
+				if campaignUsesDevice(int64(campaign.ID), deviceID) {
+					hasDevice = true
+					break
+				}
+			}
+			if hasDevice {
+				// Apply date filter if provided
+				if startDate != "" || endDate != "" {
+					campaignDate, _ := time.Parse("2006-01-02", campaign.CampaignDate)
+					if startDate != "" {
+						startDateTime, _ := time.Parse("2006-01-02", startDate)
+						if campaignDate.Before(startDateTime) {
+							continue
+						}
+					}
+					if endDate != "" {
+						endDateTime, _ := time.Parse("2006-01-02", endDate)
+						if campaignDate.After(endDateTime) {
+							continue
+						}
+					}
+				}
+				campaigns = append(campaigns, campaign)
+			}
+		}
+	}
+	
+	// Calculate statistics (same as admin)
+	totalCampaigns := len(campaigns)
+	pendingCampaigns := 0
+	triggeredCampaigns := 0
+	processingCampaigns := 0
+	sentCampaigns := 0
+	failedCampaigns := 0
+	
+	for _, campaign := range campaigns {
+		switch campaign.Status {
+		case "scheduled", "pending":
+			pendingCampaigns++
+		case "triggered":
+			triggeredCampaigns++
+		case "processing":
+			processingCampaigns++
+		case "sent", "finished":
+			sentCampaigns++
+		case "failed":
+			failedCampaigns++
+		}
+	}
+	
+	// Get broadcast statistics
+	totalShouldSend := 0
+	totalDoneSend := 0
+	totalFailedSend := 0
+	
+	for _, campaign := range campaigns {
+		// Get stats only for team member's devices
+		for _, deviceID := range deviceIDs {
+			shouldSend, doneSend, failedSend := getCampaignDeviceStats(int64(campaign.ID), deviceID)
+			totalShouldSend += shouldSend
+			totalDoneSend += doneSend
+			totalFailedSend += failedSend
+		}
+	}
+	
+	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
+	if totalRemainingSend < 0 {
+		totalRemainingSend = 0
+	}
+	
+	// Get recent campaigns with their broadcast stats
+	recentCampaigns := []map[string]interface{}{}
+	if len(campaigns) > 0 {
+		limit := min(5, len(campaigns))
+		for i := 0; i < limit; i++ {
+			campaign := campaigns[i]
+			
+			// Get broadcast stats for this campaign (only team devices)
+			shouldSend := 0
+			doneSend := 0
+			failedSend := 0
+			
+			for _, deviceID := range deviceIDs {
+				s, d, f := getCampaignDeviceStats(int64(campaign.ID), deviceID)
+				shouldSend += s
+				doneSend += d
+				failedSend += f
+			}
+			
+			remainingSend := shouldSend - doneSend - failedSend
+			if remainingSend < 0 {
+				remainingSend = 0
+			}
+			
+			campaignData := map[string]interface{}{
+				"id":               campaign.ID,
+				"title":            campaign.Title,
+				"campaign_date":    campaign.CampaignDate,
+				"time_schedule":    campaign.TimeSchedule,
+				"niche":            campaign.Niche,
+				"target_status":    campaign.TargetStatus,
+				"status":           campaign.Status,
+				"message":          campaign.Message,
+				"image_url":        campaign.ImageURL,
+				"should_send":      shouldSend,
+				"done_send":        doneSend,
+				"failed_send":      failedSend,
+				"remaining_send":   remainingSend,
+			}
+			
+			recentCampaigns = append(recentCampaigns, campaignData)
+		}
+	}
+	
+	summary := map[string]interface{}{
+		"campaigns": map[string]interface{}{
+			"total": totalCampaigns,
+			"pending": pendingCampaigns,
+			"triggered": triggeredCampaigns,
+			"processing": processingCampaigns,
+			"sent": sentCampaigns,
+			"failed": failedCampaigns,
 		},
-		"messages": fiber.Map{
-			"total": 0,
-			"sent": 0,
-			"failed": 0,
-			"pending": 0,
+		"broadcast_stats": map[string]interface{}{
+			"total_should_send":    totalShouldSend,
+			"total_done_send":      totalDoneSend,
+			"total_failed_send":    totalFailedSend,
+			"total_remaining_send": totalRemainingSend,
 		},
-		"recent_campaigns": []fiber.Map{},
+		"recent_campaigns": recentCampaigns,
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Campaign summary",
+		Results: summary,
 	})
 }
 
@@ -430,6 +589,8 @@ func (h *TeamMemberHandlers) GetTeamCampaignsAnalytics(c *fiber.Ctx) error {
 		})
 	}
 	
+	// For now, return simplified analytics
+	// In production, you'd calculate real metrics based on team member's devices
 	return c.JSON(fiber.Map{
 		"total_campaigns": 0,
 		"total_messages": 0,
@@ -442,26 +603,133 @@ func (h *TeamMemberHandlers) GetTeamCampaignsAnalytics(c *fiber.Ctx) error {
 
 // GetTeamSequencesSummary returns sequence summary for team member's devices
 func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
+	ctx := context.Background()
+	
 	// Get team member from context
-	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Not authenticated",
 		})
 	}
 	
+	// Get team member's devices
+	devices, err := h.repo.GetTeamMemberDevices(ctx, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch devices",
+		})
+	}
+	
+	// Extract device IDs
+	deviceIDs := []string{}
+	for _, device := range devices {
+		if deviceID, ok := device["id"].(uuid.UUID); ok {
+			deviceIDs = append(deviceIDs, deviceID.String())
+		}
+	}
+	
+	// Get sequences that use these devices
+	db := database.GetDB()
+	
+	// Count sequences that have been used with team member's devices
+	var totalSequences int
+	query := `
+		SELECT COUNT(DISTINCT s.id) 
+		FROM sequences s
+		JOIN sequence_contacts sc ON s.id = sc.sequence_id
+		WHERE sc.processing_device_id = ANY($1)
+	`
+	db.QueryRow(query, pq.Array(deviceIDs)).Scan(&totalSequences)
+	
+	// Get flow and contact statistics
+	var totalFlows, totalShouldSend, totalDoneSend, totalFailedSend int
+	
+	// Count total flows
+	query = `
+		SELECT COUNT(DISTINCT sequence_stepid) 
+		FROM sequence_contacts 
+		WHERE processing_device_id = ANY($1)
+	`
+	db.QueryRow(query, pq.Array(deviceIDs)).Scan(&totalFlows)
+	
+	// Count contacts
+	query = `
+		SELECT 
+			COUNT(*) as total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) as done,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+		FROM sequence_contacts
+		WHERE processing_device_id = ANY($1)
+	`
+	db.QueryRow(query, pq.Array(deviceIDs)).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend)
+	
+	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
+	if totalRemainingSend < 0 {
+		totalRemainingSend = 0
+	}
+	
+	// Get recent sequences
+	recentSequences := []map[string]interface{}{}
+	query = `
+		SELECT DISTINCT s.id, s.name, s.trigger, s.niche, s.status
+		FROM sequences s
+		JOIN sequence_contacts sc ON s.id = sc.sequence_id
+		WHERE sc.processing_device_id = ANY($1)
+		ORDER BY s.created_at DESC
+		LIMIT 5
+	`
+	rows, err := db.Query(query, pq.Array(deviceIDs))
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var seq struct {
+				ID      int64
+				Name    string
+				Trigger string
+				Niche   string
+				Status  string
+			}
+			if err := rows.Scan(&seq.ID, &seq.Name, &seq.Trigger, &seq.Niche, &seq.Status); err == nil {
+				// Get stats for this sequence
+				var seqShould, seqDone, seqFailed int
+				statsQuery := `
+					SELECT 
+						COUNT(*) as total,
+						COUNT(CASE WHEN status = 'sent' THEN 1 END) as done,
+						COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+					FROM sequence_contacts
+					WHERE sequence_id = $1 AND processing_device_id = ANY($2)
+				`
+				db.QueryRow(statsQuery, seq.ID, pq.Array(deviceIDs)).Scan(&seqShould, &seqDone, &seqFailed)
+				
+				recentSequences = append(recentSequences, map[string]interface{}{
+					"id":              seq.ID,
+					"name":            seq.Name,
+					"trigger":         seq.Trigger,
+					"niche":           seq.Niche,
+					"status":          seq.Status,
+					"should_send":     seqShould,
+					"done_send":       seqDone,
+					"failed_send":     seqFailed,
+					"remaining_send":  seqShould - seqDone - seqFailed,
+				})
+			}
+		}
+	}
+	
 	return c.JSON(fiber.Map{
 		"sequences": fiber.Map{
-			"total": 0,
-			"active": 0,
+			"total": totalSequences,
+			"active": 0, // You can calculate these based on status
 			"inactive": 0,
 		},
-		"total_flows": 0,
-		"total_should_send": 0,
-		"total_done_send": 0,
-		"total_failed_send": 0,
-		"total_remaining_send": 0,
-		"recent_sequences": []fiber.Map{},
+		"total_flows": totalFlows,
+		"total_should_send": totalShouldSend,
+		"total_done_send": totalDoneSend,
+		"total_failed_send": totalFailedSend,
+		"total_remaining_send": totalRemainingSend,
+		"recent_sequences": recentSequences,
 	})
 }
 
@@ -475,6 +743,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesAnalytics(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Return simplified analytics for now
 	return c.JSON(fiber.Map{
 		"total_sequences": 0,
 		"total_contacts": 0,
@@ -484,3 +753,34 @@ func (h *TeamMemberHandlers) GetTeamSequencesAnalytics(c *fiber.Ctx) error {
 		"sequence_performance": []fiber.Map{},
 	})
 }
+
+// Helper function to check if campaign uses a specific device
+func campaignUsesDevice(campaignID int64, deviceID string) bool {
+	db := database.GetDB()
+	var count int
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = $1 AND device_id = $2`
+	db.QueryRow(query, campaignID, deviceID).Scan(&count)
+	return count > 0
+}
+
+// Helper function to get campaign stats for a specific device
+func getCampaignDeviceStats(campaignID int64, deviceID string) (shouldSend, doneSend, failedSend int) {
+	db := database.GetDB()
+	
+	// Get total messages for this device
+	var total int
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = $1 AND device_id = $2`
+	db.QueryRow(query, campaignID, deviceID).Scan(&total)
+	shouldSend = total
+	
+	// Get sent messages
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = $1 AND device_id = $2 AND status = 'sent'`
+	db.QueryRow(query, campaignID, deviceID).Scan(&doneSend)
+	
+	// Get failed messages
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = $1 AND device_id = $2 AND status = 'failed'`
+	db.QueryRow(query, campaignID, deviceID).Scan(&failedSend)
+	
+	return
+}
+
