@@ -429,7 +429,7 @@
                 <button class="btn btn-sm btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left"></i> Back
                 </button>
-                <button class="btn btn-sm btn-outline-primary ms-2" onclick="window.location.href='/team-dashboard'">
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="window.location.href='/team-dashboard'">>
                     <i class="bi bi-house"></i> Home
                 </button>
             </div>
@@ -925,8 +925,13 @@
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Clear any stale redirect flags
+            if (window.location.pathname === '/team-dashboard') {
+                sessionStorage.removeItem('redirecting');
+            }
+            
             // Load team member info
-            loadTeamMemberInfo();
+            loadTeamMemberInfo();();
             
             // Initialize dashboard
             initializeDashboard();
@@ -957,7 +962,7 @@
         }
         
         // Load team member info
-        async function loadTeamMemberInfo() {
+        async function loadTeamMemberInfo() {() {
             try {
                 const response = await fetch('/api/team-member/info', {
                     credentials: 'include'
@@ -1161,6 +1166,7 @@
                     if (response.status === 401) {
                         console.error('Dashboard data: Authentication error');
                         // Don't redirect here, as loadTeamMemberInfo already handles auth
+                        // loadTeamMemberInfo();
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
