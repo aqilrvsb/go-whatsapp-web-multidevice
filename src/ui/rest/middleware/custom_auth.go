@@ -45,6 +45,16 @@ func CustomAuth() fiber.Handler {
 		}
 		
 		// For API and APP routes, we need to check authentication
+		
+		// IMPORTANT: Check team routes first
+		if isTeamAccessibleEndpoint(path) {
+			teamToken := c.Cookies("team_session")
+			if teamToken != "" {
+				// Team member is logged in, skip regular auth
+				return c.Next()
+			}
+		}
+		
 		// Check session token from cookie
 		token := c.Cookies("session_token")
 		
