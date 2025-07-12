@@ -766,3 +766,38 @@
     </script>
 </body>
 </html>
+    
+    // Logout function
+    function logout() {
+        fetch('/api/team-logout', { method: 'POST' })
+            .then(() => {
+                window.location.href = '/team-login';
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                window.location.href = '/team-login';
+            });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        formatDateTime();
+        setDefaultDates();
+        loadTeamMemberInfo();
+        updateDashboard();
+        
+        // Update time every minute
+        setInterval(formatDateTime, 60000);
+    });
+    
+    // Add custom styles for purple color
+    const style = document.createElement('style');
+    style.textContent = `
+        .bg-purple { background-color: #6f42c1 !important; }
+        .text-purple { color: #6f42c1 !important; }
+        .bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.1) !important; }
+    `;
+    document.head.appendChild(style);
+    </script>
+</body>
+</html>
