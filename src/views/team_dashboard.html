@@ -1765,7 +1765,7 @@
                 return;
             }
             
-            sequencesList.innerHTML = sequences.map(sequence => `
+            sequencesList.innerHTML = sequences.map(sequence => `(sequence => `
                 <div class="col-12 mb-3">
                     <div class="sequence-card">
                         <div class="sequence-header">
@@ -1798,6 +1798,7 @@
                 </div>
             `).join('');
         }
+        
         // View sequence details
         function viewSequenceDetails(sequenceId) {
             fetch(`/api/sequences/${sequenceId}/summary`, {
