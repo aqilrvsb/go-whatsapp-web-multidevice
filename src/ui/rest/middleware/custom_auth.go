@@ -133,6 +133,7 @@ func GetUserFromContext(c *fiber.Ctx) (userID string, ok bool) {
 // isTeamAccessibleEndpoint checks if the endpoint should be accessible to team members
 func isTeamAccessibleEndpoint(path string) bool {
 	teamEndpoints := []string{
+		"/team-dashboard",
 		"/api/devices",
 		"/api/campaigns",
 		"/api/campaigns/summary",
