@@ -100,7 +100,6 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitWorkerControlAPI(app) // Add worker control endpoints
 	rest.InitTeamRoutes(app, database.GetDB()) // Add team member routes
 	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
-	rest.InitRestTeamMember(app, database.GetDB()) // Initialize team member routes
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{

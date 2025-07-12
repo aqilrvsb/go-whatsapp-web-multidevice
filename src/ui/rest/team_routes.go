@@ -3,12 +3,15 @@ package rest
 import (
 	"database/sql"
 	"time"
+	"log"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
 // InitTeamRoutes initializes team member routes
 func InitTeamRoutes(app *fiber.App, db *sql.DB) {
+	log.Println("Initializing team routes...")
+	
 	// Team login page
 	app.Get("/team/login", func(c *fiber.Ctx) error {
 		return c.SendFile("./views/team_login.html")
@@ -26,17 +29,22 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Team login API
 	app.Post("/api/team/login", func(c *fiber.Ctx) error {
+		log.Println("Team login endpoint called")
+		
 		var loginReq struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
 
 		if err := c.BodyParser(&loginReq); err != nil {
+			log.Printf("Failed to parse team login request: %v", err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Invalid request format",
 				"debug": err.Error(),
 			})
 		}
+		
+		log.Printf("Team login attempt for username: %s", loginReq.Username)
 		
 		// Log the request for debugging
 		if loginReq.Username == "" || loginReq.Password == "" {
