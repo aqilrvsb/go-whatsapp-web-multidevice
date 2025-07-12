@@ -1709,6 +1709,15 @@
                                     <td><span class="badge bg-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></td>
                                     <td>${campaign.recipients_count || 0}</td>
                                     <td>${campaign.sent_count || 0}</td>
+                                    <td>${campaign.failed_count || 0}</td>
+                                    <td>${campaign.pending_count || 0}</td>
+                                    <td>${campaign.success_rate || '0'}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
             
             document.getElementById('campaignSummaryContent').innerHTML = html;
         }
@@ -1731,6 +1740,7 @@
             document.getElementById('campaignFilterInfo').style.display = 'block';
             loadCampaignSummary();
         }
+        
         // Load sequences
         async function loadSequences() {
             try {
