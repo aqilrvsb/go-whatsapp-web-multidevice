@@ -136,11 +136,16 @@ func GetUserFromContext(c *fiber.Ctx) (userID string, ok bool) {
 func isTeamAccessibleEndpoint(path string) bool {
 	teamEndpoints := []string{
 		"/api/devices",
+		"/api/campaigns",
 		"/api/campaigns/summary",
 		"/api/campaigns/analytics",
+		"/api/sequences",
 		"/api/sequences/summary",
 		"/api/sequences/analytics",
 		"/api/team-member/info",
+		"/api/analytics/dashboard",
+		"/api/leads/niches",
+		"/api/team-logout",
 	}
 	
 	for _, endpoint := range teamEndpoints {
