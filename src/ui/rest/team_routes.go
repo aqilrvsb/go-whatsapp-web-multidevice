@@ -109,9 +109,12 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		})
 
 		return c.JSON(fiber.Map{
-			"success":  true,
-			"username": username,
-			"device_name": username, // Username will be matched with device_name in user_devices
+			"status": "success",
+			"token": sessionID,
+			"user": fiber.Map{
+				"username": username,
+				"device_name": username,
+			},
 		})
 	})
 

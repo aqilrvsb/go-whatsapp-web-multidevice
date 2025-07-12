@@ -121,7 +121,7 @@
                 
                 const data = await response.json();
                 
-                if (response.ok && data.success) {
+                if (response.ok && data.status === 'success') {
                     // Success - redirect to dashboard
                     alertContainer.innerHTML = `
                         <div class="alert alert-success" role="alert">
@@ -148,17 +148,6 @@
                 `;
             }
         }
-        
-        // Check if already logged in
-        fetch('/api/team/member-info')
-            .then(response => {
-                if (response.ok) {
-                    window.location.href = '/team/dashboard';
-                }
-            })
-            .catch(() => {
-                // Ignore error - user is not logged in
-            });
     </script>
 </body>
 </html>
