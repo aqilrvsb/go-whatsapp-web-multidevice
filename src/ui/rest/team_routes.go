@@ -18,6 +18,11 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 	app.Get("/team/dashboard", func(c *fiber.Ctx) error {
 		return c.SendFile("./views/team_dashboard.html")
 	})
+	
+	// Debug endpoint to test if routes are loaded
+	app.Get("/api/team/test", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "Team routes are loaded!"})
+	})
 
 	// Team login API
 	app.Post("/api/team/login", func(c *fiber.Ctx) error {
@@ -27,7 +32,18 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		}
 
 		if err := c.BodyParser(&loginReq); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid request format",
+				"debug": err.Error(),
+			})
+		}
+		
+		// Log the request for debugging
+		if loginReq.Username == "" || loginReq.Password == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Username and password are required",
+				"debug": "Empty username or password",
+			})
 		}
 
 		// Check credentials - also check is_active

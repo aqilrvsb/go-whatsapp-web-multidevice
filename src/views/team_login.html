@@ -155,6 +155,9 @@
                 if (response.ok) {
                     window.location.href = '/team/dashboard';
                 }
+            })
+            .catch(() => {
+                // Ignore error - user is not logged in
             });
     </script>
 </body>
