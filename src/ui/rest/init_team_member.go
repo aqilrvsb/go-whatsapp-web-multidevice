@@ -61,4 +61,6 @@ func InitRestTeamMember(app *fiber.App, db *sql.DB) {
 	api.Post("/team-members", handlers.CreateTeamMember)
 	api.Put("/team-members/:id", handlers.UpdateTeamMember)
 	api.Delete("/team-members/:id", handlers.DeleteTeamMember)
+	api.Get("/team-members/:id/devices", handlers.GetTeamMemberWithDevices)
+	api.Post("/team-members/:id/devices", handlers.AssignDevicesToTeamMember)
 }

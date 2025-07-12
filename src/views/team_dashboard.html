@@ -3,74 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Dashboard - WhatsApp Multi-Device</title>
+    <title>Team Dashboard - WhatsApp Analytics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
-            --primary: #25D366;
-            --primary-dark: #1DA855;
-            --secondary: #128C7E;
+            --primary: #128c7e;
+            --primary-dark: #075e54;
+            --success: #25d366;
             --light-bg: #f0f2f5;
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
-        
+
         body {
             background-color: var(--light-bg);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        
+
         .navbar {
-            background-color: white;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            background-color: white !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
         }
-        
+
         .navbar-brand {
             color: var(--primary) !important;
             font-weight: 600;
         }
-        
+
         .metric-card {
             background: white;
             border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            text-align: center;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
+            border: none;
             transition: transform 0.2s;
         }
-        
+
         .metric-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        
-        .metric-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--secondary);
-            margin: 16px 0 8px;
-        }
-        
-        .metric-label {
-            color: #667781;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
+
         .metric-icon {
-            width: 56px;
-            height: 56px;
+            width: 48px;
+            height: 48px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto;
             font-size: 24px;
+            margin-bottom: 12px;
         }
-        
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            color: #667781;
+            font-size: 14px;
+        }
+
         .nav-tabs {
             border-bottom: 2px solid #e9ecef;
         }
-        
+
         .nav-tabs .nav-link {
             border: none;
             color: #667781;
@@ -78,78 +80,128 @@
             padding: 12px 24px;
             background: transparent;
         }
-        
+
         .nav-tabs .nav-link.active {
             color: var(--primary);
             border-bottom: 3px solid var(--primary);
         }
-        
-        .card {
-            border: none;
+
+        .chart-container {
+            background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+            height: 350px;
         }
-        
-        .table {
-            font-size: 0.875rem;
+
+        .device-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s;
         }
-        
-        .badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: 500;
+
+        .device-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .device-status.online {
+            background-color: var(--success);
+        }
+
+        .device-status.offline {
+            background-color: #e74c3c;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--card-shadow);
         }
     </style>
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg">
+    <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-whatsapp"></i> Team Dashboard
+                <i class="bi bi-whatsapp"></i> WhatsApp Analytics
             </a>
             <div class="ms-auto d-flex align-items-center gap-3">
-                <span class="text-muted">Welcome, <strong id="teamMemberName">Loading...</strong></span>
-                <button class="btn btn-outline-danger btn-sm" onclick="logout()">
-                    <i class="bi bi-box-arrow-right"></i> Logout
-                </button>
+                <span class="text-muted">Team Member</span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> <span id="teamMemberName">Team Member</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
-    
+
     <!-- Main Content -->
-    <div class="container-fluid mt-4">
+    <div class="container-fluid p-4">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/team-dashboard">Home</a></li>
+                <li class="breadcrumb-item active">Dashboard</li>
+            </ol>
+        </nav>
+
         <!-- Tabs -->
-        <ul class="nav nav-tabs" id="mainTabs">
+        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#devices">
+                <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devices" type="button">
                     <i class="bi bi-phone"></i> Devices
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#campaigns">
+                <button class="nav-link" id="campaign-tab" data-bs-toggle="tab" data-bs-target="#campaign" type="button">
                     <i class="bi bi-megaphone"></i> Campaign Summary
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sequences">
-                    <i class="bi bi-collection"></i> Sequence Summary
+                <button class="nav-link" id="sequence-tab" data-bs-toggle="tab" data-bs-target="#sequence" type="button">
+                    <i class="bi bi-diagram-3"></i> Sequence Summary
                 </button>
             </li>
         </ul>
-        
+
         <!-- Tab Content -->
-        <div class="tab-content mt-4">
+        <div class="tab-content">
             <!-- Dashboard Tab -->
             <div class="tab-pane fade show active" id="dashboard">
-                <h5 class="mb-4">Analytics Overview</h5>
+                <h2 class="section-title mb-4">Analytics Dashboard</h2>
                 
                 <!-- Device Analytics -->
+                <div class="section-title">
+                    <i class="bi bi-phone text-primary"></i> Device Analytics
+                </div>
                 <div class="row mb-4">
                     <div class="col-md-4">
                         <div class="metric-card">
@@ -165,8 +217,8 @@
                             <div class="metric-icon bg-success bg-opacity-10 text-success">
                                 <i class="bi bi-circle-fill"></i>
                             </div>
-                            <div class="metric-value" id="activeDevices">0</div>
-                            <div class="metric-label">Active Devices</div>
+                            <div class="metric-value text-success" id="totalActiveDevices">0</div>
+                            <div class="metric-label">Total Active Devices</div>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -174,287 +226,543 @@
                             <div class="metric-icon bg-danger bg-opacity-10 text-danger">
                                 <i class="bi bi-circle"></i>
                             </div>
-                            <div class="metric-value" id="offlineDevices">0</div>
-                            <div class="metric-label">Offline Devices</div>
+                            <div class="metric-value text-danger" id="totalOfflineDevices">0</div>
+                            <div class="metric-label">Total Offline Devices</div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Campaign & Sequence Summary -->
+
+                <!-- Campaign Analytics -->
+                <div class="section-title">
+                    <i class="bi bi-megaphone text-info"></i> Campaign Analytics
+                </div>
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-megaphone"></i>
+                            </div>
+                            <div class="metric-value" id="totalCampaigns">0</div>
+                            <div class="metric-label">Total Campaigns</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="metric-value" id="totalContactsShouldSend">0</div>
+                            <div class="metric-label">Total Contacts Should Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="metric-value text-success" id="totalContactsDoneSend">0</div>
+                            <div class="metric-label">Contacts Done Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="metric-value text-danger" id="totalContactsFailedSend">0</div>
+                            <div class="metric-label">Contacts Failed Send</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sequence Analytics -->
+                <div class="section-title">
+                    <i class="bi bi-diagram-3 text-purple"></i> Sequence Analytics
+                </div>
+                <div class="row mb-4">
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-purple bg-opacity-10 text-purple">
+                                <i class="bi bi-diagram-3"></i>
+                            </div>
+                            <div class="metric-value" id="totalSequences">0</div>
+                            <div class="metric-label">Total Sequences</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-layers"></i>
+                            </div>
+                            <div class="metric-value" id="totalFlows">0</div>
+                            <div class="metric-label">Total Flows</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="metric-value" id="seqTotalContactsShouldSend">0</div>
+                            <div class="metric-label">Total Contacts Should Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-check2-circle"></i>
+                            </div>
+                            <div class="metric-value text-success" id="seqContactsDoneSend">0</div>
+                            <div class="metric-label">Contacts Done Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="bi bi-exclamation-circle"></i>
+                            </div>
+                            <div class="metric-value text-danger" id="seqContactsFailedSend">0</div>
+                            <div class="metric-label">Contacts Failed Send</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="metric-card">
+                            <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="bi bi-clock"></i>
+                            </div>
+                            <div class="metric-value text-warning" id="seqContactsRemainingSend">0</div>
+                            <div class="metric-label">Contacts Remaining Send</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">Campaign Summary</h6>
-                                <div class="d-flex justify-content-between align-items-center mt-3">
-                                    <span>Total Campaigns</span>
-                                    <span class="badge bg-primary" id="totalCampaigns">0</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <span>Messages Sent</span>
-                                    <span class="badge bg-success" id="campaignsSent">0</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <span>Failed</span>
-                                    <span class="badge bg-danger" id="campaignsFailed">0</span>
-                                </div>
-                            </div>
+                        <div class="chart-container">
+                            <h6 class="mb-3">Campaign Performance (broadcast_messages)</h6>
+                            <canvas id="campaignChart"></canvas>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="card-title">Sequence Summary</h6>
-                                <div class="d-flex justify-content-between align-items-center mt-3">
-                                    <span>Total Sequences</span>
-                                    <span class="badge bg-primary" id="totalSequences">0</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <span>Messages Sent</span>
-                                    <span class="badge bg-success" id="sequencesSent">0</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mt-2">
-                                    <span>Failed</span>
-                                    <span class="badge bg-danger" id="sequencesFailed">0</span>
-                                </div>
-                            </div>
+                        <div class="chart-container">
+                            <h6 class="mb-3">Sequence Performance (sequence_contacts)</h6>
+                            <canvas id="sequenceChart"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Devices Tab -->
             <div class="tab-pane fade" id="devices">
-                <h5 class="mb-4">Your Devices</h5>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Device Name</th>
-                                        <th>Phone</th>
-                                        <th>Status</th>
-                                        <th>Last Seen</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="devicesTableBody">
-                                    <!-- Dynamic content -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <h2 class="section-title mb-4">Your Assigned Devices</h2>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Device Name</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devicesTableBody">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            
-            <!-- Campaigns Tab -->
-            <div class="tab-pane fade" id="campaigns">
-                <h5 class="mb-4">Campaign Summary</h5>
+
+            <!-- Campaign Summary Tab -->
+            <div class="tab-pane fade" id="campaign">
+                <h2 class="section-title mb-4">Campaign Summary</h2>
                 <div id="campaignSummaryContent">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
+                    <!-- Dynamic content -->
                 </div>
             </div>
-            
-            <!-- Sequences Tab -->
-            <div class="tab-pane fade" id="sequences">
-                <h5 class="mb-4">Sequence Summary</h5>
+
+            <!-- Sequence Summary Tab -->
+            <div class="tab-pane fade" id="sequence">
+                <h2 class="section-title mb-4">Sequence Summary</h2>
                 <div id="sequenceSummaryContent">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
+                    <!-- Dynamic content -->
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let teamMember = null;
-        let teamDeviceIds = [];
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
+        // Initialize charts
+        let campaignChart, sequenceChart;
+
+        // Load team member info
+        async function loadTeamMemberInfo() {
+            try {
+                const response = await fetch('/api/team-member/info');
+                const data = await response.json();
+                if (data.member) {
+                    document.getElementById('teamMemberName').textContent = data.member.username;
+                }
+            } catch (error) {
+                console.error('Error loading team member info:', error);
+            }
+        }
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                // Load devices
+                const devicesResponse = await fetch('/api/devices');
+                const devices = await devicesResponse.json();
+                
+                // Update device metrics
+                const totalDevices = devices.length;
+                const activeDevices = devices.filter(d => d.status === 'online').length;
+                const offlineDevices = devices.filter(d => d.status === 'offline').length;
+                
+                document.getElementById('totalDevices').textContent = totalDevices;
+                document.getElementById('totalActiveDevices').textContent = activeDevices;
+                document.getElementById('totalOfflineDevices').textContent = offlineDevices;
+
+                // Load campaign summary
+                const campaignResponse = await fetch('/api/campaigns/summary');
+                const campaignData = await campaignResponse.json();
+                
+                if (campaignData.code === 'SUCCESS' && campaignData.results) {
+                    const results = campaignData.results;
+                    document.getElementById('totalCampaigns').textContent = results.campaigns?.total || 0;
+                    document.getElementById('totalContactsShouldSend').textContent = results.broadcast_stats?.total_should_send || 0;
+                    document.getElementById('totalContactsDoneSend').textContent = results.broadcast_stats?.total_done_send || 0;
+                    document.getElementById('totalContactsFailedSend').textContent = results.broadcast_stats?.total_failed_send || 0;
+                }
+
+                // Load sequence summary
+                const sequenceResponse = await fetch('/api/sequences/summary');
+                const sequenceData = await sequenceResponse.json();
+                
+                document.getElementById('totalSequences').textContent = sequenceData.sequences?.total || 0;
+                document.getElementById('totalFlows').textContent = sequenceData.total_flows || 0;
+                document.getElementById('seqTotalContactsShouldSend').textContent = sequenceData.total_should_send || 0;
+                document.getElementById('seqContactsDoneSend').textContent = sequenceData.total_done_send || 0;
+                document.getElementById('seqContactsFailedSend').textContent = sequenceData.total_failed_send || 0;
+                document.getElementById('seqContactsRemainingSend').textContent = sequenceData.total_remaining_send || 0;
+
+                // Update charts
+                updateCharts();
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Load devices
+        async function loadDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                const devices = await response.json();
+                
+                const tbody = document.getElementById('devicesTableBody');
+                tbody.innerHTML = '';
+                
+                devices.forEach(device => {
+                    const statusClass = device.status === 'online' ? 'online' : 'offline';
+                    const row = `
+                        <tr>
+                            <td>${device.device_name}</td>
+                            <td>${device.phone || '-'}</td>
+                            <td><span class="device-status ${statusClass}"></span> ${device.status}</td>
+                            <td>${new Date(device.created_at).toLocaleString()}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error('Error loading devices:', error);
+            }
+        }
+
+        // Load campaign summary
+        async function loadCampaignSummary() {
+            try {
+                const response = await fetch('/api/campaigns/summary');
+                const data = await response.json();
+                
+                const content = document.getElementById('campaignSummaryContent');
+                if (data.code === 'SUCCESS' && data.results) {
+                    const results = data.results;
+                    content.innerHTML = `
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="metric-card">
+                                    <div class="metric-icon bg-primary bg-opacity-10 text-primary">
+                                        <i class="bi bi-megaphone"></i>
+                                    </div>
+                                    <div class="metric-value">${results.campaigns?.total || 0}</div>
+                                    <div class="metric-label">Total Campaigns</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric-card">
+                                    <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                        <i class="bi bi-send"></i>
+                                    </div>
+                                    <div class="metric-value">${results.broadcast_stats?.total_should_send || 0}</div>
+                                    <div class="metric-label">Should Send</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric-card">
+                                    <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                        <i class="bi bi-check-circle"></i>
+                                    </div>
+                                    <div class="metric-value text-success">${results.broadcast_stats?.total_done_send || 0}</div>
+                                    <div class="metric-label">Done Send</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="metric-card">
+                                    <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                        <i class="bi bi-x-circle"></i>
+                                    </div>
+                                    <div class="metric-value text-danger">${results.broadcast_stats?.total_failed_send || 0}</div>
+                                    <div class="metric-label">Failed Send</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <h6 class="mb-3">Recent Campaigns</h6>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Should Send</th>
+                                        <th>Done</th>
+                                        <th>Failed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${results.recent_campaigns?.map(campaign => `
+                                        <tr>
+                                            <td>${campaign.title}</td>
+                                            <td>${campaign.campaign_date}</td>
+                                            <td><span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span></td>
+                                            <td>${campaign.should_send}</td>
+                                            <td>${campaign.done_send}</td>
+                                            <td>${campaign.failed_send}</td>
+                                        </tr>
+                                    `).join('') || '<tr><td colspan="6" class="text-center">No campaigns found</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading campaign summary:', error);
+            }
+        }
+
+        // Load sequence summary
+        async function loadSequenceSummary() {
+            try {
+                const response = await fetch('/api/sequences/summary');
+                const data = await response.json();
+                
+                const content = document.getElementById('sequenceSummaryContent');
+                content.innerHTML = `
+                    <div class="row mb-4">
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-purple bg-opacity-10 text-purple">
+                                    <i class="bi bi-diagram-3"></i>
+                                </div>
+                                <div class="metric-value">${data.sequences?.total || 0}</div>
+                                <div class="metric-label">Total Sequences</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-secondary bg-opacity-10 text-secondary">
+                                    <i class="bi bi-layers"></i>
+                                </div>
+                                <div class="metric-value">${data.total_flows || 0}</div>
+                                <div class="metric-label">Total Flows</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-info bg-opacity-10 text-info">
+                                    <i class="bi bi-send"></i>
+                                </div>
+                                <div class="metric-value">${data.total_should_send || 0}</div>
+                                <div class="metric-label">Should Send</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-check2-circle"></i>
+                                </div>
+                                <div class="metric-value text-success">${data.total_done_send || 0}</div>
+                                <div class="metric-label">Done Send</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-danger bg-opacity-10 text-danger">
+                                    <i class="bi bi-exclamation-circle"></i>
+                                </div>
+                                <div class="metric-value text-danger">${data.total_failed_send || 0}</div>
+                                <div class="metric-label">Failed Send</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="metric-card">
+                                <div class="metric-icon bg-warning bg-opacity-10 text-warning">
+                                    <i class="bi bi-clock"></i>
+                                </div>
+                                <div class="metric-value text-warning">${data.total_remaining_send || 0}</div>
+                                <div class="metric-label">Remaining</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <h6 class="mb-3">Recent Sequences</h6>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Trigger</th>
+                                    <th>Status</th>
+                                    <th>Should Send</th>
+                                    <th>Done</th>
+                                    <th>Failed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.recent_sequences?.map(seq => `
+                                    <tr>
+                                        <td>${seq.name}</td>
+                                        <td>${seq.trigger}</td>
+                                        <td><span class="badge bg-${seq.status === 'active' ? 'success' : 'secondary'}">${seq.status}</span></td>
+                                        <td>${seq.should_send}</td>
+                                        <td>${seq.done_send}</td>
+                                        <td>${seq.failed_send}</td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="6" class="text-center">No sequences found</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading sequence summary:', error);
+            }
+        }
+
+        // Update charts
+        function updateCharts() {
+            // Campaign Chart
+            const campaignCtx = document.getElementById('campaignChart').getContext('2d');
+            if (campaignChart) campaignChart.destroy();
+            
+            campaignChart = new Chart(campaignCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Messages Sent', 'Failed Messages'],
+                    datasets: [{
+                        data: [
+                            parseInt(document.getElementById('totalContactsDoneSend').textContent) || 0,
+                            parseInt(document.getElementById('totalContactsFailedSend').textContent) || 0
+                        ],
+                        backgroundColor: ['#25d366', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Sequence Chart
+            const sequenceCtx = document.getElementById('sequenceChart').getContext('2d');
+            if (sequenceChart) sequenceChart.destroy();
+            
+            sequenceChart = new Chart(sequenceCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Completed', 'Failed', 'Pending'],
+                    datasets: [{
+                        label: 'Contacts',
+                        data: [
+                            parseInt(document.getElementById('seqContactsDoneSend').textContent) || 0,
+                            parseInt(document.getElementById('seqContactsFailedSend').textContent) || 0,
+                            parseInt(document.getElementById('seqContactsRemainingSend').textContent) || 0
+                        ],
+                        backgroundColor: ['#25d366', '#e74c3c', '#f39c12']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Helper function to get status color
+        function getStatusColor(status) {
+            const colors = {
+                'pending': 'warning',
+                'processing': 'info',
+                'sent': 'success',
+                'finished': 'success',
+                'failed': 'danger'
+            };
+            return colors[status] || 'secondary';
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch('/api/team-logout', { method: 'POST' });
+                window.location.href = '/team-login';
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        // Tab change handlers
+        document.getElementById('devices-tab').addEventListener('shown.bs.tab', loadDevices);
+        document.getElementById('campaign-tab').addEventListener('shown.bs.tab', loadCampaignSummary);
+        document.getElementById('sequence-tab').addEventListener('shown.bs.tab', loadSequenceSummary);
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
             loadTeamMemberInfo();
             loadDashboard();
-            
-            // Tab change handlers
-            document.querySelector('[data-bs-target="#devices"]').addEventListener('shown.bs.tab', loadDevices);
-            document.querySelector('[data-bs-target="#campaigns"]').addEventListener('shown.bs.tab', loadCampaignSummary);
-            document.querySelector('[data-bs-target="#sequences"]').addEventListener('shown.bs.tab', loadSequenceSummary);
         });
-        
-        function loadTeamMemberInfo() {
-            fetch('/api/team-member/info', {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    teamMember = data.member;
-                    teamDeviceIds = data.device_ids || [];
-                    document.getElementById('teamMemberName').textContent = teamMember.username;
-                } else {
-                    window.location.href = '/team-login';
-                }
-            })
-            .catch(error => {
-                console.error('Error loading team member info:', error);
-                window.location.href = '/team-login';
-            });
-        }
-        
-        function loadDashboard() {
-            // Load device statistics
-            fetch('/api/devices', {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                const devices = data.results || data || [];
-                const filteredDevices = devices.filter(d => teamDeviceIds.includes(d.id));
-                
-                let active = 0;
-                let offline = 0;
-                
-                filteredDevices.forEach(device => {
-                    if (device.status === 'online') {
-                        active++;
-                    } else {
-                        offline++;
-                    }
-                });
-                
-                document.getElementById('totalDevices').textContent = filteredDevices.length;
-                document.getElementById('activeDevices').textContent = active;
-                document.getElementById('offlineDevices').textContent = offline;
-            });
-            
-            // Load campaign summary
-            fetch(`/api/campaigns/analytics?device=${teamDeviceIds.join(',')}`, {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('totalCampaigns').textContent = data.totalCampaigns || 0;
-                document.getElementById('campaignsSent').textContent = data.contactsDoneSend || 0;
-                document.getElementById('campaignsFailed').textContent = data.contactsFailedSend || 0;
-            });
-            
-            // Load sequence summary
-            fetch(`/api/sequences/analytics?device=${teamDeviceIds.join(',')}`, {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('totalSequences').textContent = data.totalSequences || 0;
-                document.getElementById('sequencesSent').textContent = data.contactsDoneSend || 0;
-                document.getElementById('sequencesFailed').textContent = data.contactsFailedSend || 0;
-            });
-        }
-        
-        function loadDevices() {
-            fetch('/api/devices', {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                const devices = data.results || data || [];
-                const filteredDevices = devices.filter(d => d.device_name === teamMember.username);
-                displayDevices(filteredDevices);
-            });
-        }
-        
-        function displayDevices(devices) {
-            const tbody = document.getElementById('devicesTableBody');
-            tbody.innerHTML = '';
-            
-            if (devices.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No devices found</td></tr>';
-                return;
-            }
-            
-            devices.forEach(device => {
-                const statusBadge = device.status === 'online' 
-                    ? '<span class="badge bg-success">Online</span>'
-                    : '<span class="badge bg-danger">Offline</span>';
-                
-                const row = `
-                    <tr>
-                        <td>${device.device_name}</td>
-                        <td>${device.phone || 'Not connected'}</td>
-                        <td>${statusBadge}</td>
-                        <td>${device.last_seen || 'Never'}</td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        }
-        
-        function loadCampaignSummary() {
-            fetch(`/api/campaigns/summary?device=${teamDeviceIds.join(',')}`, {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 'SUCCESS') {
-                    displayCampaignSummary(data.results);
-                }
-            });
-        }
-        
-        function displayCampaignSummary(data) {
-            // Simplified campaign summary display
-            const content = document.getElementById('campaignSummaryContent');
-            content.innerHTML = `
-                <div class="card">
-                    <div class="card-body">
-                        <p>Campaign summary for your devices will be displayed here.</p>
-                        <p>Total Campaigns: ${data.total_campaigns || 0}</p>
-                    </div>
-                </div>
-            `;
-        }
-        
-        function loadSequenceSummary() {
-            fetch(`/api/sequences/summary?device=${teamDeviceIds.join(',')}`, {
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 'SUCCESS') {
-                    displaySequenceSummary(data.results);
-                }
-            });
-        }
-        
-        function displaySequenceSummary(data) {
-            // Simplified sequence summary display
-            const content = document.getElementById('sequenceSummaryContent');
-            content.innerHTML = `
-                <div class="card">
-                    <div class="card-body">
-                        <p>Sequence summary for your devices will be displayed here.</p>
-                        <p>Total Sequences: ${data.sequences?.total || 0}</p>
-                    </div>
-                </div>
-            `;
-        }
-        
-        function logout() {
-            fetch('/api/team-logout', {
-                method: 'POST',
-                credentials: 'include'
-            })
-            .then(() => {
-                window.location.href = '/team-login';
-            });
-        }
+
+        // Add custom styles for purple color
+        const style = document.createElement('style');
+        style.textContent = `
+            .bg-purple { background-color: #6f42c1 !important; }
+            .text-purple { color: #6f42c1 !important; }
+            .bg-purple.bg-opacity-10 { background-color: rgba(111, 66, 193, 0.1) !important; }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>

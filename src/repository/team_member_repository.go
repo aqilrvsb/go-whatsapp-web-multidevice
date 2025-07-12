@@ -310,16 +310,26 @@ func (r *TeamMemberRepository) GetDeviceIDsForMember(ctx context.Context, userna
 	return deviceIDs, nil
 }
 
-// GetTeamMemberDevices returns devices accessible to a team member
+// GetTeamMemberDevices returns devices assigned to a team member
 func (r *TeamMemberRepository) GetTeamMemberDevices(ctx context.Context, username string) ([]map[string]interface{}, error) {
+	// First get the team member ID
+	var memberID uuid.UUID
+	err := r.db.QueryRowContext(ctx, "SELECT id FROM team_members WHERE username = $1", username).Scan(&memberID)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Get assigned devices
 	query := `
-		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at
-		FROM user_devices
-		WHERE LOWER(device_name) = LOWER($1)
-		ORDER BY created_at DESC
+		SELECT 
+			d.id, d.user_id, d.device_name, d.phone, d.jid, d.status, d.created_at, d.updated_at
+		FROM user_devices d
+		JOIN team_member_devices tmd ON d.id = tmd.device_id
+		WHERE tmd.team_member_id = $1
+		ORDER BY d.created_at DESC
 	`
 	
-	rows, err := r.db.QueryContext(ctx, query, username)
+	rows, err := r.db.QueryContext(ctx, query, memberID)
 	if err != nil {
 		return nil, err
 	}
@@ -356,4 +366,43 @@ func (r *TeamMemberRepository) GetTeamMemberDevices(ctx context.Context, usernam
 	}
 	
 	return devices, nil
+}
+
+// AssignDeviceToTeamMember assigns a device to a team member
+func (r *TeamMemberRepository) AssignDeviceToTeamMember(ctx context.Context, teamMemberID, deviceID, assignedBy uuid.UUID) error {
+	query := `
+		INSERT INTO team_member_devices (team_member_id, device_id, assigned_by)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (team_member_id, device_id) DO NOTHING
+	`
+	_, err := r.db.ExecContext(ctx, query, teamMemberID, deviceID, assignedBy)
+	return err
+}
+
+// UnassignDeviceFromTeamMember removes a device assignment
+func (r *TeamMemberRepository) UnassignDeviceFromTeamMember(ctx context.Context, teamMemberID, deviceID uuid.UUID) error {
+	query := `DELETE FROM team_member_devices WHERE team_member_id = $1 AND device_id = $2`
+	_, err := r.db.ExecContext(ctx, query, teamMemberID, deviceID)
+	return err
+}
+
+// GetAssignedDeviceIDs returns just the device IDs for a team member
+func (r *TeamMemberRepository) GetAssignedDeviceIDs(ctx context.Context, teamMemberID uuid.UUID) ([]string, error) {
+	query := `SELECT device_id FROM team_member_devices WHERE team_member_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, teamMemberID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var deviceIDs []string
+	for rows.Next() {
+		var deviceID uuid.UUID
+		if err := rows.Scan(&deviceID); err != nil {
+			continue
+		}
+		deviceIDs = append(deviceIDs, deviceID.String())
+	}
+	
+	return deviceIDs, nil
 }
