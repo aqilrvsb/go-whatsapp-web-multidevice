@@ -32,11 +32,11 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		// Check credentials
 		var memberID int
-		var deviceName string
+		var username string
 		err := db.QueryRow(`
-			SELECT id, device_name FROM team_members 
-			WHERE username = ? AND password = ? AND is_active = 1
-		`, loginReq.Username, loginReq.Password).Scan(&memberID, &deviceName)
+			SELECT id, username FROM team_members 
+			WHERE username = ? AND password = ?
+		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username)
 
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid credentials"})
@@ -65,9 +65,9 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		})
 
 		return c.JSON(fiber.Map{
-			"success":     true,
-			"username":    loginReq.Username,
-			"device_name": deviceName,
+			"success":  true,
+			"username": username,
+			"device_name": username, // Username will be matched with device_name in user_devices
 		})
 	})
 
@@ -77,13 +77,12 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 	// Team member info
 	teamAPI.Get("/member-info", func(c *fiber.Ctx) error {
 		username := c.Locals("team_username").(string)
-		deviceName := c.Locals("team_device_name").(string)
 
 		return c.JSON(fiber.Map{
 			"code": "SUCCESS",
 			"results": fiber.Map{
 				"username":    username,
-				"device_name": deviceName,
+				"device_name": username, // Username matches device_name
 			},
 		})
 	})
@@ -106,15 +105,15 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		return c.JSON(fiber.Map{"success": true})
 	})
 
-	// Devices - only show assigned device
+	// Devices - only show device where device_name matches username
 	teamAPI.Get("/devices", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
 			SELECT id, device_name, phone, status, jid, last_seen
 			FROM user_devices
 			WHERE device_name = ?
-		`, deviceName)
+		`, username)
 		
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch devices"})
@@ -510,20 +509,20 @@ func TeamAuthMiddleware(db *sql.DB) fiber.Handler {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "No team session found"})
 		}
 
-		var username, deviceName string
+		var username string
 		err := db.QueryRow(`
-			SELECT tm.username, tm.device_name 
+			SELECT tm.username
 			FROM team_sessions ts
 			JOIN team_members tm ON ts.team_member_id = tm.id
 			WHERE ts.session_id = ? AND ts.expires_at > datetime('now')
-		`, sessionID).Scan(&username, &deviceName)
+		`, sessionID).Scan(&username)
 
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid or expired session"})
 		}
 
 		c.Locals("team_username", username)
-		c.Locals("team_device_name", deviceName)
+		c.Locals("team_device_name", username) // Username matches device_name
 		
 		return c.Next()
 	}
