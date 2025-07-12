@@ -36,7 +36,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		var isActive bool
 		err := db.QueryRow(`
 			SELECT id, username, is_active FROM team_members 
-			WHERE username = ? AND password = ?
+			WHERE username = $1 AND password = $2
 		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username, &isActive)
 
 		if err != nil {
@@ -44,7 +44,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			if err == sql.ErrNoRows {
 				// Check if user exists
 				var count int
-				db.QueryRow("SELECT COUNT(*) FROM team_members WHERE username = ?", loginReq.Username).Scan(&count)
+				db.QueryRow("SELECT COUNT(*) FROM team_members WHERE username = $1", loginReq.Username).Scan(&count)
 				if count > 0 {
 					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 						"error": "Invalid credentials - password mismatch",
@@ -76,7 +76,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		_, err = db.Exec(`
 			INSERT INTO team_sessions (team_member_id, session_id, expires_at, created_at)
-			VALUES (?, ?, ?, datetime('now'))
+			VALUES ($1, $2, $3, NOW())
 		`, memberID, sessionID, expiresAt)
 
 		if err != nil {
@@ -119,7 +119,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 	teamAPI.Post("/logout", func(c *fiber.Ctx) error {
 		sessionID := c.Cookies("team_session")
 		if sessionID != "" {
-			db.Exec("DELETE FROM team_sessions WHERE session_id = ?", sessionID)
+			db.Exec("DELETE FROM team_sessions WHERE session_id = $1", sessionID)
 		}
 		
 		c.Cookie(&fiber.Cookie{
@@ -140,7 +140,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		rows, err := db.Query(`
 			SELECT id, device_name, phone, status, jid, last_seen
 			FROM user_devices
-			WHERE device_name = ?
+			WHERE device_name = $1
 		`, username)
 		
 		if err != nil {
@@ -178,7 +178,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Campaign analytics - filtered by device
 	teamAPI.Get("/campaigns/analytics", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		startDate := c.Query("start")
 		endDate := c.Query("end")
 		niche := c.Query("niche")
@@ -193,17 +193,22 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.id END) as contacts_remaining_send
 			FROM campaigns c
 			LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id
-			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
 		`
-		args := []interface{}{deviceName}
+		args := []interface{}{username}
+		paramCount := 1
 
 		if startDate != "" && endDate != "" {
-			query += " AND DATE(c.date) BETWEEN ? AND ?"
+			paramCount++
+			query += " AND DATE(c.date) BETWEEN $" + string(rune('0'+paramCount))
+			paramCount++
+			query += " AND $" + string(rune('0'+paramCount))
 			args = append(args, startDate, endDate)
 		}
 
 		if niche != "" && niche != "all" {
-			query += " AND c.niche = ?"
+			paramCount++
+			query += " AND c.niche = $" + string(rune('0'+paramCount))
 			args = append(args, niche)
 		}
 
@@ -235,12 +240,16 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed
 			FROM broadcast_messages bm
 			JOIN campaigns c ON bm.campaign_id = c.id
-			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
 		`
-		chartArgs := []interface{}{deviceName}
+		chartArgs := []interface{}{username}
+		chartParamCount := 1
 
 		if startDate != "" && endDate != "" {
-			chartQuery += " AND DATE(bm.sent_at) BETWEEN ? AND ?"
+			chartParamCount++
+			chartQuery += " AND DATE(bm.sent_at) BETWEEN $" + string(rune('0'+chartParamCount))
+			chartParamCount++
+			chartQuery += " AND $" + string(rune('0'+chartParamCount))
 			chartArgs = append(chartArgs, startDate, endDate)
 		}
 
@@ -278,7 +287,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Sequence analytics - filtered by device
 	teamAPI.Get("/sequences/analytics", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		startDate := c.Query("start")
 		endDate := c.Query("end")
 		niche := c.Query("niche")
@@ -295,17 +304,22 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			FROM sequences s
 			LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
 		`
-		args := []interface{}{deviceName}
+		args := []interface{}{username}
+		paramCount := 1
 
 		if startDate != "" && endDate != "" {
-			query += " AND DATE(sc.created_at) BETWEEN ? AND ?"
+			paramCount++
+			query += " AND DATE(sc.created_at) BETWEEN $" + string(rune('0'+paramCount))
+			paramCount++
+			query += " AND $" + string(rune('0'+paramCount))
 			args = append(args, startDate, endDate)
 		}
 
 		if niche != "" && niche != "all" {
-			query += " AND s.niche = ?"
+			paramCount++
+			query += " AND s.niche = $" + string(rune('0'+paramCount))
 			args = append(args, niche)
 		}
 
@@ -363,16 +377,16 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Campaign summary - filtered by device
 	teamAPI.Get("/campaigns/summary", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
 			SELECT c.id, c.title, c.date, c.niche, c.status
 			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
-			WHERE ud.device_name = ?
+			WHERE ud.device_name = $1
 			ORDER BY c.date DESC
 			LIMIT 50
-		`, deviceName)
+		`, username)
 
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
@@ -403,15 +417,15 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Niches - filtered by device campaigns
 	teamAPI.Get("/niches", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
 			SELECT DISTINCT c.niche
 			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
-			WHERE ud.device_name = ? AND c.niche IS NOT NULL AND c.niche != ''
+			WHERE ud.device_name = $1 AND c.niche IS NOT NULL AND c.niche != ''
 			ORDER BY c.niche
-		`, deviceName)
+		`, username)
 
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch niches"})
@@ -430,7 +444,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Sequences list - filtered by device
 	teamAPI.Get("/sequences", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
 			SELECT DISTINCT s.id, s.name, s.description, s.niche, s.trigger_name, s.is_active
@@ -438,10 +452,10 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			WHERE EXISTS (
 				SELECT 1 FROM sequence_contacts sc
 				WHERE sc.sequence_id = s.id
-				AND sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
+				AND sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
 			)
 			ORDER BY s.created_at DESC
-		`, deviceName)
+		`, username)
 
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch sequences"})
@@ -477,7 +491,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 	// Sequence summary - filtered by device
 	teamAPI.Get("/sequences/summary", func(c *fiber.Ctx) error {
-		deviceName := c.Locals("team_device_name").(string)
+		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
 			SELECT 
@@ -490,10 +504,10 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(DISTINCT CASE WHEN sc.status = 'pending' THEN sc.id END) as pending
 			FROM sequences s
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
 			GROUP BY s.id, s.name, s.niche
 			ORDER BY s.created_at DESC
-		`, deviceName)
+		`, username)
 
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch sequence summary"})
@@ -542,7 +556,7 @@ func TeamAuthMiddleware(db *sql.DB) fiber.Handler {
 			SELECT tm.username
 			FROM team_sessions ts
 			JOIN team_members tm ON ts.team_member_id = tm.id
-			WHERE ts.session_id = ? AND ts.expires_at > datetime('now')
+			WHERE ts.session_id = $1 AND ts.expires_at > NOW()
 		`, sessionID).Scan(&username)
 
 		if err != nil {
