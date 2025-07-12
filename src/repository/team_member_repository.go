@@ -309,3 +309,51 @@ func (r *TeamMemberRepository) GetDeviceIDsForMember(ctx context.Context, userna
 	
 	return deviceIDs, nil
 }
+
+// GetTeamMemberDevices returns devices accessible to a team member
+func (r *TeamMemberRepository) GetTeamMemberDevices(ctx context.Context, username string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at
+		FROM user_devices
+		WHERE LOWER(device_name) = LOWER($1)
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.QueryContext(ctx, query, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var devices []map[string]interface{}
+	for rows.Next() {
+		var device struct {
+			ID         uuid.UUID
+			UserID     uuid.UUID
+			DeviceName string
+			Phone      sql.NullString
+			JID        sql.NullString
+			Status     string
+			CreatedAt  time.Time
+			UpdatedAt  sql.NullTime
+		}
+		
+		if err := rows.Scan(&device.ID, &device.UserID, &device.DeviceName, 
+			&device.Phone, &device.JID, &device.Status, &device.CreatedAt, &device.UpdatedAt); err != nil {
+			continue
+		}
+		
+		devices = append(devices, map[string]interface{}{
+			"id":          device.ID,
+			"user_id":     device.UserID,
+			"device_name": device.DeviceName,
+			"phone":       device.Phone.String,
+			"jid":         device.JID.String,
+			"status":      device.Status,
+			"created_at":  device.CreatedAt,
+			"updated_at":  device.UpdatedAt.Time,
+		})
+	}
+	
+	return devices, nil
+}

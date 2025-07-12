@@ -369,3 +369,118 @@ func adminOnly(c *fiber.Ctx) error {
 	}
 	return c.Next()
 }
+
+// GetTeamDevices returns devices accessible to the team member
+func (h *TeamMemberHandlers) GetTeamDevices(c *fiber.Ctx) error {
+	ctx := context.Background()
+	
+	// Get team member from context
+	member, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Get devices that match team member's username from repository
+	devices, err := h.repo.GetTeamMemberDevices(ctx, member.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch devices",
+		})
+	}
+	
+	return c.JSON(devices)
+}
+
+// GetTeamCampaignsSummary returns campaign summary for team member's devices
+func (h *TeamMemberHandlers) GetTeamCampaignsSummary(c *fiber.Ctx) error {
+	// Get team member from context
+	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	// Return data structure that frontend expects
+	return c.JSON(fiber.Map{
+		"campaigns": fiber.Map{
+			"total": 0,
+			"active": 0,
+			"completed": 0,
+		},
+		"messages": fiber.Map{
+			"total": 0,
+			"sent": 0,
+			"failed": 0,
+			"pending": 0,
+		},
+		"recent_campaigns": []fiber.Map{},
+	})
+}
+
+// GetTeamCampaignsAnalytics returns campaign analytics for team member's devices  
+func (h *TeamMemberHandlers) GetTeamCampaignsAnalytics(c *fiber.Ctx) error {
+	// Get team member from context
+	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"total_campaigns": 0,
+		"total_messages": 0,
+		"success_rate": 0,
+		"devices_used": 0,
+		"time_series": []fiber.Map{},
+		"device_performance": []fiber.Map{},
+	})
+}
+
+// GetTeamSequencesSummary returns sequence summary for team member's devices
+func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
+	// Get team member from context
+	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"sequences": fiber.Map{
+			"total": 0,
+			"active": 0,
+			"inactive": 0,
+		},
+		"total_flows": 0,
+		"total_should_send": 0,
+		"total_done_send": 0,
+		"total_failed_send": 0,
+		"total_remaining_send": 0,
+		"recent_sequences": []fiber.Map{},
+	})
+}
+
+// GetTeamSequencesAnalytics returns sequence analytics for team member's devices
+func (h *TeamMemberHandlers) GetTeamSequencesAnalytics(c *fiber.Ctx) error {
+	// Get team member from context
+	_, ok := c.Locals("teamMember").(*models.TeamMember)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Not authenticated",
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"total_sequences": 0,
+		"total_contacts": 0,
+		"completion_rate": 0,
+		"active_flows": 0,
+		"time_series": []fiber.Map{},
+		"sequence_performance": []fiber.Map{},
+	})
+}

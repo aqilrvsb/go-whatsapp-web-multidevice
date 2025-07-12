@@ -71,6 +71,13 @@ func CustomAuth() fiber.Handler {
 		
 		// If no token found
 		if token == "" {
+			// Check for team member session for certain endpoints
+			teamToken := c.Cookies("team_session")
+			if teamToken != "" && isTeamAccessibleEndpoint(path) {
+				// Let team middleware handle it
+				return c.Next()
+			}
+			
 			// For API routes, return JSON error
 			if strings.HasPrefix(path, "/api/") {
 				return c.Status(401).JSON(fiber.Map{
@@ -123,4 +130,23 @@ func GetUserFromContext(c *fiber.Ctx) (userID string, ok bool) {
 	}
 	userID, ok = userIDVal.(string)
 	return userID, ok
+}
+
+// isTeamAccessibleEndpoint checks if the endpoint should be accessible to team members
+func isTeamAccessibleEndpoint(path string) bool {
+	teamEndpoints := []string{
+		"/api/devices",
+		"/api/campaigns/summary",
+		"/api/campaigns/analytics",
+		"/api/sequences/summary",
+		"/api/sequences/analytics",
+		"/api/team-member/info",
+	}
+	
+	for _, endpoint := range teamEndpoints {
+		if strings.HasPrefix(path, endpoint) {
+			return true
+		}
+	}
+	return false
 }
