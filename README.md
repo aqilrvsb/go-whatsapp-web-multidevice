@@ -1,10 +1,26 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 15, 2025 - Team Member Management System Added**  
-**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management**
-**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support**
+**Last Updated: January 15, 2025 - Lead Creation Webhook Added**  
+**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management + Webhook API**
+**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support + External Integration**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATE: Team Member Management System (January 15, 2025)
+## 🚀 LATEST UPDATE: Lead Creation Webhook (January 15, 2025)
+
+### ✅ NEW: External Lead Creation via Webhook
+- **Public Endpoint**: POST `/webhook/lead/create` - No authentication required
+- **WhatsApp Bot Integration**: Create leads directly from your WhatsApp bot
+- **Direct Field Mapping**: Simple JSON in → Database columns out
+- **Instant Response**: Returns lead_id immediately after creation
+- **Perfect for Automation**: Integrate with any external service or bot
+
+### 🔧 Quick Example:
+```bash
+curl -X POST https://your-app.railway.app/webhook/lead/create \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","phone":"60123456789","target_status":"prospect","device_id":"device-id","user_id":"user_id","niche":"EXSTART","trigger":"NEWNP"}'
+```
+
+## 🚀 Previous Update: Team Member Management System (January 15, 2025)
 
 ### ✅ NEW: Complete Team Member Management
 - **Hierarchical Access Control**: Admin/Leader with full access, Team Members with read-only access
@@ -470,6 +486,51 @@ if device.Status == "online" { }
 - [x] Human-like delays
 - [x] Redis optimization
 - [x] Auto device health checks
+- [x] **Lead Creation Webhook** (NEW)
+
+### ✅ Lead Creation Webhook (NEW - January 2025)
+- [x] Public endpoint at `/webhook/lead/create`
+- [x] Create leads via HTTP POST from external services
+- [x] Direct field mapping to database columns
+- [x] No authentication required for easy integration
+- [x] Perfect for WhatsApp bot integration
+
+#### Webhook Usage Example:
+```bash
+curl -X POST https://your-app.railway.app/webhook/lead/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "phone": "60123456789",
+    "target_status": "prospect",
+    "device_id": "device-id",
+    "user_id": "user_id",
+    "niche": "EXSTART",
+    "trigger": "NEWNP"
+  }'
+```
+
+#### PHP cURL Example:
+```php
+$url = 'https://your-app.railway.app/webhook/lead/create';
+$data = array(
+    'name' => 'John Doe',
+    'phone' => '60123456789',
+    'target_status' => 'prospect',
+    'device_id' => 'device-id',
+    'user_id' => 'user_id',
+    'niche' => 'EXSTART',
+    'trigger' => 'NEWNP'
+);
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_POST, 1);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+curl_close($ch);
+```
 
 ### ✅ Technical Features
 - [x] Automatic migrations
