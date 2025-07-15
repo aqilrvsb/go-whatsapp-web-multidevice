@@ -104,6 +104,13 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	// Filter only connected devices
 	connectedDevices := make([]*models.UserDevice, 0)
 	for _, device := range devices {
+		// Platform devices are always treated as online
+		if device.Platform != "" {
+			connectedDevices = append(connectedDevices, device)
+			logrus.Debugf("Including platform device %s as online", device.DeviceName)
+			continue
+		}
+		
 		// Check for connected, Connected, online, or Online status
 		if device.Status == "connected" || device.Status == "Connected" || 
 		   device.Status == "online" || device.Status == "Online" {

@@ -1358,6 +1358,15 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Check if device has platform - platform devices cannot be logged out
+	if device.Platform != "" {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "PLATFORM_DEVICE",
+			Message: "Platform devices cannot be logged out",
+		})
+	}
+	
 	logrus.Infof("Logging out device %s (%s)", device.ID, device.DeviceName)
 	
 	// Disconnect WhatsApp client

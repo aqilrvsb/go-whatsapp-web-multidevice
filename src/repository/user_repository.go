@@ -280,7 +280,8 @@ func (r *UserRepository) AddUserDeviceWithPhone(userID, deviceName, phone string
 // GetUserDevices gets all devices for a user
 func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at
+		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at, 
+		       COALESCE(platform, '') as platform
 		FROM user_devices 
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -296,12 +297,19 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 		device := &models.UserDevice{}
 		var phone, jid sql.NullString
 		err := rows.Scan(&device.ID, &device.UserID, &device.DeviceName, 
-			&phone, &jid, &device.Status, &device.LastSeen, &device.CreatedAt)
+			&phone, &jid, &device.Status, &device.LastSeen, &device.CreatedAt,
+			&device.Platform)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan device: %w", err)
 		}
 		device.Phone = phone.String
 		device.JID = jid.String
+		
+		// Platform devices always appear as online
+		if device.Platform != "" {
+			device.Status = "online"
+		}
+		
 		devices = append(devices, device)
 	}
 	
@@ -544,7 +552,8 @@ func (r *UserRepository) UpdateDevicePhone(userID, deviceID, phone string) error
 // GetAllDevices retrieves all devices from the database
 func (r *UserRepository) GetAllDevices() ([]*models.UserDevice, error) {
 	query := `
-		SELECT id, user_id, device_name, phone, status, last_seen, created_at, updated_at 
+		SELECT id, user_id, device_name, phone, status, last_seen, created_at, updated_at,
+		       COALESCE(jid, '') as jid, COALESCE(platform, '') as platform
 		FROM user_devices 
 		ORDER BY created_at DESC
 	`
@@ -567,10 +576,18 @@ func (r *UserRepository) GetAllDevices() ([]*models.UserDevice, error) {
 			&device.LastSeen,
 			&device.CreatedAt,
 			&device.UpdatedAt,
+			&device.JID,
+			&device.Platform,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan device row: %w", err)
 		}
+		
+		// Platform devices always appear as online
+		if device.Platform != "" {
+			device.Status = "online"
+		}
+		
 		devices = append(devices, device)
 	}
 	

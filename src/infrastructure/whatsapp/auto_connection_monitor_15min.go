@@ -105,9 +105,16 @@ func (acm *AutoConnectionMonitor) checkAndReconnectDevices() {
 	offlineCount := 0
 	reconnectAttempted := 0
 	reconnectSuccess := 0
+	skippedPlatform := 0
 	
 	// Process each device
 	for _, device := range devices {
+		// Skip devices with platform value
+		if device.Platform != "" {
+			skippedPlatform++
+			logrus.Debugf("Skipping device %s - has platform: %s", device.DeviceName, device.Platform)
+			continue
+		}
 		// Get WhatsApp client
 		client, err := acm.clientManager.GetClient(device.ID)
 		
@@ -183,8 +190,8 @@ func (acm *AutoConnectionMonitor) checkAndReconnectDevices() {
 	duration := time.Since(startTime)
 	
 	// Log summary
-	logrus.Infof("15-minute check complete: %d devices, %d online, %d offline, %d reconnect attempted, %d reconnect success (took %v)",
-		totalDevices, onlineCount, offlineCount, reconnectAttempted, reconnectSuccess, duration)
+	logrus.Infof("15-minute check complete: %d devices, %d online, %d offline, %d reconnect attempted, %d reconnect success, %d skipped (platform) (took %v)",
+		totalDevices, onlineCount, offlineCount, reconnectAttempted, reconnectSuccess, skippedPlatform, duration)
 	
 	// Log detailed stats if there were changes
 	if reconnectAttempted > 0 {

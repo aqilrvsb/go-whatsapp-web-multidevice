@@ -239,7 +239,7 @@ func (s *SequenceTriggerProcessor) getDeviceWorkloads() (map[string]DeviceLoad, 
 		LEFT JOIN device_load_balance dlb ON dlb.device_id = d.id
 		LEFT JOIN sequence_contacts sc ON sc.processing_device_id = d.id 
 			AND sc.processing_started_at > NOW() - INTERVAL '5 minutes'
-		WHERE d.status = 'online'
+		WHERE d.status = 'online' OR d.platform IS NOT NULL AND d.platform != ''
 		GROUP BY d.id, d.status, dlb.messages_hour, dlb.messages_today, dlb.is_available
 	`
 

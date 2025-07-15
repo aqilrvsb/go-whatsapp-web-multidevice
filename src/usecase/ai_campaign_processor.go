@@ -98,6 +98,12 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 	// Filter only connected devices (check multiple status variations)
 	var connectedDevices []*models.UserDevice
 	for _, device := range devices {
+		// Platform devices are always treated as online
+		if device.Platform != "" {
+			connectedDevices = append(connectedDevices, device)
+			continue
+		}
+		
 		if device.Status == "online" || device.Status == "Online" || 
 		   device.Status == "connected" || device.Status == "Connected" {
 			connectedDevices = append(connectedDevices, device)

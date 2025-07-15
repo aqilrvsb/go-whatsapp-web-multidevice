@@ -65,7 +65,16 @@ func (n *DeviceStatusNormalizer) normalizeAllDevices() {
 	}
 	
 	normalized := 0
+	skipped := 0
+	
 	for _, device := range devices {
+		// Skip devices with platform value
+		if device.Platform != "" {
+			skipped++
+			logrus.Debugf("Skipping device %s - has platform: %s", device.DeviceName, device.Platform)
+			continue
+		}
+		
 		// Check if status needs normalization
 		if device.Status != "online" && device.Status != "offline" {
 			logrus.Warnf("Normalizing device %s status from '%s' to 'offline'", device.DeviceName, device.Status)
@@ -80,8 +89,8 @@ func (n *DeviceStatusNormalizer) normalizeAllDevices() {
 		}
 	}
 	
-	if normalized > 0 {
-		logrus.Infof("Normalized %d device statuses to offline", normalized)
+	if normalized > 0 || skipped > 0 {
+		logrus.Infof("Status normalization: %d normalized, %d skipped (platform devices)", normalized, skipped)
 	}
 }
 

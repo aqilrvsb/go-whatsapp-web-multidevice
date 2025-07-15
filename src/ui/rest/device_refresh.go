@@ -49,6 +49,15 @@ func RefreshDevice(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Check if device has platform - platform devices cannot be refreshed
+	if device.Platform != "" {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "PLATFORM_DEVICE",
+			Message: "Platform devices cannot be refreshed",
+		})
+	}
+	
 	// Check if device has phone/JID for reconnection
 	if device.Phone == "" {
 		return c.Status(400).JSON(utils.ResponseData{
