@@ -6,6 +6,7 @@
     <title>Lead Management - WhatsApp Analytics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
             --primary: #128c7e;
@@ -56,17 +57,19 @@
         }
 
         .lead-checkbox {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
+            margin-right: 15px;
             width: 20px;
             height: 20px;
             cursor: pointer;
+            flex-shrink: 0;
+            /* Always visible - no special positioning */
         }
 
         .lead-card-content {
-            margin-left: 40px;
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
         }
 
         .bulk-actions {
@@ -561,13 +564,13 @@
             
             return `
                 <div class="lead-card ${selectedLeads.has(lead.id) ? 'selected' : ''}" data-lead-id="${lead.id}">
-                    <input type="checkbox" class="form-check-input lead-checkbox" 
-                           value="${lead.id}" 
-                           ${selectedLeads.has(lead.id) ? 'checked' : ''}
-                           onchange="toggleLeadSelection('${lead.id}')"
-                           onclick="event.stopPropagation()">
-                    <div class="lead-card-content" onclick="editLead('${lead.id}')">
-                        <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-start">
+                        <input type="checkbox" class="form-check-input lead-checkbox" 
+                               value="${lead.id}" 
+                               ${selectedLeads.has(lead.id) ? 'checked' : ''}
+                               onchange="toggleLeadSelection('${lead.id}')"
+                               onclick="event.stopPropagation()">
+                        <div class="lead-card-content" onclick="editLead('${lead.id}')">
                             <div class="flex-grow-1">
                                 <h5 class="mb-1">${lead.name}</h5>
                                 <p class="mb-2">
@@ -815,8 +818,19 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const csv = e.target.result;
-                const lines = csv.split('\n');
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const lines = csv.split(/\r?\n/); // Handle both \n and \r\n line endings
+                
+                // Parse headers - handle potential BOM and extra spaces
+                let headerLine = lines[0];
+                // Remove BOM if present
+                if (headerLine.charCodeAt(0) === 0xFEFF) {
+                    headerLine = headerLine.substr(1);
+                }
+                
+                // Parse headers more robustly
+                const headers = parseCSVLine(headerLine).map(h => h.trim().toLowerCase());
+                
+                console.log('Headers found:', headers); // Debug log
                 
                 const nameIndex = headers.indexOf('name');
                 const phoneIndex = headers.indexOf('phone');
@@ -826,17 +840,17 @@
                 
                 // Validate required columns
                 if (nameIndex === -1 || phoneIndex === -1 || nicheIndex === -1 || targetStatusIndex === -1) {
-                    showAlert('danger', 'CSV must have "name", "phone", "niche", and "target_status" columns');
+                    showAlert('danger', `CSV must have "name", "phone", "niche", and "target_status" columns. Found: ${headers.join(', ')}`);
                     return;
                 }
                 
                 const newLeads = [];
                 for (let i = 1; i < lines.length; i++) {
                     if (lines[i].trim()) {
-                        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                        const values = parseCSVLine(lines[i]);
                         
                         // Get target_status and validate
-                        let targetStatus = values[targetStatusIndex] || 'prospect';
+                        let targetStatus = values[targetStatusIndex] ? values[targetStatusIndex].trim() : 'prospect';
                         
                         // Validate target_status
                         if (targetStatus !== 'prospect' && targetStatus !== 'customer') {
@@ -852,11 +866,11 @@
                         
                         newLeads.push({
                             device_id: deviceId,
-                            name: values[nameIndex],
-                            phone: values[phoneIndex],
-                            niche: values[nicheIndex],
-                            status: targetStatus,  // This will be mapped to target_status in the backend
-                            trigger: values[triggerIndex] || ''
+                            name: values[nameIndex].trim(),
+                            phone: values[phoneIndex].trim(),
+                            niche: values[nicheIndex].trim(),
+                            target_status: targetStatus,  // Changed from 'status' to 'target_status'
+                            trigger: values[triggerIndex] ? values[triggerIndex].trim() : ''
                         });
                     }
                 }
@@ -893,6 +907,40 @@
             };
             
             reader.readAsText(file);
+        }
+        
+        // Parse CSV line handling quotes properly
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        // Escaped quote
+                        current += '"';
+                        i++; // Skip next quote
+                    } else {
+                        // Toggle quote mode
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    // End of field
+                    values.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            // Don't forget last field
+            values.push(current);
+            
+            return values;
         }
         
         // Show alert
@@ -994,24 +1042,58 @@
         function bulkDelete() {
             if (selectedLeads.size === 0) return;
             
-            if (confirm(`Are you sure you want to delete ${selectedLeads.size} leads?`)) {
-                const deletePromises = Array.from(selectedLeads).map(leadId =>
-                    fetch(`/api/leads/${leadId}`, {
-                        method: 'DELETE',
-                        credentials: 'include'
-                    })
-                );
-                
-                Promise.all(deletePromises)
-                    .then(() => {
-                        selectedLeads.clear();
-                        loadLeads();
-                        showAlert('success', `Deleted ${deletePromises.length} leads successfully!`);
-                    })
-                    .catch(error => {
-                        showAlert('danger', 'Error deleting leads: ' + error.message);
+            Swal.fire({
+                title: 'Are you sure?',
+                text: `You are about to delete ${selectedLeads.size} leads. This action cannot be undone!`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete them!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading
+                    Swal.fire({
+                        title: 'Deleting...',
+                        text: 'Please wait while we delete the selected leads.',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
                     });
-            }
+                    
+                    const deletePromises = Array.from(selectedLeads).map(leadId =>
+                        fetch(`/api/leads/${leadId}`, {
+                            method: 'DELETE',
+                            credentials: 'include'
+                        })
+                    );
+                    
+                    Promise.all(deletePromises)
+                        .then(() => {
+                            selectedLeads.clear();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: `Successfully deleted ${deletePromises.length} leads.`,
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                // Refresh the page to see changes
+                                loadLeads();
+                            });
+                        })
+                        .catch(error => {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'Failed to delete some leads: ' + error.message
+                            });
+                        });
+                }
+            });
         }
         
         // Open bulk update modal
@@ -1031,13 +1113,31 @@
             
             // Check if any field has value
             if (!niche && !status && !trigger) {
-                showAlert('warning', 'Please select at least one field to update');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Changes',
+                    text: 'Please select at least one field to update'
+                });
                 return;
             }
             
+            // Hide modal first
+            bulkUpdateModal.hide();
+            
+            // Show loading
+            Swal.fire({
+                title: 'Updating...',
+                text: `Updating ${selectedLeads.size} leads...`,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
             const updateData = {};
             if (niche) updateData.niche = niche;
-            if (status) updateData.status = status; // Will be mapped to target_status
+            if (status) updateData.target_status = status; // Map to target_status
             if (trigger) updateData.trigger = trigger;
             
             const updatePromises = Array.from(selectedLeads).map(leadId => {
@@ -1056,7 +1156,7 @@
                         name: lead.name,
                         phone: lead.phone,
                         niche: updateData.niche || lead.niche,
-                        status: updateData.status || lead.target_status,
+                        target_status: updateData.target_status || lead.target_status,
                         trigger: updateData.trigger !== undefined ? updateData.trigger : lead.trigger,
                         journey: lead.journey || lead.notes || ''
                     })
@@ -1065,13 +1165,24 @@
             
             Promise.all(updatePromises)
                 .then(() => {
-                    bulkUpdateModal.hide();
                     selectedLeads.clear();
-                    loadLeads();
-                    showAlert('success', `Updated ${updatePromises.length} leads successfully!`);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Updated!',
+                        text: `Successfully updated ${updatePromises.length} leads.`,
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(() => {
+                        // Refresh to show changes
+                        loadLeads();
+                    });
                 })
                 .catch(error => {
-                    showAlert('danger', 'Error updating leads: ' + error.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Failed to update some leads: ' + error.message
+                    });
                 });
         }
     </script>

@@ -712,13 +712,13 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 	}
 	
 	var request struct {
-		DeviceID string `json:"device_id"`
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		Niche    string `json:"niche"`
-		Journey  string `json:"journey"`
-		Status   string `json:"status"` // This will be target_status from frontend
-		Trigger  string `json:"trigger"` // Add trigger field
+		DeviceID     string `json:"device_id"`
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Niche        string `json:"niche"`
+		Journey      string `json:"journey"`
+		TargetStatus string `json:"target_status"` // Changed from Status to TargetStatus
+		Trigger      string `json:"trigger"`
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -739,8 +739,8 @@ func (handler *App) CreateLead(c *fiber.Ctx) error {
 		Niche:        request.Niche,
 		Source:       "manual", // Set source as manual since it's added from UI
 		Status:       "", // Keep empty for backward compatibility
-		TargetStatus: request.Status, // Map status from frontend to target_status
-		Trigger:      request.Trigger, // Add trigger
+		TargetStatus: request.TargetStatus, // Use TargetStatus directly
+		Trigger:      request.Trigger,
 		Notes:        request.Journey, // Map journey to notes field
 	}
 	err = leadRepo.CreateLead(lead)
@@ -2290,12 +2290,13 @@ func (handler *App) ExportLeads(c *fiber.Ctx) error {
 			targetStatus = "prospect"
 		}
 		
+		// Properly escape CSV fields that might contain commas or quotes
 		csvContent.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
-			lead.Name,
-			lead.Phone,
-			lead.Niche,
-			targetStatus,
-			lead.Trigger,
+			strings.ReplaceAll(lead.Name, "\"", "\"\""),
+			strings.ReplaceAll(lead.Phone, "\"", "\"\""),
+			strings.ReplaceAll(lead.Niche, "\"", "\"\""),
+			strings.ReplaceAll(targetStatus, "\"", "\"\""),
+			strings.ReplaceAll(lead.Trigger, "\"", "\"\""),
 		))
 	}
 	
@@ -2406,7 +2407,7 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			phoneIndex = i
 		case "niche":
 			nicheIndex = i
-		case "target_status":
+		case "target_status", "target_sta": // Support both full and shortened name
 			targetStatusIndex = i
 		case "status":
 			statusIndex = i
