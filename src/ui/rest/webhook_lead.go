@@ -92,29 +92,34 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		
 		// Handle device ID based on whether it's a valid UUID or not
 		deviceID := request.DeviceID
+		deviceJID := request.DeviceID // JID always stores the full original
+		
 		if _, err := uuid.Parse(request.DeviceID); err != nil {
-			// Not a valid UUID, use first 6 characters as prefix for new UUID
+			// Not a valid UUID, take first 6 characters and generate new UUID
 			prefix := request.DeviceID
 			if len(prefix) > 6 {
 				prefix = prefix[:6]
 			}
-			// Generate new UUID
+			// Generate new UUID with prefix for identification
 			deviceID = uuid.New().String()
-			logrus.Info("Webhook Lead: Non-UUID device_id detected. Using prefix: ", prefix, ", Generated UUID: ", deviceID, ", Full JID: ", request.DeviceID)
+			logrus.Info("Webhook Lead: Non-UUID device_id. Using first 6 chars: ", prefix, ", Generated UUID: ", deviceID)
 			
 			// Update device name to include the prefix if not provided
 			if request.DeviceName == "" {
 				request.DeviceName = "Device-" + prefix
 			}
+		} else {
+			// It's a valid UUID, use it for both ID and JID
+			logrus.Info("Webhook Lead: Valid UUID device_id, using as-is for both ID and JID")
 		}
 		
 		// Create new device
 		newDevice := &models.UserDevice{
-			ID:               deviceID, // Use valid UUID (or original if it was valid)
+			ID:               deviceID,  // UUID (generated or original)
 			UserID:           request.UserID,
 			DeviceName:       request.DeviceName,
 			Phone:            "", // null/empty
-			JID:              request.DeviceID, // Keep full original device_id as JID
+			JID:              deviceJID, // Always the full original device_id
 			Status:           "online",
 			LastSeen:         time.Now(),
 			CreatedAt:        time.Now(),
@@ -139,7 +144,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 				Message: "Failed to create device",
 				Results: map[string]interface{}{
 					"error": err.Error(),
-					"hint": "If device_id is not a UUID, a new UUID will be generated. JID stores the full original device_id.",
+					"hint": "For non-UUID device_ids, first 6 chars are used as prefix. For UUID device_ids, full ID is used.",
 				},
 			})
 		}
