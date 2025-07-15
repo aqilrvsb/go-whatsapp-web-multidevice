@@ -82,11 +82,16 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if device exists
+	// First check if a device with this user_id and device_id (as jid) combination already exists
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByID(request.DeviceID)
+	device, err := userRepo.GetDeviceByUserAndJID(request.UserID, request.DeviceID)
 	
-	// If device doesn't exist, create it
+	// If device doesn't exist by user_id + jid, try by ID
+	if err != nil || device == nil {
+		device, err = userRepo.GetDeviceByID(request.DeviceID)
+	}
+	
+	// If device still doesn't exist, create it
 	if err != nil || device == nil {
 		logrus.Info("Webhook Lead: Device not found, creating new device - ", request.DeviceID)
 		
@@ -121,11 +126,15 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 				Message: "Failed to create device",
 				Results: map[string]interface{}{
 					"error": err.Error(),
+					"hint": "Check if user_id + jid combination already exists",
 				},
 			})
 		}
 		
 		logrus.Info("Webhook Lead: Device created successfully - ", newDevice.ID)
+		device = newDevice
+	} else {
+		logrus.Info("Webhook Lead: Using existing device - ", device.ID)
 	}
 
 	// Create lead object with direct field mapping

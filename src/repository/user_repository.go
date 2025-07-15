@@ -647,3 +647,39 @@ func (r *UserRepository) CreateDevice(device *models.UserDevice) error {
 	
 	return nil
 }
+
+
+// GetDeviceByUserAndJID gets a device by user ID and JID combination
+func (r *UserRepository) GetDeviceByUserAndJID(userID, jid string) (*models.UserDevice, error) {
+	device := &models.UserDevice{}
+	query := `
+		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at, updated_at,
+		       COALESCE(min_delay_seconds, 5) as min_delay_seconds,
+		       COALESCE(max_delay_seconds, 15) as max_delay_seconds,
+		       COALESCE(platform, '') as platform
+		FROM user_devices
+		WHERE user_id = $1 AND jid = $2
+		LIMIT 1
+	`
+	
+	err := r.db.QueryRow(query, userID, jid).Scan(
+		&device.ID,
+		&device.UserID,
+		&device.DeviceName,
+		&device.Phone,
+		&device.JID,
+		&device.Status,
+		&device.LastSeen,
+		&device.CreatedAt,
+		&device.UpdatedAt,
+		&device.MinDelaySeconds,
+		&device.MaxDelaySeconds,
+		&device.Platform,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return device, nil
+}
