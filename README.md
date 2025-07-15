@@ -1,10 +1,66 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 15, 2025 - Lead Creation Webhook Added**  
-**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management + Webhook API**
-**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support + External Integration**
+**Last Updated: January 15, 2025 - Platform Device Support & External API Integration**  
+**Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management + Webhook API + External Platform Integration**
+**Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support + External Integration + Platform APIs**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATE: Lead Creation Webhook (January 15, 2025)
+## 🚀 LATEST UPDATE: Platform Device Support & External API Integration (January 15, 2025)
+
+### ✅ NEW: Platform Device Support
+Devices can now be configured to use external platforms (Wablas/Whacenter) instead of WhatsApp Web:
+
+#### **Platform Device Features:**
+- **Skip Status Checks**: Platform devices bypass all automatic status monitoring
+- **Always Online**: Treated as online for campaigns and sequences
+- **External API Routing**: Messages sent via Wablas or Whacenter APIs
+- **No Manual Operations**: Cannot be manually refreshed or logged out
+
+#### **How Platform Devices Work:**
+1. **Normal Device** (platform = NULL): Uses WhatsApp Web as usual
+2. **Wablas Device** (platform = "Wablas"): Routes messages through Wablas API
+3. **Whacenter Device** (platform = "Whacenter"): Routes messages through Whacenter API
+
+#### **Setting Up Platform Devices:**
+
+```sql
+-- Configure device for Wablas
+UPDATE user_devices 
+SET platform = 'Wablas',
+    jid = 'your-wablas-instance-token'
+WHERE id = 'device-uuid';
+
+-- Configure device for Whacenter
+UPDATE user_devices 
+SET platform = 'Whacenter',
+    jid = 'your-whacenter-device-id'
+WHERE id = 'device-uuid';
+
+-- Revert to normal WhatsApp Web
+UPDATE user_devices 
+SET platform = NULL
+WHERE id = 'device-uuid';
+```
+
+#### **API Integration Details:**
+
+**Wablas API:**
+- Text endpoint: `https://my.wablas.com/api/send-message`
+- Image endpoint: `https://my.wablas.com/api/send-image`
+- Authorization: Uses `jid` value as Authorization header
+- Format: Form-encoded data
+
+**Whacenter API:**
+- Single endpoint: `https://api.whacenter.com/api/send`
+- Authentication: Uses `jid` value as device_id parameter
+- Format: JSON payload
+
+#### **Important Notes:**
+- Platform devices are always included in campaigns/sequences
+- JID column stores the API credentials (not WhatsApp JID)
+- Failed API calls are logged and messages marked as failed
+- Both text and image messages supported for all platforms
+
+## 🚀 Previous Update: Lead Creation Webhook (January 15, 2025)
 
 ### ✅ NEW: External Lead Creation via Webhook
 - **Public Endpoint**: POST `/webhook/lead/create` - No authentication required
@@ -508,6 +564,16 @@ if device.Status == "online" { }
 - Minimal resource usage
 
 ## 📋 Feature Summary
+
+### ✅ Platform Device Support & External APIs (NEW - January 15, 2025)
+- [x] Platform device configuration (Wablas/Whacenter)
+- [x] Automatic API routing based on platform
+- [x] Skip all status checks for platform devices
+- [x] Always treat platform devices as online
+- [x] Block manual operations on platform devices
+- [x] Support for both text and image messages
+- [x] API error handling and logging
+- [x] Use JID column for API credentials
 
 ### ✅ Team Member Management (NEW)
 - [x] User Management tab in admin dashboard
@@ -1126,6 +1192,25 @@ IF next_trigger is another sequence (e.g., "advanced_start"):
 ```
 
 ### 🔧 Technical Implementation
+
+#### **Platform Device Architecture**
+```go
+// Message routing based on platform
+if device.Platform != "" {
+    // Route to external API (Wablas/Whacenter)
+    platformSender.SendMessage(device.Platform, device.JID, phone, message, imageURL)
+} else {
+    // Use normal WhatsApp Web
+    whatsappClient.SendMessage(...)
+}
+```
+
+#### **Platform API Integration**
+- **Wablas**: Form-encoded POST with Authorization header
+- **Whacenter**: JSON POST with device_id parameter
+- **Credential Storage**: JID column stores API token/device_id
+- **Error Handling**: API failures mark messages as failed
+- **Logging**: All API responses logged for debugging
 
 #### **Database Schema**
 ```sql
