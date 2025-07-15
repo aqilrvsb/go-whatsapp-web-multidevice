@@ -18,6 +18,7 @@ type Lead struct {
 	TargetStatus string    `json:"target_status" db:"target_status"` // New column: prospect/customer
 	Trigger      string    `json:"trigger" db:"trigger"` // New column: comma-separated sequence triggers
 	Notes        string    `json:"notes" db:"notes"`
+	Platform     string    `json:"platform" db:"platform"` // New column: Whacenter, etc.
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }

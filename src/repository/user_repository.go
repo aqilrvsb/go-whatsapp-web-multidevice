@@ -580,3 +580,53 @@ func (r *UserRepository) GetAllDevices() ([]*models.UserDevice, error) {
 	
 	return devices, nil
 }
+
+// CreateDevice creates a new device with all fields
+func (r *UserRepository) CreateDevice(device *models.UserDevice) error {
+	// Ensure we have required fields
+	if device.ID == "" {
+		device.ID = uuid.New().String()
+	}
+	if device.Status == "" {
+		device.Status = "offline"
+	}
+	if device.CreatedAt.IsZero() {
+		device.CreatedAt = time.Now()
+	}
+	if device.UpdatedAt.IsZero() {
+		device.UpdatedAt = time.Now()
+	}
+	if device.LastSeen.IsZero() {
+		device.LastSeen = time.Now()
+	}
+	
+	query := `
+		INSERT INTO user_devices (
+			id, user_id, device_name, phone, jid, status, 
+			last_seen, created_at, updated_at, 
+			min_delay_seconds, max_delay_seconds, platform
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+	
+	_, err := r.db.Exec(query, 
+		device.ID, 
+		device.UserID, 
+		device.DeviceName,
+		device.Phone,
+		device.JID,
+		device.Status,
+		device.LastSeen,
+		device.CreatedAt,
+		device.UpdatedAt,
+		device.MinDelaySeconds,
+		device.MaxDelaySeconds,
+		device.Platform,
+	)
+	
+	if err != nil {
+		return fmt.Errorf("failed to create device: %w", err)
+	}
+	
+	return nil
+}

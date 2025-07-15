@@ -34,8 +34,8 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	lead.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, platform, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id
 	`
 	
@@ -55,7 +55,7 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	
 	var id int
 	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
 	
 	if err == nil {
 		lead.ID = fmt.Sprintf("%d", id)

@@ -29,6 +29,7 @@ type UserDevice struct {
 	JID             string    `json:"jid,omitempty"`
 	MinDelaySeconds int       `json:"minDelaySeconds"`
 	MaxDelaySeconds int       `json:"maxDelaySeconds"`
+	Platform        string    `json:"platform"` // Whacenter, etc.
 }
 
 // UserSession represents an active user session
