@@ -9,8 +9,6 @@ import (
 	"strings"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	waE2E "go.mau.fi/whatsmeow/binary/proto"
@@ -20,58 +18,18 @@ import (
 
 // WhatsAppMessageSender handles actual WhatsApp message sending
 type WhatsAppMessageSender struct {
-	clientManager   *whatsapp.ClientManager
-	platformSender  *external.PlatformSender
-	userRepo        *repository.UserRepository
+	clientManager *whatsapp.ClientManager
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		clientManager:   whatsapp.GetClientManager(),
-		platformSender:  external.NewPlatformSender(),
-		userRepo:       repository.GetUserRepository(),
+		clientManager: whatsapp.GetClientManager(),
 	}
 }
 
-// SendMessage sends a message via WhatsApp or external platform
+// SendMessage sends a message via WhatsApp
 func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.BroadcastMessage) error {
-	// Get device details to check platform
-	device, err := w.userRepo.GetDeviceByID(deviceID)
-	if err != nil {
-		return fmt.Errorf("failed to get device: %v", err)
-	}
-	
-	// Check if device has platform
-	if device.Platform != "" {
-		// Send via external platform
-		logrus.Infof("Sending message via platform %s for device %s", device.Platform, deviceID)
-		
-		// Get instance/token from device JID (or you can add a separate column)
-		instance := device.JID // Using JID as instance/token
-		
-		err = w.platformSender.SendMessage(
-			device.Platform,
-			instance,
-			msg.RecipientPhone,
-			msg.Message,
-			msg.ImageURL,
-		)
-		
-		if err != nil {
-			return fmt.Errorf("platform send failed: %v", err)
-		}
-		
-		logrus.Infof("Successfully sent message via %s platform", device.Platform)
-		return nil
-	}
-	
-	// Normal WhatsApp sending
-	return w.sendViaWhatsApp(deviceID, msg)
-}
-
-// sendViaWhatsApp sends message via normal WhatsApp
-func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.BroadcastMessage) error {
 	// Get WhatsApp client for device
 	waClient, err := w.clientManager.GetClient(deviceID)
 	if err != nil {
