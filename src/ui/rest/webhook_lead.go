@@ -48,6 +48,11 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 
 	// Log the incoming request for debugging
 	logrus.Info("Webhook Lead: Received request - ", request)
+	
+	// Create a unique key based on phone + user_id to prevent duplicates
+	// This helps if the webhook is called multiple times quickly
+	dedupeKey := request.Phone + "_" + request.UserID
+	logrus.Info("Webhook Lead: Processing request with dedupe key: ", dedupeKey)
 
 	// Basic validation - only check required fields
 	if request.Name == "" {
@@ -170,8 +175,37 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		UpdatedAt:    time.Now(),
 	}
 
-	// Create lead in database
+	// Check if lead with same device_id, user_id, and phone already exists
 	leadRepo := repository.GetLeadRepository()
+	existingLead, err := leadRepo.GetLeadByDeviceUserPhone(device.ID, request.UserID, request.Phone)
+	if err == nil && existingLead != nil {
+		// Lead already exists with same device, user, and phone - skip creation
+		logrus.Info("Webhook Lead: Lead already exists with same device_id, user_id, and phone. Skipping creation.")
+		
+		// Return success but indicate it was a duplicate
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "DUPLICATE_SKIPPED",
+			Message: "Lead already exists with same device, user, and phone",
+			Results: map[string]interface{}{
+				"lead_id":       existingLead.ID,
+				"name":          existingLead.Name,
+				"phone":         existingLead.Phone,
+				"niche":         existingLead.Niche,
+				"trigger":       existingLead.Trigger,
+				"target_status": existingLead.TargetStatus,
+				"device_id":     device.ID,
+				"device_jid":    device.JID,
+				"user_id":       existingLead.UserID,
+				"platform":      existingLead.Platform,
+				"duplicate":     true,
+				"created_at":    existingLead.CreatedAt,
+				"updated_at":    existingLead.UpdatedAt,
+			},
+		})
+	}
+
+	// No duplicate found, create new lead
 	err = leadRepo.CreateLead(lead)
 	if err != nil {
 		logrus.Error("Webhook Lead: Failed to create lead - ", err)
