@@ -24,6 +24,7 @@ var PublicRoutes = []string{
 	"/robots.txt",
 	"/team/login",        // Team member login page
 	"/api/team/login",    // Team member login API
+	"/webhook/lead/create", // Public webhook for lead creation
 }
 
 // CustomAuth middleware for session-based authentication
