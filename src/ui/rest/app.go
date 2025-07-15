@@ -2688,7 +2688,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 			SELECT COUNT(l.phone) 
 			FROM leads l
 			WHERE l.device_id = $1 
-			AND l.niche = $2
+			AND l.niche LIKE '%' || $2 || '%'
 			AND ($3 = 'all' OR l.target_status = $3)
 		`
 		var deviceShouldSend int

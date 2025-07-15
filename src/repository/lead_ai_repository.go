@@ -118,7 +118,7 @@ func (r *leadAIRepository) GetLeadAIByNiche(userID, niche string) ([]models.Lead
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE user_id = $1 AND niche = $2
+		WHERE user_id = $1 AND niche LIKE '%' || $2 || '%'
 		ORDER BY created_at DESC`
 	
 	return r.getLeadAIList(query, userID, niche)
@@ -132,7 +132,7 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = $1 AND niche = $2 AND status = 'pending'
+			WHERE user_id = $1 AND niche LIKE '%' || $2 || '%' AND status = 'pending'
 			ORDER BY created_at ASC`
 		args = []interface{}{userID, niche}
 	} else {
@@ -140,7 +140,7 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = $1 AND niche = $2 AND target_status = $3 AND status = 'pending'
+			WHERE user_id = $1 AND niche LIKE '%' || $2 || '%' AND target_status = $3 AND status = 'pending'
 			ORDER BY created_at ASC`
 		args = []interface{}{userID, niche, targetStatus}
 	}

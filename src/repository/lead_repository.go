@@ -182,7 +182,7 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 		SELECT l.id, l.user_id, l.name, l.phone, l.niche, 
 		       l.journey, l.status, l.created_at, l.updated_at
 		FROM leads l
-		WHERE l.niche = $1
+		WHERE l.niche LIKE '%' || $1 || '%'
 		AND NOT EXISTS (
 			SELECT 1 FROM sequence_contacts sc 
 			WHERE sc.sequence_id = $2 

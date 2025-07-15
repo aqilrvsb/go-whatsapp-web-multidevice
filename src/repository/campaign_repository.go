@@ -388,7 +388,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		SELECT COUNT(l.phone) 
 		FROM leads l
 		WHERE l.user_id = $1 
-		AND l.niche = $2
+		AND l.niche LIKE '%' || $2 || '%'
 		AND ($3 = 'all' OR l.target_status = $3)
 	`
 	
@@ -397,7 +397,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		SELECT l.phone, l.device_id, l.niche, l.target_status 
 		FROM leads l
 		WHERE l.user_id = $1 
-		AND l.niche = $2
+		AND l.niche LIKE '%' || $2 || '%'
 		AND ($3 = 'all' OR l.target_status = $3)
 	`
 	
