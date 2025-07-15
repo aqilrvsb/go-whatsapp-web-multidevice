@@ -3,6 +3,7 @@
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
@@ -2353,9 +2354,22 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Parse CSV
-	lines := strings.Split(string(content), "\n")
-	if len(lines) < 2 {
+	// Parse CSV using csv.Reader
+	reader := csv.NewReader(strings.NewReader(string(content)))
+	reader.LazyQuotes = true
+	reader.TrimLeadingSpace = true
+	
+	// Read all records
+	records, err := reader.ReadAll()
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to parse CSV: " + err.Error(),
+		})
+	}
+	
+	if len(records) < 2 {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "BAD_REQUEST",
@@ -2364,9 +2378,9 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 	}
 	
 	// Parse headers
-	headers := strings.Split(strings.ToLower(lines[0]), ",")
+	headers := records[0]
 	for i := range headers {
-		headers[i] = strings.Trim(headers[i], "\" \r")
+		headers[i] = strings.ToLower(strings.TrimSpace(headers[i]))
 	}
 	
 	// Find column indices
@@ -2378,6 +2392,7 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 	notesIndex := -1
 	journeyIndex := -1
 	deviceIdIndex := -1
+	triggerIndex := -1
 	
 	for i, h := range headers {
 		switch h {
@@ -2397,6 +2412,8 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			journeyIndex = i
 		case "device_id":
 			deviceIdIndex = i
+		case "trigger":
+			triggerIndex = i
 		}
 	}
 	
@@ -2413,21 +2430,18 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 	successCount := 0
 	errorCount := 0
 	
-	for i := 1; i < len(lines); i++ {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
-		}
+	for i := 1; i < len(records); i++ {
+		record := records[i]
 		
-		values := strings.Split(line, ",")
-		for j := range values {
-			values[j] = strings.Trim(values[j], "\" \r")
+		// Skip empty rows
+		if len(record) == 0 {
+			continue
 		}
 		
 		// Get values safely
 		getValue := func(index int) string {
-			if index >= 0 && index < len(values) {
-				return values[index]
+			if index >= 0 && index < len(record) {
+				return strings.TrimSpace(record[index])
 			}
 			return ""
 		}
@@ -2461,6 +2475,7 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			Niche:        getValue(nicheIndex),
 			TargetStatus: targetStatus,
 			Notes:        notes,
+			Trigger:      getValue(triggerIndex),
 		}
 		
 		err := leadRepo.CreateLead(lead)
