@@ -96,7 +96,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 			UserID:           request.UserID,
 			DeviceName:       request.DeviceName,
 			Phone:            "", // null/empty
-			JID:              "", // null/empty
+			JID:              request.DeviceID, // Also save device_id in JID column
 			Status:           "online",
 			LastSeen:         time.Now(),
 			CreatedAt:        time.Now(),
