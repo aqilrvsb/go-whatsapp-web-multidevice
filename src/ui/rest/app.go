@@ -80,6 +80,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/devices/:id/send", rest.SendWhatsAppWebMessage)
 	app.Post("/api/devices/:id/sync", rest.SyncWhatsAppDevice)
 	app.Get("/api/devices/:id/diagnose", rest.DiagnoseDevice)
+	app.Post("/api/devices/:id/sync-contacts", rest.SyncWhatsAppContacts)
+	app.Post("/api/devices/merge-contacts", rest.MergeDeviceContacts)
 	
 	// Media serving endpoint
 	app.Get("/media/:filename", rest.ServeMedia)

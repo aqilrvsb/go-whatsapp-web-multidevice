@@ -179,6 +179,20 @@ func HandleHistorySyncForChats(deviceID string, client *whatsmeow.Client, evt *e
 	
 	// Also process messages
 	HandleHistorySyncForWebView(deviceID, evt)
+	
+	// Auto-save chats to leads after history sync
+	cm := GetClientManager()
+	if client, err := cm.GetClient(deviceID); err == nil && client.Store.ID != nil {
+		// Get user ID from device
+		userRepo := repository.GetUserRepository()
+		devices, _ := userRepo.GetAllDevices()
+		for _, device := range devices {
+			if device.ID == deviceID {
+				AutoSaveChatsToLeads(deviceID, device.UserID)
+				break
+			}
+		}
+	}
 }
 
 // GetChatsFromDatabase retrieves ONLY chats with actual messages
@@ -206,7 +220,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				AND chat_jid != 'status@broadcast'  -- Exclude status
 				AND message_text IS NOT NULL
 				AND message_text != ''
-				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::BIGINT
+				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '6 months')::BIGINT
 			ORDER BY chat_jid, timestamp DESC
 		),
 		chat_counts AS (
@@ -301,7 +315,7 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 	db := userRepo.DB()
 	
 	if days <= 0 {
-		days = 30 // Default to 30 days
+		days = 180 // Default to 6 months (180 days)
 	}
 	
 	// Query that only returns chats with messages in the specified time period

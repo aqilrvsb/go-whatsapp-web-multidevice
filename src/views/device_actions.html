@@ -135,6 +135,20 @@
 
         <!-- Actions Grid -->
         <div class="row">
+            <!-- Sync WhatsApp Contacts -->
+            <div class="col-md-6">
+                <div class="action-card">
+                    <h5 class="mb-3">
+                        <i class="bi bi-arrow-repeat text-primary"></i> Sync WhatsApp Contacts
+                    </h5>
+                    <p class="text-muted mb-3">Import all WhatsApp contacts from the last 6 months as leads. Duplicates will be skipped automatically.</p>
+                    <button type="button" class="test-button w-100" onclick="syncContacts()">
+                        <i class="bi bi-download"></i> Sync Contacts to Leads
+                    </button>
+                    <div id="syncResult" class="result-box mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
             <!-- Send Message -->
             <div class="col-md-6">
                 <div class="action-card">
@@ -603,6 +617,42 @@
             // Update display
             const logEl = document.getElementById('activityLog');
             logEl.innerHTML = activityLog.join('<br>');
+        }
+        
+        // Sync WhatsApp contacts to leads
+        function syncContacts() {
+            const resultBox = document.getElementById('syncResult');
+            
+            resultBox.style.display = 'block';
+            resultBox.className = 'result-box';
+            resultBox.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing contacts... This may take a few seconds.';
+            
+            fetch(`/api/devices/${deviceId}/sync-contacts`, {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    resultBox.className = 'result-box success-result';
+                    resultBox.innerHTML = `<i class="bi bi-check-circle"></i> ${data.message}`;
+                    logActivity('Sync Contacts', 'Started contact sync', 'success');
+                    
+                    // Show link to leads page
+                    setTimeout(() => {
+                        resultBox.innerHTML += `<br><a href="/device/${deviceId}/leads" class="btn btn-sm btn-primary mt-2">View Leads</a>`;
+                    }, 1000);
+                } else {
+                    resultBox.className = 'result-box error-result';
+                    resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Failed: ${data.message || 'Unknown error'}`;
+                    logActivity('Sync Contacts', `Failed: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                resultBox.className = 'result-box error-result';
+                resultBox.innerHTML = `<i class="bi bi-x-circle"></i> Error: ${error.message}`;
+                logActivity('Sync Contacts', `Error: ${error.message}`, 'error');
+            });
         }
         
         // Show warning
