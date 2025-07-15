@@ -60,6 +60,8 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 	}
 	
 	logrus.Infof("AI Campaign: %s, Device Limit: %d", campaign.Title, campaign.Limit)
+	logrus.Infof("Looking for leads with UserID: %s, Niche: %s, TargetStatus: %s", 
+		campaign.UserID, campaign.Niche, campaign.TargetStatus)
 	
 	// 2. Get all pending AI leads based on campaign criteria
 	var leads []models.LeadAI
@@ -73,6 +75,8 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 		return fmt.Errorf("failed to get AI leads: %w", err)
 	}
 	
+	logrus.Infof("Found %d total AI leads before filtering", len(leads))
+	
 	// Filter only pending leads
 	var pendingLeads []models.LeadAI
 	for _, lead := range leads {
@@ -80,6 +84,8 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 			pendingLeads = append(pendingLeads, lead)
 		}
 	}
+	
+	logrus.Infof("Found %d pending leads after filtering", len(pendingLeads))
 	
 	if len(pendingLeads) == 0 {
 		logrus.Info("No pending leads found for AI campaign")
