@@ -307,12 +307,15 @@
                 <div class="modal-body">
                     <p>Upload a CSV file with the following columns:</p>
                     <ul>
-                        <li>name (required)</li>
-                        <li>phone (required - format: 60123456789)</li>
-                        <li>niche (optional - can be single: EXSTART or multiple: EXSTART,ITADRESS)</li>
-                        <li>additional_note (optional)</li>
-                        <li>status (optional: prospect, customer)</li>
+                        <li><strong>name</strong> (required) - Lead's name</li>
+                        <li><strong>phone</strong> (required) - Phone number in format like 60123456789</li>
+                        <li><strong>niche</strong> (required) - Can be single (EXSTART) or multiple (EXSTART,ITADRESS)</li>
+                        <li><strong>target_status</strong> (required) - Either "prospect" or "customer"</li>
+                        <li><strong>trigger</strong> (optional) - Can be single (EXSTART) or multiple (EXSTART,ITADRESS)</li>
                     </ul>
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Only these 5 columns are accepted. Any other columns will be ignored.
+                    </div>
                     <div class="mt-3">
                         <input type="file" class="form-control" id="importFile" accept=".csv">
                     </div>
@@ -664,14 +667,13 @@
         
         // Convert to CSV
         function convertToCSV(data) {
-            const headers = ['name', 'phone', 'niche', 'target_status', 'additional_note', 'device_id'];
+            const headers = ['name', 'phone', 'niche', 'target_status', 'trigger'];
             const rows = data.map(lead => [
                 lead.name,
                 lead.phone,
                 lead.niche || '',
                 lead.target_status || 'prospect',
-                lead.notes || lead.journey || '',
-                lead.device_id || deviceId
+                lead.trigger || ''
             ]);
             
             const csvContent = [
@@ -703,9 +705,13 @@
                 
                 const nameIndex = headers.indexOf('name');
                 const phoneIndex = headers.indexOf('phone');
+                const nicheIndex = headers.indexOf('niche');
+                const targetStatusIndex = headers.indexOf('target_status');
+                const triggerIndex = headers.indexOf('trigger');
                 
-                if (nameIndex === -1 || phoneIndex === -1) {
-                    showAlert('danger', 'CSV must have "name" and "phone" columns');
+                // Validate required columns
+                if (nameIndex === -1 || phoneIndex === -1 || nicheIndex === -1 || targetStatusIndex === -1) {
+                    showAlert('danger', 'CSV must have "name", "phone", "niche", and "target_status" columns');
                     return;
                 }
                 
@@ -714,25 +720,40 @@
                     if (lines[i].trim()) {
                         const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
                         
-                        // Get target_status - support both old 'status' and new 'target_status' column names
-                        let targetStatus = values[headers.indexOf('target_status')] || 
-                                         values[headers.indexOf('status')] || 
-                                         'prospect';
+                        // Get target_status and validate
+                        let targetStatus = values[targetStatusIndex] || 'prospect';
                         
                         // Validate target_status
                         if (targetStatus !== 'prospect' && targetStatus !== 'customer') {
+                            showAlert('warning', `Row ${i}: Invalid target_status "${targetStatus}". Must be "prospect" or "customer". Defaulting to "prospect".`);
                             targetStatus = 'prospect';
                         }
                         
+                        // Validate required fields
+                        if (!values[nameIndex] || !values[phoneIndex] || !values[nicheIndex]) {
+                            showAlert('warning', `Row ${i}: Skipping - missing required fields (name, phone, or niche)`);
+                            continue;
+                        }
+                        
                         newLeads.push({
-                            device_id: values[headers.indexOf('device_id')] || deviceId,
+                            device_id: deviceId,
                             name: values[nameIndex],
                             phone: values[phoneIndex],
-                            niche: values[headers.indexOf('niche')] || '',
+                            niche: values[nicheIndex],
                             status: targetStatus,  // This will be mapped to target_status in the backend
-                            journey: values[headers.indexOf('additional_note')] || values[headers.indexOf('journey')] || ''
+                            trigger: values[triggerIndex] || ''
                         });
                     }
+                }
+                
+                if (newLeads.length === 0) {
+                    showAlert('danger', 'No valid leads found in the CSV file');
+                    return;
+                }
+                
+                // Show confirmation
+                if (!confirm(`Import ${newLeads.length} leads?`)) {
+                    return;
                 }
                 
                 // Batch create leads

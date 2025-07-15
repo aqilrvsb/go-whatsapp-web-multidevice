@@ -2279,16 +2279,21 @@ func (handler *App) ExportLeads(c *fiber.Ctx) error {
 	
 	// Convert to CSV
 	var csvContent strings.Builder
-	csvContent.WriteString("name,phone,niche,target_status,additional_note,device_id\n")
+	csvContent.WriteString("name,phone,niche,target_status,trigger\n")
 	
 	for _, lead := range leads {
-		csvContent.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+		// Ensure target_status has a value
+		targetStatus := lead.TargetStatus
+		if targetStatus == "" {
+			targetStatus = "prospect"
+		}
+		
+		csvContent.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
 			lead.Name,
 			lead.Phone,
 			lead.Niche,
-			lead.TargetStatus,
-			lead.Notes,
-			lead.DeviceID,
+			targetStatus,
+			lead.Trigger,
 		))
 	}
 	
@@ -2389,9 +2394,6 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 	nicheIndex := -1
 	targetStatusIndex := -1
 	statusIndex := -1
-	notesIndex := -1
-	journeyIndex := -1
-	deviceIdIndex := -1
 	triggerIndex := -1
 	
 	for i, h := range headers {
@@ -2406,22 +2408,16 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			targetStatusIndex = i
 		case "status":
 			statusIndex = i
-		case "additional_note", "notes":
-			notesIndex = i
-		case "journey":
-			journeyIndex = i
-		case "device_id":
-			deviceIdIndex = i
 		case "trigger":
 			triggerIndex = i
 		}
 	}
 	
-	if nameIndex == -1 || phoneIndex == -1 {
+	if nameIndex == -1 || phoneIndex == -1 || nicheIndex == -1 || (targetStatusIndex == -1 && statusIndex == -1) {
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "BAD_REQUEST",
-			Message: "CSV must have 'name' and 'phone' columns",
+			Message: "CSV must have 'name', 'phone', 'niche', and 'target_status' columns",
 		})
 	}
 	
@@ -2446,6 +2442,18 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			return ""
 		}
 		
+		// Get required values
+		name := getValue(nameIndex)
+		phone := getValue(phoneIndex)
+		niche := getValue(nicheIndex)
+		
+		// Skip if required fields are empty
+		if name == "" || phone == "" || niche == "" {
+			errorCount++
+			log.Printf("Row %d: Skipping - missing required fields (name, phone, or niche)", i)
+			continue
+		}
+		
 		// Get target status (support both columns)
 		targetStatus := getValue(targetStatusIndex)
 		if targetStatus == "" {
@@ -2455,26 +2463,14 @@ func (handler *App) ImportLeads(c *fiber.Ctx) error {
 			targetStatus = "prospect"
 		}
 		
-		// Get notes
-		notes := getValue(notesIndex)
-		if notes == "" {
-			notes = getValue(journeyIndex)
-		}
-		
-		// Get device ID
-		leadDeviceId := getValue(deviceIdIndex)
-		if leadDeviceId == "" {
-			leadDeviceId = deviceId
-		}
-		
 		lead := &models.Lead{
 			UserID:       session.UserID,
-			DeviceID:     leadDeviceId,
-			Name:         getValue(nameIndex),
-			Phone:        getValue(phoneIndex),
-			Niche:        getValue(nicheIndex),
+			DeviceID:     deviceId, // Always use the current device ID
+			Name:         name,
+			Phone:        phone,
+			Niche:        niche,
 			TargetStatus: targetStatus,
-			Notes:        notes,
+			Notes:        "", // No longer importing notes
 			Trigger:      getValue(triggerIndex),
 		}
 		
