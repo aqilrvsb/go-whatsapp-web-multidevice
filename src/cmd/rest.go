@@ -165,6 +165,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartBroadcastCoordinator()
 	logrus.Info("Broadcast coordinator started")
 	
+	// Start campaign completion checker
+	go usecase.StartCampaignCompletionChecker()
+	logrus.Info("Campaign completion checker started")
+	
 	// Auto-reconnect devices on startup - DISABLED
 	// Using MonitorDeviceErrors instead for continuous monitoring
 	/*

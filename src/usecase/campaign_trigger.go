@@ -175,11 +175,9 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 		logrus.Infof("Campaign %s triggered: %d messages queued across %d devices, %d failed", 
 			campaign.Title, successful, len(connectedDevices), failed)
 	} else {
-		// No leads found - mark as completed
-		if err := campaignRepo.UpdateCampaignStatus(campaign.ID, "completed"); err != nil {
-			logrus.Errorf("Failed to update campaign status to completed: %v", err)
-		}
-		logrus.Infof("Campaign %s completed: No leads found matching criteria", campaign.Title)
+		// No leads found - keep as scheduled, don't mark as completed yet
+		// The campaign completion checker will handle this properly
+		logrus.Infof("Campaign %s: No leads found at this time, keeping status as scheduled", campaign.Title)
 	}
 }
 
