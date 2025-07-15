@@ -13,12 +13,64 @@
 - **Instant Response**: Returns lead_id immediately after creation
 - **Perfect for Automation**: Integrate with any external service or bot
 
-### 🔧 Quick Example:
-```bash
-curl -X POST https://your-app.railway.app/webhook/lead/create \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","phone":"60123456789","target_status":"prospect","device_id":"device-id","user_id":"user_id","niche":"EXSTART","trigger":"NEWNP"}'
+### 🔧 Webhook Quick Start:
+
+#### 1. Endpoint URL:
 ```
+https://web-production-b777.up.railway.app/webhook/lead/create
+```
+
+#### 2. Request Format:
+```json
+{
+  "name": "John Doe",
+  "phone": "60123456789",
+  "target_status": "prospect",
+  "device_id": "your-device-uuid",
+  "user_id": "your-user-uuid",
+  "niche": "EXSTART",
+  "trigger": "NEWNP"
+}
+```
+
+#### 3. Testing with Postman:
+- Method: `POST`
+- Headers: `Content-Type: application/json`
+- Body: Raw JSON (as above)
+- No authentication needed!
+
+#### 4. PHP Example:
+```php
+$url = 'https://web-production-b777.up.railway.app/webhook/lead/create';
+$data = array(
+    'name' => 'John Doe',
+    'phone' => '60123456789',
+    'target_status' => 'prospect',
+    'device_id' => 'your-device-uuid',
+    'user_id' => 'your-user-uuid',
+    'niche' => 'EXSTART',
+    'trigger' => 'NEWNP'
+);
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_POST, 1);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+curl_close($ch);
+```
+
+#### 5. Important Notes:
+- **user_id** and **device_id** must be valid UUIDs from your system
+- Get these IDs from your admin dashboard
+- Required fields: name, phone, user_id, device_id
+- Optional fields: target_status, niche, trigger
+
+#### 6. Common Errors:
+- `Invalid UUID syntax`: Ensure IDs are in format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- `401 Unauthorized`: Fixed! Webhook is now public (no auth needed)
+- `400 Bad Request`: Check JSON format and required fields
 
 ## 🚀 Previous Update: Team Member Management System (January 15, 2025)
 
@@ -497,18 +549,24 @@ if device.Status == "online" { }
 
 #### Webhook Usage Example:
 ```bash
-curl -X POST https://your-app.railway.app/webhook/lead/create \
+# Your actual webhook URL:
+https://web-production-b777.up.railway.app/webhook/lead/create
+
+# Example request:
+curl -X POST https://web-production-b777.up.railway.app/webhook/lead/create \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
     "phone": "60123456789",
     "target_status": "prospect",
-    "device_id": "device-id",
-    "user_id": "user_id",
+    "device_id": "44f6f5bd-56a5-4f1e-ac78-d4f33aa75158",
+    "user_id": "7d8e9f0a-1b2c-3d4e-5f6g-7h8i9j0k1l2m",
     "niche": "EXSTART",
     "trigger": "NEWNP"
   }'
 ```
+
+⚠️ **Important**: user_id and device_id must be valid UUIDs (without quotes at the end!)
 
 #### PHP cURL Example:
 ```php
