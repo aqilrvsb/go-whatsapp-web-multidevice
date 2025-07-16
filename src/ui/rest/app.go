@@ -3006,15 +3006,45 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 	
 	rowsAffected, _ := result.RowsAffected()
 	
-	// The broadcast workers will automatically pick up the pending messages
-	// No need to explicitly trigger them as they continuously check for pending messages
+	if rowsAffected > 0 {
+		// Get campaign details to check if it's AI campaign
+		var aiType sql.NullString
+		var campaignStatus string
+		err = db.QueryRow("SELECT ai, status FROM campaigns WHERE id = $1", campaignId).Scan(&aiType, &campaignStatus)
+		if err == nil {
+			// If campaign is finished, update it back to triggered/processing
+			if campaignStatus == "finished" || campaignStatus == "completed" {
+				newStatus := "triggered"
+				if aiType.Valid && aiType.String == "ai" {
+					newStatus = "processing"
+				}
+				
+				updateCampaignQuery := `
+					UPDATE campaigns 
+					SET status = $1, updated_at = CURRENT_TIMESTAMP 
+					WHERE id = $2
+				`
+				_, err = db.Exec(updateCampaignQuery, newStatus, campaignId)
+				if err != nil {
+					logrus.Warnf("Failed to update campaign status for retry: %v", err)
+				} else {
+					logrus.Infof("Campaign %d status updated to %s for retry", campaignId, newStatus)
+				}
+			}
+		}
+		
+		logrus.Infof("Retry requested for campaign %d, device %s: %d messages moved to pending", 
+			campaignId, deviceId, rowsAffected)
+	}
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: fmt.Sprintf("Successfully queued %d messages for retry", rowsAffected),
 		Results: map[string]interface{}{
-			"retried": rowsAffected,
+			"retried":   rowsAffected,
+			"campaignId": campaignId,
+			"deviceId":   deviceId,
 		},
 	})
 }
