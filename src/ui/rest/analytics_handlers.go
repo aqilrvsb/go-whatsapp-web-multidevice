@@ -91,8 +91,8 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	broadcastQuery := `
 		SELECT 
 			COALESCE(COUNT(*), 0) as total,
-			COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent,
-			COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed
+			COALESCE(COUNT(CASE WHEN bm.status = 'sent' THEN 1 END), 0) as sent,
+			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
 		INNER JOIN campaigns c ON bm.campaign_id = c.id
 		WHERE bm.created_at BETWEEN $1 AND $2`
@@ -125,8 +125,8 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	chartQuery := `
 		SELECT 
 			DATE(bm.created_at) as date,
-			COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent,
-			COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed
+			COALESCE(COUNT(CASE WHEN bm.status = 'sent' THEN 1 END), 0) as sent,
+			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
 		INNER JOIN campaigns c ON bm.campaign_id = c.id
 		WHERE bm.created_at BETWEEN $1 AND $2`
@@ -294,7 +294,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE s.status = 'active' AND sc.created_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.completed_at BETWEEN $1 AND $2`
 
 	args = []interface{}{start, end}
 	argCount := 3
@@ -323,13 +323,13 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	// Get chart data (only from active sequences)
 	chartQuery := `
 		SELECT 
-			DATE(COALESCE(sc.completed_at, sc.created_at)) as date,
+			DATE(sc.completed_at) as date,
 			COALESCE(COUNT(CASE WHEN sc.status = 'sent' THEN 1 END), 0) as completed,
 			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed,
 			COALESCE(COUNT(CASE WHEN sc.status IN ('pending', 'active') THEN 1 END), 0) as pending
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE s.status = 'active' AND sc.created_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.completed_at BETWEEN $1 AND $2`
 
 	args = []interface{}{start, end}
 	argCount = 3
@@ -345,7 +345,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		args = append(args, nicheFilter)
 	}
 
-	chartQuery += " GROUP BY date ORDER BY date"
+	chartQuery += " GROUP BY DATE(sc.completed_at) ORDER BY date"
 
 	rows, err := db.Query(chartQuery, args...)
 	if err != nil {

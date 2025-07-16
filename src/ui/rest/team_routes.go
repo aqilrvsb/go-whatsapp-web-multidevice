@@ -338,7 +338,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		if startDate != "" && endDate != "" {
 			paramCount++
-			query += " AND DATE(sc.created_at) BETWEEN $" + string(rune('0'+paramCount))
+			query += " AND DATE(sc.completed_at) BETWEEN $" + string(rune('0'+paramCount))
 			paramCount++
 			query += " AND $" + string(rune('0'+paramCount))
 			args = append(args, startDate, endDate)
