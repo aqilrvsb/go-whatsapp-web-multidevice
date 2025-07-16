@@ -1171,21 +1171,28 @@
                 const lead = leads.find(l => l.id === leadId);
                 if (!lead) return Promise.resolve();
                 
+                // Debug logging
+                console.log('Updating lead:', leadId, 'with target_status:', updateData.target_status);
+                
+                const payload = {
+                    device_id: lead.device_id,
+                    name: lead.name,
+                    phone: lead.phone,
+                    niche: updateData.niche !== undefined ? updateData.niche : lead.niche,
+                    target_status: updateData.target_status !== undefined ? updateData.target_status : (lead.target_status || 'prospect'),
+                    trigger: updateData.trigger !== undefined ? updateData.trigger : lead.trigger,
+                    journey: lead.journey || lead.notes || ''
+                };
+                
+                console.log('Payload for lead', leadId, ':', payload);
+                
                 return fetch(`/api/leads/${leadId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     credentials: 'include',
-                    body: JSON.stringify({
-                        device_id: lead.device_id,
-                        name: lead.name,
-                        phone: lead.phone,
-                        niche: updateData.niche !== undefined ? updateData.niche : lead.niche,
-                        target_status: updateData.target_status !== undefined ? updateData.target_status : lead.target_status,
-                        trigger: updateData.trigger !== undefined ? updateData.trigger : lead.trigger,
-                        journey: lead.journey || lead.notes || ''
-                    })
+                    body: JSON.stringify(payload)
                 });
             });
             

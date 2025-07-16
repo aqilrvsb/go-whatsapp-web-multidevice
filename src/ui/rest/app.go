@@ -785,13 +785,13 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 	}
 	
 	var request struct {
-		DeviceID string `json:"device_id"`
-		Name     string `json:"name"`
-		Phone    string `json:"phone"`
-		Niche    string `json:"niche"`
-		Journey  string `json:"journey"`
-		Status   string `json:"status"`
-		Trigger  string `json:"trigger"` // Add trigger field
+		DeviceID     string `json:"device_id"`
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Niche        string `json:"niche"`
+		Journey      string `json:"journey"`
+		TargetStatus string `json:"target_status"` // Changed from status to target_status
+		Trigger      string `json:"trigger"`
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
@@ -812,7 +812,7 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 		Niche:        request.Niche,
 		Source:       "manual", // Keep source as manual
 		Status:       "", // Keep empty for backward compatibility
-		TargetStatus: request.Status, // Map status from frontend to target_status
+		TargetStatus: request.TargetStatus, // Use TargetStatus directly from request
 		Trigger:      request.Trigger, // Add trigger
 		Notes:        request.Journey, // Map journey to notes field
 	}
