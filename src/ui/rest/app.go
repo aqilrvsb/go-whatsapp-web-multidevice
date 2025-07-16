@@ -2683,6 +2683,13 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	// Calculate per-device statistics based on actual leads
 	
 	for deviceId, report := range deviceMap {
+		// Only include devices that have messages for this campaign
+		if report.TotalLeads == 0 {
+			// Skip devices with no messages
+			log.Printf("Device Report - Skipping device %s with 0 messages", deviceId)
+			continue
+		}
+		
 		// Count leads for this device matching campaign criteria
 		deviceLeadQuery := `
 			SELECT COUNT(l.phone) 
@@ -2937,8 +2944,30 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Update failed messages to pending status for retry
+	// Check if device is online before allowing retry
 	db := database.GetDB()
+	var deviceStatus string
+	var deviceName string
+	err = db.QueryRow("SELECT status, device_name FROM user_devices WHERE id = $1 AND user_id = $2", 
+		deviceId, session.UserID).Scan(&deviceStatus, &deviceName)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Only allow retry if device is online
+	if deviceStatus != "online" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "DEVICE_OFFLINE",
+			Message: fmt.Sprintf("Cannot retry messages: Device '%s' is offline", deviceName),
+		})
+	}
+	
+	// Update failed messages to pending status for retry
 	query := `
 		UPDATE broadcast_messages
 		SET status = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
