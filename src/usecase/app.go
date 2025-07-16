@@ -50,12 +50,24 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	// Create a new WhatsApp client for this device
 	newClient := whatsmeow.NewClient(device, waLog.Stdout("Client", config.WhatsappLogLevel, true))
 	
+	// Configure client for better stability
+	newClient.EnableAutoReconnect = true
+	newClient.AutoTrustIdentity = true
+	
 	// Channel to signal successful connection
 	connectedChan := make(chan bool, 1)
 	
 	// Add event handler to properly register device after successful login
 	newClient.AddEventHandler(func(evt interface{}) {
 		switch v := evt.(type) {
+		case *events.Disconnected:
+			logrus.Warnf("Device disconnected event received")
+			// Don't panic, let connection manager handle it
+		case *events.StreamError:
+			logrus.Errorf("Stream error: %v", v)
+			// Let auto-reconnect handle it
+		case *events.StreamReplaced:
+			logrus.Warn("Stream replaced - another client connected with same credentials")
 		case *events.PairSuccess:
 			logrus.Infof("Pair success event: %s", v.ID.String())
 		case *events.Connected, *events.PushNameSetting:
