@@ -6,6 +6,7 @@ import (
 	"sync"
 	"strings"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -127,6 +128,19 @@ func (dm *DeviceManager) CreateDeviceSession(deviceID, userID, phone string) (*D
 
 // GetDeviceConnection gets an existing device connection
 func (dm *DeviceManager) GetDeviceConnection(deviceID string) (*DeviceConnection, error) {
+	// First check if this is a platform device
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err == nil && device.Platform != "" {
+		// Return a dummy connection for platform devices
+		return &DeviceConnection{
+			DeviceID:  deviceID,
+			UserID:    device.UserID,
+			Phone:     device.Phone,
+			Connected: true, // Always consider platform devices as connected
+		}, nil
+	}
+	
 	dm.mu.RLock()
 	defer dm.mu.RUnlock()
 	

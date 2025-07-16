@@ -90,6 +90,13 @@ func (dhm *DeviceHealthMonitor) checkAllDevices() {
 
 // checkDeviceHealth checks health of a single device
 func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whatsmeow.Client, userRepo *repository.UserRepository) {
+	// First check if this is a platform device
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err == nil && device.Platform != "" {
+		// Skip health check for platform devices (Wablas, Whacenter, etc)
+		return
+	}
+	
 	if client == nil {
 		logrus.Warnf("Device %s has nil client, removing from manager", deviceID)
 		cm := GetClientManager()
@@ -128,6 +135,11 @@ func (dhm *DeviceHealthMonitor) reconnectDevice(deviceID string) error {
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return fmt.Errorf("device not found: %v", err)
+	}
+	
+	// Skip reconnection for platform devices
+	if device.Platform != "" {
+		return nil
 	}
 	
 	if device.JID == "" {

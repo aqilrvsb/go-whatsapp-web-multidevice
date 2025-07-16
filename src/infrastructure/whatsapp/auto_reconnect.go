@@ -29,9 +29,10 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	
 	// Find all devices that have a JID and were online (previously connected)
 	rows, err := db.Query(`
-		SELECT id, device_name, phone, jid, user_id
+		SELECT id, device_name, phone, jid, user_id, COALESCE(platform, '') as platform
 		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
+		AND (platform IS NULL OR platform = '')
 		ORDER BY last_seen DESC
 	`)
 	if err != nil {
@@ -44,10 +45,15 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 	attemptCount := 0
 	
 	for rows.Next() {
-		var deviceID, name, phone, jid, userID string
-		err := rows.Scan(&deviceID, &name, &phone, &jid, &userID)
+		var deviceID, name, phone, jid, userID, platform string
+		err := rows.Scan(&deviceID, &name, &phone, &jid, &userID, &platform)
 		if err != nil {
 			logrus.Warnf("Failed to scan device row: %v", err)
+			continue
+		}
+		
+		// Skip platform devices - this should not happen due to WHERE clause, but double check
+		if platform != "" {
 			continue
 		}
 		
