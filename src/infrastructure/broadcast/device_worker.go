@@ -60,7 +60,7 @@ func NewDeviceWorker(deviceID string, client *whatsmeow.Client, minDelay, maxDel
 // Start starts the worker
 func (dw *DeviceWorker) Start() {
 	go dw.processMessages()
-	go dw.healthCheck()
+	// go dw.healthCheck() // DISABLED - Device Health Monitor is the single source of truth
 }
 
 // Stop stops the worker
@@ -270,7 +270,8 @@ func (dw *DeviceWorker) getRandomDelay() time.Duration {
 	return time.Duration(delay) * time.Second
 }
 
-// healthCheck monitors worker health
+// healthCheck monitors worker health - DISABLED (using Device Health Monitor instead)
+/*
 func (dw *DeviceWorker) healthCheck() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -293,6 +294,7 @@ func (dw *DeviceWorker) healthCheck() {
 		}
 	}
 }
+*/
 
 // SendMessage sends a message (implements direct sending without queue)
 func (dw *DeviceWorker) SendMessage(msg domainBroadcast.BroadcastMessage) error {
@@ -319,8 +321,15 @@ func (dw *DeviceWorker) IsHealthy() bool {
 		return false
 	}
 	
-	// Check if client is still connected
-	if dw.client == nil || !dw.client.IsConnected() {
+	// Check device status from DATABASE instead of WhatsApp
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(dw.deviceID)
+	if err != nil || device == nil {
+		return false
+	}
+	
+	// Check if device is online in database
+	if device.Status != "online" {
 		return false
 	}
 	

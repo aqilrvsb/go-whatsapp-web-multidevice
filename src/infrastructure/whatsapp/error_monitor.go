@@ -119,6 +119,9 @@ func (hook *errorHook) Fire(entry *logrus.Entry) error {
 
 // MonitorDeviceErrors starts monitoring for device connection errors
 func MonitorDeviceErrors() {
+	logrus.Info("Error monitor DISABLED - no auto reconnect")
+	return // DISABLED - No auto reconnect
+	/*
 	if errorMonitor == nil {
 		InitErrorMonitor()
 	}
@@ -133,4 +136,5 @@ func MonitorDeviceErrors() {
 		// This will reconnect all devices that were online before
 		AutoReconnectOnlineDevices()
 	}()
+	*/
 }

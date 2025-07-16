@@ -41,6 +41,9 @@ func GetAutoConnectionMonitor() *AutoConnectionMonitor {
 
 // Start begins automatic connection monitoring
 func (acm *AutoConnectionMonitor) Start() error {
+	logrus.Info("Auto connection monitor DISABLED - no auto reconnect")
+	return nil // DISABLED - No auto reconnect
+	/*
 	acm.mu.Lock()
 	defer acm.mu.Unlock()
 	
@@ -53,6 +56,7 @@ func (acm *AutoConnectionMonitor) Start() error {
 	
 	logrus.Info("Auto connection monitor started - checking every 15 minutes")
 	return nil
+	*/
 }
 
 // Stop stops the monitoring
