@@ -63,6 +63,29 @@
             cursor: pointer;
             flex-shrink: 0;
             /* Always visible - no special positioning */
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        .lead-checkbox:checked {
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        .lead-checkbox:focus {
+            box-shadow: 0 0 0 0.25rem rgba(95, 173, 173, 0.25) !important;
+            border-color: #5fadad !important;
+        }
+        
+        /* Style all checkboxes with the same color */
+        input[type="checkbox"].form-check-input:checked {
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        input[type="checkbox"].form-check-input:focus {
+            box-shadow: 0 0 0 0.25rem rgba(95, 173, 173, 0.25) !important;
+            border-color: #5fadad !important;
         }
 
         .lead-card-content {
@@ -898,8 +921,11 @@
                 ))
                 .then(() => {
                     importModal.hide();
-                    loadLeads();
                     showAlert('success', `Imported ${newLeads.length} leads successfully!`);
+                    // Add small delay to ensure database has updated
+                    setTimeout(() => {
+                        loadLeads();
+                    }, 500);
                 })
                 .catch(error => {
                     showAlert('danger', 'Error importing leads: ' + error.message);
@@ -1137,8 +1163,8 @@
             
             const updateData = {};
             if (niche) updateData.niche = niche;
-            if (status) updateData.target_status = status; // Map to target_status
-            if (trigger) updateData.trigger = trigger;
+            if (status) updateData.target_status = status; // Only set if not empty
+            if (trigger !== '') updateData.trigger = trigger; // Allow empty string to clear trigger
             
             const updatePromises = Array.from(selectedLeads).map(leadId => {
                 // Get the lead data to preserve other fields
@@ -1155,8 +1181,8 @@
                         device_id: lead.device_id,
                         name: lead.name,
                         phone: lead.phone,
-                        niche: updateData.niche || lead.niche,
-                        target_status: updateData.target_status || lead.target_status,
+                        niche: updateData.niche !== undefined ? updateData.niche : lead.niche,
+                        target_status: updateData.target_status !== undefined ? updateData.target_status : lead.target_status,
                         trigger: updateData.trigger !== undefined ? updateData.trigger : lead.trigger,
                         journey: lead.journey || lead.notes || ''
                     })
