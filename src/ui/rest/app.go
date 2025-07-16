@@ -3012,7 +3012,8 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 		var campaignStatus string
 		err = db.QueryRow("SELECT ai, status FROM campaigns WHERE id = $1", campaignId).Scan(&aiType, &campaignStatus)
 		if err == nil {
-			// If campaign is finished, update it back to triggered/processing
+			// Only update campaign status if it's finished/completed
+			// Don't touch campaigns that are already processing
 			if campaignStatus == "finished" || campaignStatus == "completed" {
 				newStatus := "triggered"
 				if aiType.Valid && aiType.String == "ai" {
@@ -3030,8 +3031,16 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 				} else {
 					logrus.Infof("Campaign %d status updated to %s for retry", campaignId, newStatus)
 				}
+			} else if campaignStatus == "processing" || campaignStatus == "triggered" {
+				// Campaign is already active, just log
+				logrus.Infof("Campaign %d is already active (status: %s), messages will be processed", 
+					campaignId, campaignStatus)
 			}
 		}
+		
+		// Important: Don't trigger any broadcast pool operations here
+		// The existing workers will pick up the pending messages automatically
+		// This prevents the cleanup issue that disconnects devices
 		
 		logrus.Infof("Retry requested for campaign %d, device %s: %d messages moved to pending", 
 			campaignId, deviceId, rowsAffected)
