@@ -2660,27 +2660,14 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	pendingLeads := 0
 	successLeads := 0
 	failedLeads := 0
-	activeDevices := 0
-	disconnectedDevices := 0
-	
-	// Count active and disconnected devices from ALL devices first
-	for _, device := range devices {
-		if device.Status == "online" {
-			activeDevices++
-		} else {
-			disconnectedDevices++
-		}
-	}
-	
-	// Debug: Log device counts
-	log.Printf("Device Report - Total devices from DB: %d (Active: %d, Disconnected: %d)", 
-		len(devices), activeDevices, disconnectedDevices)
-	log.Printf("Device Report - Processing %d devices with messages", len(deviceMap))
 	
 	// Get campaign details to know target criteria
 	campaign, _ := campaignRepo.GetCampaignByID(campaignId)
 	
 	// Calculate per-device statistics based on actual leads
+	totalDevicesWithLeads := 0
+	onlineDevicesWithLeads := 0
+	offlineDevicesWithLeads := 0
 	
 	for deviceId, report := range deviceMap {
 		// Only include devices that have messages for this campaign
@@ -2725,27 +2712,32 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		successLeads += report.SuccessLeads
 		failedLeads += report.FailedLeads
 		
+		// Count devices with leads based on their status
+		totalDevicesWithLeads++
 		if report.Status == "online" {
-			activeDevices++
+			onlineDevicesWithLeads++
 		} else {
-			disconnectedDevices++
+			offlineDevicesWithLeads++
 		}
 	}
 	
 	// Log final totals and device details
-	log.Printf("Device Report Final - Total Devices: %d, Total Leads: %d, Pending: %d, Success: %d, Failed: %d", 
-		len(devices), totalLeads, pendingLeads, successLeads, failedLeads)
+	log.Printf("Device Report Final - Total Devices with Leads: %d (Online: %d, Offline: %d)", 
+		totalDevicesWithLeads, onlineDevicesWithLeads, offlineDevicesWithLeads)
+	log.Printf("Device Report Final - Total Leads: %d, Pending: %d, Success: %d, Failed: %d", 
+		totalLeads, pendingLeads, successLeads, failedLeads)
 	
 	// Log each device's counts
 	for _, report := range deviceReports {
-		log.Printf("Device %s: Total=%d (Pending=%d, Success=%d, Failed=%d)", 
-			report.Name, report.TotalLeads, report.PendingLeads, report.SuccessLeads, report.FailedLeads)
+		log.Printf("Device %s: Total=%d (Pending=%d, Success=%d, Failed=%d) Should=%d, Done=%d, Failed=%d, Remaining=%d", 
+			report.Name, report.TotalLeads, report.PendingLeads, report.SuccessLeads, report.FailedLeads,
+			report.ShouldSend, report.DoneSend, report.FailedSend, report.RemainingSend)
 	}
 	
 	result := map[string]interface{}{
-		"totalDevices":        activeDevices + disconnectedDevices,  // Total = Online + Offline
-		"activeDevices":       activeDevices,
-		"disconnectedDevices": disconnectedDevices,
+		"totalDevices":        totalDevicesWithLeads,     // Only devices with matching leads
+		"activeDevices":       onlineDevicesWithLeads,    // Only online devices with matching leads
+		"disconnectedDevices": offlineDevicesWithLeads,   // Only offline devices with matching leads
 		"totalLeads":          totalLeads,
 		"pendingLeads":        pendingLeads,
 		"successLeads":        successLeads,
