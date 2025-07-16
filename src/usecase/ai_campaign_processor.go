@@ -66,8 +66,10 @@ func (p *AICampaignProcessor) ProcessAICampaign(ctx context.Context, campaignID 
 	// 2. Get all pending AI leads based on campaign criteria
 	var leads []models.LeadAI
 	if campaign.TargetStatus == "all" {
+		logrus.Infof("Getting AI leads with niche '%s' (all statuses)", campaign.Niche)
 		leads, err = p.leadAIRepo.GetLeadAIByNiche(campaign.UserID, campaign.Niche)
 	} else {
+		logrus.Infof("Getting AI leads with niche '%s' and target_status '%s'", campaign.Niche, campaign.TargetStatus)
 		leads, err = p.leadAIRepo.GetLeadAIByNicheAndStatus(campaign.UserID, campaign.Niche, campaign.TargetStatus)
 	}
 	

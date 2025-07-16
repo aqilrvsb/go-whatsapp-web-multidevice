@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -131,6 +132,9 @@ func (r *leadRepository) GetLeadsByNicheAndStatus(niche string, status string) (
 
 // GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
 func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
+	// Trim whitespace from niche to avoid matching issues
+	niche = strings.TrimSpace(niche)
+	
 	query := `
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
 		FROM leads
@@ -140,6 +144,10 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 		ORDER BY created_at DESC
 	`
 	
+	// Debug logging
+	logrus.Debugf("GetLeadsByDeviceNicheAndStatus - DeviceID: '%s', Niche: '%s' (len=%d), Status: '%s'", 
+		deviceID, niche, len(niche), status)
+	
 	rows, err := r.db.Query(query, deviceID, niche, status)
 	if err != nil {
 		return nil, err
@@ -147,6 +155,7 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 	defer rows.Close()
 	
 	var leads []models.Lead
+	var foundCount int
 	for rows.Next() {
 		var lead models.Lead
 		var journey sql.NullString
@@ -170,8 +179,14 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 			lead.Trigger = trigger.String
 		}
 		
+		// Debug: Show what niche was found
+		logrus.Debugf("Found lead with niche: '%s' (searching for '%s')", lead.Niche, niche)
+		
 		leads = append(leads, lead)
+		foundCount++
 	}
+	
+	logrus.Debugf("GetLeadsByDeviceNicheAndStatus - Found %d leads with niche containing '%s'", foundCount, niche)
 	
 	return leads, nil
 }

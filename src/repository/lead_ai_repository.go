@@ -2,10 +2,12 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/sirupsen/logrus"
 )
 
 type LeadAIRepository interface {
@@ -114,6 +116,11 @@ func (r *leadAIRepository) GetPendingLeadAI(userID string) ([]models.LeadAI, err
 }
 
 func (r *leadAIRepository) GetLeadAIByNiche(userID, niche string) ([]models.LeadAI, error) {
+	// Trim whitespace from niche to avoid matching issues
+	niche = strings.TrimSpace(niche)
+	
+	logrus.Debugf("GetLeadAIByNiche - UserID: %s, Niche: '%s' (len=%d)", userID, niche, len(niche))
+	
 	query := `
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
@@ -124,6 +131,12 @@ func (r *leadAIRepository) GetLeadAIByNiche(userID, niche string) ([]models.Lead
 	return r.getLeadAIList(query, userID, niche)
 }
 func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus string) ([]models.LeadAI, error) {
+	// Trim whitespace from niche to avoid matching issues
+	niche = strings.TrimSpace(niche)
+	
+	logrus.Debugf("GetLeadAIByNicheAndStatus - UserID: %s, Niche: '%s' (len=%d), TargetStatus: %s", 
+		userID, niche, len(niche), targetStatus)
+	
 	var query string
 	var args []interface{}
 	
@@ -286,6 +299,8 @@ func (r *leadAIRepository) getLeadAIList(query string, args ...interface{}) ([]m
 }
 
 func (r *leadAIRepository) getLeadAIListWithArgs(query string, args ...interface{}) ([]models.LeadAI, error) {
+	logrus.Debugf("getLeadAIListWithArgs - Query: %s, Args: %v", query, args)
+	
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -293,6 +308,7 @@ func (r *leadAIRepository) getLeadAIListWithArgs(query string, args ...interface
 	defer rows.Close()
 	
 	var leads []models.LeadAI
+	var count int
 	for rows.Next() {
 		var lead models.LeadAI
 		err := rows.Scan(
@@ -315,8 +331,20 @@ func (r *leadAIRepository) getLeadAIListWithArgs(query string, args ...interface
 		if err != nil {
 			continue
 		}
+		
+		// Debug: Show what niche was found
+		if len(args) >= 2 {
+			searchNiche, ok := args[1].(string)
+			if ok {
+				logrus.Debugf("Found AI lead with niche: '%s' (searching for '%s')", lead.Niche, searchNiche)
+			}
+		}
+		
 		leads = append(leads, lead)
+		count++
 	}
+	
+	logrus.Debugf("getLeadAIListWithArgs - Found %d AI leads", count)
 	
 	return leads, nil
 }
