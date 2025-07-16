@@ -1,10 +1,48 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 15, 2025 - Platform Device Support & External API Integration**  
+**Last Updated: January 16, 2025 - Campaign Fixes & Device Stability Improvements**  
 **Status: ✅ Production-ready with 3000+ device support + AI Campaign + Full WhatsApp Web Interface + Team Management + Webhook API + External Platform Integration**
 **Architecture: ✅ Redis-optimized + WebSocket real-time + Auto-sync + Auto-refresh + Multi-user support + External Integration + Platform APIs**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATE: Platform Device Support & External API Integration (January 15, 2025)
+## 🚀 LATEST UPDATE: Campaign & Device Stability Fixes (January 16, 2025)
+
+### ✅ FIXED: Campaign Niche Matching with LIKE Queries
+- **Issue**: Campaigns weren't finding leads with multiple niches (e.g., "EX,AQIL" when searching for "AQIL")
+- **Solution**: 
+  - All niche queries now use `LIKE '%' || $niche || '%'` for partial matching
+  - Added whitespace trimming to prevent matching issues
+  - Added comprehensive debug logging to track niche matching
+- **Result**: Campaigns now correctly find leads with comma-separated niches
+
+### ✅ FIXED: Campaign Device Report Accuracy
+- **Issue**: Device report showed all devices even those with 0 matching leads
+- **Solution**:
+  - Only show devices that have leads matching the campaign niche
+  - Fixed device counts (Total/Online/Offline) to only include relevant devices
+  - Fixed duplicate leads in detail view using DISTINCT queries
+- **Result**: Device counts and lead details now match exactly
+
+### ✅ FIXED: Retry Failed Messages
+- **Issue**: Retry was causing device disconnections after 5 minutes
+- **Solution**:
+  - Only allow retry for online devices
+  - Reactivate finished campaigns when retrying
+  - Prevent creating duplicate broadcast pools
+  - Let existing workers handle retried messages
+- **Result**: Devices stay connected when retrying failed messages
+
+### ✅ FIXED: SQL Scan Error for Campaign Stats
+- **Issue**: "converting driver.Value type []uint8 to int64: invalid syntax"
+- **Solution**: Changed `sql.NullInt64` to `sql.NullFloat64` for EXTRACT(EPOCH) results
+- **Result**: Campaign status monitor works without errors
+
+### 🔧 Known Issue: Device Connection Stability
+- **Problem**: Devices sometimes go offline unexpectedly
+- **Cause**: Health monitor marks devices offline on temporary disconnections
+- **Workaround**: Manual refresh reconnects devices
+- **Future Fix**: See DEVICE_CONNECTION_IMPROVEMENTS.md for planned improvements
+
+## 🚀 Previous Update: Platform Device Support & External API Integration (January 15, 2025)
 
 ### ✅ NEW: Platform Device Support
 Devices can now be configured to use external platforms (Wablas/Whacenter) instead of WhatsApp Web:

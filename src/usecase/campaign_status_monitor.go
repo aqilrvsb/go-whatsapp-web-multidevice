@@ -56,7 +56,7 @@ func updateCampaignStatuses() {
 		
 		// Get message statistics
 		var total, pending, queued, sent, failed, skipped int
-		var oldestQueuedMinutes sql.NullInt64
+		var oldestQueuedMinutes sql.NullFloat64
 		
 		err := db.QueryRow(`
 			SELECT 
@@ -77,9 +77,9 @@ func updateCampaignStatuses() {
 		}
 		
 		// Check for stuck queued messages
-		if queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Int64 > 5 {
-			logrus.Warnf("Campaign %d has %d messages stuck in queued state for %d minutes", 
-				campaignID, queued, oldestQueuedMinutes.Int64)
+		if queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Float64 > 5 {
+			logrus.Warnf("Campaign %d has %d messages stuck in queued state for %.0f minutes", 
+				campaignID, queued, oldestQueuedMinutes.Float64)
 		}
 		
 		// Get device count for this campaign
@@ -122,7 +122,7 @@ func updateCampaignStatuses() {
 			} else {
 				newStatus = "finished"
 			}
-		} else if currentStatus == "processing" && queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Int64 > 10 {
+		} else if currentStatus == "processing" && queued > 0 && oldestQueuedMinutes.Valid && oldestQueuedMinutes.Float64 > 10 {
 			// Messages stuck in queue for too long - might indicate a problem
 			logrus.Warnf("Campaign %d might be stuck - %d messages queued for over 10 minutes", 
 				campaignID, queued)
