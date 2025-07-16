@@ -153,6 +153,9 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			}
 			// Keep the client alive by adding keepalive monitoring
 			go func(client *whatsmeow.Client) {
+				// DISABLED - No auto reconnect
+				return
+				/*
 				ticker := time.NewTicker(30 * time.Second)
 				defer ticker.Stop()
 				
@@ -182,6 +185,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 						client.SendPresence(types.PresenceAvailable)
 					}
 				}
+				*/
 			}(newClient)
 		case *events.LoggedOut:
 			logrus.Warn("Device logged out event received")

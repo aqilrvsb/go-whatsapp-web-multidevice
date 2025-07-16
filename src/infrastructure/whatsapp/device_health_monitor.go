@@ -6,13 +6,10 @@ import (
 	"sync"
 	"time"
 	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
 // DeviceHealthMonitor monitors device health and handles reconnections
@@ -107,33 +104,13 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	
 	// Check if client is connected
 	if !client.IsConnected() {
-		logrus.Warnf("Device %s is disconnected, attempting reconnection", deviceID)
+		logrus.Warnf("Device %s is disconnected", deviceID)
 		
-		// Don't immediately mark as offline - try to reconnect first
-		// Update status to reconnecting (not offline)
-		userRepo.UpdateDeviceStatus(deviceID, "reconnecting", "", "")
-		
-		// Try to reconnect multiple times
-		reconnected := false
-		for i := 0; i < 3; i++ {
-			if err := dhm.reconnectDevice(deviceID); err != nil {
-				logrus.Errorf("Reconnection attempt %d failed for device %s: %v", i+1, deviceID, err)
-				time.Sleep(5 * time.Second)
-			} else {
-				reconnected = true
-				break
-			}
-		}
-		
-		// Only mark offline if all reconnection attempts fail
-		if !reconnected {
-			logrus.Errorf("Failed to reconnect device %s after 3 attempts", deviceID)
-			userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
-		}
+		// Update status to offline - NO RECONNECTION
+		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 	} else if !client.IsLoggedIn() {
-		logrus.Warnf("Device %s is connected but not logged in, attempting to re-login", deviceID)
-		// Try to reconnect instead of just marking disconnected
-		dhm.reconnectDevice(deviceID)
+		logrus.Warnf("Device %s is connected but not logged in", deviceID)
+		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 	} else {
 		// Device is healthy, ensure status is correct
 		device, err := userRepo.GetDeviceByID(deviceID)
@@ -143,7 +120,8 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	}
 }
 
-// reconnectDevice attempts to reconnect a disconnected device
+// reconnectDevice - DISABLED - We only check status now
+/*
 func (dhm *DeviceHealthMonitor) reconnectDevice(deviceID string) error {
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
@@ -219,36 +197,16 @@ func (dhm *DeviceHealthMonitor) reconnectDevice(deviceID string) error {
 	
 	return nil
 }
+*/
 
 // ManualReconnectDevice manually triggers device reconnection
 func (dhm *DeviceHealthMonitor) ManualReconnectDevice(deviceID string) error {
-	logrus.Infof("Manual reconnection requested for device %s", deviceID)
-	return dhm.reconnectDevice(deviceID)
+	logrus.Infof("Manual reconnection DISABLED - only status check available")
+	return fmt.Errorf("reconnection disabled - use refresh button instead")
 }
 
-// ReconnectAllOfflineDevices attempts to reconnect all offline devices
+// ReconnectAllOfflineDevices - DISABLED - only status check available
 func (dhm *DeviceHealthMonitor) ReconnectAllOfflineDevices() (int, int) {
-	userRepo := repository.GetUserRepository()
-	devices, err := userRepo.GetAllDevices()
-	if err != nil {
-		logrus.Errorf("Failed to get devices: %v", err)
-		return 0, 0
-	}
-	
-	successful := 0
-	failed := 0
-	
-	for _, device := range devices {
-		if device.Status == "offline" || device.Status == "disconnected" {
-			err := dhm.reconnectDevice(device.ID)
-			if err != nil {
-				failed++
-				logrus.Errorf("Failed to reconnect device %s: %v", device.ID, err)
-			} else {
-				successful++
-			}
-		}
-	}
-	
-	return successful, failed
+	logrus.Info("Reconnect all devices DISABLED - only status check available")
+	return 0, 0
 }

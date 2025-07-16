@@ -135,10 +135,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Optimize system for 3000 devices
 	broadcast.OptimizeFor3000Devices()
 	
-	// Start device health monitor
+	// Start device health monitor - STATUS CHECK ONLY (no reconnection)
 	healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
 	healthMonitor.Start()
-	logrus.Info("Device health monitor started")
+	logrus.Info("Device health monitor started - STATUS CHECK ONLY (no auto reconnect)")
 	
 	// Start the ultra-optimized broadcast processor for 3000+ devices
 	// This processor creates broadcast-specific worker pools

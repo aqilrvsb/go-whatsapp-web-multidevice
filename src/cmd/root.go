@@ -218,7 +218,8 @@ func initApp() {
 	
 	// Initialize error monitor for auto device refresh
 	// This will monitor errors and reconnect devices automatically
-	whatsapp.MonitorDeviceErrors()
+	// whatsapp.MonitorDeviceErrors() // DISABLED - No auto reconnect
+	logrus.Info("Error monitor DISABLED - no auto reconnect")
 	
 	// Start device status normalizer to ensure all devices are online/offline
 	whatsapp.StartDeviceStatusNormalizer()

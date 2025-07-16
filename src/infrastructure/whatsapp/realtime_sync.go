@@ -9,6 +9,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 )
 
 // RealtimeSyncManager handles automatic real-time sync for all devices
@@ -81,9 +82,16 @@ func (rsm *RealtimeSyncManager) syncAllDevices() {
 	// Use goroutines for parallel processing (optimized for 3000 devices)
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, 50) // Limit concurrent syncs to 50
+	userRepo := repository.GetUserRepository()
 	
 	for deviceID, client := range allClients {
-		if client == nil || !client.IsConnected() {
+		if client == nil {
+			continue
+		}
+		
+		// Check device status from database
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err != nil || device == nil || device.Status != "online" {
 			continue
 		}
 		

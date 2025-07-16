@@ -250,12 +250,18 @@ func (ocm *OptimizedClientManager) startBackgroundWorkers() {
 // cleanupInactiveClients removes clients that haven't been accessed recently
 func (ocm *OptimizedClientManager) cleanupInactiveClients() {
 	cutoff := time.Now().Add(-30 * time.Minute)
+	userRepo := repository.GetUserRepository()
 	
 	for _, shard := range ocm.shards {
 		shard.mutex.Lock()
 		for deviceID, dc := range shard.clients {
-			if dc.lastAccess.Before(cutoff) && !dc.client.IsConnected() {
-				delete(shard.clients, deviceID)
+			// Check database status instead of WhatsApp connection
+			device, err := userRepo.GetDeviceByID(deviceID)
+			if err != nil || device == nil || device.Status != "online" {
+				// Device is offline in database, remove from memory
+				if dc.lastAccess.Before(cutoff) {
+					delete(shard.clients, deviceID)
+				}
 			}
 		}
 		shard.mutex.Unlock()
@@ -313,15 +319,18 @@ func (ocm *OptimizedClientManager) queueDeviceSync(deviceID string) {
 
 // GetActiveDeviceCount returns the number of active devices
 func (ocm *OptimizedClientManager) GetActiveDeviceCount() int {
+	// Use database status instead of checking WhatsApp connection
+	userRepo := repository.GetUserRepository()
+	devices, err := userRepo.GetAllDevices()
+	if err != nil {
+		return 0
+	}
+	
 	count := 0
-	for _, shard := range ocm.shards {
-		shard.mutex.RLock()
-		for _, dc := range shard.clients {
-			if dc.client.IsConnected() {
-				count++
-			}
+	for _, device := range devices {
+		if device.Status == "online" {
+			count++
 		}
-		shard.mutex.RUnlock()
 	}
 	return count
 }
