@@ -20,6 +20,7 @@ import (
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
@@ -143,42 +144,61 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				ticker := time.NewTicker(30 * time.Second)
 				defer ticker.Stop()
 				
+				consecutiveFailures := 0
 				for range ticker.C {
 					if !client.IsConnected() {
-						logrus.Warn("Client disconnected, attempting reconnect...")
-						client.Connect()
+						consecutiveFailures++
+						logrus.Warnf("Client disconnected, attempting reconnect (failure count: %d)", consecutiveFailures)
+						
+						// Only give up after 5 consecutive failures
+						if consecutiveFailures > 5 {
+							logrus.Errorf("Client failed to reconnect after 5 attempts, giving up")
+							return
+						}
+						
+						// Try to reconnect
+						err := client.Connect()
+						if err != nil {
+							logrus.Errorf("Reconnection failed: %v", err)
+						} else {
+							consecutiveFailures = 0
+							logrus.Info("Client reconnected successfully")
+						}
+					} else {
+						consecutiveFailures = 0
+						// Send presence to keep connection alive
+						client.SendPresence(types.PresenceAvailable)
 					}
 				}
 			}(newClient)
 		case *events.LoggedOut:
-			logrus.Warn("Device logged out")
-			// Handle logout event
+			logrus.Warn("Device logged out event received")
+			// Don't immediately mark as offline - this could be temporary
+			// Let the health monitor handle reconnection
 			if newClient.Store.ID != nil {
 				phoneNumber := newClient.Store.ID.User
 				jidStr := newClient.Store.ID.String()
-				logrus.Infof("Device with phone %s (JID: %s) logged out", phoneNumber, jidStr)
+				logrus.Infof("Device with phone %s (JID: %s) logged out - will attempt reconnection", phoneNumber, jidStr)
 				
 				// Find device ID by phone
 				userRepo := repository.GetUserRepository()
 				var deviceID string
 				err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
 				if err == nil && deviceID != "" {
-					// Update device status but KEEP phone and JID for reconnection
-					userRepo.UpdateDeviceStatus(deviceID, "offline", phoneNumber, jidStr)
+					// Update status to reconnecting (not offline)
+					userRepo.UpdateDeviceStatus(deviceID, "reconnecting", phoneNumber, jidStr)
 					
-					// Remove from client manager
-					cm := whatsapp.GetClientManager()
-					cm.RemoveClient(deviceID)
+					// Don't remove from client manager yet - let health monitor try to reconnect
+					// Only send notification after reconnection fails
 					
-					// Send WebSocket notification with phone number
-					websocket.Broadcast <- websocket.BroadcastMessage{
-						Code:    "DEVICE_LOGGED_OUT",
-						Message: "Device logged out",
-						Result: map[string]interface{}{
-							"deviceId": deviceID,
-							"phone":    phoneNumber,
-						},
-					}
+					// Schedule reconnection attempt
+					go func() {
+						time.Sleep(5 * time.Second)
+						// Check if still disconnected
+						if !newClient.IsConnected() {
+							logrus.Warnf("Device %s still disconnected after 5 seconds", deviceID)
+						}
+					}()
 				}
 			}
 		}

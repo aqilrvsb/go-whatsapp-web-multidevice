@@ -109,17 +109,31 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	if !client.IsConnected() {
 		logrus.Warnf("Device %s is disconnected, attempting reconnection", deviceID)
 		
-		// Update status to disconnected
-		userRepo.UpdateDeviceStatus(deviceID, "disconnected", "", "")
+		// Don't immediately mark as offline - try to reconnect first
+		// Update status to reconnecting (not offline)
+		userRepo.UpdateDeviceStatus(deviceID, "reconnecting", "", "")
 		
-		// Try to reconnect
-		if err := dhm.reconnectDevice(deviceID); err != nil {
-			logrus.Errorf("Failed to reconnect device %s: %v", deviceID, err)
+		// Try to reconnect multiple times
+		reconnected := false
+		for i := 0; i < 3; i++ {
+			if err := dhm.reconnectDevice(deviceID); err != nil {
+				logrus.Errorf("Reconnection attempt %d failed for device %s: %v", i+1, deviceID, err)
+				time.Sleep(5 * time.Second)
+			} else {
+				reconnected = true
+				break
+			}
+		}
+		
+		// Only mark offline if all reconnection attempts fail
+		if !reconnected {
+			logrus.Errorf("Failed to reconnect device %s after 3 attempts", deviceID)
 			userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
 		}
 	} else if !client.IsLoggedIn() {
-		logrus.Warnf("Device %s is connected but not logged in", deviceID)
-		userRepo.UpdateDeviceStatus(deviceID, "disconnected", "", "")
+		logrus.Warnf("Device %s is connected but not logged in, attempting to re-login", deviceID)
+		// Try to reconnect instead of just marking disconnected
+		dhm.reconnectDevice(deviceID)
 	} else {
 		// Device is healthy, ensure status is correct
 		device, err := userRepo.GetDeviceByID(deviceID)

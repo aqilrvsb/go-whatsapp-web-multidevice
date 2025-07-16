@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
@@ -80,6 +81,31 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 	
 	if !waClient.IsConnected() {
 		return fmt.Errorf("device %s is not connected to WhatsApp", deviceID)
+	}
+	
+	// Check if client is still connected before sending
+	if !waClient.IsConnected() {
+		logrus.Warnf("Device %s disconnected, attempting to reconnect before sending", deviceID)
+		
+		// Try to reconnect
+		err := waClient.Connect()
+		if err != nil {
+			return fmt.Errorf("device %s failed to reconnect: %v", deviceID, err)
+		}
+		
+		// Wait a bit for connection to stabilize
+		time.Sleep(2 * time.Second)
+		
+		// Check again
+		if !waClient.IsConnected() {
+			return fmt.Errorf("device %s still not connected after reconnection attempt", deviceID)
+		}
+		
+		logrus.Infof("Device %s reconnected successfully", deviceID)
+	}
+	
+	if !waClient.IsLoggedIn() {
+		return fmt.Errorf("device %s is not logged in", deviceID)
 	}
 	
 	// Parse recipient JID
@@ -188,5 +214,9 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 	}
 	
 	logrus.Infof("Image message sent to %s (ID: %s)", recipient.String(), resp.ID)
+	
+	// Note: Delay should be handled by the broadcast worker based on campaign settings
+	// Don't add hardcoded delays here
+	
 	return nil
 }

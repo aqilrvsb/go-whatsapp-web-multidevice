@@ -306,6 +306,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		// Apply delay if configured
 		if msg.MinDelay > 0 && msg.MaxDelay > 0 {
 			delay := calculateRandomDelay(msg.MinDelay, msg.MaxDelay)
+			logrus.Debugf("Applying delay of %v before next message", delay)
 			time.Sleep(delay)
 		}
 	}
