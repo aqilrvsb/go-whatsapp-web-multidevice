@@ -2807,37 +2807,61 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	log.Printf("GetCampaignDeviceLeads - Campaign: %d, Device: %s, User: %s, Status: %s, AI: %v", 
 		campaignId, deviceId, session.UserID, status, aiType.String)
 	
+	// Debug: Check for duplicates in broadcast_messages
+	var duplicateCount int
+	dupQuery := `
+		SELECT COUNT(*) - COUNT(DISTINCT recipient_phone) as duplicates
+		FROM broadcast_messages
+		WHERE campaign_id = $1 AND device_id = $2 AND user_id = $3
+	`
+	db.QueryRow(dupQuery, campaignId, deviceId, session.UserID).Scan(&duplicateCount)
+	if duplicateCount > 0 {
+		log.Printf("WARNING: Found %d duplicate phone numbers in broadcast_messages for this device", duplicateCount)
+	}
+	
 	var query string
 	if aiType.Valid && aiType.String == "ai" {
-		// For AI campaigns (when ai column = 'ai'), join with leads_ai table
+		// For AI campaigns - group by phone to get latest status
 		query = `
-			SELECT bm.recipient_phone, bm.status, bm.sent_at, lai.name
-			FROM broadcast_messages bm
-			LEFT JOIN leads_ai lai ON lai.phone = bm.recipient_phone AND lai.user_id = bm.user_id
-			WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
+			WITH latest_messages AS (
+				SELECT DISTINCT ON (recipient_phone) 
+					recipient_phone, status, sent_at
+				FROM broadcast_messages
+				WHERE campaign_id = $1 AND device_id = $2 AND user_id = $3
+				ORDER BY recipient_phone, created_at DESC
+			)
+			SELECT lm.recipient_phone, lm.status, lm.sent_at, lai.name
+			FROM latest_messages lm
+			LEFT JOIN leads_ai lai ON lai.phone = lm.recipient_phone AND lai.user_id = $3
 		`
 	} else {
-		// For regular campaigns, join with leads table
+		// For regular campaigns - group by phone to get latest status
 		query = `
-			SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
-			FROM broadcast_messages bm
-			LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
-			WHERE bm.campaign_id = $1 AND bm.device_id = $2 AND bm.user_id = $3
+			WITH latest_messages AS (
+				SELECT DISTINCT ON (recipient_phone) 
+					recipient_phone, status, sent_at
+				FROM broadcast_messages
+				WHERE campaign_id = $1 AND device_id = $2 AND user_id = $3
+				ORDER BY recipient_phone, created_at DESC
+			)
+			SELECT lm.recipient_phone, lm.status, lm.sent_at, l.name
+			FROM latest_messages lm
+			LEFT JOIN leads l ON l.phone = lm.recipient_phone AND l.device_id = $2
 		`
 	}
 	
 	// Add status filter if not "all"
 	if status != "all" {
 		if status == "success" {
-			query += ` AND bm.status IN ('sent', 'delivered', 'success')`
+			query += ` WHERE lm.status IN ('sent', 'delivered', 'success')`
 		} else if status == "pending" {
-			query += ` AND bm.status IN ('pending', 'queued')`
+			query += ` WHERE lm.status IN ('pending', 'queued')`
 		} else if status == "failed" {
-			query += ` AND bm.status IN ('failed', 'error')`
+			query += ` WHERE lm.status IN ('failed', 'error')`
 		}
 	}
 	
-	query += ` ORDER BY bm.created_at DESC LIMIT 100`
+	query += ` ORDER BY lm.sent_at DESC NULLS LAST`
 	
 	rows, err := db.Query(query, campaignId, deviceId, session.UserID)
 	if err != nil {
@@ -2850,6 +2874,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	defer rows.Close()
 	
 	leadDetails := []map[string]interface{}{}
+	leadCount := 0
 	for rows.Next() {
 		var phone, msgStatus string
 		var sentAt sql.NullTime
@@ -2876,7 +2901,11 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 			"status": msgStatus,
 			"sentAt": sentTime,
 		})
+		leadCount++
 	}
+	
+	log.Printf("GetCampaignDeviceLeads - Found %d leads for campaign %d, device %s, status %s", 
+		leadCount, campaignId, deviceId, status)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
