@@ -20,7 +20,6 @@ import (
 	"github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
@@ -155,37 +154,6 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			go func(client *whatsmeow.Client) {
 				// DISABLED - No auto reconnect
 				return
-				/*
-				ticker := time.NewTicker(30 * time.Second)
-				defer ticker.Stop()
-				
-				consecutiveFailures := 0
-				for range ticker.C {
-					if !client.IsConnected() {
-						consecutiveFailures++
-						logrus.Warnf("Client disconnected, attempting reconnect (failure count: %d)", consecutiveFailures)
-						
-						// Only give up after 5 consecutive failures
-						if consecutiveFailures > 5 {
-							logrus.Errorf("Client failed to reconnect after 5 attempts, giving up")
-							return
-						}
-						
-						// Try to reconnect
-						err := client.Connect()
-						if err != nil {
-							logrus.Errorf("Reconnection failed: %v", err)
-						} else {
-							consecutiveFailures = 0
-							logrus.Info("Client reconnected successfully")
-						}
-					} else {
-						consecutiveFailures = 0
-						// Send presence to keep connection alive
-						client.SendPresence(types.PresenceAvailable)
-					}
-				}
-				*/
 			}(newClient)
 		case *events.LoggedOut:
 			logrus.Warn("Device logged out event received")
