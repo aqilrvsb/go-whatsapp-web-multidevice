@@ -133,6 +133,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 				DeviceID:       device.ID, // Use the specific device that owns this lead
 				CampaignID:     &campaign.ID,
 				RecipientPhone: lead.Phone,
+				RecipientName:  lead.Name,
 				Type:           "text", // Default to text, or determine from ImageURL
 				Content:        campaign.Message,
 				MediaURL:       campaign.ImageURL,
@@ -344,6 +345,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 				DeviceID:       device.ID,
 				SequenceID:     &sequence.ID,
 				RecipientPhone: contact.ContactPhone,
+				RecipientName:  contact.ContactName,
 				Type:           nextStep.MessageType,
 				Content:        nextStep.Content,
 				MediaURL:       nextStep.MediaURL,

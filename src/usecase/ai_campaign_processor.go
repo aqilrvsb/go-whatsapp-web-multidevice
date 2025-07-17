@@ -269,6 +269,7 @@ func (p *AICampaignProcessor) sendLeadMessage(ctx context.Context, lead models.L
 		DeviceID:       device.ID,
 		CampaignID:     &campaign.ID,
 		RecipientPhone: lead.Phone,
+		RecipientName:  lead.Name,
 		RecipientJID:   lead.Phone + "@s.whatsapp.net",
 		Type:           "text",
 		Content:        campaign.Message,

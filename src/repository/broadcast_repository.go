@@ -34,9 +34,9 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	
 	query := `
 		INSERT INTO broadcast_messages 
-		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
+		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`	
 	// Get user_id - use from message if provided, otherwise get from device
 	var userID string
@@ -78,7 +78,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	}
 	
 	_, err := r.db.Exec(query, msg.ID, userID, msg.DeviceID, campaignID,
-		sequenceID, msg.RecipientPhone, msg.Type, msg.Content, 
+		sequenceID, msg.RecipientPhone, msg.RecipientName, msg.Type, msg.Content, 
 		msg.MediaURL, "pending", msg.ScheduledAt, time.Now(), groupID, groupOrder)
 		
 	return err
@@ -89,7 +89,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 	query := `
 		SELECT 
 			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
-			bm.recipient_phone, bm.message_type, bm.content as message, bm.media_url as image_url, 
+			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content as message, bm.media_url as image_url, 
 			bm.scheduled_at, bm.group_id, bm.group_order,
 			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) as min_delay,
 			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) as max_delay
@@ -117,7 +117,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		var scheduledAt sql.NullTime
 		
 		err := rows.Scan(&msg.ID, &userID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
+			&msg.RecipientPhone, &msg.RecipientName, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
 			&groupID, &groupOrder, &msg.MinDelay, &msg.MaxDelay)
 		if err != nil {
 			continue

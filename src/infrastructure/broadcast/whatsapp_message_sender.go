@@ -22,19 +22,21 @@ import (
 
 // WhatsAppMessageSender handles actual WhatsApp message sending
 type WhatsAppMessageSender struct {
-	clientManager    *whatsapp.ClientManager
-	platformSender   *external.PlatformSender
+	clientManager     *whatsapp.ClientManager
+	platformSender    *external.PlatformSender
 	userRepo         *repository.UserRepository
 	messageRandomizer *antipattern.MessageRandomizer
+	greetingProcessor *antipattern.GreetingProcessor
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		clientManager:    whatsapp.GetClientManager(),
-		platformSender:   external.NewPlatformSender(),
-		userRepo:        repository.GetUserRepository(),
+		clientManager:     whatsapp.GetClientManager(),
+		platformSender:    external.NewPlatformSender(),
+		userRepo:         repository.GetUserRepository(),
 		messageRandomizer: antipattern.NewMessageRandomizer(),
+		greetingProcessor: antipattern.NewGreetingProcessor(),
 	}
 }
 
@@ -142,8 +144,19 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 
 // sendTextMessage sends a text message
 func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, recipient types.JID, msg *broadcast.BroadcastMessage) error {
+	// Get device ID from the message context
+	deviceID := msg.DeviceID
+	
+	// Prepare message with greeting
+	messageWithGreeting := w.greetingProcessor.PrepareMessageWithGreeting(
+		msg.Message, 
+		msg.RecipientName, 
+		deviceID, 
+		msg.RecipientPhone,
+	)
+	
 	// Apply anti-pattern techniques to the message
-	randomizedMessage := w.messageRandomizer.RandomizeMessage(msg.Message)
+	randomizedMessage := w.messageRandomizer.RandomizeMessage(messageWithGreeting)
 	
 	// Add typing indicator for human-like behavior
 	typingDelay := antipattern.AddTypingDelay(len(msg.Message))

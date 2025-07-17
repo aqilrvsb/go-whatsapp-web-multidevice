@@ -156,6 +156,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 			DeviceID:       lead.DeviceID, // Use the lead's device ID
 			CampaignID:     &campaign.ID,
 			RecipientPhone: lead.Phone,
+			RecipientName:  lead.Name,
 			Type:           "text",
 			Content:        campaign.Message,
 			MediaURL:       campaign.ImageURL,
