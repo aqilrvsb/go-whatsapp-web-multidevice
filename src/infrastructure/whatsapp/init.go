@@ -108,7 +108,8 @@ func InitWaCLI(ctx context.Context, storeContainer *sqlstore.Container) *whatsme
 	cli.EnableAutoReconnect = true
 	cli.AutoTrustIdentity = true
 	cli.AddEventHandler(func(rawEvt interface{}) {
-		handler(ctx, rawEvt)
+		// Process all events asynchronously to prevent WebSocket blocking
+		go handler(ctx, rawEvt)
 	})
 	
 	// Set as global client for debugging

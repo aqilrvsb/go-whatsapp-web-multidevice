@@ -73,7 +73,8 @@ func RefreshDeviceConnectionByID(deviceID string) error {
 	
 	// Add event handler
 	client.AddEventHandler(func(evt interface{}) {
-		HandleDeviceEvent(context.Background(), deviceID, evt)
+		// Process asynchronously
+		go HandleDeviceEvent(context.Background(), deviceID, evt)
 	})
 	
 	// Try to connect

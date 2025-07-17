@@ -58,17 +58,19 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	
 	// Add event handler to properly register device after successful login
 	newClient.AddEventHandler(func(evt interface{}) {
-		switch v := evt.(type) {
-		case *events.Disconnected:
-			logrus.Warnf("Device disconnected event received")
-			// Don't panic, let connection manager handle it
-		case *events.StreamError:
-			logrus.Errorf("Stream error: %v", v)
-			// Let auto-reconnect handle it
-		case *events.StreamReplaced:
-			logrus.Warn("Stream replaced - another client connected with same credentials")
-		case *events.PairSuccess:
-			logrus.Infof("Pair success event: %s", v.ID.String())
+		// Process events asynchronously to prevent WebSocket blocking
+		go func() {
+			switch v := evt.(type) {
+			case *events.Disconnected:
+				logrus.Warnf("Device disconnected event received")
+				// Don't panic, let connection manager handle it
+			case *events.StreamError:
+				logrus.Errorf("Stream error: %v", v)
+				// Let auto-reconnect handle it
+			case *events.StreamReplaced:
+				logrus.Warn("Stream replaced - another client connected with same credentials")
+			case *events.PairSuccess:
+				logrus.Infof("Pair success event: %s", v.ID.String())
 		case *events.Connected, *events.PushNameSetting:
 			logrus.Info("Connected event received - device fully connected!")
 			
@@ -186,6 +188,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				}
 			}
 		}
+		}()  // Close the go func
 	})
 	
 	// IMPORTANT: Get QR channel BEFORE connecting (like the working version)

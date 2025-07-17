@@ -93,7 +93,8 @@ func AutoReconnectDevices(container *sqlstore.Container) {
 			
 			// Add device-specific event handler
 			client.AddEventHandler(func(evt interface{}) {
-				HandleDeviceEvent(context.Background(), devID, evt)
+				// Process asynchronously
+				go HandleDeviceEvent(context.Background(), devID, evt)
 			})
 			
 			// Try to connect

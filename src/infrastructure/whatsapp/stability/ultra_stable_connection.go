@@ -72,7 +72,8 @@ func (usc *UltraStableConnection) RegisterClient(deviceID string, client *whatsm
 	
 	// Add our aggressive handlers
 	client.AddEventHandler(func(evt interface{}) {
-		stable.handleEvent(evt)
+		// Process asynchronously
+		go stable.handleEvent(evt)
 	})
 	
 	// Force connection settings if available

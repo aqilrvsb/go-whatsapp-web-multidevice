@@ -66,11 +66,14 @@ func (cm *ConnectionManager) AddClient(deviceID string, client *whatsmeow.Client
 	
 	// Add disconnect handler
 	client.AddEventHandler(func(evt interface{}) {
-		switch evt.(type) {
-		case *events.Disconnected:
-			logrus.Warnf("Device %s disconnected, will attempt reconnection", deviceID)
-			cm.handleDisconnect(deviceID)
-		}
+		// Process asynchronously to prevent blocking
+		go func() {
+			switch evt.(type) {
+			case *events.Disconnected:
+				logrus.Warnf("Device %s disconnected, will attempt reconnection", deviceID)
+				cm.handleDisconnect(deviceID)
+			}
+		}()
 	})
 }
 

@@ -163,7 +163,8 @@ func (dhm *DeviceHealthMonitor) reconnectDevice(deviceID string) error {
 	
 	// Add event handlers
 	client.AddEventHandler(func(evt interface{}) {
-		HandleDeviceEvent(context.Background(), deviceID, evt)
+		// Process asynchronously
+		go HandleDeviceEvent(context.Background(), deviceID, evt)
 	})
 	
 	// Connect
