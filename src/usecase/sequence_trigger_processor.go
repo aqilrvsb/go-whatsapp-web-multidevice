@@ -169,7 +169,9 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 			AND position(ss.trigger in l.trigger) > 0
 			AND NOT EXISTS (
 				SELECT 1 FROM sequence_contacts sc
-				WHERE sc.sequence_id = s.id AND sc.contact_phone = l.phone
+				WHERE sc.sequence_id = s.id 
+				AND sc.contact_phone = l.phone
+				AND sc.current_step = 1
 			)
 		LIMIT 5000
 	`
@@ -203,25 +205,111 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 	return enrolledCount, nil
 }
 
-// enrollContactInSequence adds a contact to a sequence
+// enrollContactInSequence adds a contact to a sequence with individual records per step
 func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, lead models.Lead, trigger string) error {
-	query := `
+	// First, get all steps for this sequence
+	stepsQuery := `
+		SELECT id, day_number, trigger, next_trigger, trigger_delay_hours 
+		FROM sequence_steps 
+		WHERE sequence_id = $1 
+		ORDER BY day_number ASC
+	`
+	
+	rows, err := s.db.Query(stepsQuery, sequenceID)
+	if err != nil {
+		return fmt.Errorf("failed to get sequence steps: %w", err)
+	}
+	defer rows.Close()
+	
+	var steps []struct {
+		ID              string
+		DayNumber       int
+		Trigger         string
+		NextTrigger     sql.NullString
+		TriggerDelayHours int
+	}
+	
+	for rows.Next() {
+		var step struct {
+			ID              string
+			DayNumber       int
+			Trigger         string
+			NextTrigger     sql.NullString
+			TriggerDelayHours int
+		}
+		if err := rows.Scan(&step.ID, &step.DayNumber, &step.Trigger, &step.NextTrigger, &step.TriggerDelayHours); err != nil {
+			continue
+		}
+		steps = append(steps, step)
+	}
+	
+	if len(steps) == 0 {
+		return fmt.Errorf("no steps found for sequence %s", sequenceID)
+	}
+	
+	// Create unique constraint if needed
+	s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sequence_contacts_unique 
+		ON sequence_contacts(sequence_id, contact_phone, sequence_stepid) 
+		WHERE sequence_stepid IS NOT NULL`)
+	
+	// Now create one sequence_contacts record for each step
+	insertQuery := `
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
-			current_step, current_trigger,
-			next_trigger_time, status, completed_at
-		) VALUES ($1, $2, $3, 1, $4, $5, 'active', $6)
-		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
+			current_step, status, completed_at, current_trigger,
+			next_trigger_time, sequence_stepid
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
 	`
-
-	_, err := s.db.Exec(query, sequenceID, lead.Phone, lead.Name, 
-		trigger, time.Now(), time.Now())
 	
-	if err != nil {
-		return fmt.Errorf("failed to enroll contact: %w", err)
+	enrolledCount := 0
+	currentTime := time.Now()
+	
+	for i, step := range steps {
+		// Calculate when this step should be processed
+		var nextTriggerTime time.Time
+		if i == 0 {
+			// First step processes immediately
+			nextTriggerTime = currentTime
+		} else {
+			// Calculate based on cumulative delays from previous steps
+			totalHours := 0
+			for j := 0; j < i; j++ {
+				totalHours += steps[j].TriggerDelayHours
+			}
+			nextTriggerTime = currentTime.Add(time.Duration(totalHours) * time.Hour)
+		}
+		
+		// Determine status - first step is 'active', others are 'pending'
+		status := "pending"
+		if i == 0 {
+			status = "active"
+		}
+		
+		_, err := s.db.Exec(insertQuery, 
+			sequenceID,          // sequence_id
+			lead.Phone,          // contact_phone
+			lead.Name,           // contact_name
+			step.DayNumber,      // current_step
+			status,              // status
+			currentTime,         // completed_at (enrollment time)
+			step.Trigger,        // current_trigger
+			nextTriggerTime,     // next_trigger_time
+			step.ID,             // sequence_stepid
+		)
+		
+		if err != nil {
+			logrus.Warnf("Failed to enroll contact %s for step %d: %v", lead.Phone, step.DayNumber, err)
+			continue
+		}
+		
+		enrolledCount++
 	}
-
-	logrus.Debugf("Enrolled %s in sequence %s with trigger %s", lead.Phone, sequenceID, trigger)
+	
+	if enrolledCount > 0 {
+		logrus.Infof("Enrolled %s in sequence %s with %d steps", lead.Phone, sequenceID, enrolledCount)
+	}
+	
 	return nil
 }
 
@@ -437,38 +525,82 @@ func (s *SequenceTriggerProcessor) selectDeviceForContact(preferredDeviceID stri
 	return bestDevice
 }
 
-// updateContactProgress moves contact to next step
+// updateContactProgress updates the current record as completed and activates the next step
 func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextTrigger sql.NullString, delayHours int) error {
-	if !nextTrigger.Valid || nextTrigger.String == "" {
-		// Sequence complete
-		query := `
-			UPDATE sequence_contacts 
-			SET status = 'completed', 
-				completed_at = $1,
-				current_trigger = NULL,
-				processing_device_id = NULL,
-				processing_started_at = NULL
-			WHERE id = $2
-		`
-		_, err := s.db.Exec(query, time.Now(), contactID)
-		return err
-	}
-
-	// Move to next step
-	nextTime := time.Now().Add(time.Duration(delayHours) * time.Hour)
+	// First, mark current contact record as completed
 	query := `
 		UPDATE sequence_contacts 
-		SET current_trigger = $1,
-			next_trigger_time = $2,
-			current_step = current_step + 1,
+		SET status = 'sent', 
 			processing_device_id = NULL,
-			processing_started_at = NULL,
-			retry_count = 0
-		WHERE id = $3
+			processing_started_at = NULL
+		WHERE id = $1
 	`
+	_, err := s.db.Exec(query, contactID)
+	if err != nil {
+		return fmt.Errorf("failed to mark contact as sent: %w", err)
+	}
 	
-	_, err := s.db.Exec(query, nextTrigger.String, nextTime, contactID)
-	return err
+	// If there's a next trigger, activate the next step
+	if nextTrigger.Valid && nextTrigger.String != "" {
+		// Get the contact info from current record
+		var phone, sequenceID string
+		err := s.db.QueryRow(`
+			SELECT contact_phone, sequence_id 
+			FROM sequence_contacts 
+			WHERE id = $1
+		`, contactID).Scan(&phone, &sequenceID)
+		
+		if err != nil {
+			return fmt.Errorf("failed to get contact info: %w", err)
+		}
+		
+		// Activate the next step record
+		nextTime := time.Now().Add(time.Duration(delayHours) * time.Hour)
+		updateQuery := `
+			UPDATE sequence_contacts 
+			SET status = 'active',
+				next_trigger_time = $1
+			WHERE sequence_id = $2 
+				AND contact_phone = $3 
+				AND current_trigger = $4
+				AND status = 'pending'
+		`
+		
+		result, err := s.db.Exec(updateQuery, nextTime, sequenceID, phone, nextTrigger.String)
+		if err != nil {
+			return fmt.Errorf("failed to activate next step: %w", err)
+		}
+		
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			logrus.Warnf("No pending step found for trigger %s", nextTrigger.String)
+		} else {
+			logrus.Debugf("Activated next step with trigger %s for %s", nextTrigger.String, phone)
+		}
+	} else {
+		// No next trigger - sequence is complete
+		logrus.Debugf("Sequence completed for contact %s", contactID)
+		
+		// Mark all remaining steps as completed
+		var phone, sequenceID string
+		err := s.db.QueryRow(`
+			SELECT contact_phone, sequence_id 
+			FROM sequence_contacts 
+			WHERE id = $1
+		`, contactID).Scan(&phone, &sequenceID)
+		
+		if err == nil {
+			s.db.Exec(`
+				UPDATE sequence_contacts 
+				SET status = 'completed' 
+				WHERE sequence_id = $1 
+				AND contact_phone = $2 
+				AND status = 'pending'
+			`, sequenceID, phone)
+		}
+	}
+	
+	return nil
 }
 
 // releaseContact releases a contact from processing
