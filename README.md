@@ -42,7 +42,7 @@ To prevent WhatsApp from detecting patterns and disconnecting devices, we've rem
 
 #### **2. Sync Chat History**
 - ✅ Receive history sync events (automatically from WhatsApp)
-- ✅ Process last 30 days of chats
+- ✅ Process last 6 months of chats
 - ✅ Extract phone numbers and names to create leads
 - ✅ Store messages for WhatsApp Web interface
 - ❌ NO presence needed for sync
