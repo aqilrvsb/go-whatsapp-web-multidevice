@@ -255,14 +255,6 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 		}
 		
 		for _, contact := range contacts {
-			// Check if 24 hours have passed since last message
-			if contact.LastMessageAt != nil {
-				timeSince := time.Since(*contact.LastMessageAt)
-				if timeSince < 24*time.Hour {
-					continue // Not time yet
-				}
-			}
-			
 			// Get the next step for this contact
 			nextDay := contact.CurrentStep + 1
 			if nextDay > sequence.TotalDays {

@@ -461,14 +461,13 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 		SET current_trigger = $1,
 			next_trigger_time = $2,
 			current_step = current_step + 1,
-			last_sent_at = $3,
 			processing_device_id = NULL,
 			processing_started_at = NULL,
 			retry_count = 0
-		WHERE id = $4
+		WHERE id = $3
 	`
 	
-	_, err := s.db.Exec(query, nextTrigger.String, nextTime, time.Now(), contactID)
+	_, err := s.db.Exec(query, nextTrigger.String, nextTime, contactID)
 	return err
 }
 

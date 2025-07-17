@@ -361,14 +361,13 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 }
 // UpdateContactProgress updates contact's progress in sequence
 func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep int, status string) error {
-	now := time.Now()
 	query := `
 		UPDATE sequence_contacts 
-		SET current_step = $1, status = $2, last_message_at = $3
-		WHERE id = $4
+		SET current_step = $1, status = $2
+		WHERE id = $3
 	`
 	
-	_, err := r.db.Exec(query, currentStep, status, now, contactID)
+	_, err := r.db.Exec(query, currentStep, status, contactID)
 	return err
 }
 
