@@ -11,6 +11,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -21,17 +22,19 @@ import (
 
 // WhatsAppMessageSender handles actual WhatsApp message sending
 type WhatsAppMessageSender struct {
-	clientManager   *whatsapp.ClientManager
-	platformSender  *external.PlatformSender
-	userRepo        *repository.UserRepository
+	clientManager    *whatsapp.ClientManager
+	platformSender   *external.PlatformSender
+	userRepo         *repository.UserRepository
+	messageRandomizer *antipattern.MessageRandomizer
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		clientManager:   whatsapp.GetClientManager(),
-		platformSender:  external.NewPlatformSender(),
-		userRepo:       repository.GetUserRepository(),
+		clientManager:    whatsapp.GetClientManager(),
+		platformSender:   external.NewPlatformSender(),
+		userRepo:        repository.GetUserRepository(),
+		messageRandomizer: antipattern.NewMessageRandomizer(),
 	}
 }
 
@@ -139,9 +142,20 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 
 // sendTextMessage sends a text message
 func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, recipient types.JID, msg *broadcast.BroadcastMessage) error {
-	// Create message
+	// Apply anti-pattern techniques to the message
+	randomizedMessage := w.messageRandomizer.RandomizeMessage(msg.Message)
+	
+	// Add typing indicator for human-like behavior
+	typingDelay := antipattern.AddTypingDelay(len(msg.Message))
+	logrus.Debugf("Simulating typing for %v", typingDelay)
+	
+	// Send typing presence
+	waClient.SendPresence(types.Presence("composing"))
+	time.Sleep(typingDelay)
+	
+	// Create message with randomized content
 	message := &waE2E.Message{
-		Conversation: proto.String(msg.Message),
+		Conversation: proto.String(randomizedMessage),
 	}
 	
 	// Send message
@@ -149,6 +163,9 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 	if err != nil {
 		return fmt.Errorf("failed to send text message: %v", err)
 	}
+	
+	// Send available presence after sending
+	waClient.SendPresence(types.Presence("available"))
 	
 	logrus.Infof("Text message sent to %s (ID: %s)", recipient.String(), resp.ID)
 	return nil
@@ -192,8 +209,18 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		return fmt.Errorf("failed to upload image: %v", err)
 	}
 	
-	// Create image message
+	// Apply anti-pattern to caption if exists
 	caption := msg.Message
+	if caption != "" {
+		caption = w.messageRandomizer.RandomizeMessage(caption)
+		
+		// Add typing indicator for caption
+		typingDelay := antipattern.AddTypingDelay(len(caption))
+		waClient.SendPresence(types.Presence("composing"))
+		time.Sleep(typingDelay)
+	}
+	
+	// Create image message
 	message := &waE2E.Message{
 		ImageMessage: &waE2E.ImageMessage{
 			Caption:       proto.String(caption),
@@ -212,6 +239,9 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 	if err != nil {
 		return fmt.Errorf("failed to send image message: %v", err)
 	}
+	
+	// Send available presence after sending
+	waClient.SendPresence(types.Presence("available"))
 	
 	logrus.Infof("Image message sent to %s (ID: %s)", recipient.String(), resp.ID)
 	

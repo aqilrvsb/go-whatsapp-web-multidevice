@@ -7,6 +7,7 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 )
 
@@ -249,7 +250,9 @@ func (ocm *OptimizedClientManager) startBackgroundWorkers() {
 
 // cleanupInactiveClients removes clients that haven't been accessed recently
 func (ocm *OptimizedClientManager) cleanupInactiveClients() {
-	cutoff := time.Now().Add(-30 * time.Minute)
+	// Get start of today (midnight)
+	now := time.Now()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	userRepo := repository.GetUserRepository()
 	
 	for _, shard := range ocm.shards {
@@ -258,9 +261,12 @@ func (ocm *OptimizedClientManager) cleanupInactiveClients() {
 			// Check database status instead of WhatsApp connection
 			device, err := userRepo.GetDeviceByID(deviceID)
 			if err != nil || device == nil || device.Status != "online" {
-				// Device is offline in database, remove from memory
-				if dc.lastAccess.Before(cutoff) {
+				// Device is offline in database
+				// Only remove if lastAccess is before today (yesterday or older)
+				if dc.lastAccess.Before(startOfToday) {
 					delete(shard.clients, deviceID)
+					logrus.Debugf("Removed offline device %s from memory (last access: %s)", 
+						deviceID, dc.lastAccess.Format("2006-01-02 15:04:05"))
 				}
 			}
 		}

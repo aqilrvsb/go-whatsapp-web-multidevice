@@ -25,10 +25,11 @@ const (
 	DatabaseMaxIdleConns   = 50    // Idle connections
 	DatabaseConnLifetime   = 3600  // Connection lifetime in seconds
 	
-	// Rate Limiting per Device
-	MessagesPerMinute     = 20     // Max messages per minute per device
-	MessagesPerHour       = 500    // Max messages per hour per device
-	MessagesPerDay        = 5000   // Max messages per day per device
+	// Rate Limiting per Device - DEPRECATED
+	// These are not used anymore - campaigns/sequences have their own min/max delays
+	// MessagesPerMinute     = 3      // Not used
+	// MessagesPerHour       = 80     // Not used  
+	// MessagesPerDay        = 800    // Not used
 	
 	// System Limits
 	MaxDevicesPerUser     = 20     // Max devices per user (with buffer)
@@ -59,9 +60,10 @@ func GetWorkerConfig() map[string]interface{} {
 		"batch_size":               BatchSize,
 		"retry_attempts":           RetryAttempts,
 		"retry_delay_sec":          RetryDelaySeconds,
-		"messages_per_minute":      MessagesPerMinute,
-		"messages_per_hour":        MessagesPerHour,
-		"messages_per_day":         MessagesPerDay,
+		// Rate limits removed - using campaign/sequence delays
+		// "messages_per_minute":      MessagesPerMinute,
+		// "messages_per_hour":        MessagesPerHour,
+		// "messages_per_day":         MessagesPerDay,
 	}
 }
 

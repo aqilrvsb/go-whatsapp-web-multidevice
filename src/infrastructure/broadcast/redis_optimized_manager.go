@@ -199,10 +199,7 @@ func (rm *RedisOptimizedBroadcastManager) processMessage(redisMsg RedisMessage) 
 		return fmt.Errorf("no worker available for device %s", msg.DeviceID)
 	}
 	
-	// Check rate limiting
-	if !rm.checkRateLimit(msg.DeviceID) {
-		return fmt.Errorf("rate limit exceeded for device %s", msg.DeviceID)
-	}
+	// Rate limiting removed - using campaign/sequence delays instead
 	
 	// Send message through worker
 	startTime := time.Now()
@@ -275,7 +272,9 @@ func (rm *RedisOptimizedBroadcastManager) getOrCreateWorker(deviceID string) *De
 	return worker
 }
 
-// checkRateLimit checks if device can send another message
+// checkRateLimit checks if device can send another message - DISABLED
+// Using campaign/sequence min/max delays instead
+/*
 func (rm *RedisOptimizedBroadcastManager) checkRateLimit(deviceID string) bool {
 	key := fmt.Sprintf("%s%s", rateLimitPrefix, deviceID)
 	
@@ -308,6 +307,7 @@ func (rm *RedisOptimizedBroadcastManager) checkRateLimit(deviceID string) bool {
 	
 	return true
 }
+*/
 
 // retryMessage adds message back to queue with exponential backoff
 func (rm *RedisOptimizedBroadcastManager) retryMessage(redisMsg RedisMessage) {
