@@ -113,12 +113,6 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 	
 	var responses []domainSequence.SequenceResponse
 	for _, seq := range sequences {
-		// Skip inactive sequences
-		if !seq.IsActive {
-			logrus.Debugf("Skipping inactive sequence: ID=%s, Name=%s", seq.ID, seq.Name)
-			continue
-		}
-		
 		// Get contact count
 		contacts, _ := repo.GetSequenceContacts(seq.ID)
 		
@@ -130,12 +124,20 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 		}
 		logrus.Infof("Retrieved %d steps for sequence %s", len(steps), seq.ID)
 		
-		// Debug log the steps
-		for i, step := range steps {
-			logrus.Infof("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
+		// Debug log the steps only for active sequences
+		if seq.IsActive {
+			for i, step := range steps {
+				logrus.Infof("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
+			}
 		}
 		
-		logrus.Infof("Processing sequence: ID=%s, Name=%s, Status=ACTIVE, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
+		// Determine status string
+		statusStr := "INACTIVE"
+		if seq.IsActive {
+			statusStr = "ACTIVE"
+		}
+		
+		logrus.Infof("Processing sequence: ID=%s, Name=%s, Status=%s, TimeSchedule=%s", seq.ID, seq.Name, statusStr, seq.TimeSchedule)
 		
 		response := domainSequence.SequenceResponse{
 			ID:              seq.ID,
