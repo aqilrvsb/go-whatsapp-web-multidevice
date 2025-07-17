@@ -39,10 +39,14 @@ func GetDB() *sql.DB {
 			log.Fatalf("Failed to ping database: %v", err)
 		}
 		
-		// Initialize schema
+		// Initialize schema - SKIP MIGRATIONS
+		// Uncomment the lines below to enable migrations
+		/*
 		if err := InitializeSchema(); err != nil {
 			log.Fatalf("Failed to initialize schema: %v", err)
 		}
+		*/
+		log.Println("Skipping schema migrations as requested")
 		
 		log.Println("Database connection established")
 	})
