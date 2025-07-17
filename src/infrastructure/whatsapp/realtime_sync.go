@@ -126,11 +126,8 @@ func (rsm *RealtimeSyncManager) syncDevice(deviceID string, client *whatsmeow.Cl
 	rsm.lastSyncTime[deviceID] = time.Now()
 	rsm.mu.Unlock()
 	
-	// Request latest chats from WhatsApp
-	err := client.SendPresence(types.PresenceAvailable)
-	if err != nil {
-		logrus.Debugf("Failed to send presence for device %s: %v", deviceID, err)
-	}
+	// No need to send presence for sync
+	// Device is already connected and receiving messages
 	
 	logrus.Debugf("Synced device %s", deviceID)
 }

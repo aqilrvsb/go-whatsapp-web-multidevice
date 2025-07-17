@@ -158,12 +158,11 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 	// Apply anti-pattern techniques to the message
 	randomizedMessage := w.messageRandomizer.RandomizeMessage(messageWithGreeting)
 	
-	// Add typing indicator for human-like behavior
+	// Add typing delay for human-like behavior (but no presence)
 	typingDelay := antipattern.AddTypingDelay(len(msg.Message))
-	logrus.Debugf("Simulating typing for %v", typingDelay)
+	logrus.Debugf("Simulating typing delay for %v", typingDelay)
 	
-	// Send typing presence
-	waClient.SendPresence(types.Presence("composing"))
+	// Just wait, don't send presence
 	time.Sleep(typingDelay)
 	
 	// Create message with randomized content
@@ -177,8 +176,7 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 		return fmt.Errorf("failed to send text message: %v", err)
 	}
 	
-	// Send available presence after sending
-	waClient.SendPresence(types.Presence("available"))
+	// No presence update after sending
 	
 	logrus.Infof("Text message sent to %s (ID: %s)", recipient.String(), resp.ID)
 	return nil
@@ -227,9 +225,8 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 	if caption != "" {
 		caption = w.messageRandomizer.RandomizeMessage(caption)
 		
-		// Add typing indicator for caption
+		// Add typing delay for caption (but no presence)
 		typingDelay := antipattern.AddTypingDelay(len(caption))
-		waClient.SendPresence(types.Presence("composing"))
 		time.Sleep(typingDelay)
 	}
 	
@@ -253,8 +250,7 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		return fmt.Errorf("failed to send image message: %v", err)
 	}
 	
-	// Send available presence after sending
-	waClient.SendPresence(types.Presence("available"))
+	// No presence update after sending
 	
 	logrus.Infof("Image message sent to %s (ID: %s)", recipient.String(), resp.ID)
 	

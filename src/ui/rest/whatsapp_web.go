@@ -5,7 +5,6 @@ import (
 	"time"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow/types"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -318,13 +317,11 @@ func (handler *App) SyncWhatsAppDevice(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Force a sync by getting the WhatsApp client and requesting presence
+	// Force a sync by getting the WhatsApp client
 	cm := whatsapp.GetClientManager()
 	client, err := cm.GetClient(deviceId)
 	if err == nil && client != nil && client.IsConnected() {
-		// Send presence to trigger any pending updates
-		client.SendPresence(types.PresenceAvailable)
-		
+		// Just verify connection, no presence needed
 		// Small delay to allow messages to process
 		time.Sleep(500 * time.Millisecond)
 		

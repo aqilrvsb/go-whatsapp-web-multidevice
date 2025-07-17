@@ -8,7 +8,6 @@ import (
 	
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
@@ -197,16 +196,10 @@ func (sc *StableClient) maintainConnection() {
 	}
 }
 
-// sendKeepAlive sends presence and other keep-alive signals
+// sendKeepAlive sends keep-alive signals (removed presence)
 func (sc *StableClient) sendKeepAlive() {
-	// Send presence
-	err := sc.Client.SendPresence(types.PresenceAvailable)
-	if err != nil {
-		logrus.Warnf("Failed to send presence for device %s: %v", sc.DeviceID, err)
-		// If presence fails, connection might be dead
-		go sc.forceReconnect()
-		return
-	}
+	// No longer send presence to avoid pattern detection
+	// Just update last activity timestamp
 	
 	// Update last activity
 	sc.mu.Lock()

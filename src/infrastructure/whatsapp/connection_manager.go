@@ -187,8 +187,8 @@ func (cm *ConnectionManager) checkConnections() {
 				cm.handleDisconnect(deviceID)
 			}
 		} else {
-			// Send keep-alive presence
-			mc.Client.SendPresence(types.PresenceAvailable)
+			// Device is connected - no need to send presence
+			// This reduces pattern detection by WhatsApp
 		}
 	}
 }
