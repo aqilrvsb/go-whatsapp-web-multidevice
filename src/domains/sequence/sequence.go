@@ -145,8 +145,7 @@ type SequenceContactResponse struct {
 	ContactName  string     `json:"contact_name"`
 	CurrentStep  int        `json:"current_step"`
 	Status       string     `json:"status"`
-	AddedAt      time.Time  `json:"added_at"`
-	EnrolledAt   time.Time  `json:"enrolled_at"`
+	AddedAt      *time.Time `json:"added_at"`
 	LastSentAt   *time.Time `json:"last_sent_at,omitempty"`
 	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`

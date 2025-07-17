@@ -209,7 +209,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
 			current_step, current_trigger,
-			next_trigger_time, status, enrolled_at
+			next_trigger_time, status, completed_at
 		) VALUES ($1, $2, $3, 1, $4, $5, 'active', $6)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`

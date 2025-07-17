@@ -282,18 +282,18 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 // AddContactToSequence adds a contact to sequence
 func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContact) error {
 	contact.ID = uuid.New().String()
-	contact.EnrolledAt = time.Now()
+	contact.CompletedAt = &[]time.Time{time.Now()}[0]
 	contact.CurrentStep = 0
 	contact.Status = "active"
 
 	query := `
-		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, enrolled_at)
+		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, completed_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
 	
 	_, err := r.db.Exec(query, contact.ID, contact.SequenceID, contact.ContactPhone,
-		contact.ContactName, contact.CurrentStep, contact.Status, contact.EnrolledAt)
+		contact.ContactName, contact.CurrentStep, contact.Status, contact.CompletedAt)
 		
 	return err
 }
@@ -301,10 +301,10 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.SequenceContact, error) {
 	query := `
 		SELECT id, sequence_id, contact_phone, contact_name, current_step, status, 
-			   enrolled_at, last_message_at, completed_at
+			   completed_at
 		FROM sequence_contacts
 		WHERE sequence_id = $1
-		ORDER BY enrolled_at DESC
+		ORDER BY completed_at DESC
 	`
 	
 	rows, err := r.db.Query(query, sequenceID)
@@ -318,7 +318,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 		var contact models.SequenceContact
 		err := rows.Scan(&contact.ID, &contact.SequenceID, &contact.ContactPhone,
 			&contact.ContactName, &contact.CurrentStep, &contact.Status,
-			&contact.EnrolledAt, &contact.LastMessageAt, &contact.CompletedAt)
+			&contact.CompletedAt)
 		if err != nil {
 			continue
 		}
@@ -332,13 +332,11 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([]models.SequenceContact, error) {
 	query := `
 		SELECT sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name, 
-			   sc.current_step, sc.status, sc.enrolled_at, sc.last_message_at, sc.completed_at
+			   sc.current_step, sc.status, sc.completed_at
 		FROM sequence_contacts sc
 		JOIN sequences s ON s.id = sc.sequence_id
 		WHERE sc.status = 'active' 
 		AND s.is_active = true
-		AND (sc.last_message_at IS NULL 
-			 OR sc.last_message_at < DATE_SUB($1, INTERVAL 24 HOUR))
 	`
 	
 	rows, err := r.db.Query(query, currentTime)
@@ -352,7 +350,7 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 		var contact models.SequenceContact
 		err := rows.Scan(&contact.ID, &contact.SequenceID, &contact.ContactPhone,
 			&contact.ContactName, &contact.CurrentStep, &contact.Status,
-			&contact.EnrolledAt, &contact.LastMessageAt, &contact.CompletedAt)
+			&contact.CompletedAt)
 		if err != nil {
 			continue
 		}
