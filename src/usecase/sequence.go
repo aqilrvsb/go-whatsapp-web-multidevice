@@ -395,7 +395,7 @@ func (s *sequenceService) GetSequenceContacts(sequenceID string) ([]domainSequen
 			ContactName:   contact.ContactName,
 			CurrentStep:   contact.CurrentStep,
 			Status:        contact.Status,
-			AddedAt:       contact.AddedAt,
+			AddedAt:       contact.EnrolledAt,
 		}
 		
 		if contact.LastMessageAt != nil {

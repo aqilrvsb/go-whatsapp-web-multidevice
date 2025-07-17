@@ -282,29 +282,29 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 // AddContactToSequence adds a contact to sequence
 func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContact) error {
 	contact.ID = uuid.New().String()
-	contact.AddedAt = time.Now()
+	contact.EnrolledAt = time.Now()
 	contact.CurrentStep = 0
 	contact.Status = "active"
 
 	query := `
-		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, added_at)
+		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, enrolled_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
 	
 	_, err := r.db.Exec(query, contact.ID, contact.SequenceID, contact.ContactPhone,
-		contact.ContactName, contact.CurrentStep, contact.Status, contact.AddedAt)
+		contact.ContactName, contact.CurrentStep, contact.Status, contact.EnrolledAt)
 		
 	return err
 }
 // GetSequenceContacts gets all contacts in a sequence
 func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.SequenceContact, error) {
 	query := `
-		SELECT id, sequence_id, contact_phone, contact_name, current_day, status, 
-			   added_at, last_message_at, completed_at
+		SELECT id, sequence_id, contact_phone, contact_name, current_step, status, 
+			   enrolled_at, last_message_at, completed_at
 		FROM sequence_contacts
 		WHERE sequence_id = $1
-		ORDER BY added_at DESC
+		ORDER BY enrolled_at DESC
 	`
 	
 	rows, err := r.db.Query(query, sequenceID)
@@ -318,7 +318,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 		var contact models.SequenceContact
 		err := rows.Scan(&contact.ID, &contact.SequenceID, &contact.ContactPhone,
 			&contact.ContactName, &contact.CurrentStep, &contact.Status,
-			&contact.AddedAt, &contact.LastMessageAt, &contact.CompletedAt)
+			&contact.EnrolledAt, &contact.LastMessageAt, &contact.CompletedAt)
 		if err != nil {
 			continue
 		}
@@ -332,7 +332,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([]models.SequenceContact, error) {
 	query := `
 		SELECT sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name, 
-			   sc.current_step, sc.status, sc.added_at, sc.last_message_at, sc.completed_at
+			   sc.current_step, sc.status, sc.enrolled_at, sc.last_message_at, sc.completed_at
 		FROM sequence_contacts sc
 		JOIN sequences s ON s.id = sc.sequence_id
 		WHERE sc.status = 'active' 
@@ -352,7 +352,7 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 		var contact models.SequenceContact
 		err := rows.Scan(&contact.ID, &contact.SequenceID, &contact.ContactPhone,
 			&contact.ContactName, &contact.CurrentStep, &contact.Status,
-			&contact.AddedAt, &contact.LastMessageAt, &contact.CompletedAt)
+			&contact.EnrolledAt, &contact.LastMessageAt, &contact.CompletedAt)
 		if err != nil {
 			continue
 		}

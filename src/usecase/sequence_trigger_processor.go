@@ -208,9 +208,9 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 	query := `
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
-			current_step, current_day, current_trigger,
+			current_step, current_trigger,
 			next_trigger_time, status, enrolled_at
-		) VALUES ($1, $2, $3, 1, 1, $4, $5, 'active', $6)
+		) VALUES ($1, $2, $3, 1, $4, $5, 'active', $6)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
 
@@ -460,7 +460,7 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 		UPDATE sequence_contacts 
 		SET current_trigger = $1,
 			next_trigger_time = $2,
-			current_day = current_day + 1,
+			current_step = current_step + 1,
 			last_sent_at = $3,
 			processing_device_id = NULL,
 			processing_started_at = NULL,
