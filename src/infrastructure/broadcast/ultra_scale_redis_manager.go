@@ -208,8 +208,6 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 			return
 		}
 		
-		logrus.Infof("Worker doesn't exist for device %s, attempting to create...", deviceID)
-		
 		// Try to acquire lock for this device
 		lockKey := fmt.Sprintf("%s%s", ultraWorkerLockPrefix, deviceID)
 		locked, err := um.redisClient.SetNX(um.ctx, lockKey, "1", lockTTL).Result()
@@ -223,6 +221,9 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 			logrus.Debugf("Another server is handling device %s", deviceID)
 			return
 		}
+		
+		// Now we have the lock, log that we're creating the worker
+		logrus.Infof("Worker doesn't exist for device %s, creating worker...", deviceID)
 		
 		// Check worker limit
 		currentWorkers := atomic.LoadInt32(&um.activeWorkers)
@@ -244,11 +245,13 @@ func (um *UltraScaleRedisManager) ensureWorker(deviceID string) {
 				um.wg.Add(1)
 				go um.runWorker(deviceID, worker)
 				
-				logrus.Infof("Started worker for device %s (total: %d)", 
+				logrus.Infof("Successfully created and started worker for device %s (total: %d)", 
 					deviceID, atomic.LoadInt32(&um.activeWorkers))
 			} else {
 				logrus.Warnf("Could not create worker for device %s - WhatsApp client not available", deviceID)
 			}
+		} else {
+			logrus.Debugf("Worker for device %s was already created by another goroutine", deviceID)
 		}
 		um.workersMutex.Unlock()
 	}
