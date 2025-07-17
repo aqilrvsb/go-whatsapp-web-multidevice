@@ -32,6 +32,34 @@ To prevent WhatsApp from detecting patterns and disconnecting devices, we've rem
 - Recipients won't see "typing..." indicator
 - But messages still send perfectly!
 
+### 📋 How The System Works Now:
+
+#### **1. First Login (QR Scan)**
+- ✅ Send initial presence (KEPT - required by WhatsApp protocol)
+- ✅ Get phone number and JID from WhatsApp
+- ✅ Update device status to "online" in database
+- ✅ Register device with ClientManager
+
+#### **2. Sync Chat History**
+- ✅ Receive history sync events (automatically from WhatsApp)
+- ✅ Process last 30 days of chats
+- ✅ Extract phone numbers and names to create leads
+- ✅ Store messages for WhatsApp Web interface
+- ❌ NO presence needed for sync
+
+#### **3. Device Monitoring (Every 30 Seconds)**
+- ✅ Check `client.IsConnected()` - only checks local connection state
+- ✅ Update database status (online/offline)
+- ✅ Attempt reconnection if disconnected
+- ❌ NO presence sent (removed to avoid pattern detection)
+
+#### **4. Broadcast/Sequences Message Sending**
+- ✅ Check device status from database
+- ✅ Only use devices with status = "online"
+- ✅ Send message directly via WhatsApp
+- ✅ Apply greeting variations and anti-spam techniques
+- ❌ NO "typing..." or "available" presence sent
+
 ### 🔧 Technical Details:
 - Removed `SendPresence()` from:
   - Connection manager monitoring
