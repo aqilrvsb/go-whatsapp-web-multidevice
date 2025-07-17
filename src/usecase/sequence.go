@@ -113,6 +113,12 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 	
 	var responses []domainSequence.SequenceResponse
 	for _, seq := range sequences {
+		// Skip inactive sequences
+		if !seq.IsActive {
+			logrus.Debugf("Skipping inactive sequence: ID=%s, Name=%s", seq.ID, seq.Name)
+			continue
+		}
+		
 		// Get contact count
 		contacts, _ := repo.GetSequenceContacts(seq.ID)
 		
@@ -129,7 +135,7 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			logrus.Infof("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
 		}
 		
-		logrus.Infof("Processing sequence: ID=%s, Name=%s, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
+		logrus.Infof("Processing sequence: ID=%s, Name=%s, Status=ACTIVE, TimeSchedule=%s", seq.ID, seq.Name, seq.TimeSchedule)
 		
 		response := domainSequence.SequenceResponse{
 			ID:              seq.ID,

@@ -62,7 +62,14 @@ func (controller *Sequence) GetSequences(c *fiber.Ctx) error {
 		})
 	}
 	
-	logrus.Infof("Found %d sequences for user %s", len(sequences), userID)
+	// Count only active sequences
+	activeCount := 0
+	for _, seq := range sequences {
+		if seq.IsActive {
+			activeCount++
+		}
+	}
+	logrus.Infof("Found %d active sequences (total: %d) for user %s", activeCount, len(sequences), userID)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
