@@ -158,8 +158,10 @@ func (ubm *UltraScaleBroadcastManager) QueueMessageToBroadcast(msg *domainBroadc
 	if !exists {
 		// Create pool if it doesn't exist
 		broadcastType := "campaign"
-		broadcastID := fmt.Sprintf("%d", *msg.CampaignID)
-		if msg.SequenceID != nil {
+		broadcastID := ""
+		if msg.CampaignID != nil {
+			broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
+		} else if msg.SequenceID != nil {
 			broadcastType = "sequence"
 			broadcastID = *msg.SequenceID
 		}
@@ -264,8 +266,10 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 	bw.mu.Unlock()
 	
 	// Log which broadcast this message belongs to
-	broadcastInfo := fmt.Sprintf("Campaign %d", *msg.CampaignID)
-	if msg.SequenceID != nil {
+	broadcastInfo := "Unknown broadcast"
+	if msg.CampaignID != nil {
+		broadcastInfo = fmt.Sprintf("Campaign %d", *msg.CampaignID)
+	} else if msg.SequenceID != nil {
 		broadcastInfo = fmt.Sprintf("Sequence %s", *msg.SequenceID)
 	}
 	
