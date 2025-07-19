@@ -480,25 +480,12 @@ func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, de
 			job.currentStep, job.phone, timeRemaining, 
 			job.nextTriggerTime.Format("15:04:05"))
 		
-		// Update to active status so we know it's next in line
-		result, err := s.db.Exec(`
-			UPDATE sequence_contacts 
-			SET status = 'active'
-			WHERE id = $1 AND status = 'pending'
-		`, job.contactID)
+		// Don't update status - keep as pending until actually processed
+		// This avoids issues with the database constraint
+		logrus.Debugf("Step %d for %s remains PENDING until trigger time", 
+			job.currentStep, job.phone)
 		
-		if err != nil {
-			logrus.Errorf("Failed to activate contact %s: %v", job.contactID, err)
-			return false
-		}
-		
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected > 0 {
-			logrus.Debugf("Marked step %d for %s as ACTIVE (next in line)", 
-				job.currentStep, job.phone)
-		}
-		
-		return false // Not processed, just marked active
+		return false // Not processed yet
 	}
 	
 	// Time has arrived! Send the message
