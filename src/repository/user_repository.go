@@ -349,7 +349,7 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 	query := `
 		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, 
 		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
-		       created_at, COALESCE(updated_at, created_at), last_seen
+		       created_at, COALESCE(updated_at, created_at), last_seen, COALESCE(platform, '')
 		FROM user_devices
 		WHERE id = $1
 	`
@@ -357,7 +357,7 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 	err := r.db.QueryRow(query, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName, &device.Phone,
 		&device.JID, &device.Status, &device.MinDelaySeconds, &device.MaxDelaySeconds,
-		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen,
+		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen, &device.Platform,
 	)
 	
 	if err == sql.ErrNoRows {
