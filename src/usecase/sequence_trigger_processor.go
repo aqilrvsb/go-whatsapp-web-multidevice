@@ -296,6 +296,12 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			status = "active"
 		}
 		
+		// CRITICAL: Ensure only step 1 is active
+		if status == "active" && i != 0 {
+			logrus.Errorf("BUG DETECTED: Trying to set step %d as active! Only step 1 should be active!", i+1)
+			status = "pending"
+		}
+		
 		// Debug logging
 		logrus.Debugf("Enrolling step %d/%d for %s: status=%s, trigger=%s, delay=%dh", 
 			i+1, len(steps), lead.Phone, status, step.Trigger, step.TriggerDelayHours)
@@ -486,6 +492,33 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 
 // processContact handles a single contact's message
 func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads map[string]DeviceLoad) bool {
+	// CRITICAL: Double-check that this contact is really ready to process
+	var nextTriggerTime time.Time
+	var status string
+	err := s.db.QueryRow(`
+		SELECT next_trigger_time, status 
+		FROM sequence_contacts 
+		WHERE id = $1
+	`, job.contactID).Scan(&nextTriggerTime, &status)
+	
+	if err != nil {
+		logrus.Errorf("Failed to verify contact %s: %v", job.contactID, err)
+		return false
+	}
+	
+	// CRITICAL: Ensure the record is still active
+	if status != "active" {
+		logrus.Warnf("Contact %s is not active anymore (status=%s), skipping", job.contactID, status)
+		return false
+	}
+	
+	// CRITICAL: Ensure we're not processing too early
+	if nextTriggerTime.After(time.Now()) {
+		logrus.Warnf("Contact %s not ready yet - next trigger time is %v (in %v)", 
+			job.phone, nextTriggerTime, time.Until(nextTriggerTime))
+		return false
+	}
+	
 	// Select best device for this contact
 	deviceID := s.selectDeviceForContact(job.preferredDevice.String, deviceLoads)
 	if deviceID == "" {
@@ -624,6 +657,8 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 		logrus.Infof("Activating next step: trigger=%s, delay=%dh, will process at %v", 
 			nextTrigger.String, delayHours, nextTime)
 		
+		// CRITICAL FIX: Ensure we set the correct next_trigger_time
+		// The next step should NOT be processed until nextTime
 		updateQuery := `
 			UPDATE sequence_contacts 
 			SET status = 'active',
@@ -632,6 +667,12 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 				AND contact_phone = $3 
 				AND current_trigger = $4
 				AND status = 'pending'
+				AND NOT EXISTS (
+					SELECT 1 FROM sequence_contacts sc2
+					WHERE sc2.sequence_id = $2
+					AND sc2.contact_phone = $3
+					AND sc2.status = 'active'
+				)
 		`
 		
 		result, err := s.db.Exec(updateQuery, nextTime, sequenceID, phone, nextTrigger.String)
