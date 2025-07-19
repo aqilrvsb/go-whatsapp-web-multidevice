@@ -212,23 +212,19 @@ func (s *SequenceTriggerProcessor) enrollLeadsFromTriggers() (int, error) {
 	return enrolledCount, nil
 }
 
-// enrollContactInSequence adds a contact to a sequence with individual records per step
+// enrollContactInSequence adds a contact to a sequence - ONLY creates the first step
 func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, lead models.Lead, trigger string) error {
-	// First, get all steps for this sequence
-	stepsQuery := `
+	// Get only the first step (entry point)
+	stepQuery := `
 		SELECT id, day_number, trigger, next_trigger, trigger_delay_hours 
 		FROM sequence_steps 
 		WHERE sequence_id = $1 
+		AND is_entry_point = true
 		ORDER BY day_number ASC
+		LIMIT 1
 	`
 	
-	rows, err := s.db.Query(stepsQuery, sequenceID)
-	if err != nil {
-		return fmt.Errorf("failed to get sequence steps: %w", err)
-	}
-	defer rows.Close()
-	
-	var steps []struct {
+	var step struct {
 		ID              string
 		DayNumber       int
 		Trigger         string
@@ -236,30 +232,15 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		TriggerDelayHours int
 	}
 	
-	for rows.Next() {
-		var step struct {
-			ID              string
-			DayNumber       int
-			Trigger         string
-			NextTrigger     sql.NullString
-			TriggerDelayHours int
-		}
-		if err := rows.Scan(&step.ID, &step.DayNumber, &step.Trigger, &step.NextTrigger, &step.TriggerDelayHours); err != nil {
-			continue
-		}
-		steps = append(steps, step)
+	err := s.db.QueryRow(stepQuery, sequenceID).Scan(
+		&step.ID, &step.DayNumber, &step.Trigger, 
+		&step.NextTrigger, &step.TriggerDelayHours)
+	
+	if err != nil {
+		return fmt.Errorf("failed to get entry step: %w", err)
 	}
 	
-	if len(steps) == 0 {
-		return fmt.Errorf("no steps found for sequence %s", sequenceID)
-	}
-	
-	// Create unique constraint if needed
-	s.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sequence_contacts_unique 
-		ON sequence_contacts(sequence_id, contact_phone, sequence_stepid) 
-		WHERE sequence_stepid IS NOT NULL`)
-	
-	// Now create one sequence_contacts record for each step
+	// Create only the first step record
 	insertQuery := `
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
@@ -269,73 +250,28 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
 	`
 	
-	enrolledCount := 0
 	currentTime := time.Now()
 	
-	// CRITICAL: Log what we're about to insert
-	logrus.Infof("Enrolling contact %s in sequence %s with %d steps", lead.Phone, sequenceID, len(steps))
+	logrus.Infof("Enrolling contact %s in sequence %s - creating ONLY step 1", lead.Phone, sequenceID)
 	
-	for i, step := range steps {
-		// Calculate when this step should be processed
-		var nextTriggerTime time.Time
-		if i == 0 {
-			// First step processes immediately
-			nextTriggerTime = currentTime
-		} else {
-			// Calculate based on cumulative delays from previous steps
-			totalHours := 0
-			for j := 0; j < i; j++ {
-				totalHours += steps[j].TriggerDelayHours
-			}
-			nextTriggerTime = currentTime.Add(time.Duration(totalHours) * time.Hour)
-		}
-		
-		// Determine status - first step is 'active', others are 'pending'
-		status := "pending"
-		if i == 0 {
-			status = "active"
-			// CRITICAL: Only step 1 should have immediate trigger time
-			nextTriggerTime = currentTime
-		}
-		
-		// CRITICAL: Ensure only step 1 is active
-		if status == "active" && i != 0 {
-			logrus.Errorf("BUG DETECTED: Trying to set step %d as active! Only step 1 should be active!", i+1)
-			status = "pending"
-		}
-		
-		// Debug logging
-		logrus.Debugf("Enrolling step %d/%d for %s: status=%s, trigger=%s, delay=%dh", 
-			i+1, len(steps), lead.Phone, status, step.Trigger, step.TriggerDelayHours)
-		
-		// CRITICAL: Ensure we're setting the right values
-		logrus.Infof("INSERT: phone=%s, step=%d, status=%s, trigger=%s, next_time=%v", 
-			lead.Phone, i+1, status, step.Trigger, nextTriggerTime.Format("2006-01-02 15:04:05"))
-		
-		_, err := s.db.Exec(insertQuery, 
-			sequenceID,          // sequence_id
-			lead.Phone,          // contact_phone
-			lead.Name,           // contact_name
-			i + 1,               // current_step (FIXED: use index + 1 instead of day_number)
-			status,              // status
-			step.Trigger,        // current_trigger
-			nextTriggerTime,     // next_trigger_time
-			step.ID,             // sequence_stepid
-			lead.DeviceID,       // assigned_device_id
-		)
-		
-		if err != nil {
-			logrus.Warnf("Failed to enroll contact %s for step %d: %v", lead.Phone, step.DayNumber, err)
-			continue
-		}
-		
-		enrolledCount++
+	_, err = s.db.Exec(insertQuery, 
+		sequenceID,          // sequence_id
+		lead.Phone,          // contact_phone
+		lead.Name,           // contact_name
+		step.DayNumber,      // current_step - use actual day_number from sequence_steps
+		"active",            // status - first step is active
+		step.Trigger,        // current_trigger
+		currentTime,         // next_trigger_time - process immediately
+		step.ID,             // sequence_stepid
+		lead.DeviceID,       // assigned_device_id
+	)
+	
+	if err != nil {
+		logrus.Warnf("Failed to enroll contact %s: %v", lead.Phone, err)
+		return err
 	}
 	
-	if enrolledCount > 0 {
-		logrus.Infof("Enrolled %s in sequence %s with %d steps", lead.Phone, sequenceID, enrolledCount)
-	}
-	
+	logrus.Infof("Successfully enrolled %s with step 1 only", lead.Phone)
 	return nil
 }
 
@@ -651,7 +587,7 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 		return fmt.Errorf("failed to mark contact as completed: %w", err)
 	}
 	
-	// If there's a next trigger, activate the next step
+	// If there's a next trigger, create the next step record
 	if nextTrigger.Valid && nextTrigger.String != "" {
 		// Get the contact info from current record
 		var phone, sequenceID string
@@ -665,56 +601,79 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 			return fmt.Errorf("failed to get contact info: %w", err)
 		}
 		
-		// Activate the next step record
-		nextTime := time.Now().Add(time.Duration(delayHours) * time.Hour)
+		// Find the next step details from sequence_steps
+		var nextStep struct {
+			ID              string
+			DayNumber       int
+			Trigger         string
+			NextTrigger     sql.NullString
+			TriggerDelayHours int
+		}
+		err = s.db.QueryRow(`
+			SELECT id, day_number, trigger, next_trigger, trigger_delay_hours
+			FROM sequence_steps
+			WHERE sequence_id = $1 AND trigger = $2
+			LIMIT 1
+		`, sequenceID, nextTrigger.String).Scan(
+			&nextStep.ID, &nextStep.DayNumber, &nextStep.Trigger,
+			&nextStep.NextTrigger, &nextStep.TriggerDelayHours)
 		
-		// IMPORTANT: Only activate if the delay time has passed
-		logrus.Infof("Activating next step: trigger=%s, delay=%dh, will process at %v", 
-			nextTrigger.String, delayHours, nextTime)
+		if err != nil {
+			logrus.Warnf("Next step not found for trigger %s: %v", nextTrigger.String, err)
+			return nil
+		}
 		
-		// CRITICAL FIX: Ensure we set the correct next_trigger_time
-		// The next step should NOT be processed until nextTime
-		updateQuery := `
-			UPDATE sequence_contacts 
-			SET status = 'active',
-				next_trigger_time = $1
-			WHERE sequence_id = $2 
-				AND contact_phone = $3 
-				AND current_trigger = $4
-				AND status = 'pending'
+		// Calculate next trigger time based on NOW + delay hours
+		nextTime := time.Now().Add(time.Duration(nextStep.TriggerDelayHours) * time.Hour)
+		
+		logrus.Infof("Creating next step: phone=%s, step=%d, trigger=%s, will process at %v", 
+			phone, nextStep.DayNumber, nextStep.Trigger, nextTime)
+		
+		// Create the next step record
+		insertQuery := `
+			INSERT INTO sequence_contacts (
+				sequence_id, contact_phone, contact_name, 
+				current_step, status, current_trigger,
+				next_trigger_time, sequence_stepid, assigned_device_id, user_id
+			) 
+			SELECT 
+				sequence_id, contact_phone, contact_name,
+				$1, 'active', $2, $3, $4, assigned_device_id, user_id
+			FROM sequence_contacts
+			WHERE id = $5
+			ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
 		`
 		
-		result, err := s.db.Exec(updateQuery, nextTime, sequenceID, phone, nextTrigger.String)
+		_, err = s.db.Exec(insertQuery, 
+			nextStep.DayNumber,  // current_step - use actual day_number
+			nextStep.Trigger,    // current_trigger
+			nextTime,            // next_trigger_time
+			nextStep.ID,         // sequence_stepid
+			contactID,           // source record id
+		)
+		
 		if err != nil {
-			return fmt.Errorf("failed to activate next step: %w", err)
+			return fmt.Errorf("failed to create next step: %w", err)
 		}
 		
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			logrus.Warnf("No pending step found for trigger %s", nextTrigger.String)
-		} else {
-			logrus.Debugf("Activated next step with trigger %s for %s", nextTrigger.String, phone)
-		}
+		logrus.Infof("Successfully created next step %d for %s", nextStep.DayNumber, phone)
+		
 	} else {
 		// No next trigger - sequence is complete
-		logrus.Debugf("Sequence completed for contact %s", contactID)
+		logrus.Infof("Sequence completed for contact %s - no more steps", contactID)
 		
-		// Mark all remaining steps as completed
-		var phone, sequenceID string
+		// Get contact info for trigger removal
+		var phone, currentTrigger string
 		err := s.db.QueryRow(`
-			SELECT contact_phone, sequence_id 
+			SELECT contact_phone, current_trigger 
 			FROM sequence_contacts 
 			WHERE id = $1
-		`, contactID).Scan(&phone, &sequenceID)
+		`, contactID).Scan(&phone, &currentTrigger)
 		
 		if err == nil {
-			s.db.Exec(`
-				UPDATE sequence_contacts 
-				SET status = 'completed' 
-				WHERE sequence_id = $1 
-				AND contact_phone = $2 
-				AND status = 'pending'
-			`, sequenceID, phone)
+			// Remove the completed trigger from lead
+			s.removeCompletedTriggerFromLead(phone, currentTrigger)
+			logrus.Infof("Removed trigger %s from lead %s", currentTrigger, phone)
 		}
 	}
 	
