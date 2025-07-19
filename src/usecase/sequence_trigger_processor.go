@@ -399,7 +399,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			WHERE sc.status = 'pending'
 				AND s.is_active = true
 				AND sc.processing_device_id IS NULL
-			ORDER BY sc.sequence_id, sc.contact_phone, sc.next_trigger_time ASC
+			ORDER BY sc.sequence_id, sc.contact_phone, sc.current_step ASC, sc.next_trigger_time ASC
 		)
 		SELECT * FROM earliest_pending
 		ORDER BY next_trigger_time ASC
