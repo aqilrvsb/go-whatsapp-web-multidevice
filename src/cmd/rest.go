@@ -146,8 +146,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
 	
 	// Start campaign/sequence trigger processor
-	go usecase.StartTriggerProcessor()
-	logrus.Info("Campaign trigger processor started")
+	// DISABLED: Old sequence processor that causes issues
+	// go usecase.StartTriggerProcessor()
+	// logrus.Info("Campaign trigger processor started")
 	
 	// Start sequence trigger processor for trigger-based flow
 	go usecase.StartSequenceTriggerProcessor()

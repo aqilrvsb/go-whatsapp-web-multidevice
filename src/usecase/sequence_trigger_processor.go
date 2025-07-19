@@ -483,7 +483,7 @@ func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, de
 		// Update to active status so we know it's next in line
 		result, err := s.db.Exec(`
 			UPDATE sequence_contacts 
-			SET status = 'active', updated_at = NOW()
+			SET status = 'active'
 			WHERE id = $1 AND status = 'pending'
 		`, job.contactID)
 		
@@ -543,8 +543,7 @@ func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, de
 		s.db.Exec(`
 			UPDATE sequence_contacts 
 			SET status = 'failed', 
-				last_error = $1,
-				updated_at = NOW()
+				last_error = $1
 			WHERE id = $2
 		`, err.Error(), job.contactID)
 		
@@ -556,8 +555,7 @@ func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, de
 		UPDATE sequence_contacts 
 		SET status = 'completed', 
 			completed_at = NOW(),
-			processing_device_id = $1,
-			updated_at = NOW()
+			processing_device_id = $1
 		WHERE id = $2
 	`, deviceID, job.contactID)
 	
