@@ -31,6 +31,8 @@ type contactJob struct {
 	minDelaySeconds  int
 	maxDelaySeconds  int
 	userID           string  // Added to track user
+	sequenceStepID   string  // Added to track which step
+	nextTriggerTime  time.Time // Added for time-based processing
 }
 
 // SequenceTriggerProcessor handles trigger-based sequence processing
@@ -272,10 +274,10 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		var status string
 		
 		if i == 0 {
-			// FIRST STEP: ACTIVE with 5 minute delay
+			// FIRST STEP: PENDING with 5 minute delay
 			nextTriggerTime = currentTime.Add(5 * time.Minute)
-			status = "active" // ACTIVE, ready to process!
-			logrus.Infof("Step 1: ACTIVE - will send at %v (NOW + 5 minutes)", 
+			status = "pending" // CHANGED: Now PENDING instead of active
+			logrus.Infof("Step 1: PENDING - will trigger at %v (NOW + 5 minutes)", 
 				nextTriggerTime.Format("15:04:05"))
 		} else {
 			// Subsequent steps - PENDING with calculated time
@@ -375,52 +377,38 @@ func (s *SequenceTriggerProcessor) getDeviceWorkloads() (map[string]DeviceLoad, 
 	return loads, nil
 }
 
-// processSequenceContacts processes contacts ready for their next message
+// processSequenceContacts processes contacts using PENDING-FIRST approach
 func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[string]DeviceLoad) (int, error) {
-	// ONLY process ACTIVE contacts where next_trigger_time <= NOW
-	// No separate activation needed - it happens in updateContactProgress
-	
+	// NEW LOGIC: Find earliest PENDING step for each contact
 	query := `
-		SELECT 
-			sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
-			sc.current_trigger, sc.current_step,
-			ss.content, ss.message_type, ss.media_url,
-			ss.next_trigger, ss.trigger_delay_hours,
-			sc.assigned_device_id as preferred_device_id,
-			COALESCE(ss.min_delay_seconds, 5) as min_delay_seconds,
-			COALESCE(ss.max_delay_seconds, 15) as max_delay_seconds,
-			sc.user_id,
-			sc.next_trigger_time
-		FROM sequence_contacts sc
-		JOIN sequence_steps ss ON ss.id = sc.sequence_stepid
-		JOIN sequences s ON s.id = sc.sequence_id
-		WHERE sc.status = 'active'
-			AND s.is_active = true
-			AND sc.next_trigger_time <= $1
-			AND sc.processing_device_id IS NULL
-		ORDER BY sc.next_trigger_time ASC
-		LIMIT $2
+		WITH earliest_pending AS (
+			SELECT DISTINCT ON (sc.sequence_id, sc.contact_phone)
+				sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
+				sc.current_trigger, sc.current_step,
+				ss.content, ss.message_type, ss.media_url,
+				ss.next_trigger, ss.trigger_delay_hours,
+				sc.assigned_device_id as preferred_device_id,
+				COALESCE(ss.min_delay_seconds, 5) as min_delay_seconds,
+				COALESCE(ss.max_delay_seconds, 15) as max_delay_seconds,
+				sc.user_id,
+				sc.next_trigger_time,
+				sc.sequence_stepid
+			FROM sequence_contacts sc
+			JOIN sequence_steps ss ON ss.id = sc.sequence_stepid
+			JOIN sequences s ON s.id = sc.sequence_id
+			WHERE sc.status = 'pending'
+				AND s.is_active = true
+				AND sc.processing_device_id IS NULL
+			ORDER BY sc.sequence_id, sc.contact_phone, sc.next_trigger_time ASC
+		)
+		SELECT * FROM earliest_pending
+		ORDER BY next_trigger_time ASC
+		LIMIT $1
 	`
-	
-	// Debug: Show what's ready to process
-	var readyCount int
-	s.db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM sequence_contacts sc
-		JOIN sequences s ON s.id = sc.sequence_id
-		WHERE sc.status = 'active' 
-		AND sc.next_trigger_time <= $1
-		AND s.is_active = true
-		AND sc.processing_device_id IS NULL
-	`, time.Now()).Scan(&readyCount)
-	
-	if readyCount > 0 {
-		logrus.Infof("📤 Found %d ACTIVE contacts ready to send now", readyCount)
-	}
 
-	rows, err := s.db.Query(query, time.Now(), s.batchSize)
+	rows, err := s.db.Query(query, s.batchSize)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get contacts for processing: %w", err)
+		return 0, fmt.Errorf("failed to get pending contacts: %w", err)
 	}
 	defer rows.Close()
 
@@ -428,19 +416,15 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	jobs := make(chan contactJob, s.batchSize)
 	results := make(chan bool, s.batchSize)
 	
-	// Start workers - increase for 3000 devices
-	numWorkers := 50  // Increased from 10
+	// Start workers
+	numWorkers := 50
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 			for job := range jobs {
-				success := s.processContact(job, deviceLoads)
-				if success {
-					logrus.Debugf("Worker %d: Sent message for %s step %d", 
-						workerID, job.phone, job.currentStep)
-				}
+				success := s.processContactWithNewLogic(job, deviceLoads)
 				results <- success
 			}
 		}(i)
@@ -448,57 +432,158 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 
 	// Queue jobs
 	go func() {
-		jobCount := 0
 		for rows.Next() {
 			var job contactJob
 			var triggerTime time.Time
+			var sequenceStepID string
+			
 			if err := rows.Scan(&job.contactID, &job.sequenceID, &job.phone, &job.name,
 				&job.currentTrigger, &job.currentStep, &job.messageText, &job.messageType,
 				&job.mediaURL, &job.nextTrigger, &job.delayHours, &job.preferredDevice,
-				&job.minDelaySeconds, &job.maxDelaySeconds, &job.userID, &triggerTime); err != nil {
+				&job.minDelaySeconds, &job.maxDelaySeconds, &job.userID, &triggerTime,
+				&sequenceStepID); err != nil {
 				logrus.Errorf("Error scanning job: %v", err)
 				continue
 			}
 			
-			// Debug log the preferred device
-			logrus.Infof("[DEVICE-SCAN] Contact %s has preferredDevice: %v (Valid: %v)", 
-				job.phone, job.preferredDevice.String, job.preferredDevice.Valid)
-			
-			logrus.Infof("📨 Queueing: %s step %d (was scheduled for %v)", 
-				job.phone, job.currentStep, triggerTime.Format("15:04:05"))
-			
+			job.sequenceStepID = sequenceStepID
+			job.nextTriggerTime = triggerTime
 			jobs <- job
-			jobCount++
 		}
 		close(jobs)
-		
-		if jobCount > 0 {
-			logrus.Infof("Queued %d messages for sending", jobCount)
-		}
 	}()
 
 	// Wait for completion
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	wg.Wait()
+	close(results)
 
-	// Count successes
+	// Count results
 	processedCount := 0
-	failedCount := 0
 	for success := range results {
 		if success {
 			processedCount++
-		} else {
-			failedCount++
 		}
-	}
-	
-	if processedCount > 0 || failedCount > 0 {
-		logrus.Infof("✅ Processing complete: %d sent, %d failed", processedCount, failedCount)
 	}
 
 	return processedCount, nil
+}
+
+// processContactWithNewLogic handles a single contact with time-based logic
+func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, deviceLoads map[string]DeviceLoad) bool {
+	now := time.Now()
+	
+	// Check if it's time to send this message
+	if job.nextTriggerTime.After(now) {
+		// Not time yet - mark as ACTIVE to track it
+		timeRemaining := time.Until(job.nextTriggerTime)
+		logrus.Infof("⏰ Step %d for %s not ready (triggers in %v at %v)", 
+			job.currentStep, job.phone, timeRemaining, 
+			job.nextTriggerTime.Format("15:04:05"))
+		
+		// Update to active status so we know it's next in line
+		result, err := s.db.Exec(`
+			UPDATE sequence_contacts 
+			SET status = 'active', updated_at = NOW()
+			WHERE id = $1 AND status = 'pending'
+		`, job.contactID)
+		
+		if err != nil {
+			logrus.Errorf("Failed to activate contact %s: %v", job.contactID, err)
+			return false
+		}
+		
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			logrus.Debugf("Marked step %d for %s as ACTIVE (next in line)", 
+				job.currentStep, job.phone)
+		}
+		
+		return false // Not processed, just marked active
+	}
+	
+	// Time has arrived! Send the message
+	logrus.Infof("✅ Time reached for %s step %d - processing message", 
+		job.phone, job.currentStep)
+	
+	// Check device
+	deviceID := job.preferredDevice.String
+	if deviceID == "" {
+		logrus.Warnf("No assigned device for contact %s - skipping", job.phone)
+		return false
+	}
+	
+	// Create broadcast message
+	broadcastMsg := domainBroadcast.BroadcastMessage{
+		UserID:         job.userID,
+		DeviceID:       deviceID,
+		SequenceID:     &job.sequenceID,
+		SequenceStepID: &job.sequenceStepID,
+		RecipientPhone: job.phone,
+		RecipientName:  job.name,
+		Message:        job.messageText,
+		Content:        job.messageText,
+		Type:           job.messageType,
+		MinDelay:       job.minDelaySeconds,
+		MaxDelay:       job.maxDelaySeconds,
+		ScheduledAt:    now,
+		Status:         "pending",
+	}
+	
+	if job.mediaURL.Valid && job.mediaURL.String != "" {
+		broadcastMsg.MediaURL = job.mediaURL.String
+		broadcastMsg.ImageURL = job.mediaURL.String
+	}
+	
+	// Queue to database
+	broadcastRepo := repository.GetBroadcastRepository()
+	if err := broadcastRepo.QueueMessage(broadcastMsg); err != nil {
+		logrus.Errorf("Failed to queue sequence message for %s: %v", job.phone, err)
+		
+		// Mark as failed
+		s.db.Exec(`
+			UPDATE sequence_contacts 
+			SET status = 'failed', 
+				last_error = $1,
+				updated_at = NOW()
+			WHERE id = $2
+		`, err.Error(), job.contactID)
+		
+		return false
+	}
+	
+	// Mark this step as completed
+	result, err := s.db.Exec(`
+		UPDATE sequence_contacts 
+		SET status = 'completed', 
+			completed_at = NOW(),
+			processing_device_id = $1,
+			updated_at = NOW()
+		WHERE id = $2
+	`, deviceID, job.contactID)
+	
+	if err != nil {
+		logrus.Errorf("Failed to mark contact as completed: %v", err)
+		return false
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		logrus.Warnf("No rows updated when marking contact %s as completed", job.contactID)
+		return false
+	}
+	
+	logrus.Infof("📤 Successfully queued and completed step %d for %s", 
+		job.currentStep, job.phone)
+	
+	// Check if this was the last step
+	if !job.nextTrigger.Valid || job.nextTrigger.String == "" {
+		logrus.Infof("🎉 Sequence complete for %s - no more steps", job.phone)
+		
+		// Remove trigger from lead if it's complete
+		s.removeCompletedTriggerFromLead(job.phone, job.currentTrigger)
+	}
+	
+	return true
 }
 
 // processContact handles a single contact's message
