@@ -683,3 +683,43 @@ func (r *UserRepository) GetDeviceByUserAndJID(userID, jid string) (*models.User
 	
 	return device, nil
 }
+
+// GetDeviceByUserAndName gets a device by user ID and device name combination
+func (r *UserRepository) GetDeviceByUserAndName(userID, deviceName string) (*models.UserDevice, error) {
+	device := &models.UserDevice{}
+	query := `
+		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at, updated_at,
+		       COALESCE(min_delay_seconds, 5) as min_delay_seconds,
+		       COALESCE(max_delay_seconds, 15) as max_delay_seconds,
+		       COALESCE(platform, '') as platform
+		FROM user_devices
+		WHERE user_id = $1 AND device_name = $2
+		LIMIT 1
+	`
+	
+	err := r.db.QueryRow(query, userID, deviceName).Scan(
+		&device.ID,
+		&device.UserID,
+		&device.DeviceName,
+		&device.Phone,
+		&device.JID,
+		&device.Status,
+		&device.LastSeen,
+		&device.CreatedAt,
+		&device.UpdatedAt,
+		&device.MinDelaySeconds,
+		&device.MaxDelaySeconds,
+		&device.Platform,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return device, nil
+}
+
+// GetDB returns the database connection
+func (r *UserRepository) GetDB() *sql.DB {
+	return r.db
+}

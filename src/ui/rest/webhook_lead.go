@@ -87,42 +87,73 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	// First check if a device with this user_id and device_id (as jid) combination already exists
-	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByUserAndJID(request.UserID, request.DeviceID)
-	
-	// If device doesn't exist, create it
-	if err != nil || device == nil {
-		logrus.Info("Webhook Lead: Device not found, creating new device - ", request.DeviceID)
-		
-		// Handle device ID based on whether it's a valid UUID or not
-		deviceID := request.DeviceID
-		deviceJID := request.DeviceID // JID always stores the full original
-		
-		if _, err := uuid.Parse(request.DeviceID); err != nil {
-			// Not a valid UUID, take first 6 characters and generate new UUID
+	// Determine device name first
+	deviceName := request.DeviceName
+	if deviceName == "" {
+		// Generate device name based on device_id
+		if _, uuidErr := uuid.Parse(request.DeviceID); uuidErr != nil {
+			// Non-UUID, use first 6 chars as prefix
 			prefix := request.DeviceID
 			if len(prefix) > 6 {
 				prefix = prefix[:6]
 			}
-			// Generate new UUID with prefix for identification
-			deviceID = uuid.New().String()
-			logrus.Info("Webhook Lead: Non-UUID device_id. Using first 6 chars: ", prefix, ", Generated UUID: ", deviceID)
-			
-			// Update device name to include the prefix if not provided
-			if request.DeviceName == "" {
-				request.DeviceName = "Device-" + prefix
-			}
+			deviceName = "Device-" + prefix
 		} else {
-			// It's a valid UUID, use it for both ID and JID
-			logrus.Info("Webhook Lead: Valid UUID device_id, using as-is for both ID and JID")
+			// UUID device_id, create timestamp-based name
+			deviceName = "Device-" + time.Now().Format("20060102150405")
+		}
+	}
+	
+	logrus.Info("Webhook Lead: Using device name: ", deviceName)
+	
+	// First check if a device with this user_id and device_name already exists
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByUserAndName(request.UserID, deviceName)
+	
+	// If device doesn't exist by name, check by JID as fallback
+	if err != nil || device == nil {
+		device, err = userRepo.GetDeviceByUserAndJID(request.UserID, request.DeviceID)
+	}
+	
+	// If device exists, update JID; otherwise create new
+	if device != nil {
+		// Device exists - just update the JID
+		logrus.Info("Webhook Lead: Device found, updating JID from ", device.JID, " to ", request.DeviceID)
+		
+		updateQuery := `
+			UPDATE user_devices 
+			SET jid = $1, platform = $2, updated_at = $3, status = 'online'
+			WHERE id = $4
+		`
+		_, err = userRepo.GetDB().Exec(updateQuery, request.DeviceID, request.Platform, time.Now(), device.ID)
+		if err != nil {
+			logrus.Error("Webhook Lead: Failed to update device JID - ", err)
+		} else {
+			logrus.Info("Webhook Lead: Successfully updated device JID")
+		}
+	} else {
+		// Device doesn't exist, create it
+		logrus.Info("Webhook Lead: Device not found, creating new device - ", request.DeviceID)
+		
+		// Handle device ID based on whether it's a valid UUID or not
+		var deviceID string
+		deviceJID := request.DeviceID // JID always stores the full original
+		
+		if _, err := uuid.Parse(request.DeviceID); err != nil {
+			// Not a valid UUID, generate new UUID
+			deviceID = uuid.New().String()
+			logrus.Info("Webhook Lead: Non-UUID device_id. Generated UUID: ", deviceID)
+		} else {
+			// It's a valid UUID, use it
+			deviceID = request.DeviceID
+			logrus.Info("Webhook Lead: Valid UUID device_id, using as-is")
 		}
 		
 		// Create new device
 		newDevice := &models.UserDevice{
-			ID:               deviceID,  // UUID (generated or original)
+			ID:               deviceID,
 			UserID:           request.UserID,
-			DeviceName:       request.DeviceName,
+			DeviceName:       deviceName,
 			Phone:            "", // null/empty
 			JID:              deviceJID, // Always the full original device_id
 			Status:           "online",
@@ -132,11 +163,6 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 			MinDelaySeconds:  5,
 			MaxDelaySeconds:  15,
 			Platform:         request.Platform,
-		}
-		
-		// If device_name not provided, use a default
-		if newDevice.DeviceName == "" {
-			newDevice.DeviceName = "Device-" + time.Now().Format("20060102150405")
 		}
 		
 		// Create device in database
@@ -149,15 +175,13 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 				Message: "Failed to create device",
 				Results: map[string]interface{}{
 					"error": err.Error(),
-					"hint": "For non-UUID device_ids, first 6 chars are used as prefix. For UUID device_ids, full ID is used.",
+					"hint": "Check if device with same name already exists for this user",
 				},
 			})
 		}
 		
 		logrus.Info("Webhook Lead: Device created successfully - ID: ", newDevice.ID, ", JID: ", newDevice.JID)
 		device = newDevice
-	} else {
-		logrus.Info("Webhook Lead: Using existing device - ID: ", device.ID, ", JID: ", device.JID)
 	}
 
 	// Create lead object with direct field mapping
