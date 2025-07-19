@@ -293,11 +293,15 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			status = "active"
 		}
 		
+		// Debug logging
+		logrus.Debugf("Enrolling step %d/%d for %s: status=%s, trigger=%s, delay=%dh", 
+			i+1, len(steps), lead.Phone, status, step.Trigger, step.TriggerDelayHours)
+		
 		_, err := s.db.Exec(insertQuery, 
 			sequenceID,          // sequence_id
 			lead.Phone,          // contact_phone
 			lead.Name,           // contact_name
-			step.DayNumber,      // current_step
+			i + 1,               // current_step (FIXED: use index + 1 instead of day_number)
 			status,              // status
 			step.Trigger,        // current_trigger
 			nextTriggerTime,     // next_trigger_time
@@ -359,6 +363,11 @@ func (s *SequenceTriggerProcessor) getDeviceWorkloads() (map[string]DeviceLoad, 
 
 // processSequenceContacts processes contacts ready for their next message
 func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[string]DeviceLoad) (int, error) {
+	// Debug: Log how many active contacts we're about to process
+	var activeCount int
+	s.db.QueryRow(`SELECT COUNT(*) FROM sequence_contacts WHERE status = 'active' AND next_trigger_time <= $1`, time.Now()).Scan(&activeCount)
+	logrus.Infof("Found %d active sequence contacts ready for processing", activeCount)
+	
 	// Get contacts ready for processing
 	query := `
 		SELECT 
