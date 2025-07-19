@@ -51,11 +51,17 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	// Check if device has platform
 	if device.Platform != "" {
 		// Send via external platform
-		logrus.Infof("Sending message via platform %s for device %s", device.Platform, deviceID)
+		logrus.Infof("[PLATFORM-SEND] 📤 Sending message via %s platform for device %s (%s)", 
+			device.Platform, device.DeviceName, deviceID)
+		logrus.Infof("[PLATFORM-SEND] Recipient: %s, Message type: %s", 
+			msg.RecipientPhone, msg.Type)
 		
 		// Get instance/token from device JID (or you can add a separate column)
 		instance := device.JID // Using JID as instance/token
 		
+		logrus.Debugf("[PLATFORM-SEND] Using instance/token: %s", instance)
+		
+		startTime := time.Now()
 		err = w.platformSender.SendMessage(
 			device.Platform,
 			instance,
@@ -65,12 +71,16 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 			msg.ImageURL,
 			deviceID,
 		)
+		duration := time.Since(startTime)
 		
 		if err != nil {
+			logrus.Errorf("[PLATFORM-SEND] ❌ Failed to send via %s platform: %v (took %v)", 
+				device.Platform, err, duration)
 			return fmt.Errorf("platform send failed: %v", err)
 		}
 		
-		logrus.Infof("Successfully sent message via %s platform", device.Platform)
+		logrus.Infof("[PLATFORM-SEND] ✅ Successfully sent message via %s platform to %s (took %v)", 
+			device.Platform, msg.RecipientPhone, duration)
 		return nil
 	}
 	

@@ -657,15 +657,16 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 	
 	logrus.Infof("✅ COMPLETED: Step %d for %s", currentStep, phone)
 	
-	// Step 2: Find and activate the next pending step for this contact
+	// Step 2: Find and activate the next pending step based on EARLIEST next_trigger_time
+	// FIXED: Now using next_trigger_time instead of current_step
 	activateNextQuery := `
 		UPDATE sequence_contacts 
 		SET status = 'active'
 		WHERE sequence_id = $1 
 		AND contact_phone = $2
 		AND status = 'pending'
-		AND current_step = (
-			SELECT MIN(current_step) 
+		AND next_trigger_time = (
+			SELECT MIN(next_trigger_time) 
 			FROM sequence_contacts 
 			WHERE sequence_id = $1 
 			AND contact_phone = $2 
