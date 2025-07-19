@@ -294,6 +294,8 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		status := "pending"
 		if i == 0 {
 			status = "active"
+			// CRITICAL: Only step 1 should have immediate trigger time
+			nextTriggerTime = currentTime
 		}
 		
 		// CRITICAL: Ensure only step 1 is active
@@ -433,6 +435,19 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	currentTimeStr := time.Now().Format("2006-01-02 15:04:05")
 	logrus.Infof("Processing sequence contacts: status='active', time<='%s', limit=%d", 
 		currentTimeStr, s.batchSize)
+	
+	// SAFETY CHECK: Log any suspicious active records
+	var suspiciousCount int
+	s.db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM sequence_contacts 
+		WHERE status = 'active' 
+		AND next_trigger_time > $1
+	`, time.Now()).Scan(&suspiciousCount)
+	
+	if suspiciousCount > 0 {
+		logrus.Warnf("WARNING: Found %d active records with future trigger times - these should NOT be active yet!", suspiciousCount)
+	}
 
 	rows, err := s.db.Query(query, time.Now(), s.batchSize)
 	if err != nil {
@@ -667,12 +682,6 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 				AND contact_phone = $3 
 				AND current_trigger = $4
 				AND status = 'pending'
-				AND NOT EXISTS (
-					SELECT 1 FROM sequence_contacts sc2
-					WHERE sc2.sequence_id = $2
-					AND sc2.contact_phone = $3
-					AND sc2.status = 'active'
-				)
 		`
 		
 		result, err := s.db.Exec(updateQuery, nextTime, sequenceID, phone, nextTrigger.String)
