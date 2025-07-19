@@ -199,18 +199,18 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		UpdatedAt:    time.Now(),
 	}
 
-	// Check if lead with same device_id, user_id, and phone already exists
+	// Check if lead with same device_id, user_id, phone AND niche already exists
 	leadRepo := repository.GetLeadRepository()
-	existingLead, err := leadRepo.GetLeadByDeviceUserPhone(device.ID, request.UserID, request.Phone)
+	existingLead, err := leadRepo.GetLeadByDeviceUserPhoneNiche(device.ID, request.UserID, request.Phone, request.Niche)
 	if err == nil && existingLead != nil {
-		// Lead already exists with same device, user, and phone - skip creation
-		logrus.Info("Webhook Lead: Lead already exists with same device_id, user_id, and phone. Skipping creation.")
+		// Lead already exists with same device, user, phone AND niche - skip creation
+		logrus.Info("Webhook Lead: Lead already exists with same device_id, user_id, phone, and niche. Skipping creation.")
 		
 		// Return success but indicate it was a duplicate
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "DUPLICATE_SKIPPED",
-			Message: "Lead already exists with same device, user, and phone",
+			Message: "Lead already exists with same device, user, phone, and niche",
 			Results: map[string]interface{}{
 				"lead_id":       existingLead.ID,
 				"name":          existingLead.Name,
@@ -220,6 +220,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 				"target_status": existingLead.TargetStatus,
 				"device_id":     device.ID,
 				"device_jid":    device.JID,
+				"device_name":   device.DeviceName,
 				"user_id":       existingLead.UserID,
 				"platform":      existingLead.Platform,
 				"duplicate":     true,

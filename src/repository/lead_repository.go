@@ -376,3 +376,40 @@ func (r *leadRepository) GetLeadByDeviceUserPhone(deviceID, userID, phone string
 	
 	return lead, nil
 }
+
+// GetLeadByDeviceUserPhoneNiche gets a lead by device_id, user_id, phone AND niche combination
+func (r *leadRepository) GetLeadByDeviceUserPhoneNiche(deviceID, userID, phone, niche string) (*models.Lead, error) {
+	lead := &models.Lead{}
+	query := `
+		SELECT id, device_id, user_id, name, phone, email, niche, source, status, 
+		       target_status, trigger, notes, created_at, updated_at,
+		       COALESCE(platform, '') as platform
+		FROM leads
+		WHERE device_id = $1 AND user_id = $2 AND phone = $3 AND niche = $4
+		LIMIT 1
+	`
+	
+	err := r.db.QueryRow(query, deviceID, userID, phone, niche).Scan(
+		&lead.ID,
+		&lead.DeviceID,
+		&lead.UserID,
+		&lead.Name,
+		&lead.Phone,
+		&lead.Email,
+		&lead.Niche,
+		&lead.Source,
+		&lead.Status,
+		&lead.TargetStatus,
+		&lead.Trigger,
+		&lead.Notes,
+		&lead.CreatedAt,
+		&lead.UpdatedAt,
+		&lead.Platform,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return lead, nil
+}
