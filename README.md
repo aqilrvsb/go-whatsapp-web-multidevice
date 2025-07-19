@@ -1,62 +1,58 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 19, 2025 - Enhanced Duplicate Prevention & Database Management**  
+**Last Updated: January 19, 2025 - Sequence Processing Fix for 3000 Devices**  
 **Status: ✅ Production-ready with 3000+ device support + Zero WebSocket Timeouts**
 **Architecture: ✅ Async event processing + Worker pools + Extended timeouts**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATE: Enhanced Duplicate Prevention (January 19, 2025)
+## 🚀 LATEST
+## 🚀 LATEST UPDATE: Fixed Sequence Contact Processing (January 19, 2025)
 
-### ✅ Device Duplicate Prevention
-Fixed device duplication issue in webhook by checking `device_name` first:
-- **Before**: Multiple devices created with same name but different IDs
-- **After**: If device with same name exists, only updates the JID
-- **Result**: No more duplicate devices in the dashboard
+### ✅ Fixed Sequence Step Activation Logic
+Fixed critical issues with sequence contact progression where steps were activated out of order:
+- **Before**: Steps activated by step number (1, 2, 3...) causing issues
+- **After**: Steps activated by **earliest `next_trigger_time`** respecting scheduled times
+- **Result**: Proper sequence flow without missing or duplicate steps
 
-### ✅ Lead Duplicate Logic Enhancement
-Improved lead duplicate detection to include `niche` field:
-- **Before**: Duplicate = same device_id + user_id + phone
-- **After**: Duplicate = same device_id + user_id + phone + **niche**
-- **Result**: Same phone can have multiple leads with different niches
+### 🔧 Technical Fixes Applied
 
-#### **Examples:**
-```
-✅ Allowed: Phone "60123456789" with niche "fitness"
-✅ Allowed: Phone "60123456789" with niche "crypto" (different niche)
-❌ Blocked: Phone "60123456789" with niche "fitness" (duplicate)
-```
-
-### 📊 Direct PostgreSQL Database Access
-
-#### **Connection String (Railway):**
-```bash
-# Direct psql connection
-psql "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
-
-# Using Python
-import psycopg2
-conn = psycopg2.connect("postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require")
-```
-
-#### **Useful Database Queries:**
-
+#### **Database Optimizations:**
 ```sql
--- 1. Find duplicate devices by name
-SELECT user_id, device_name, COUNT(*) as count
-FROM user_devices
-GROUP BY user_id, device_name
-HAVING COUNT(*) > 1;
+-- 1. Unique constraint preventing duplicate active steps
+CREATE UNIQUE INDEX idx_one_active_per_contact
+ON sequence_contacts(sequence_id, contact_phone)
+WHERE status = 'active';
 
--- 2. Find duplicate leads (with new niche logic)
-SELECT device_id, user_id, phone, niche, COUNT(*) as count
-FROM leads
-GROUP BY device_id, user_id, phone, niche
-HAVING COUNT(*) > 1;
-
--- 3. Clean up duplicate devices (keep latest created_at)
--- See cleanup_duplicates.py for automated cleanup
+-- 2. Performance index for finding pending steps by time
+CREATE INDEX idx_pending_steps_by_time
+ON sequence_contacts(sequence_id, contact_phone, next_trigger_time)
+WHERE status = 'pending';
 ```
 
-## 🚀 Previous Update: Async Event Processing (January 17, 2025)
+#### **Query Changes:**
+```sql
+-- OLD: Activated by step number
+WHERE current_step = $3 AND status = 'pending'
+
+-- NEW: Activated by earliest scheduled time
+WHERE status = 'pending' AND next_trigger_time <= NOW()
+ORDER BY next_trigger_time ASC
+FOR UPDATE SKIP LOCKED  -- Handles 3000 concurrent devices
+```
+
+### 📊 What This Fixes:
+1. **Missing Step 1**: Steps are now marked 'completed' not deleted
+2. **Duplicate Step 2**: Unique constraint prevents multiple active steps
+3. **Out-of-order Steps**: Activation by time ensures proper sequence
+4. **Race Conditions**: FOR UPDATE SKIP LOCKED prevents conflicts
+
+### 🚀 3000 Device Optimization:
+- **Concurrent Processing**: Each device can process without blocking others
+- **Row-level Locking**: Prevents duplicate processing of same contact
+- **Transaction Isolation**: Proper isolation level for concurrent access
+- **Performance Indexes**: Fast lookups even with millions of records
+
+## 🚀 Previous Update: Enhanced Duplicate Prevention (January 19, 2025)
+us Update: Async Event Processing (January 17, 2025)
 
 ### ✅ CRITICAL FIX: WebSocket "close 1006" Errors Eliminated
 
