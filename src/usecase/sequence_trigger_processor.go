@@ -272,6 +272,9 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 	enrolledCount := 0
 	currentTime := time.Now()
 	
+	// CRITICAL: Log what we're about to insert
+	logrus.Infof("Enrolling contact %s in sequence %s with %d steps", lead.Phone, sequenceID, len(steps))
+	
 	for i, step := range steps {
 		// Calculate when this step should be processed
 		var nextTriggerTime time.Time
@@ -296,6 +299,10 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		// Debug logging
 		logrus.Debugf("Enrolling step %d/%d for %s: status=%s, trigger=%s, delay=%dh", 
 			i+1, len(steps), lead.Phone, status, step.Trigger, step.TriggerDelayHours)
+		
+		// CRITICAL: Ensure we're setting the right values
+		logrus.Infof("INSERT: phone=%s, step=%d, status=%s, trigger=%s, next_time=%v", 
+			lead.Phone, i+1, status, step.Trigger, nextTriggerTime.Format("2006-01-02 15:04:05"))
 		
 		_, err := s.db.Exec(insertQuery, 
 			sequenceID,          // sequence_id
@@ -368,6 +375,31 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 	s.db.QueryRow(`SELECT COUNT(*) FROM sequence_contacts WHERE status = 'active' AND next_trigger_time <= $1`, time.Now()).Scan(&activeCount)
 	logrus.Infof("Found %d active sequence contacts ready for processing", activeCount)
 	
+	// CRITICAL: Add extra logging to debug the issue
+	var debugInfo []string
+	debugRows, _ := s.db.Query(`
+		SELECT sc.contact_phone, sc.current_step, sc.status, sc.next_trigger_time, ss.day_number 
+		FROM sequence_contacts sc 
+		JOIN sequence_steps ss ON ss.id = sc.sequence_stepid 
+		WHERE sc.status = 'active' 
+		ORDER BY sc.contact_phone, ss.day_number 
+		LIMIT 10
+	`)
+	defer debugRows.Close()
+	for debugRows.Next() {
+		var phone string
+		var step int
+		var status string
+		var nextTime time.Time
+		var dayNum int
+		debugRows.Scan(&phone, &step, &status, &nextTime, &dayNum)
+		debugInfo = append(debugInfo, fmt.Sprintf("%s: step=%d, day=%d, status=%s, next=%v", 
+			phone, step, dayNum, status, nextTime.Format("15:04:05")))
+	}
+	if len(debugInfo) > 0 {
+		logrus.Infof("Active contacts sample: %v", debugInfo)
+	}
+	
 	// Get contacts ready for processing
 	query := `
 		SELECT 
@@ -390,6 +422,11 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 		ORDER BY sc.next_trigger_time ASC
 		LIMIT $2
 	`
+	
+	// CRITICAL: Log the query parameters
+	currentTimeStr := time.Now().Format("2006-01-02 15:04:05")
+	logrus.Infof("Processing sequence contacts: status='active', time<='%s', limit=%d", 
+		currentTimeStr, s.batchSize)
 
 	rows, err := s.db.Query(query, time.Now(), s.batchSize)
 	if err != nil {
@@ -582,6 +619,11 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 		
 		// Activate the next step record
 		nextTime := time.Now().Add(time.Duration(delayHours) * time.Hour)
+		
+		// IMPORTANT: Only activate if the delay time has passed
+		logrus.Infof("Activating next step: trigger=%s, delay=%dh, will process at %v", 
+			nextTrigger.String, delayHours, nextTime)
+		
 		updateQuery := `
 			UPDATE sequence_contacts 
 			SET status = 'active',
