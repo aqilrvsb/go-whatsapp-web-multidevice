@@ -461,6 +461,10 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 				continue
 			}
 			
+			// Debug log the preferred device
+			logrus.Infof("[DEVICE-SCAN] Contact %s has preferredDevice: %v (Valid: %v)", 
+				job.phone, job.preferredDevice.String, job.preferredDevice.Valid)
+			
 			logrus.Infof("📨 Queueing: %s step %d (was scheduled for %v)", 
 				job.phone, job.currentStep, triggerTime.Format("15:04:05"))
 			
@@ -527,12 +531,17 @@ func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads ma
 		return false
 	}
 	
-	// Select best device for this contact
-	deviceID := s.selectDeviceForContact(job.preferredDevice.String, deviceLoads)
+	// Use the assigned device - don't check availability here
+	// Let the broadcast processor handle offline devices
+	deviceID := job.preferredDevice.String
 	if deviceID == "" {
-		logrus.Warnf("No available device for contact %s", job.phone)
+		logrus.Warnf("No assigned device for contact %s - skipping", job.phone)
 		return false
 	}
+	
+	// Log device assignment
+	logrus.Infof("[SEQUENCE-DEVICE] Using assigned device %s for contact %s", 
+		deviceID, job.phone)
 
 	// Claim the contact for processing
 	claimQuery := `
