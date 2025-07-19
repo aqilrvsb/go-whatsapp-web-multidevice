@@ -68,6 +68,9 @@ func (s *SequenceTriggerProcessor) Start() error {
 	s.ticker = time.NewTicker(s.processInterval)
 	s.isRunning = true
 
+	// Also monitor broadcast message results
+	go s.monitorBroadcastResults()
+	
 	go s.run()
 	
 	logrus.Info("Sequence trigger processor started")
@@ -260,9 +263,9 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 	insertQuery := `
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
-			current_step, status, completed_at, current_trigger,
+			current_step, status, current_trigger,
 			next_trigger_time, sequence_stepid, assigned_device_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
 	`
 	
@@ -296,11 +299,10 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			lead.Name,           // contact_name
 			step.DayNumber,      // current_step
 			status,              // status
-			currentTime,         // completed_at (enrollment time)
 			step.Trigger,        // current_trigger
 			nextTriggerTime,     // next_trigger_time
 			step.ID,             // sequence_stepid
-			lead.DeviceID,       // assigned_device_id - ADDED
+			lead.DeviceID,       // assigned_device_id
 		)
 		
 		if err != nil {
@@ -369,7 +371,7 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			COALESCE(ss.max_delay_seconds, 15) as max_delay_seconds,
 			l.user_id
 		FROM sequence_contacts sc
-		JOIN sequence_steps ss ON ss.trigger = sc.current_trigger
+		JOIN sequence_steps ss ON ss.id = sc.sequence_stepid
 		JOIN sequences s ON s.id = sc.sequence_id
 		LEFT JOIN leads l ON l.phone = sc.contact_phone
 		WHERE sc.status = 'active'
@@ -544,14 +546,15 @@ func (s *SequenceTriggerProcessor) updateContactProgress(contactID string, nextT
 	// First, mark current contact record as completed
 	query := `
 		UPDATE sequence_contacts 
-		SET status = 'sent', 
+		SET status = 'completed', 
 			processing_device_id = NULL,
-			processing_started_at = NULL
+			processing_started_at = NULL,
+			completed_at = NOW()
 		WHERE id = $1
 	`
 	_, err := s.db.Exec(query, contactID)
 	if err != nil {
-		return fmt.Errorf("failed to mark contact as sent: %w", err)
+		return fmt.Errorf("failed to mark contact as completed: %w", err)
 	}
 	
 	// If there's a next trigger, activate the next step
@@ -724,4 +727,40 @@ func (d DeviceLoad) CanAcceptMore() bool {
 		d.MessagesHour < 80 && // WhatsApp limit ~100/hour
 		d.MessagesToday < 800 && // Daily limit ~1000
 		d.CurrentProcessing < 50 // Don't overload single device
+}
+
+// monitorBroadcastResults monitors broadcast messages and updates sequence_contacts accordingly
+func (s *SequenceTriggerProcessor) monitorBroadcastResults() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ticker.C:
+			// Check for failed messages and handle them
+			query := `
+				UPDATE sequence_contacts sc
+				SET status = 'failed',
+					last_error = bm.error_message,
+					retry_count = sc.retry_count + 1
+				FROM broadcast_messages bm
+				WHERE bm.sequence_id = sc.sequence_id
+					AND bm.recipient_phone = sc.contact_phone
+					AND bm.status = 'failed'
+					AND sc.status = 'active'
+					AND sc.processing_device_id IS NOT NULL
+					AND bm.created_at > NOW() - INTERVAL '5 minutes'
+			`
+			
+			result, err := s.db.Exec(query)
+			if err == nil {
+				if affected, _ := result.RowsAffected(); affected > 0 {
+					logrus.Warnf("Marked %d sequence contacts as failed due to broadcast failures", affected)
+				}
+			}
+			
+		case <-s.stopChan:
+			return
+		}
+	}
 }
