@@ -57,14 +57,22 @@ type SequenceStep struct {
 
 // SequenceContact model for tracking individual progress
 type SequenceContact struct {
-	ID             string     `json:"id" db:"id"`
-	SequenceID     string     `json:"sequence_id" db:"sequence_id"`
-	ContactPhone   string     `json:"contact_phone" db:"contact_phone"`
-	ContactName    string     `json:"contact_name" db:"contact_name"`
-	CurrentStep    int        `json:"current_step" db:"current_step"`
-	Status         string     `json:"status" db:"status"` // active, completed, paused
-	NextSendAt     *time.Time `json:"next_send_at" db:"next_trigger_time"`
-	CompletedAt    *time.Time `json:"completed_at" db:"completed_at"`
+	ID                   string     `json:"id" db:"id"`
+	SequenceID           string     `json:"sequence_id" db:"sequence_id"`
+	ContactPhone         string     `json:"contact_phone" db:"contact_phone"`
+	ContactName          string     `json:"contact_name" db:"contact_name"`
+	CurrentStep          int        `json:"current_step" db:"current_step"`
+	Status               string     `json:"status" db:"status"` // active, completed, paused
+	CompletedAt          *time.Time `json:"completed_at" db:"completed_at"`
+	CurrentTrigger       string     `json:"current_trigger" db:"current_trigger"`
+	NextTriggerTime      *time.Time `json:"next_trigger_time" db:"next_trigger_time"`
+	ProcessingDeviceID   *string    `json:"processing_device_id" db:"processing_device_id"`
+	LastError            *string    `json:"last_error" db:"last_error"`
+	RetryCount           int        `json:"retry_count" db:"retry_count"`
+	AssignedDeviceID     *string    `json:"assigned_device_id" db:"assigned_device_id"`
+	ProcessingStartedAt  *time.Time `json:"processing_started_at" db:"processing_started_at"`
+	SequenceStepID       *string    `json:"sequence_stepid" db:"sequence_stepid"`
+	UserID               *string    `json:"user_id" db:"user_id"`
 }
 
 // SequenceLog model for tracking message history

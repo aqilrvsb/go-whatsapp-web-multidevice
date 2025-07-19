@@ -230,10 +230,16 @@ func InitializeSchema() error {
 		contact_name VARCHAR(255),
 		current_step INTEGER DEFAULT 0,
 		status VARCHAR(50) DEFAULT 'active',
-		enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		last_sent_at TIMESTAMP,
-		next_trigger_time TIMESTAMP,
 		completed_at TIMESTAMP,
+		current_trigger VARCHAR(255),
+		next_trigger_time TIMESTAMP,
+		processing_device_id UUID,
+		last_error TEXT,
+		retry_count INTEGER DEFAULT 0,
+		assigned_device_id UUID,
+		processing_started_at TIMESTAMP,
+		sequence_stepid UUID,
+		user_id UUID,
 		UNIQUE(sequence_id, contact_phone)
 	);
 	
