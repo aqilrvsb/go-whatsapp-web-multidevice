@@ -1,96 +1,106 @@
 import psycopg2
+from datetime import datetime
 
-# Connect to PostgreSQL
-conn = psycopg2.connect(
-    "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
-)
-cur = conn.cursor()
+# Database connection
+DB_URI = "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
 
-print("=== DELETING ALL SEQUENCE DATA ===\n")
-
-try:
-    # First, check how many records exist
-    cur.execute("SELECT COUNT(*) FROM sequence_contacts")
-    count_before = cur.fetchone()[0]
-    print(f"1. Found {count_before} records in sequence_contacts")
+def delete_all_sequence_data():
+    conn = psycopg2.connect(DB_URI)
+    cur = conn.cursor()
     
-    # Delete ALL sequence_contacts records
-    cur.execute("DELETE FROM sequence_contacts")
-    sc_deleted = cur.rowcount
-    print(f"   Deleted {sc_deleted} sequence_contacts records")
-    
-    # Also delete ALL broadcast messages related to sequences
-    cur.execute("DELETE FROM broadcast_messages WHERE sequence_id IS NOT NULL")
-    bm_deleted = cur.rowcount
-    print(f"   Deleted {bm_deleted} broadcast_messages with sequence_id")
-    
-    # Commit the changes
-    conn.commit()
-    print("\n2. Changes committed successfully!")
-    
-    # Verify deletion
-    cur.execute("SELECT COUNT(*) FROM sequence_contacts")
-    count_after = cur.fetchone()[0]
-    print(f"\n3. Verification: {count_after} records remaining in sequence_contacts (should be 0)")
-    
-    # Check by sequence
-    cur.execute("""
-        SELECT s.name, COUNT(sc.id) as count
-        FROM sequences s
-        LEFT JOIN sequence_contacts sc ON sc.sequence_id = s.id
-        GROUP BY s.name
-        ORDER BY s.name
-    """)
-    results = cur.fetchall()
-    print("\n4. Records per sequence:")
-    for row in results:
-        print(f"   {row[0]}: {row[1]} records")
-    
-    # Double check with a different query
-    cur.execute("SELECT id FROM sequence_contacts LIMIT 5")
-    remaining = cur.fetchall()
-    if remaining:
-        print(f"\n5. WARNING: Still found {len(remaining)} records!")
-        print("   Running TRUNCATE command...")
-        
-        # Use TRUNCATE for more aggressive deletion
-        cur.execute("TRUNCATE TABLE sequence_contacts RESTART IDENTITY CASCADE")
-        conn.commit()
-        print("   TRUNCATE executed successfully!")
-        
-        # Final check
-        cur.execute("SELECT COUNT(*) FROM sequence_contacts")
-        final_count = cur.fetchone()[0]
-        print(f"   Final count: {final_count}")
-    else:
-        print("\n5. SUCCESS: No records found in sequence_contacts!")
-    
-except Exception as e:
-    conn.rollback()
-    print(f"\nERROR: {e}")
-    print("Trying alternative approach...")
+    print("=== DELETE ALL SEQUENCE CONTACTS AND BROADCAST MESSAGES ===")
+    print("!!! WARNING: This will DELETE ALL DATA from:")
+    print("   - sequence_contacts table")
+    print("   - broadcast_messages table")
+    print("")
     
     try:
-        # Try without CASCADE
-        cur.execute("TRUNCATE TABLE sequence_contacts RESTART IDENTITY")
+        # First, show current counts
+        print("Current data counts:")
+        
+        cur.execute("SELECT COUNT(*) FROM sequence_contacts")
+        sc_count = cur.fetchone()[0]
+        print(f"  - sequence_contacts: {sc_count} records")
+        
+        cur.execute("SELECT COUNT(*) FROM broadcast_messages")
+        bm_count = cur.fetchone()[0]
+        print(f"  - broadcast_messages: {bm_count} records")
+        
+        if sc_count == 0 and bm_count == 0:
+            print("\n[OK] Both tables are already empty!")
+            return
+        
+        # Confirm deletion
+        print("\n" + "="*50)
+        confirm = input("Are you SURE you want to delete ALL records? Type 'DELETE ALL' to confirm: ")
+        
+        if confirm != "DELETE ALL":
+            print("\n[X] Deletion cancelled. No data was deleted.")
+            return
+        
+        print("\nDeleting data...")
+        
+        # Delete broadcast_messages first (it may have foreign keys)
+        print("\n1. Deleting all broadcast_messages...")
+        cur.execute("DELETE FROM broadcast_messages")
+        bm_deleted = cur.rowcount
+        print(f"   [OK] Deleted {bm_deleted} broadcast messages")
+        
+        # Delete sequence_contacts
+        print("\n2. Deleting all sequence_contacts...")
+        cur.execute("DELETE FROM sequence_contacts")
+        sc_deleted = cur.rowcount
+        print(f"   [OK] Deleted {sc_deleted} sequence contacts")
+        
+        # Reset any sequences if needed
+        print("\n3. Resetting sequences to 'scheduled' status...")
+        cur.execute("""
+            UPDATE sequences 
+            SET status = 'scheduled' 
+            WHERE status IN ('processing', 'completed')
+        """)
+        seq_reset = cur.rowcount
+        print(f"   [OK] Reset {seq_reset} sequences")
+        
+        # Also reset campaigns if needed
+        print("\n4. Resetting campaigns to 'scheduled' status...")
+        cur.execute("""
+            UPDATE campaigns 
+            SET status = 'scheduled' 
+            WHERE status IN ('triggered', 'processing', 'completed')
+              AND campaign_date >= CURRENT_DATE
+        """)
+        camp_reset = cur.rowcount
+        print(f"   [OK] Reset {camp_reset} campaigns")
+        
+        # Commit the changes
         conn.commit()
-        print("TRUNCATE without CASCADE successful!")
-    except:
-        # Last resort - delete with no conditions
-        cur.execute("DELETE FROM sequence_contacts WHERE 1=1")
-        conn.commit()
-        print("DELETE with WHERE 1=1 successful!")
+        
+        print("\n" + "="*50)
+        print("[OK] DELETION COMPLETE!")
+        print(f"   - Deleted {bm_deleted} broadcast messages")
+        print(f"   - Deleted {sc_deleted} sequence contacts")
+        print(f"   - Reset {seq_reset} sequences")
+        print(f"   - Reset {camp_reset} campaigns")
+        
+        # Verify deletion
+        print("\nVerifying deletion...")
+        cur.execute("SELECT COUNT(*) FROM sequence_contacts")
+        new_sc_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM broadcast_messages")
+        new_bm_count = cur.fetchone()[0]
+        
+        print(f"  - sequence_contacts: {new_sc_count} records (should be 0)")
+        print(f"  - broadcast_messages: {new_bm_count} records (should be 0)")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"\n[X] Error: {e}")
+        print("No data was deleted due to error.")
+        raise
+    finally:
+        cur.close()
+        conn.close()
 
-finally:
-    # Final verification
-    cur.execute("SELECT COUNT(*) FROM sequence_contacts")
-    absolute_final = cur.fetchone()[0]
-    print(f"\n=== FINAL RESULT: {absolute_final} records in sequence_contacts ===")
-    
-    if absolute_final == 0:
-        print("✅ ALL DATA SUCCESSFULLY DELETED!")
-    else:
-        print("❌ Some records still remain. Manual intervention may be needed.")
-
-cur.close()
-conn.close()
+if __name__ == "__main__":
+    delete_all_sequence_data()

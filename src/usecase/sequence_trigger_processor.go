@@ -386,15 +386,14 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			sc.current_trigger, sc.current_step,
 			ss.content, ss.message_type, ss.media_url,
 			ss.next_trigger, ss.trigger_delay_hours,
-			COALESCE(sc.assigned_device_id, l.device_id) as preferred_device_id,
+			sc.assigned_device_id as preferred_device_id,
 			COALESCE(ss.min_delay_seconds, 5) as min_delay_seconds,
 			COALESCE(ss.max_delay_seconds, 15) as max_delay_seconds,
-			l.user_id,
+			sc.user_id,
 			sc.next_trigger_time
 		FROM sequence_contacts sc
 		JOIN sequence_steps ss ON ss.id = sc.sequence_stepid
 		JOIN sequences s ON s.id = sc.sequence_id
-		LEFT JOIN leads l ON l.phone = sc.contact_phone
 		WHERE sc.status = 'active'
 			AND s.is_active = true
 			AND sc.next_trigger_time <= $1
