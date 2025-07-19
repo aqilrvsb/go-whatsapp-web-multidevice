@@ -188,6 +188,96 @@ Special promotion for gym membership..."
   - Sequences include greetings
   - Database schema updated with `recipient_name`
 
+## 📢 Campaign & Sequence System - Complete Architecture
+
+### 🎯 Overview
+The system supports two powerful messaging modes:
+1. **Campaigns** - One-time broadcasts to targeted audiences
+2. **Sequences** - Multi-step automated drip campaigns
+
+Both use the SAME infrastructure with different scheduling logic.
+
+### 📊 Campaign System
+
+#### What is a Campaign?
+A scheduled one-time message blast sent to all leads matching specific criteria.
+
+#### Campaign Features:
+- **Scheduled Execution**: Set specific date and time
+- **Targeted Messaging**: Filter by niche and status (prospect/customer/all)
+- **Device-Specific**: Each device only processes its own leads
+- **Media Support**: Text and image messages
+- **Anti-Spam Protection**: Malaysian greetings + message randomization
+- **Human-like Delays**: Random delays between messages (min/max seconds)
+- **Status Tracking**: scheduled → triggered → completed/failed
+
+#### Campaign Flow:
+```
+1. Create Campaign → Set date/time, message, target audience
+2. Campaign Trigger (every minute) → Finds campaigns ready to send
+3. For Each Device → Get matching leads → Queue messages
+4. Broadcast Worker → Process queue → Apply delays
+5. Message Sender → Add anti-spam → Send via WhatsApp/Platform
+6. Update Status → Track success/failure
+```
+
+### 🔄 Sequence System (Trigger-Based Drip Campaigns)
+
+#### What is a Sequence?
+An automated multi-step message series where contacts progress based on triggers and delays.
+
+#### Sequence Features:
+- **Multi-Step Flows**: Up to 30+ steps/days
+- **Trigger-Based**: Each step has entry/exit triggers
+- **Individual Timelines**: Each contact progresses independently
+- **Flexible Delays**: Configure hours between steps
+- **Per-Step Customization**: Different delays for each step
+- **Sequence Chaining**: Link sequences together
+- **Entry Points**: Multiple ways to start
+- **Same Anti-Spam**: All messages get greeting + randomization
+
+#### Sequence Flow:
+```
+1. Lead Gets Trigger → "fitness_start"
+2. Sequence Processor → Creates records for all steps
+3. Process Step 1 → Send message → Wait trigger_delay_hours
+4. Activate Step 2 → Send message → Continue...
+5. Complete/Chain → Remove trigger or start new sequence
+```
+
+### 🔍 Key Differences
+
+| Feature | Campaigns | Sequences |
+|---------|-----------|-----------|
+| **Execution** | One-time blast | Multi-step over time |
+| **Scheduling** | Date/time based | Trigger-based |
+| **Progression** | All at once | Individual timelines |
+| **Message Count** | Single | Multiple (up to 30+) |
+| **Delays** | Between messages only | Between steps (hours/days) |
+
+### 🛡️ Shared Infrastructure
+
+Both campaigns and sequences use:
+1. **Same Database Queue**: Messages stored in `broadcast_messages`
+2. **Same Device Workers**: Process messages with delays
+3. **Same Anti-Spam**: Malaysian greetings + randomization
+4. **Same Platform Support**: WhatsApp Web + Wablas/Whacenter
+5. **Same Status Tracking**: pending → processing → sent/failed
+
+### 📋 Recent Updates (January 2025)
+
+#### Sequences Fixed to Match Campaigns:
+- ✅ Now use database queue (not in-memory)
+- ✅ Include UserID and SequenceID tracking
+- ✅ Persist messages for reliability
+- ✅ Per-step delay configuration
+- ✅ Strict device assignment (no cross-device)
+
+#### Anti-Spam Enhanced:
+- ✅ Platform messages (Wablas/Whacenter) now get anti-spam
+- ✅ All message types protected
+- ✅ Unified protection across all sending methods
+
 ## 🚀 Previous Update: Connection Resilience & Stability (January 16, 2025)
 
 ### ✅ NEW: Robust Connection Management System

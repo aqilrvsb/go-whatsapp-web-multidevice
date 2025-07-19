@@ -60,8 +60,10 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 			device.Platform,
 			instance,
 			msg.RecipientPhone,
+			msg.RecipientName,
 			msg.Message,
 			msg.ImageURL,
+			deviceID,
 		)
 		
 		if err != nil {

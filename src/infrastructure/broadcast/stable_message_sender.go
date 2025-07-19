@@ -52,8 +52,10 @@ func (s *StableMessageSender) SendMessage(deviceID string, msg *broadcast.Broadc
 			device.Platform,
 			device.JID,
 			msg.RecipientPhone,
+			msg.RecipientName,
 			msg.Message,
 			msg.ImageURL,
+			deviceID,
 		)
 	}
 	

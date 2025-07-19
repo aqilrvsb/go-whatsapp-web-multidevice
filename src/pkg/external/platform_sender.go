@@ -10,12 +10,15 @@ import (
 	"strings"
 	"time"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 	"github.com/sirupsen/logrus"
 )
 
 // PlatformSender handles sending messages via external platforms
 type PlatformSender struct {
-	client *http.Client
+	client            *http.Client
+	messageRandomizer *antipattern.MessageRandomizer
+	greetingProcessor *antipattern.GreetingProcessor
 }
 
 // NewPlatformSender creates a new platform sender
@@ -24,11 +27,16 @@ func NewPlatformSender() *PlatformSender {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		messageRandomizer: antipattern.NewMessageRandomizer(),
+		greetingProcessor: antipattern.NewGreetingProcessor(),
 	}
 }
 
-// SendMessage sends a message via external platform
-func (ps *PlatformSender) SendMessage(platform, instance, phone, message, imageURL string) error {
+// SendMessage sends a message via external platform with anti-spam
+func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, message, imageURL, deviceID string) error {
+	// Apply anti-spam to message first
+	message = ps.applyAntiSpam(message, recipientName, deviceID, phone)
+	
 	switch platform {
 	case "Wablas":
 		return ps.sendViaWablas(instance, phone, message, imageURL)
@@ -180,4 +188,22 @@ func (ps *PlatformSender) sendViaWhacenter(deviceID, phone, message, imageURL st
 	}
 	
 	return nil
+}
+
+// applyAntiSpam applies greeting and randomization to message
+func (ps *PlatformSender) applyAntiSpam(message, recipientName, deviceID, phone string) string {
+	// Add Malaysian greeting
+	messageWithGreeting := ps.greetingProcessor.PrepareMessageWithGreeting(
+		message,
+		recipientName,
+		deviceID,
+		phone,
+	)
+	
+	// Apply randomization (homoglyphs, zero-width chars, etc.)
+	randomizedMessage := ps.messageRandomizer.RandomizeMessage(messageWithGreeting)
+	
+	logrus.Debugf("Platform anti-spam applied for %s: greeting added, message randomized", phone)
+	
+	return randomizedMessage
 }

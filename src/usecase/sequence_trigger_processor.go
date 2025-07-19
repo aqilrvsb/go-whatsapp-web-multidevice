@@ -10,6 +10,7 @@ import (
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,6 +28,9 @@ type contactJob struct {
 	nextTrigger      sql.NullString
 	delayHours       int
 	preferredDevice  sql.NullString
+	minDelaySeconds  int
+	maxDelaySeconds  int
+	userID           string  // Added to track user
 }
 
 // SequenceTriggerProcessor handles trigger-based sequence processing
@@ -257,8 +261,8 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		INSERT INTO sequence_contacts (
 			sequence_id, contact_phone, contact_name, 
 			current_step, status, completed_at, current_trigger,
-			next_trigger_time, sequence_stepid
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			next_trigger_time, sequence_stepid, assigned_device_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
 	`
 	
@@ -296,6 +300,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			step.Trigger,        // current_trigger
 			nextTriggerTime,     // next_trigger_time
 			step.ID,             // sequence_stepid
+			lead.DeviceID,       // assigned_device_id - ADDED
 		)
 		
 		if err != nil {
@@ -359,7 +364,10 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			sc.current_trigger, sc.current_step,
 			ss.content, ss.message_type, ss.media_url,
 			ss.next_trigger, ss.trigger_delay_hours,
-			l.device_id as preferred_device_id
+			COALESCE(sc.assigned_device_id, l.device_id) as preferred_device_id,
+			COALESCE(ss.min_delay_seconds, 5) as min_delay_seconds,
+			COALESCE(ss.max_delay_seconds, 15) as max_delay_seconds,
+			l.user_id
 		FROM sequence_contacts sc
 		JOIN sequence_steps ss ON ss.trigger = sc.current_trigger
 		JOIN sequences s ON s.id = sc.sequence_id
@@ -402,7 +410,8 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			var job contactJob
 			if err := rows.Scan(&job.contactID, &job.sequenceID, &job.phone, &job.name,
 				&job.currentTrigger, &job.currentStep, &job.messageText, &job.messageType,
-				&job.mediaURL, &job.nextTrigger, &job.delayHours, &job.preferredDevice); err != nil {
+				&job.mediaURL, &job.nextTrigger, &job.delayHours, &job.preferredDevice,
+				&job.minDelaySeconds, &job.maxDelaySeconds, &job.userID); err != nil {
 				continue
 			}
 			jobs <- job
@@ -456,25 +465,36 @@ func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads ma
 	}
 
 	// Queue message to broadcast system
-	// Create broadcast message
+	// Create broadcast message with all required fields like campaigns
 	broadcastMsg := domainBroadcast.BroadcastMessage{
+		UserID:         job.userID,           // Added - required for tracking
 		DeviceID:       deviceID,
+		SequenceID:     &job.sequenceID,      // Added - link to sequence
 		RecipientPhone: job.phone,
+		RecipientName:  job.name,
 		Message:        job.messageText,
 		Content:        job.messageText,
 		Type:           job.messageType,
+		MinDelay:       job.minDelaySeconds,
+		MaxDelay:       job.maxDelaySeconds,
+		ScheduledAt:    time.Now(),           // Added - when queued
+		Status:         "pending",            // Added - initial status
 	}
 
 	if job.mediaURL.Valid && job.mediaURL.String != "" {
 		broadcastMsg.MediaURL = job.mediaURL.String
+		broadcastMsg.ImageURL = job.mediaURL.String
 	}
 
-	// Send to broadcast manager
-	if err := s.broadcastMgr.SendMessage(broadcastMsg); err != nil {
-		logrus.Errorf("Failed to queue message for %s: %v", job.phone, err)
+	// Queue to database like campaigns (NOT direct to manager)
+	broadcastRepo := repository.GetBroadcastRepository()
+	if err := broadcastRepo.QueueMessage(broadcastMsg); err != nil {
+		logrus.Errorf("Failed to queue sequence message for %s: %v", job.phone, err)
 		s.releaseContact(job.contactID)
 		return false
 	}
+	
+	logrus.Debugf("Queued sequence message for %s to database", job.phone)
 
 	// Update contact with next trigger
 	if err := s.updateContactProgress(job.contactID, job.nextTrigger, job.delayHours); err != nil {
@@ -504,25 +524,19 @@ func (s *SequenceTriggerProcessor) processContact(job contactJob, deviceLoads ma
 
 // selectDeviceForContact chooses the best device for sending
 func (s *SequenceTriggerProcessor) selectDeviceForContact(preferredDeviceID string, loads map[string]DeviceLoad) string {
-	// Try preferred device first
+	// STRICT DEVICE MATCHING - Like campaigns, only use the device that owns the lead
 	if preferredDeviceID != "" {
 		if load, ok := loads[preferredDeviceID]; ok && load.CanAcceptMore() {
 			return preferredDeviceID
 		}
+		// Device not available - do NOT fall back to other devices
+		logrus.Debugf("Preferred device %s not available for processing", preferredDeviceID)
+		return ""
 	}
 
-	// Find least loaded device
-	var bestDevice string
-	minLoad := int(^uint(0) >> 1) // Max int
-
-	for deviceID, load := range loads {
-		if load.CanAcceptMore() && load.CurrentProcessing < minLoad {
-			bestDevice = deviceID
-			minLoad = load.CurrentProcessing
-		}
-	}
-
-	return bestDevice
+	// No preferred device - this shouldn't happen if leads are properly assigned
+	logrus.Warnf("No preferred device for contact - skipping")
+	return ""
 }
 
 // updateContactProgress updates the current record as completed and activates the next step
