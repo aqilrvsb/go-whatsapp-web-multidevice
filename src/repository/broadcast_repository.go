@@ -34,9 +34,9 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	
 	query := `
 		INSERT INTO broadcast_messages 
-		(id, user_id, device_id, campaign_id, sequence_id, recipient_phone, recipient_name,
+		(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 	`	
 	// Get user_id - use from message if provided, otherwise get from device
 	var userID string
@@ -64,6 +64,13 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		sequenceID = nil
 	}
 	
+	var sequenceStepID interface{}
+	if msg.SequenceStepID != nil {
+		sequenceStepID = *msg.SequenceStepID
+	} else {
+		sequenceStepID = nil
+	}
+	
 	var groupID interface{}
 	if msg.GroupID != nil {
 		groupID = *msg.GroupID
@@ -78,7 +85,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	}
 	
 	_, err := r.db.Exec(query, msg.ID, userID, msg.DeviceID, campaignID,
-		sequenceID, msg.RecipientPhone, msg.RecipientName, msg.Type, msg.Content, 
+		sequenceID, sequenceStepID, msg.RecipientPhone, msg.RecipientName, msg.Type, msg.Content, 
 		msg.MediaURL, "pending", msg.ScheduledAt, time.Now(), groupID, groupOrder)
 		
 	return err

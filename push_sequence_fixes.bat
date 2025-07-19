@@ -1,22 +1,38 @@
 @echo off
-echo Pushing sequence fixes to GitHub...
+echo === Building and Pushing Sequence Fixes ===
+echo.
 
-REM Add all changes
+cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+
+echo 1. Building with sequence fixes...
+call build_local.bat
+
+if errorlevel 1 (
+    echo Build failed!
+    pause
+    exit /b 1
+)
+
+echo.
+echo 2. Committing changes...
 git add -A
+git commit -m "Fix sequence system: Add sequence_stepid tracking and complete monitoring
 
-REM Commit with descriptive message
-git commit -m "Fix sequence creation: niche, time_schedule, and steps saving
+- Added sequenceStepID field to contactJob struct
+- Updated queries to include sequence_stepid
+- Added SequenceStepID to BroadcastMessage domain
+- Updated QueueMessage to save sequence_stepid
+- Enhanced monitorBroadcastResults to sync both success and failure
+- Added sequence_failed status for sequences with multiple failures
 
-- Added niche field saving in sequence creation
-- Added time_schedule field saving and display
-- Fixed sequence steps not being saved properly
-- Added min/max delay fields to sequence creation
-- Updated frontend to show niche and schedule time
-- Fixed step creation with all required fields (day_number, message_type, etc.)
-- Enhanced sequence response to include all fields"
+This allows proper tracking of which specific step's message was sent/failed"
 
-REM Push to main branch
+echo.
+echo 3. Pushing to GitHub...
 git push origin main
 
-echo Push complete!
+echo.
+echo === Complete! ===
+echo Sequence fixes have been pushed to GitHub.
+echo The Go application should now properly track sequence steps.
 pause

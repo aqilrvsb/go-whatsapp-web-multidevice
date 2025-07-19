@@ -9,6 +9,7 @@ type BroadcastMessage struct {
 	DeviceID       string
 	CampaignID     *int    // Pointer to allow null
 	SequenceID     *string // Pointer to allow null
+	SequenceStepID *string // Pointer to allow null - links to specific step
 	RecipientPhone string
 	RecipientName  string  // Name of the recipient
 	RecipientJID   string  // WhatsApp JID format
