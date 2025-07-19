@@ -1,10 +1,62 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 17, 2025 - Async Event Processing for Zero Disconnections**  
+**Last Updated: January 19, 2025 - Enhanced Duplicate Prevention & Database Management**  
 **Status: ✅ Production-ready with 3000+ device support + Zero WebSocket Timeouts**
 **Architecture: ✅ Async event processing + Worker pools + Extended timeouts**
 **Deploy**: ✅ Auto-deployment via Railway (Fully optimized)
 
-## 🚀 LATEST UPDATE: Async Event Processing (January 17, 2025)
+## 🚀 LATEST UPDATE: Enhanced Duplicate Prevention (January 19, 2025)
+
+### ✅ Device Duplicate Prevention
+Fixed device duplication issue in webhook by checking `device_name` first:
+- **Before**: Multiple devices created with same name but different IDs
+- **After**: If device with same name exists, only updates the JID
+- **Result**: No more duplicate devices in the dashboard
+
+### ✅ Lead Duplicate Logic Enhancement
+Improved lead duplicate detection to include `niche` field:
+- **Before**: Duplicate = same device_id + user_id + phone
+- **After**: Duplicate = same device_id + user_id + phone + **niche**
+- **Result**: Same phone can have multiple leads with different niches
+
+#### **Examples:**
+```
+✅ Allowed: Phone "60123456789" with niche "fitness"
+✅ Allowed: Phone "60123456789" with niche "crypto" (different niche)
+❌ Blocked: Phone "60123456789" with niche "fitness" (duplicate)
+```
+
+### 📊 Direct PostgreSQL Database Access
+
+#### **Connection String (Railway):**
+```bash
+# Direct psql connection
+psql "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
+
+# Using Python
+import psycopg2
+conn = psycopg2.connect("postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require")
+```
+
+#### **Useful Database Queries:**
+
+```sql
+-- 1. Find duplicate devices by name
+SELECT user_id, device_name, COUNT(*) as count
+FROM user_devices
+GROUP BY user_id, device_name
+HAVING COUNT(*) > 1;
+
+-- 2. Find duplicate leads (with new niche logic)
+SELECT device_id, user_id, phone, niche, COUNT(*) as count
+FROM leads
+GROUP BY device_id, user_id, phone, niche
+HAVING COUNT(*) > 1;
+
+-- 3. Clean up duplicate devices (keep latest created_at)
+-- See cleanup_duplicates.py for automated cleanup
+```
+
+## 🚀 Previous Update: Async Event Processing (January 17, 2025)
 
 ### ✅ CRITICAL FIX: WebSocket "close 1006" Errors Eliminated
 
@@ -826,6 +878,62 @@ NotifyMessageUpdate(deviceID, chatJID, message) // WebSocket broadcast
 4. **Sync Button**: Enhanced to trigger presence updates
 5. **Database**: Fixed duplicate column issues (name vs chat_name)
 
+## 🗄️ Database Management & Direct Access
+
+### PostgreSQL Connection (Railway)
+```bash
+# Direct connection using psql
+psql "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
+
+# Python connection
+pip install psycopg2-binary
+```
+
+```python
+import psycopg2
+DB_URI = "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
+conn = psycopg2.connect(DB_URI)
+cur = conn.cursor()
+```
+
+### Common Database Operations
+
+#### 1. **Device Management**
+```sql
+-- View all devices
+SELECT id, user_id, device_name, jid, platform, status FROM user_devices ORDER BY created_at DESC;
+
+-- Find duplicate devices
+SELECT user_id, device_name, COUNT(*) as count
+FROM user_devices
+GROUP BY user_id, device_name
+HAVING COUNT(*) > 1;
+
+-- Update device status
+UPDATE user_devices SET status = 'online' WHERE device_name = 'SCHQ-S09';
+```
+
+#### 2. **Lead Management**
+```sql
+-- View leads with their devices
+SELECT l.name, l.phone, l.niche, d.device_name 
+FROM leads l 
+JOIN user_devices d ON l.device_id = d.id
+ORDER BY l.created_at DESC;
+
+-- Find duplicate leads (new logic with niche)
+SELECT device_id, user_id, phone, niche, COUNT(*) as count
+FROM leads
+GROUP BY device_id, user_id, phone, niche
+HAVING COUNT(*) > 1;
+
+-- Update lead niche
+UPDATE leads SET niche = 'fitness' WHERE phone = '60123456789';
+```
+
+#### 3. **Database Cleanup Script**
+See `cleanup_duplicates.py` for automated cleanup of duplicate devices.
+
 ## 📦 Installation & Setup
 
 ### Quick Start
@@ -961,12 +1069,25 @@ if device.Status == "online" { }
 - [x] Auto device health checks
 - [x] **Lead Creation Webhook** (NEW)
 
-### ✅ Lead Creation Webhook (NEW - January 2025)
+### ✅ Lead Creation Webhook (UPDATED - January 19, 2025)
 - [x] Public endpoint at `/webhook/lead/create`
 - [x] Create leads via HTTP POST from external services
 - [x] Direct field mapping to database columns
 - [x] No authentication required for easy integration
 - [x] Perfect for WhatsApp bot integration
+- [x] **NEW**: Device name-based duplicate prevention
+- [x] **NEW**: Lead duplicate check includes niche field
+
+#### Updated Webhook Behavior:
+1. **Device Creation**:
+   - First checks if device with same `device_name` exists
+   - If exists → updates only the JID (doesn't create duplicate)
+   - If not exists → creates new device
+
+2. **Lead Creation**:
+   - Duplicate check now includes: device_id + user_id + phone + **niche**
+   - Same phone can exist with different niches
+   - Example: "60123456789" can have leads for "fitness" AND "crypto"
 
 #### Webhook Usage Example:
 ```bash
