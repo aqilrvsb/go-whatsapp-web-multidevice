@@ -838,8 +838,7 @@ func (s *SequenceTriggerProcessor) monitorBroadcastResults() {
 			failQuery := `
 				UPDATE sequence_contacts sc
 				SET status = 'failed',
-					last_error = bm.error_message,
-					retry_count = sc.retry_count + 1
+					last_error = bm.error_message
 				FROM broadcast_messages bm
 				WHERE bm.sequence_id = sc.sequence_id
 					AND bm.recipient_phone = sc.contact_phone
@@ -877,22 +876,6 @@ func (s *SequenceTriggerProcessor) monitorBroadcastResults() {
 					logrus.Infof("Marked %d sequence contacts as sent due to successful broadcasts", affected)
 				}
 			}
-			
-			// Mark entire sequence as failed after 3 failures
-			markFailedQuery := `
-				UPDATE sequence_contacts
-				SET status = 'sequence_failed'
-				WHERE sequence_id IN (
-					SELECT sequence_id
-					FROM sequence_contacts
-					WHERE status = 'failed'
-					AND retry_count >= 3
-					GROUP BY sequence_id, contact_phone
-				)
-				AND status IN ('pending', 'active')
-			`
-			
-			s.db.Exec(markFailedQuery)
 			
 		case <-s.stopChan:
 			return
