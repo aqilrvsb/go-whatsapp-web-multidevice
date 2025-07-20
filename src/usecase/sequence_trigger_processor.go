@@ -326,9 +326,9 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			continue
 		}
 		
-		logrus.Infof("Created step %d for %s - status: %s, trigger: %s, time: %v", 
-			step.DayNumber, lead.Phone, status, step.Trigger, 
-			nextTriggerTime.Format("2006-01-02 15:04:05"))
+		// Debug log the lead name being used
+		logrus.Infof("[ENROLLMENT] Created step %d for %s - Name: '%s', status: %s", 
+			step.DayNumber, lead.Phone, lead.Name, status)
 	}
 	
 	// Log summary
@@ -448,6 +448,10 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			
 			job.sequenceStepID = sequenceStepID
 			job.nextTriggerTime = triggerTime
+			
+			// Debug logging for name issue
+			logrus.Infof("[SEQUENCE-NAME] Contact: %s, Name from sequence_contacts: '%s'", job.phone, job.name)
+			
 			jobs <- job
 		}
 		close(jobs)

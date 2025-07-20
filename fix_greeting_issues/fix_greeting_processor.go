@@ -47,31 +47,52 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 	// Process spintax
 	greeting := g.processSpintax(template)
 	
-	// Handle name - if phone number or empty, use "Cik"
-	processedName := name
-	if isPhoneNumber(name) || name == "" || strings.TrimSpace(name) == "" {
-		processedName = "Cik"
-		logrus.Debugf("[GREETING] Name is empty/phone, using 'Cik' instead of '%s'", name)
-	} else {
-		// Also check if name is same as phone number
-		cleanPhone := strings.ReplaceAll(recipientPhone, "+", "")
-		cleanPhone = strings.ReplaceAll(cleanPhone, " ", "")
-		cleanPhone = strings.ReplaceAll(cleanPhone, "-", "")
-		
-		cleanName := strings.ReplaceAll(name, "+", "")
-		cleanName = strings.ReplaceAll(cleanName, " ", "")
-		cleanName = strings.ReplaceAll(cleanName, "-", "")
-		
-		if cleanName == cleanPhone {
-			processedName = "Cik"
-			logrus.Debugf("[GREETING] Name matches phone number, using 'Cik'")
-		}
-	}
+	// FIXED: Better name handling
+	processedName := g.processName(name, recipientPhone)
 	
 	greeting = strings.ReplaceAll(greeting, "{name}", processedName)
 	
 	// Apply micro-variations
 	return g.applyMicroVariations(greeting)
+}
+
+// processName handles name processing with better logic
+func (g *GreetingProcessor) processName(name string, recipientPhone string) string {
+	// Log the original name for debugging
+	logrus.Debugf("Processing name: '%s' for phone: %s", name, recipientPhone)
+	
+	// Trim spaces
+	name = strings.TrimSpace(name)
+	
+	// If empty, use Cik
+	if name == "" {
+		logrus.Debug("Name is empty, using 'Cik'")
+		return "Cik"
+	}
+	
+	// If it's the same as phone number (without formatting), use Cik
+	cleanPhone := strings.ReplaceAll(recipientPhone, "+", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, " ", "")
+	cleanPhone = strings.ReplaceAll(cleanPhone, "-", "")
+	
+	cleanName := strings.ReplaceAll(name, "+", "")
+	cleanName = strings.ReplaceAll(cleanName, " ", "")
+	cleanName = strings.ReplaceAll(cleanName, "-", "")
+	
+	if cleanName == cleanPhone {
+		logrus.Debug("Name is same as phone number, using 'Cik'")
+		return "Cik"
+	}
+	
+	// Check if it's a phone number format
+	if isPhoneNumber(name) {
+		logrus.Debug("Name looks like a phone number, using 'Cik'")
+		return "Cik"
+	}
+	
+	// Use the actual name
+	logrus.Debugf("Using actual name: '%s'", name)
+	return name
 }
 
 // selectTimeAppropriateTemplate chooses template based on current time
@@ -189,9 +210,7 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	// Get unique greeting
 	greeting := g.GetAntiSpamGreeting(name, deviceID, recipientPhone)
 	
-	// Log for debugging
-	logrus.Debugf("[GREETING] Name: '%s', Phone: %s, Greeting: '%s'", name, recipientPhone, greeting)
-	
-	// Combine with double line break for WhatsApp formatting
+	// CRITICAL FIX: WhatsApp needs double line break
+	// Using actual newlines which will be handled by the message sender
 	return greeting + "\n\n" + originalMessage
 }
