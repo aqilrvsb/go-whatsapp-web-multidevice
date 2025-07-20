@@ -1856,6 +1856,31 @@ const (
 
 The trigger-based system is production-ready and optimized for massive scale with 3000+ devices!
 
+## 📊 Sequence Summary & Progress Tracking
+
+### Sequence Summary Features
+The sequence system provides comprehensive tracking and analytics:
+
+1. **Main Dashboard Metrics**:
+   - Total Sequences (active/inactive)
+   - Total Flows (sum of all steps across sequences)
+   - Total Contacts Should Send (leads matching triggers)
+   - Contacts Done Send Message (successfully sent)
+   - Contacts Failed Send Message (failed deliveries)
+   - Contacts Remaining Send Message (yet to process)
+
+2. **Per-Sequence Details**:
+   - Individual flow statistics
+   - Device performance tracking
+   - Date range filtering
+   - Export capabilities
+
+3. **Sequence Processing (January 2025 Update)**:
+   - **Pending-First Approach**: ALL steps start as 'pending'
+   - **Time-Based Processing**: Messages sent when `next_trigger_time` arrives
+   - **No Activation Chain**: Direct pending → completed status
+   - **Individual Records**: Each step tracked separately with `sequence_stepid`
+
 ## 🎉 What's Next?
 
 ### Completed ✅
@@ -1873,6 +1898,10 @@ The trigger-based system is production-ready and optimized for massive scale wit
   - Track leads by trigger matching
   - Monitor sent, failed, and remaining contacts
   - Date filtering based on completed_at timestamp
+- **Sequence Pending-First Logic** ✅
+  - Fixed database triggers blocking progression
+  - All steps created as pending
+  - Time-based processing only
 
 ### Future Enhancements
 - Message search
