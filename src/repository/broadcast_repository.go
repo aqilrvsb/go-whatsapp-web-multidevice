@@ -130,6 +130,10 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 			continue
 		}
 		
+		// CRITICAL FIX: Ensure Message field is populated for the greeting processor
+		msg.Message = msg.Content
+		msg.ImageURL = msg.MediaURL // Also ensure ImageURL alias is set
+		
 		if userID.Valid {
 			msg.UserID = userID.String
 		}
@@ -286,6 +290,11 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 		if err != nil {
 			continue
 		}
+		
+		// CRITICAL FIX: Ensure Message field is populated for the greeting processor
+		msg.Message = msg.Content
+		msg.ImageURL = msg.MediaURL // Also ensure ImageURL alias is set
+		msg.RecipientName = msg.RecipientPhone // Set recipient name to phone if missing
 		
 		if campaignID.Valid {
 			campaignIDInt := int(campaignID.Int64)
