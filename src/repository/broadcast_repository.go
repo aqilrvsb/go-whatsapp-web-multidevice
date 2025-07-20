@@ -134,6 +134,11 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		msg.Message = msg.Content
 		msg.ImageURL = msg.MediaURL // Also ensure ImageURL alias is set
 		
+		// Ensure RecipientName is not empty for greeting processor
+		if msg.RecipientName == "" {
+			msg.RecipientName = msg.RecipientPhone
+		}
+		
 		if userID.Valid {
 			msg.UserID = userID.String
 		}

@@ -18,9 +18,9 @@ func NewGreetingProcessor() *GreetingProcessor {
 	return &GreetingProcessor{
 		templates: []string{
 			"{Hi|Hello|Hai} {name}",
-			"{name} {hi|hello}",
+			"{Hi|Hello} {name}",
 			"{Salam|Hi|Hello} {name}",
-			"{name}, {apa khabar|hi}",
+			"{Hai|Hi} {name}, {apa khabar}",
 			"{Selamat pagi|Hi} {name}", // Time-aware
 		},
 	}
@@ -67,7 +67,7 @@ func (g *GreetingProcessor) selectTimeAppropriateTemplate() string {
 		morningTemplates := []string{
 			"{Selamat pagi|Pagi} {name}",
 			"{Hi|Hello|Hai} {name}",
-			"{name}, {selamat pagi|hi}",
+			"{Selamat pagi} {name}, {apa khabar}",
 		}
 		return morningTemplates[rand.Intn(len(morningTemplates))]
 	}
@@ -76,7 +76,7 @@ func (g *GreetingProcessor) selectTimeAppropriateTemplate() string {
 	if hour >= 19 {
 		eveningTemplates := []string{
 			"{Hi|Hello|Hai} {name}",
-			"{name} {hi|hello}",
+			"{Selamat malam|Hi} {name}",
 			"{Salam|Hi} {name}",
 		}
 		return eveningTemplates[rand.Intn(len(eveningTemplates))]
