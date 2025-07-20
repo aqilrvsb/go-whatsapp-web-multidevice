@@ -39,8 +39,14 @@ func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, 
 		platform, phone, deviceID, imageURL != "")
 	logrus.Debugf("[PLATFORM] Message preview (first 100 chars): %s", truncateString(message, 100))
 	
-	// Apply anti-spam to message first
-	message = ps.applyAntiSpam(message, recipientName, deviceID, phone)
+	// UPDATED: Ensure we have a name to use
+	nameToUse := recipientName
+	if nameToUse == "" {
+		nameToUse = phone // Fallback to phone if name is empty
+	}
+	
+	// Apply anti-spam to message first - using the name we determined
+	message = ps.applyAntiSpam(message, nameToUse, deviceID, phone)
 	
 	startTime := time.Now()
 	var err error

@@ -159,10 +159,20 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 	// Get device ID from the message context
 	deviceID := msg.DeviceID
 	
-	// Prepare message with greeting
+	// UPDATED: Use RecipientName directly from broadcast_messages
+	// This ensures consistency for both campaigns and sequences
+	nameToUse := msg.RecipientName
+	if nameToUse == "" {
+		nameToUse = msg.RecipientPhone // Fallback to phone if name is empty
+	}
+	
+	// Log what name we're using
+	logrus.Infof("[WHATSAPP-NAME] Using recipient_name from broadcast_messages: '%s' for phone %s", nameToUse, msg.RecipientPhone)
+	
+	// Prepare message with greeting using the name from broadcast_messages
 	messageWithGreeting := w.greetingProcessor.PrepareMessageWithGreeting(
 		msg.Message, 
-		msg.RecipientName, 
+		nameToUse,  // Use the name from broadcast_messages
 		deviceID, 
 		msg.RecipientPhone,
 	)
