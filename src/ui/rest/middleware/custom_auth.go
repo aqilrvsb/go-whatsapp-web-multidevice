@@ -14,6 +14,7 @@ var PublicRoutes = []string{
 	"/login",
 	"/api/login",         // Add API login endpoint
 	"/register",
+	"/api/register",      // ADDED: API register endpoint
 	"/logout",
 	"/dashboard",         // Allow dashboard access
 	"/health",
