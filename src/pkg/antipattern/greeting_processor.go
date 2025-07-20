@@ -88,7 +88,8 @@ func (g *GreetingProcessor) selectTimeAppropriateTemplate() string {
 
 // processSpintax processes spintax notation {option1|option2|option3}
 func (g *GreetingProcessor) processSpintax(template string) string {
-	spintaxRegex := regexp.MustCompile(`\{([^}]+)\}`)
+	// Only process spintax that contains | (not placeholders like {name})
+	spintaxRegex := regexp.MustCompile(`\{([^}]*\|[^}]*)\}`)
 	
 	return spintaxRegex.ReplaceAllStringFunc(template, func(match string) string {
 		// Remove braces and split by |
