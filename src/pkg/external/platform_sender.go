@@ -85,10 +85,14 @@ func (ps *PlatformSender) sendWablasText(token, phone, message string) error {
 	
 	logrus.Infof("[WABLAS-TEXT] Preparing request to %s for phone: %s", apiURL, phone)
 	
+	// CRITICAL FIX: Don't URL encode the message here
+	// Wablas expects the message with actual newlines in form data
+	// The form encoding will handle it properly
+	
 	// Prepare form data
 	data := url.Values{}
 	data.Set("phone", phone)
-	data.Set("message", message)
+	data.Set("message", message) // Keep newlines as \n
 	
 	logrus.Debugf("[WABLAS-TEXT] Request data: phone=%s, message_length=%d", phone, len(message))
 	
@@ -259,6 +263,7 @@ func (ps *PlatformSender) sendViaWhacenter(deviceID, phone, message, imageURL st
 func (ps *PlatformSender) applyAntiSpam(message, recipientName, deviceID, phone string) string {
 	logrus.Debugf("[PLATFORM-ANTISPAM] Starting anti-spam for %s", phone)
 	logrus.Debugf("[PLATFORM-ANTISPAM] Original message: %s", truncateString(message, 100))
+	logrus.Debugf("[PLATFORM-ANTISPAM] Recipient name: '%s'", recipientName)
 	
 	// Add Malaysian greeting
 	messageWithGreeting := ps.greetingProcessor.PrepareMessageWithGreeting(
@@ -268,7 +273,8 @@ func (ps *PlatformSender) applyAntiSpam(message, recipientName, deviceID, phone 
 		phone,
 	)
 	
-	logrus.Debugf("[PLATFORM-ANTISPAM] After greeting: %s", truncateString(messageWithGreeting, 100))
+	// Log with escaped characters to see line breaks
+	logrus.Infof("[PLATFORM-ANTISPAM] After greeting (escaped): %q", truncateString(messageWithGreeting, 150))
 	
 	// Apply randomization (homoglyphs, zero-width chars, etc.)
 	randomizedMessage := ps.messageRandomizer.RandomizeMessage(messageWithGreeting)

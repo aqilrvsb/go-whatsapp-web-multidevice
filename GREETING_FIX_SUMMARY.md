@@ -1,71 +1,83 @@
-# Greeting Processor Fix - January 20, 2025
+# Greeting Fix Summary - January 2025
 
-## Issue Found
-Messages were showing "Hi ոaṁe" instead of "Hi Aqil" - the {name} placeholder was not being replaced properly.
+## Issues Fixed
 
-## Root Cause
-The `processSpintax` function was using a regex that matched ALL curly braces `{...}`, including the `{name}` placeholder. This caused:
+### 1. Customer Name Not Showing
+**Problem**: Greeting showed "Hi Cik" instead of using the actual customer name
 
-1. `{Hi|Hello|Hai}` → "Hi" ✓ (correct)
-2. `{name}` → "name" ✗ (incorrect - removed the braces)
-3. Later `ReplaceAll("{name}", "Aqil")` couldn't find `{name}` because it was already changed to just "name"
+**Root Cause**: 
+- For sequences: The `contact_name` field in `sequence_contacts` table might contain phone numbers or be empty
+- The greeting processor wasn't properly detecting when names were phone numbers
 
-## The Fix
-Changed the regex from:
-```go
-// OLD - matches everything in curly braces
-regexp.MustCompile(`\{([^}]+)\}`)
+**Fix Applied**:
+- Enhanced name detection logic in `greeting_processor.go`
+- Added check for names that match phone numbers (even with formatting differences)
+- Added debug logging to track names throughout the flow
+- Properly falls back to "Cik" when name is empty, whitespace only, or a phone number
+
+### 2. Line Break Issue
+**Note**: The code already has proper line breaks (`\n\n`). The issue might be:
+- WhatsApp's rendering of the message
+- Platform API encoding requirements
+
+**Current Implementation**:
+- Messages use `greeting + "\n\n" + originalMessage` format
+- This should display as:
+  ```
+  Hi [Name],
+  
+  [Your message content]
+  ```
+
+### 3. Debug Logging Added
+To help troubleshoot future issues, we added logging at key points:
+- `[ENROLLMENT]` - Shows what name is stored when lead enrolls
+- `[SEQUENCE-NAME]` - Shows what name is retrieved from database  
+- `[GREETING]` - Shows greeting generation details
+
+## How Names Work
+
+### For Sequences:
+1. Lead enrolls → `lead.name` is copied to `sequence_contacts.contact_name`
+2. When processing → Uses `contact_name` from `sequence_contacts` table
+3. If name is empty/phone → Falls back to "Cik"
+
+### For Campaigns:
+1. Uses `name` directly from `leads` table
+2. Same fallback logic applies
+
+## Testing the Fix
+
+1. Check Railway logs for the debug messages:
+   ```
+   [ENROLLMENT] Created step 1 for 60123456789 - Name: 'John Doe', status: pending
+   [SEQUENCE-NAME] Contact: 60123456789, Name from sequence_contacts: 'John Doe'
+   [GREETING] Name: 'John Doe', Phone: 60123456789, Greeting: 'Hi John Doe,'
+   ```
+
+2. If name is still showing as "Cik", check:
+   - What's stored in the `leads.name` field
+   - What's stored in `sequence_contacts.contact_name` field
+   - The debug logs to see where the name gets lost
+
+## Database Check Queries
+
+```sql
+-- Check lead names
+SELECT phone, name FROM leads WHERE phone = '60123456789';
+
+-- Check sequence contact names
+SELECT contact_phone, contact_name 
+FROM sequence_contacts 
+WHERE contact_phone = '60123456789';
+
+-- Update name if needed
+UPDATE leads SET name = 'Customer Name' WHERE phone = '60123456789';
 ```
 
-To:
-```go
-// NEW - only matches spintax with | character
-regexp.MustCompile(`\{([^}]*\|[^}]*)\}`)
-```
+## Next Steps
 
-This ensures:
-- `{Hi|Hello|Hai}` is processed as spintax ✓
-- `{name}` is left untouched for later replacement ✓
-
-## Result
-Messages now correctly show:
-```
-Hi Aqil 1, apa khabar
-
-[Message content]
-```
-
-Instead of:
-```
-Hi ոaṁe [Message content with no line breaks]
-```
-
-## How Greetings Work
-
-1. **Name Logic**:
-   - If name is phone number (only digits) → "Cik"
-   - If name is empty → "Cik"
-   - Otherwise → Use actual name
-
-2. **Format**:
-   - Greeting line (e.g., "Hi Aqil, apa khabar")
-   - Double line break (`\n\n`)
-   - Original message content
-
-3. **Variations**:
-   - Different templates based on time of day
-   - Random selection from options
-   - Micro-variations (punctuation, spacing)
-
-## Important Notes
-
-- Greetings are applied at send time, not stored in database
-- Each recipient gets a unique variation
-- The `content` field in database shows original message only
-- To verify greetings, check actual WhatsApp messages received
-
-## Deployment Required
-After pulling latest code:
-1. Rebuild application
-2. Deploy to server
-3. Messages will have proper greetings with recipient names
+If issues persist:
+1. Check the debug logs to see what names are being used
+2. Verify the database has proper names (not phone numbers)
+3. For platform APIs (Wablas/Whacenter), may need special encoding for line breaks

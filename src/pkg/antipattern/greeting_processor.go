@@ -189,9 +189,22 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	// Get unique greeting
 	greeting := g.GetAntiSpamGreeting(name, deviceID, recipientPhone)
 	
-	// Log for debugging
+	// Log for debugging - show exact format with escaped characters
 	logrus.Debugf("[GREETING] Name: '%s', Phone: %s, Greeting: '%s'", name, recipientPhone, greeting)
 	
 	// Combine with double line break for WhatsApp formatting
-	return greeting + "\n\n" + originalMessage
+	finalMessage := greeting + "\n\n" + originalMessage
+	
+	// Log the final message with visible line breaks
+	logrus.Infof("[GREETING] Final message preview (first 100 chars): %q", truncateForLog(finalMessage, 100))
+	
+	return finalMessage
+}
+
+// truncateForLog truncates string for logging and shows escaped characters
+func truncateForLog(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

@@ -93,25 +93,60 @@ func (mr *MessageRandomizer) insertZeroWidthSpaces(text string, count int) strin
 		return text
 	}
 	
-	words := strings.Fields(text)
-	if len(words) <= 1 {
+	// CRITICAL FIX: Don't use strings.Fields as it removes line breaks!
+	// Instead, work with the original text and find word boundaries
+	
+	// Find positions after words (but not after newlines)
+	var positions []int
+	runes := []rune(text)
+	inWord := false
+	
+	for i := 0; i < len(runes)-1; i++ {
+		current := runes[i]
+		next := runes[i+1]
+		
+		// Check if we're at the end of a word (not newline)
+		if inWord && !unicode.IsLetter(current) && current != '\n' && unicode.IsLetter(next) {
+			positions = append(positions, i+1)
+		}
+		
+		inWord = unicode.IsLetter(current)
+	}
+	
+	if len(positions) == 0 {
 		return text
 	}
 	
-	// Find random positions between words
-	possiblePositions := len(words) - 1
-	if count > possiblePositions {
-		count = possiblePositions
+	// Limit count to available positions
+	if count > len(positions) {
+		count = len(positions)
 	}
 	
-	// Insert zero-width characters
-	for i := 0; i < count; i++ {
-		pos := rand.Intn(len(words)-1) + 1
+	// Shuffle positions
+	rand.Shuffle(len(positions), func(i, j int) {
+		positions[i], positions[j] = positions[j], positions[i]
+	})
+	
+	// Take only needed positions
+	positions = positions[:count]
+	
+	// Sort positions in reverse order to insert from end
+	for i := 0; i < len(positions)-1; i++ {
+		for j := i + 1; j < len(positions); j++ {
+			if positions[i] < positions[j] {
+				positions[i], positions[j] = positions[j], positions[i]
+			}
+		}
+	}
+	
+	// Insert zero-width characters at selected positions
+	result := text
+	for _, pos := range positions {
 		zeroWidth := mr.zeroWidthChars[rand.Intn(len(mr.zeroWidthChars))]
-		words[pos] = zeroWidth + words[pos]
+		result = result[:pos] + zeroWidth + result[pos:]
 	}
 	
-	return strings.Join(words, " ")
+	return result
 }
 
 // randomizePunctuation adds subtle variations to punctuation
