@@ -1,8 +1,8 @@
 # Greeting Fix Summary - January 2025
 
-## Issues Fixed
+## Issues Fixed ✅
 
-### 1. Customer Name Not Showing
+### 1. Customer Name Not Showing ✅
 **Problem**: Greeting showed "Hi Cik" instead of using the actual customer name
 
 **Root Cause**: 
@@ -15,19 +15,24 @@
 - Added debug logging to track names throughout the flow
 - Properly falls back to "Cik" when name is empty, whitespace only, or a phone number
 
-### 2. Line Break Issue
-**Note**: The code already has proper line breaks (`\n\n`). The issue might be:
-- WhatsApp's rendering of the message
-- Platform API encoding requirements
+### 2. Line Break Issue ✅ FIXED!
+**Problem**: Messages showed "Hi Cik, apa khabarMasa awal..." without line breaks
 
-**Current Implementation**:
-- Messages use `greeting + "\n\n" + originalMessage` format
-- This should display as:
-  ```
-  Hi [Name],
-  
-  [Your message content]
-  ```
+**Root Cause**: 
+- The `MessageRandomizer` was using `strings.Fields()` which splits text by ALL whitespace
+- This was converting `\n\n` (double newline) into a single space
+
+**Fix Applied**:
+- Rewrote `insertZeroWidthSpaces()` to preserve newlines
+- Now carefully inserts zero-width characters without destroying formatting
+- Line breaks are preserved throughout the entire message flow
+
+**Result**: Messages now display properly as:
+```
+Hi [Name],
+
+[Your message content]
+```
 
 ### 3. Debug Logging Added
 To help troubleshoot future issues, we added logging at key points:
