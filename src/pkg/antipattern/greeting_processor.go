@@ -125,9 +125,26 @@ func (g *GreetingProcessor) applyMicroVariations(text string) string {
 
 // isPhoneNumber checks if the name looks like a phone number
 func isPhoneNumber(name string) bool {
-	// Check if name contains only numbers, +, -, and spaces
-	phoneRegex := regexp.MustCompile(`^[0-9\+\-\s]+$`)
-	return phoneRegex.MatchString(name)
+	// Remove spaces and check if it's mostly digits
+	cleaned := strings.ReplaceAll(name, " ", "")
+	cleaned = strings.ReplaceAll(cleaned, "+", "")
+	cleaned = strings.ReplaceAll(cleaned, "-", "")
+	
+	// If empty after cleaning, it's not a valid name
+	if cleaned == "" {
+		return true
+	}
+	
+	// Check if at least 80% are digits (to handle cases like +60-123-456-789)
+	digitCount := 0
+	for _, ch := range cleaned {
+		if ch >= '0' && ch <= '9' {
+			digitCount++
+		}
+	}
+	
+	// If more than 80% digits, it's likely a phone number
+	return float64(digitCount) / float64(len(cleaned)) > 0.8
 }
 
 // hash creates a simple hash from string
