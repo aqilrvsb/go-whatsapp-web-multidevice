@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -63,34 +64,61 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			switch v := evt.(type) {
 			case *events.Disconnected:
 				logrus.Warnf("Device disconnected event received")
-				// Attempt immediate reconnection
+				// Check if device has platform before attempting reconnection
 				go func() {
-					time.Sleep(2 * time.Second) // Brief delay before reconnecting
-					if !newClient.IsConnected() {
-						logrus.Info("Attempting to reconnect disconnected device...")
-						err := newClient.Connect()
-						if err != nil {
-							logrus.Errorf("Failed to reconnect: %v", err)
-							// Try again after a longer delay
-							time.Sleep(5 * time.Second)
-							newClient.Connect()
-						} else {
-							logrus.Info("Successfully reconnected after disconnect")
+					// Get device info to check platform
+					if newClient.Store.ID != nil {
+						phoneNumber := newClient.Store.ID.User
+						userRepo := repository.GetUserRepository()
+						
+						var platform sql.NullString
+						err := userRepo.DB().QueryRow(`SELECT platform FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&platform)
+						
+						// Only reconnect if no platform is set
+						if err == nil && (!platform.Valid || platform.String == "") {
+							time.Sleep(2 * time.Second) // Brief delay before reconnecting
+							if !newClient.IsConnected() {
+								logrus.Info("Attempting to reconnect disconnected device (no platform)...")
+								err := newClient.Connect()
+								if err != nil {
+									logrus.Errorf("Failed to reconnect: %v", err)
+									// Try again after a longer delay
+									time.Sleep(5 * time.Second)
+									newClient.Connect()
+								} else {
+									logrus.Info("Successfully reconnected after disconnect")
+								}
+							}
+						} else if platform.Valid && platform.String != "" {
+							logrus.Infof("Device has platform '%s', skipping reconnection", platform.String)
 						}
 					}
 				}()
 			case *events.StreamError:
 				logrus.Errorf("Stream error: %v", v)
-				// Attempt reconnection on stream error
+				// Check platform before reconnection
 				go func() {
-					time.Sleep(3 * time.Second) // Wait a bit before reconnecting
-					if !newClient.IsConnected() {
-						logrus.Info("Attempting to reconnect after stream error...")
-						err := newClient.Connect()
-						if err != nil {
-							logrus.Errorf("Failed to reconnect after stream error: %v", err)
-						} else {
-							logrus.Info("Successfully reconnected after stream error")
+					if newClient.Store.ID != nil {
+						phoneNumber := newClient.Store.ID.User
+						userRepo := repository.GetUserRepository()
+						
+						var platform sql.NullString
+						err := userRepo.DB().QueryRow(`SELECT platform FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&platform)
+						
+						// Only reconnect if no platform is set
+						if err == nil && (!platform.Valid || platform.String == "") {
+							time.Sleep(3 * time.Second) // Wait a bit before reconnecting
+							if !newClient.IsConnected() {
+								logrus.Info("Attempting to reconnect after stream error (no platform)...")
+								err := newClient.Connect()
+								if err != nil {
+									logrus.Errorf("Failed to reconnect after stream error: %v", err)
+								} else {
+									logrus.Info("Successfully reconnected after stream error")
+								}
+							}
+						} else if platform.Valid && platform.String != "" {
+							logrus.Infof("Device has platform '%s', skipping stream error reconnection", platform.String)
 						}
 					}
 				}()
@@ -122,7 +150,8 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				
 				// Find the device ID by phone for client manager registration
 				var deviceID string
-				err = userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID)
+				var platform sql.NullString
+				err = userRepo.DB().QueryRow(`SELECT id, platform FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID, &platform)
 				if err == nil && deviceID != "" {
 					// Register with client manager
 					cm := whatsapp.GetClientManager()
@@ -140,25 +169,29 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 						},
 					}
 					
-					// Start keepalive monitoring for this client
-					go func(client *whatsmeow.Client, devID string) {
-						ticker := time.NewTicker(15 * time.Second) // More aggressive keepalive
-						defer ticker.Stop()
-						
-						logrus.Infof("Started keepalive monitor for device %s", devID)
-						
-						for range ticker.C {
-							if !client.IsConnected() {
-								logrus.Warnf("Keepalive: Device %s disconnected, attempting reconnect...", devID)
-								err := client.Connect()
-								if err != nil {
-									logrus.Errorf("Keepalive reconnect failed for %s: %v", devID, err)
-								} else {
-									logrus.Infof("Keepalive reconnect successful for %s", devID)
+					// Start keepalive monitoring ONLY for devices without platform
+					if !platform.Valid || platform.String == "" {
+						go func(client *whatsmeow.Client, devID string) {
+							ticker := time.NewTicker(15 * time.Second) // More aggressive keepalive
+							defer ticker.Stop()
+							
+							logrus.Infof("Started keepalive monitor for device %s (no platform)", devID)
+							
+							for range ticker.C {
+								if !client.IsConnected() {
+									logrus.Warnf("Keepalive: Device %s disconnected, attempting reconnect...", devID)
+									err := client.Connect()
+									if err != nil {
+										logrus.Errorf("Keepalive reconnect failed for %s: %v", devID, err)
+									} else {
+										logrus.Infof("Keepalive reconnect successful for %s", devID)
+									}
 								}
 							}
-						}
-					}(newClient, deviceID)
+						}(newClient, deviceID)
+					} else {
+						logrus.Infof("Device %s has platform '%s', skipping keepalive monitor", deviceID, platform.String)
+					}
 				}
 			}
 			
