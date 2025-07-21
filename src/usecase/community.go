@@ -86,6 +86,36 @@ func (service *communityService) AddParticipantsToCommunity(ctx context.Context,
 		return nil, fmt.Errorf("invalid community ID: %v", err)
 	}
 	
+	// Get community info to find the announcement group
+	communityInfo, err := waClient.GetGroupInfo(communityJID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get community info: %v", err)
+	}
+	
+	// Check if this is actually a community
+	if !communityInfo.IsParent {
+		return nil, fmt.Errorf("the provided ID is not a community")
+	}
+	
+	// Find the announcement group (default group) of the community
+	// In WhatsApp communities, the announcement group is typically the default linked group
+	var announcementGroupJID types.JID
+	
+	// Get linked groups
+	subgroups, err := waClient.GetSubGroups(communityJID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get community subgroups: %v", err)
+	}
+	
+	// The announcement group is usually the first linked group or has a special indicator
+	if len(subgroups) == 0 {
+		return nil, fmt.Errorf("no announcement group found for this community")
+	}
+	
+	// Use the first subgroup as the announcement group
+	// In most cases, this is the default group created with the community
+	announcementGroupJID = subgroups[0].JID
+	
 	// Parse participant JIDs
 	var participantJIDs []types.JID
 	result = make([]domainCommunity.ParticipantStatus, 0, len(request.Participants))
@@ -107,42 +137,41 @@ func (service *communityService) AddParticipantsToCommunity(ctx context.Context,
 		return result, fmt.Errorf("no valid participants to add")
 	}
 	
-	// Add participants to community (announcement group)
-	participants, err := waClient.UpdateGroupParticipants(communityJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
+	// Add participants to the announcement group
+	participants, err := waClient.UpdateGroupParticipants(announcementGroupJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
 	if err != nil {
 		// If general error, mark all as failed
 		for _, jid := range participantJIDs {
 			result = append(result, domainCommunity.ParticipantStatus{
 				Participant: jid.String(),
-				Status:      "failed",
-				Message:     err.Error(),
+				Status:      "failed", 
+				Message:     fmt.Sprintf("Failed to add to community: %v", err),
 			})
 		}
-		return result, err
+		return result, fmt.Errorf("failed to add participants: %v", err)
 	}
 	
 	// Process results
-	addedMap := make(map[string]bool)
 	for _, p := range participants {
+		status := "failed"
+		message := "Failed to add participant"
+		
 		if p.Error == 0 {
-			addedMap[p.JID.String()] = true
-		}
-	}
-	
-	for _, jid := range participantJIDs {
-		if addedMap[jid.String()] {
-			result = append(result, domainCommunity.ParticipantStatus{
-				Participant: jid.String(),
-				Status:      "success",
-				Message:     "Added to community successfully",
-			})
+			status = "success"
+			message = "Added to community announcement group successfully"
+		} else if p.Error == 403 {
+			message = "Permission denied - user may have privacy settings blocking adds"
+		} else if p.Error == 409 {
+			message = "User is already in the group"
 		} else {
-			result = append(result, domainCommunity.ParticipantStatus{
-				Participant: jid.String(),
-				Status:      "failed",
-				Message:     "Failed to add to community",
-			})
+			message = fmt.Sprintf("Failed with error code: %d", p.Error)
 		}
+		
+		result = append(result, domainCommunity.ParticipantStatus{
+			Participant: p.JID.String(),
+			Status:      status,
+			Message:     message,
+		})
 	}
 	
 	return result, nil
