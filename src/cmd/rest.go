@@ -94,6 +94,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestUser(app, userUsecase)
 	rest.InitRestMessage(app, messageUsecase)
 	rest.InitRestGroup(app, groupUsecase)
+	rest.InitRestCommunity(app, communityUsecase)
 	rest.InitRestNewsletter(app, newsletterUsecase)
 	rest.InitRestSequence(app, sequenceUsecase)
 	rest.InitRestMonitoring(app) // Add monitoring endpoints

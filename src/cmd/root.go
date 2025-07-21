@@ -9,6 +9,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	domainCommunity "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/community"
 	domainGroup "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/group"
 	domainMessage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/message"
 	domainNewsletter "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/newsletter"
@@ -42,6 +43,7 @@ var (
 	userUsecase       domainUser.IUserUsecase
 	messageUsecase    domainMessage.IMessageUsecase
 	groupUsecase      domainGroup.IGroupUsecase
+	communityUsecase  domainCommunity.ICommunityUsecase
 	newsletterUsecase domainNewsletter.INewsletterUsecase
 	sequenceUsecase   domainSequence.ISequenceUsecase
 )
@@ -233,6 +235,7 @@ func initApp() {
 	userUsecase = usecase.NewUserService(whatsappCli)
 	messageUsecase = usecase.NewMessageService(whatsappCli)
 	groupUsecase = usecase.NewGroupService(whatsappCli)
+	communityUsecase = usecase.NewCommunityService(whatsappCli)
 	newsletterUsecase = usecase.NewNewsletterService(whatsappCli)
 	sequenceUsecase = usecase.NewSequenceUsecase(whatsappCli, sendUsecase)
 }
