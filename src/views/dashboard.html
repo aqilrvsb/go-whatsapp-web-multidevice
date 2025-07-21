@@ -2528,9 +2528,9 @@
             // First try to check real-time connection status (optional)
             fetch('/api/devices/check-connection', { credentials: 'include' })
                 .then(response => {
-                    // If check-connection fails, just continue
+                    // If connection check fails, just continue
                     if (!response.ok) {
-                        console.log('Check-connection endpoint not available, continuing...');
+                        console.log('Connection check endpoint not available, continuing...');
                     }
                     return response.ok ? response.json() : null;
                 })

@@ -141,6 +141,11 @@ func restServer(_ *cobra.Command, _ []string) {
 	healthMonitor.Start()
 	logrus.Info("Device health monitor started - STATUS CHECK ONLY (no auto reconnect)")
 	
+	// Start device connection monitor
+	connMonitor := whatsapp.GetDeviceConnectionMonitor()
+	connMonitor.Start()
+	logrus.Info("Device connection monitor started for stability")
+	
 	// Start the ultra-optimized broadcast processor for 3000+ devices
 	// This processor creates broadcast-specific worker pools
 	go usecase.StartUltraOptimizedBroadcastProcessor()
