@@ -250,24 +250,37 @@ func (ocm *OptimizedClientManager) startBackgroundWorkers() {
 
 // cleanupInactiveClients removes clients that haven't been accessed recently
 func (ocm *OptimizedClientManager) cleanupInactiveClients() {
-	// Get start of today (midnight)
-	now := time.Now()
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	// Get time threshold - only clean up clients inactive for more than 1 hour
+	inactiveThreshold := time.Now().Add(-1 * time.Hour)
 	userRepo := repository.GetUserRepository()
 	
 	for _, shard := range ocm.shards {
 		shard.mutex.Lock()
 		for deviceID, dc := range shard.clients {
-			// Check database status instead of WhatsApp connection
+			// Skip cleanup if client was accessed recently (within last hour)
+			if dc.lastAccess.After(inactiveThreshold) {
+				continue
+			}
+			
+			// Check database status
 			device, err := userRepo.GetDeviceByID(deviceID)
-			if err != nil || device == nil || device.Status != "online" {
-				// Device is offline in database
-				// Only remove if lastAccess is before today (yesterday or older)
-				if dc.lastAccess.Before(startOfToday) {
-					delete(shard.clients, deviceID)
-					logrus.Debugf("Removed offline device %s from memory (last access: %s)", 
-						deviceID, dc.lastAccess.Format("2006-01-02 15:04:05"))
-				}
+			if err != nil || device == nil {
+				// Device doesn't exist in DB - remove it
+				delete(shard.clients, deviceID)
+				logrus.Debugf("Removed non-existent device %s from memory", deviceID)
+				continue
+			}
+			
+			// For platform devices, always keep in memory regardless of status
+			if device.Platform != "" {
+				continue
+			}
+			
+			// For non-platform devices, only remove if offline AND inactive for > 1 hour
+			if device.Status != "online" && dc.lastAccess.Before(inactiveThreshold) {
+				delete(shard.clients, deviceID)
+				logrus.Debugf("Removed inactive offline device %s from memory (last access: %s)", 
+					deviceID, dc.lastAccess.Format("2006-01-02 15:04:05"))
 			}
 		}
 		shard.mutex.Unlock()

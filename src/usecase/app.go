@@ -71,8 +71,9 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 						phoneNumber := newClient.Store.ID.User
 						userRepo := repository.GetUserRepository()
 						
+						var deviceID string
 						var platform sql.NullString
-						err := userRepo.DB().QueryRow(`SELECT platform FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&platform)
+						err := userRepo.DB().QueryRow(`SELECT id, platform FROM user_devices WHERE phone = $1 LIMIT 1`, phoneNumber).Scan(&deviceID, &platform)
 						
 						// Only reconnect if no platform is set
 						if err == nil && (!platform.Valid || platform.String == "") {
@@ -84,9 +85,24 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 									logrus.Errorf("Failed to reconnect: %v", err)
 									// Try again after a longer delay
 									time.Sleep(5 * time.Second)
-									newClient.Connect()
+									err = newClient.Connect()
+									if err == nil {
+										logrus.Info("Successfully reconnected on second attempt")
+										// Re-register with client manager after successful reconnection
+										if deviceID != "" {
+											cm := whatsapp.GetClientManager()
+											cm.AddClient(deviceID, newClient)
+											logrus.Infof("Re-registered device %s with client manager after reconnection", deviceID)
+										}
+									}
 								} else {
 									logrus.Info("Successfully reconnected after disconnect")
+									// Re-register with client manager
+									if deviceID != "" {
+										cm := whatsapp.GetClientManager()
+										cm.AddClient(deviceID, newClient)
+										logrus.Infof("Re-registered device %s with client manager after reconnection", deviceID)
+									}
 								}
 							}
 						} else if platform.Valid && platform.String != "" {
@@ -185,6 +201,9 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 										logrus.Errorf("Keepalive reconnect failed for %s: %v", devID, err)
 									} else {
 										logrus.Infof("Keepalive reconnect successful for %s", devID)
+										// Ensure it's in ClientManager
+										cm := whatsapp.GetClientManager()
+										cm.AddClient(devID, client)
 									}
 								}
 							}

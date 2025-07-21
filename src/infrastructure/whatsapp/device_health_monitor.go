@@ -95,9 +95,8 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	}
 	
 	if client == nil {
-		logrus.Warnf("Device %s has nil client, removing from manager", deviceID)
-		cm := GetClientManager()
-		cm.RemoveClient(deviceID)
+		logrus.Warnf("Device %s has nil client in health monitor", deviceID)
+		// Don't remove from manager - just update status
 		userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
 		return
 	}
