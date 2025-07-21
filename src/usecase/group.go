@@ -53,7 +53,21 @@ func (service serviceGroup) CreateGroup(ctx context.Context, request domainGroup
 	if err = validations.ValidateCreateGroup(ctx, request); err != nil {
 		return groupID, err
 	}
-	whatsapp.MustLogin(service.WaCli)
+	
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return "", fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to default client
+		waClient = service.WaCli
+	}
+	
+	whatsapp.MustLogin(waClient)
 
 	participantsJID, err := service.participantToJID(request.Participants)
 	if err != nil {
@@ -67,7 +81,7 @@ func (service serviceGroup) CreateGroup(ctx context.Context, request domainGroup
 		GroupLinkedParent: types.GroupLinkedParent{},
 	}
 
-	groupInfo, err := service.WaCli.CreateGroup(groupConfig)
+	groupInfo, err := waClient.CreateGroup(groupConfig)
 	if err != nil {
 		return
 	}
@@ -79,7 +93,21 @@ func (service serviceGroup) ManageParticipant(ctx context.Context, request domai
 	if err = validations.ValidateParticipant(ctx, request); err != nil {
 		return result, err
 	}
-	whatsapp.MustLogin(service.WaCli)
+	
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return result, fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to default client
+		waClient = service.WaCli
+	}
+	
+	whatsapp.MustLogin(waClient)
 
 	groupJID, err := whatsapp.ValidateJidWithLogin(service.WaCli, request.GroupID)
 	if err != nil {
@@ -91,7 +119,7 @@ func (service serviceGroup) ManageParticipant(ctx context.Context, request domai
 		return result, err
 	}
 
-	participants, err := service.WaCli.UpdateGroupParticipants(groupJID, participantsJID, request.Action)
+	participants, err := waClient.UpdateGroupParticipants(groupJID, participantsJID, request.Action)
 	if err != nil {
 		return result, err
 	}

@@ -22,8 +22,21 @@ func NewCommunityService(waCli *whatsmeow.Client) domainCommunity.ICommunityUsec
 
 // CreateCommunity creates a new WhatsApp community
 func (service *communityService) CreateCommunity(ctx context.Context, request domainCommunity.CreateCommunityRequest) (communityID string, err error) {
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return "", fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to default client
+		waClient = service.WaCli
+	}
+	
 	// Ensure client is connected
-	whatsapp.MustLogin(service.WaCli)
+	whatsapp.MustLogin(waClient)
 	
 	// Create community with GroupParent configuration
 	req := whatsmeow.ReqCreateGroup{
@@ -32,14 +45,14 @@ func (service *communityService) CreateCommunity(ctx context.Context, request do
 	}
 	
 	// Create the community
-	communityInfo, err := service.WaCli.CreateGroup(req)
+	communityInfo, err := waClient.CreateGroup(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to create community: %v", err)
 	}
 	
 	// Set community description if provided
 	if request.Description != "" {
-		err = service.WaCli.SetGroupTopic(communityInfo.JID, "", "", request.Description)
+		err = waClient.SetGroupTopic(communityInfo.JID, "", "", request.Description)
 		if err != nil {
 			// Log error but don't fail the community creation
 			fmt.Printf("Warning: Failed to set community description: %v\n", err)
@@ -52,7 +65,20 @@ func (service *communityService) CreateCommunity(ctx context.Context, request do
 // AddParticipantsToCommunity adds participants to a community
 // This actually adds them to the community's announcement group
 func (service *communityService) AddParticipantsToCommunity(ctx context.Context, request domainCommunity.AddParticipantsRequest) (result []domainCommunity.ParticipantStatus, err error) {
-	whatsapp.MustLogin(service.WaCli)
+	// Get device-specific client
+	var waClient *whatsmeow.Client
+	if request.DeviceID != "" {
+		cm := whatsapp.GetClientManager()
+		waClient, err = cm.GetClient(request.DeviceID)
+		if err != nil {
+			return nil, fmt.Errorf("device not connected: %v", err)
+		}
+	} else {
+		// Fallback to default client
+		waClient = service.WaCli
+	}
+	
+	whatsapp.MustLogin(waClient)
 	
 	// Parse community JID
 	communityJID, err := whatsapp.ParseJID(request.CommunityID)
@@ -82,7 +108,7 @@ func (service *communityService) AddParticipantsToCommunity(ctx context.Context,
 	}
 	
 	// Add participants to community (announcement group)
-	participants, err := service.WaCli.UpdateGroupParticipants(communityJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
+	participants, err := waClient.UpdateGroupParticipants(communityJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
 	if err != nil {
 		// If general error, mark all as failed
 		for _, jid := range participantJIDs {

@@ -15,11 +15,13 @@ type ICommunityUsecase interface {
 }
 
 type CreateCommunityRequest struct {
+	DeviceID    string   `json:"device_id" form:"device_id"`
 	Name        string   `json:"name" form:"name"`
 	Description string   `json:"description" form:"description"`
 }
 
 type AddParticipantsRequest struct {
+	DeviceID     string   `json:"device_id" form:"device_id"`
 	CommunityID  string   `json:"community_id" form:"community_id"`
 	Participants []string `json:"participants" form:"participants"`
 }

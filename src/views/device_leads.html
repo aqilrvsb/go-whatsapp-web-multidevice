@@ -1361,7 +1361,9 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
+                        device_id: deviceId,
                         title: groupName,
                         participants: participants
                     })
@@ -1410,7 +1412,9 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
+                        device_id: deviceId,
                         name: communityName,
                         description: communityDescription
                     })
@@ -1440,7 +1444,9 @@
                             headers: {
                                 'Content-Type': 'application/json',
                             },
+                            credentials: 'include',
                             body: JSON.stringify({
+                                device_id: deviceId,
                                 community_id: communityId,
                                 participants: participants
                             })
@@ -1474,7 +1480,9 @@
 
         async function loadGroupsForBulkAdd() {
             try {
-                const response = await fetch('/user/my/groups');
+                const response = await fetch('/user/my/groups', {
+                    credentials: 'include'
+                });
                 const data = await response.json();
                 
                 if (response.ok && data.results && data.results.data) {
@@ -1523,7 +1531,9 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify({
+                        device_id: deviceId,
                         group_id: groupId,
                         participants: participants
                     })

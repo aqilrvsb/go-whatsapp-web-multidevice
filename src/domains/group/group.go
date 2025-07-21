@@ -25,11 +25,13 @@ type LeaveGroupRequest struct {
 }
 
 type CreateGroupRequest struct {
+	DeviceID     string   `json:"device_id" form:"device_id"`
 	Title        string   `json:"title" form:"title"`
 	Participants []string `json:"participants" form:"participants"`
 }
 
 type ParticipantRequest struct {
+	DeviceID     string                      `json:"device_id" form:"device_id"`
 	GroupID      string                      `json:"group_id" form:"group_id"`
 	Participants []string                    `json:"participants" form:"participants"`
 	Action       whatsmeow.ParticipantChange `json:"action" form:"action"`
