@@ -36,16 +36,26 @@ func StartUltraOptimizedBroadcastProcessor() {
 func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	db := database.GetDB()
 	
-	// Get pending messages grouped by broadcast
+	// FIXED: Get delays from sequence_steps for sequences, campaigns for campaigns
 	rows, err := db.Query(`
 		SELECT 
 			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
-			bm.recipient_phone, bm.content as message, bm.media_url as image_url,
-			COALESCE(c.min_delay_seconds, 5) as min_delay,
-			COALESCE(c.max_delay_seconds, 15) as max_delay,
+			bm.sequence_stepid, bm.recipient_phone, bm.content as message, 
+			bm.media_url as image_url,
+			CASE 
+				WHEN bm.campaign_id IS NOT NULL THEN COALESCE(c.min_delay_seconds, 5)
+				WHEN bm.sequence_stepid IS NOT NULL THEN COALESCE(ss.min_delay_seconds, 5)
+				ELSE 5
+			END as min_delay,
+			CASE 
+				WHEN bm.campaign_id IS NOT NULL THEN COALESCE(c.max_delay_seconds, 15)
+				WHEN bm.sequence_stepid IS NOT NULL THEN COALESCE(ss.max_delay_seconds, 15)
+				ELSE 15
+			END as max_delay,
 			d.status as device_status
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
+		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		LEFT JOIN user_devices d ON bm.device_id = d.id
 		WHERE bm.status = 'pending'
 		AND bm.scheduled_at <= NOW()
@@ -66,13 +76,13 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	for rows.Next() {
 		var msg domainBroadcast.BroadcastMessage
 		var campaignID *int
-		var sequenceID *string
+		var sequenceID, sequenceStepID *string
 		var minDelay, maxDelay int
 		var deviceStatus string
 		
 		err := rows.Scan(
 			&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Message, &msg.ImageURL,
+			&sequenceStepID, &msg.RecipientPhone, &msg.Message, &msg.ImageURL,
 			&minDelay, &maxDelay, &deviceStatus,
 		)
 		
@@ -92,6 +102,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		// Set broadcast references
 		msg.CampaignID = campaignID
 		msg.SequenceID = sequenceID
+		msg.SequenceStepID = sequenceStepID
 		msg.MinDelay = minDelay
 		msg.MaxDelay = maxDelay
 		msg.Type = "text"
