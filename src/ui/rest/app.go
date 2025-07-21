@@ -109,6 +109,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/user/avatar", rest.ChangeUserAvatar)
 	app.Post("/user/pushname", rest.ChangeUserPushName)
 	
+	// Group and Community management
+	app.Post("/group/participants", AddGroupParticipants)
+	app.Post("/community/participants", AddCommunityParticipants)
+	
 	// Lead management endpoints
 	app.Get("/api/devices/:deviceId/leads", rest.GetDeviceLeads)
 	app.Post("/api/leads", rest.CreateLead)
