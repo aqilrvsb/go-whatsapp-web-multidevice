@@ -6,6 +6,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/sirupsen/logrus"
+	"go.mau.fi/whatsmeow"
 )
 
 type GroupInfo struct {
@@ -57,17 +58,30 @@ func GetUserGroups(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Use the first device
-	deviceID := devices[0].ID
-	
-	// Get WhatsApp client
+	// Find a connected device
 	cm := whatsapp.GetClientManager()
-	client, err := cm.GetClient(deviceID)
-	if err != nil {
+	var client *whatsmeow.Client
+	
+	for _, device := range devices {
+		// Skip platform devices
+		if device.Platform != "" {
+			continue
+		}
+		
+		// Try to get client for this device
+		deviceClient, err := cm.GetClient(device.ID)
+		if err == nil && deviceClient != nil && deviceClient.IsConnected() && deviceClient.IsLoggedIn() {
+			client = deviceClient
+			break
+		}
+	}
+	
+	if client == nil {
+		logrus.Warn("No connected WhatsApp device found for user")
 		return c.JSON(utils.ResponseData{
 			Status:  200,
 			Code:    "SUCCESS",
-			Message: "Device not connected",
+			Message: "No connected device found",
 			Results: map[string]interface{}{
 				"data": []GroupInfo{},
 			},

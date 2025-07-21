@@ -37,6 +37,24 @@ func GetClientManager() *ClientManager {
 
 // AddClient adds a WhatsApp client for a device
 func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
+	// Validate device ID
+	if strings.HasPrefix(deviceID, "/") || strings.Contains(deviceID, "createtics") {
+		logrus.Errorf("Attempted to add client with corrupted device ID: %s", deviceID)
+		return
+	}
+	
+	// Clean device ID
+	deviceID = strings.TrimPrefix(deviceID, "/")
+	if idx := strings.LastIndex(deviceID, "/"); idx != -1 {
+		deviceID = deviceID[idx+1:]
+	}
+	
+	// Validate UUID format (should be 36 characters)
+	if len(deviceID) != 36 {
+		logrus.Errorf("Invalid device ID format: %s (length: %d)", deviceID, len(deviceID))
+		return
+	}
+	
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 	cm.clients[deviceID] = client
