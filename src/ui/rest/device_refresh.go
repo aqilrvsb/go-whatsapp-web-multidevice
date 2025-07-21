@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -194,6 +195,13 @@ func RefreshDevice(c *fiber.Ctx) error {
 								if connected {
 									// Register with ClientManager
 									cm.AddClient(deviceID, newClient)
+									
+									// IMPORTANT: Also register with DeviceManager
+									dm := multidevice.GetDeviceManager()
+									err = dm.RegisterExistingClient(deviceID, session.UserID, newClient)
+									if err != nil {
+										logrus.Warnf("Failed to register in DeviceManager: %v", err)
+									}
 									
 									// Update device status
 									jidStr := ""

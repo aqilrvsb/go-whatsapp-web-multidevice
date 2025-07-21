@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"strings"
+	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"go.mau.fi/whatsmeow"
@@ -281,6 +282,44 @@ func (dm *DeviceManager) UpdateDeviceStatus(deviceID string, connected bool, pho
 	if connected {
 		conn.Phone = phone
 	}
+	
+	return nil
+}
+
+// RegisterExistingClient registers an already connected client with DeviceManager
+// This is used during reconnection when we have a client but no device session
+func (dm *DeviceManager) RegisterExistingClient(deviceID, userID string, client *whatsmeow.Client) error {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	
+	// Check if device already exists
+	if _, exists := dm.devices[deviceID]; exists {
+		// Update existing connection
+		dm.devices[deviceID].Client = client
+		dm.devices[deviceID].Connected = true
+		dm.devices[deviceID].ConnectedAt = time.Now().Unix()
+		log.Infof("Updated existing device session for device %s", deviceID)
+		return nil
+	}
+	
+	// Create new device connection with existing client
+	phone := ""
+	if client.Store.ID != nil {
+		phone = client.Store.ID.User
+	}
+	
+	conn := &DeviceConnection{
+		DeviceID:    deviceID,
+		UserID:      userID,
+		Phone:       phone,
+		Client:      client,
+		Store:       client.Store,
+		Connected:   true,
+		ConnectedAt: time.Now().Unix(),
+	}
+	
+	dm.devices[deviceID] = conn
+	log.Infof("Registered existing client for device %s (user: %s, phone: %s)", deviceID, userID, phone)
 	
 	return nil
 }

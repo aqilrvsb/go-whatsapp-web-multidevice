@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -250,6 +251,13 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 		// Register with ClientManager
 		cm.AddClient(deviceID, client)
 		
+		// IMPORTANT: Also register with DeviceManager
+		dm := multidevice.GetDeviceManager()
+		err = dm.RegisterExistingClient(deviceID, session.UserID, client)
+		if err != nil {
+			logrus.Warnf("Failed to register in DeviceManager: %v", err)
+		}
+		
 		// Update device status
 		jidStr := ""
 		if client.Store.ID != nil {
@@ -257,7 +265,7 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 		}
 		userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, jidStr)
 		
-		logrus.Infof("✅ Successfully reconnected device %s and registered in ClientManager", deviceID)
+		logrus.Infof("✅ Successfully reconnected device %s and registered in both managers", deviceID)
 		
 		return c.JSON(utils.ResponseData{
 			Status:  200,
