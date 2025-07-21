@@ -69,7 +69,7 @@ func (service serviceGroup) CreateGroup(ctx context.Context, request domainGroup
 	
 	whatsapp.MustLogin(waClient)
 
-	participantsJID, err := service.participantToJID(request.Participants)
+	participantsJID, err := service.participantToJID(waClient, request.Participants)
 	if err != nil {
 		return
 	}
@@ -114,7 +114,7 @@ func (service serviceGroup) ManageParticipant(ctx context.Context, request domai
 		return result, err
 	}
 
-	participantsJID, err := service.participantToJID(request.Participants)
+	participantsJID, err := service.participantToJID(waClient, request.Participants)
 	if err != nil {
 		return result, err
 	}
@@ -178,7 +178,7 @@ func (service serviceGroup) ManageGroupRequestParticipants(ctx context.Context, 
 		return result, err
 	}
 
-	participantsJID, err := service.participantToJID(request.Participants)
+	participantsJID, err := service.participantToJID(service.WaCli, request.Participants)
 	if err != nil {
 		return result, err
 	}
