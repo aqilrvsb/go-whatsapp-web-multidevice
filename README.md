@@ -199,6 +199,57 @@ max_delay_seconds: 20
 3. **Per-Step Delays** - Each sequence step uses its own settings
 4. **Zombie Prevention** - Pools cleaned from registry properly
 
+## 🧹 Data Cleanup - Delete Sequence Contacts & Broadcast Messages
+
+### Quick Delete (Recommended)
+To delete all records from sequence_contacts and broadcast_messages tables:
+
+```bash
+# Run the Python script
+cd go-whatsapp-web-multidevice-main
+python delete_contacts_messages.py
+```
+
+This will:
+- Show current record counts
+- Ask for confirmation
+- Delete ALL sequence contacts
+- Delete ALL broadcast messages
+- Show verification of deletion
+
+### Alternative Methods
+
+#### Method 1: Using SQL directly
+```bash
+# If you have psql installed
+psql "postgresql://postgres:password@localhost:5432/whatsapp_db" -f delete_contacts_and_messages.sql
+```
+
+#### Method 2: Manual SQL commands
+```sql
+-- Connect to your database and run:
+BEGIN;
+DELETE FROM sequence_contacts;
+DELETE FROM broadcast_messages;
+COMMIT;
+
+-- Verify deletion
+SELECT COUNT(*) FROM sequence_contacts;
+SELECT COUNT(*) FROM broadcast_messages;
+```
+
+### What Gets Deleted?
+- **sequence_contacts**: All sequence enrollments (which contacts are in which sequences)
+- **broadcast_messages**: All queued/pending messages waiting to be sent
+
+### When to Use This?
+- Before testing new sequences
+- To clear stuck/old messages
+- When starting fresh with campaigns
+- To resolve processing issues
+
+**⚠️ WARNING**: This permanently deletes data. Make sure to backup if needed!
+
 ## 🐛 Troubleshooting
 
 **System won't start**

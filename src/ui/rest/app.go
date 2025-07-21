@@ -97,6 +97,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/devices/:deviceId/clear-session", rest.ClearDeviceSession)
 	app.Post("/api/devices/clear-all-sessions", rest.ClearAllSessions)
 	app.Get("/api/devices/check-connection", SimpleCheckConnection)
+	app.Get("/api/devices/check-registration", rest.CheckDeviceRegistration)
 	app.Get("/app/logout", rest.LogoutDevice)
 	app.Get("/app/reconnect", rest.ReconnectDevice)
 	app.Get("/app/devices", rest.GetDevices)
