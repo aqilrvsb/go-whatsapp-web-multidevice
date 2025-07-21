@@ -35,8 +35,8 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	lead.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, platform, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, platform, "group", community, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id
 	`
 	
@@ -56,7 +56,8 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 	
 	var id int
 	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, 
+		lead.Group, lead.Community, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
 	
 	if err == nil {
 		lead.ID = fmt.Sprintf("%d", id)
@@ -236,7 +237,8 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 // GetLeadsByDevice gets all leads for a specific user's device
 func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lead, error) {
 	query := `
-		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, 
+		       COALESCE("group", '') as "group", COALESCE(community, '') as community, created_at, updated_at
 		FROM leads
 		WHERE user_id = $1 AND device_id = $2
 		ORDER BY created_at DESC
@@ -257,7 +259,7 @@ func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lea
 		
 		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
 			&lead.Niche, &journey, &lead.Status, &targetStatus, &trigger,
-			&lead.CreatedAt, &lead.UpdatedAt)
+			&lead.Group, &lead.Community, &lead.CreatedAt, &lead.UpdatedAt)
 		if err != nil {
 			continue
 		}
@@ -290,7 +292,8 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 	query := `
 		UPDATE leads 
 		SET device_id = $2, name = $3, phone = $4, niche = $5, 
-		    journey = $6, status = $7, target_status = $8, trigger = $9, updated_at = $10
+		    journey = $6, status = $7, target_status = $8, trigger = $9, 
+		    "group" = $10, community = $11, updated_at = $12
 		WHERE id = $1
 	`
 	
@@ -309,7 +312,8 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 	}
 	
 	result, err := r.db.Exec(query, id, lead.DeviceID, lead.Name, lead.Phone,
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt)
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, 
+		lead.Group, lead.Community, lead.UpdatedAt)
 	if err != nil {
 		return err
 	}
@@ -405,6 +409,46 @@ func (r *leadRepository) GetLeadByDeviceUserPhoneNiche(deviceID, userID, phone, 
 		&lead.CreatedAt,
 		&lead.UpdatedAt,
 		&lead.Platform,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return lead, nil
+}
+
+// GetLead gets a lead by ID
+func (r *leadRepository) GetLead(leadID string) (*models.Lead, error) {
+	lead := &models.Lead{}
+	query := `
+		SELECT id, device_id, user_id, name, phone, email, niche, source, status, 
+		       target_status, trigger, notes, created_at, updated_at,
+		       COALESCE(platform, '') as platform, COALESCE("group", '') as "group",
+		       COALESCE(community, '') as community
+		FROM leads
+		WHERE id = $1
+		LIMIT 1
+	`
+	
+	err := r.db.QueryRow(query, leadID).Scan(
+		&lead.ID,
+		&lead.DeviceID,
+		&lead.UserID,
+		&lead.Name,
+		&lead.Phone,
+		&lead.Email,
+		&lead.Niche,
+		&lead.Source,
+		&lead.Status,
+		&lead.TargetStatus,
+		&lead.Trigger,
+		&lead.Notes,
+		&lead.CreatedAt,
+		&lead.UpdatedAt,
+		&lead.Platform,
+		&lead.Group,
+		&lead.Community,
 	)
 	
 	if err != nil {

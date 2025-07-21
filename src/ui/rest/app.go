@@ -103,6 +103,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/app/devices", rest.GetDevices)
 	app.Get("/user/info", rest.GetUserInfo)
 	app.Get("/user/avatar", rest.GetUserAvatar)
+	app.Get("/user/my/groups", GetUserGroups)
+	app.Get("/user/my/communities", GetUserCommunities)
 	app.Post("/user/avatar", rest.ChangeUserAvatar)
 	app.Post("/user/pushname", rest.ChangeUserPushName)
 	
@@ -135,6 +137,8 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/leads-ai", rest.GetLeadsAI)
 	app.Put("/api/leads-ai/:id", rest.UpdateLeadAI)
 	app.Delete("/api/leads-ai/:id", rest.DeleteLeadAI)
+	app.Post("/api/leads-ai/update-group", UpdateLeadGroup)
+	app.Post("/api/leads-ai/update-community", UpdateLeadCommunity)
 	
 	// AI Campaign Trigger Route
 	app.Post("/api/campaigns-ai/:id/trigger", rest.TriggerAICampaign)

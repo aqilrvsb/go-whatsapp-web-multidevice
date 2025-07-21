@@ -17,6 +17,8 @@ type Lead struct {
 	Status       string    `json:"status" db:"status"` // Keep for backward compatibility
 	TargetStatus string    `json:"target_status" db:"target_status"` // New column: prospect/customer
 	Trigger      string    `json:"trigger" db:"trigger"` // New column: comma-separated sequence triggers
+	Group        string    `json:"group" db:"group"` // New column: comma-separated group names
+	Community    string    `json:"community" db:"community"` // New column: comma-separated community names
 	Notes        string    `json:"notes" db:"notes"`
 	Platform     string    `json:"platform" db:"platform"` // New column: Whacenter, etc.
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`

@@ -292,7 +292,7 @@
                 </div>
             </div>
             <div class="row mt-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="d-flex align-items-center">
                         <span class="me-2">Niche:</span>
                         <div id="nicheFilters">
@@ -301,7 +301,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="d-flex align-items-center">
                         <span class="me-2">Trigger:</span>
                         <div id="triggerFilters">
@@ -310,7 +310,27 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 text-end">
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Group:</span>
+                        <div id="groupFilters">
+                            <span class="filter-chip active" data-group="all">All</span>
+                            <!-- Dynamic group filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Community:</span>
+                        <div id="communityFilters">
+                            <span class="filter-chip active" data-community="all">All</span>
+                            <!-- Dynamic community filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-12 text-end">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                         <label class="form-check-label" for="selectAll">
@@ -574,6 +594,8 @@
         let currentFilter = 'all';
         let currentNicheFilter = 'all';
         let currentTriggerFilter = 'all';
+        let currentGroupFilter = 'all';
+        let currentCommunityFilter = 'all';
         let leadModal;
         let importModal;
         let bulkUpdateModal;
@@ -664,12 +686,14 @@
             updateBulkActionsVisibility();
         }
         
-        // Build niche and trigger filters from leads
+        // Build niche, trigger, group and community filters from leads
         function buildNicheFilters() {
             const nicheSet = new Set();
             const triggerSet = new Set();
+            const groupSet = new Set();
+            const communitySet = new Set();
             
-            // Collect all unique niches and triggers
+            // Collect all unique values
             leads.forEach(lead => {
                 if (lead.niche) {
                     const niches = lead.niche.split(',').map(n => n.trim());
@@ -677,6 +701,14 @@
                 }
                 if (lead.trigger) {
                     triggerSet.add(lead.trigger);
+                }
+                if (lead.group) {
+                    const groups = lead.group.split(',').map(g => g.trim());
+                    groups.forEach(group => groupSet.add(group));
+                }
+                if (lead.community) {
+                    const communities = lead.community.split(',').map(c => c.trim());
+                    communities.forEach(community => communitySet.add(community));
                 }
             });
             
@@ -715,6 +747,42 @@
                     filterLeads();
                 });
             });
+            
+            // Build group filter HTML
+            const groupFilters = document.getElementById('groupFilters');
+            groupFilters.innerHTML = '<span class="filter-chip active" data-group="all">All</span>';
+            
+            Array.from(groupSet).sort().forEach(group => {
+                groupFilters.innerHTML += `<span class="filter-chip" data-group="${group}">${group}</span>`;
+            });
+            
+            // Add click handlers for group filters
+            groupFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    groupFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentGroupFilter = this.dataset.group;
+                    filterLeads();
+                });
+            });
+            
+            // Build community filter HTML
+            const communityFilters = document.getElementById('communityFilters');
+            communityFilters.innerHTML = '<span class="filter-chip active" data-community="all">All</span>';
+            
+            Array.from(communitySet).sort().forEach(community => {
+                communityFilters.innerHTML += `<span class="filter-chip" data-community="${community}">${community}</span>`;
+            });
+            
+            // Add click handlers for community filters
+            communityFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    communityFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentCommunityFilter = this.dataset.community;
+                    filterLeads();
+                });
+            });
         }
         
         // Create lead card HTML
@@ -744,6 +812,8 @@
                                 </div>
                                 ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
                                 ${lead.trigger ? `<div class="mt-2"><span class="badge bg-info"><i class="bi bi-lightning"></i> Trigger: ${lead.trigger}</span></div>` : ''}
+                                ${lead.group ? `<div class="mt-1"><span class="badge bg-success"><i class="bi bi-people-fill"></i> Groups: ${lead.group}</span></div>` : ''}
+                                ${lead.community ? `<div class="mt-1"><span class="badge bg-primary"><i class="bi bi-globe"></i> Communities: ${lead.community}</span></div>` : ''}
                             </div>
                             <div class="dropdown" onclick="event.stopPropagation()">
                                 <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
@@ -792,6 +862,26 @@
                 filtered = filtered.filter(lead => {
                     if (!lead.trigger) return false;
                     return lead.trigger === currentTriggerFilter;
+                });
+            }
+            
+            // Group filter
+            if (currentGroupFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.group) return false;
+                    // Split group by comma and check if any match
+                    const groups = lead.group.split(',').map(g => g.trim());
+                    return groups.includes(currentGroupFilter);
+                });
+            }
+            
+            // Community filter
+            if (currentCommunityFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.community) return false;
+                    // Split community by comma and check if any match
+                    const communities = lead.community.split(',').map(c => c.trim());
+                    return communities.includes(currentCommunityFilter);
                 });
             }
             
@@ -1554,9 +1644,103 @@
         }
 
         async function loadCommunitiesForBulkAdd() {
-            // For now, we'll show a message since community listing might not be fully implemented
-            const dropdown = document.getElementById('communityDropdown');
-            dropdown.innerHTML = '<li><a class="dropdown-item disabled" href="#">Community listing coming soon</a></li>';
+            try {
+                const response = await fetch('/user/my/communities', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (response.ok && data.results && data.results.data) {
+                    existingCommunities = data.results.data;
+                    const dropdown = document.getElementById('communityDropdown');
+                    dropdown.innerHTML = '';
+                    
+                    if (existingCommunities.length === 0) {
+                        dropdown.innerHTML = '<li><a class="dropdown-item disabled" href="#">No communities found</a></li>';
+                    } else {
+                        existingCommunities.forEach(community => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<a class="dropdown-item" href="#" onclick="addSelectedToCommunity('${community.JID}', '${community.Name || community.JID}')">${community.Name || community.JID}</a>`;
+                            dropdown.appendChild(li);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load communities:', error);
+                const dropdown = document.getElementById('communityDropdown');
+                dropdown.innerHTML = '<li><a class="dropdown-item disabled" href="#">Failed to load communities</a></li>';
+            }
+        }
+        
+        async function addSelectedToCommunity(communityId, communityName) {
+            if (selectedLeads.size === 0) {
+                Swal.fire('Error', 'No contacts selected', 'error');
+                return;
+            }
+
+            const participants = [];
+            const leadIds = [];
+            
+            selectedLeads.forEach(leadId => {
+                const lead = leads.find(l => l.id === leadId);
+                if (lead && lead.phone) {
+                    participants.push(lead.phone);
+                    leadIds.push(leadId);
+                }
+            });
+
+            try {
+                // First, add participants to WhatsApp community
+                const response = await fetch('/community/participants', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        device_id: deviceId,
+                        community_id: communityId,
+                        participants: participants
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update leads with community information
+                    await fetch('/api/leads-ai/update-community', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            lead_ids: leadIds,
+                            community_name: communityName,
+                            community_jid: communityId
+                        })
+                    });
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: `Added ${participants.length} contacts to community ${communityName}`,
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+
+                    // Reload leads to show updated community info
+                    loadLeads();
+                    
+                    // Clear selection
+                    selectedLeads.clear();
+                    updateBulkActionsVisibility();
+                } else {
+                    throw new Error(data.message || 'Failed to add participants to community');
+                }
+            } catch (error) {
+                Swal.fire('Error', error.message, 'error');
+            }
         }
 
         async function addSelectedToGroup(groupId) {
@@ -1566,14 +1750,25 @@
             }
 
             const participants = [];
+            const leadIds = [];
+            let groupName = '';
+            
+            // Find the group name
+            const selectedGroup = existingGroups.find(g => g.JID === groupId);
+            if (selectedGroup) {
+                groupName = selectedGroup.Name || groupId;
+            }
+            
             selectedLeads.forEach(leadId => {
                 const lead = leads.find(l => l.id === leadId);
                 if (lead && lead.phone) {
                     participants.push(lead.phone);
+                    leadIds.push(leadId);
                 }
             });
 
             try {
+                // First, add participants to WhatsApp group
                 const response = await fetch('/group/participants', {
                     method: 'POST',
                     headers: {
@@ -1590,17 +1785,33 @@
                 const data = await response.json();
                 
                 if (response.ok) {
+                    // Update leads with group information
+                    await fetch('/api/leads-ai/update-group', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            lead_ids: leadIds,
+                            group_name: groupName,
+                            group_jid: groupId
+                        })
+                    });
+                    
                     Swal.fire({
                         icon: 'success',
                         title: 'Success!',
-                        text: `Added ${participants.length} contacts to group`,
+                        text: `Added ${participants.length} contacts to group ${groupName}`,
                         showConfirmButton: false,
                         timer: 2000
                     });
 
+                    // Reload leads to show updated group info
+                    loadLeads();
+                    
                     // Clear selection
                     selectedLeads.clear();
-                    displayLeads();
                     updateBulkActionsVisibility();
                 } else {
                     throw new Error(data.message || 'Failed to add participants');
