@@ -3,7 +3,6 @@ package whatsapp
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 	
@@ -82,17 +81,9 @@ func (dhm *DeviceHealthMonitor) checkAllDevices() {
 	userRepo := repository.GetUserRepository()
 	
 	for deviceID, client := range allClients {
-		// Skip corrupted device IDs
-		if strings.HasPrefix(deviceID, "/") || strings.Contains(deviceID, "createtics") {
-			logrus.Warnf("Skipping corrupted device ID: %s", deviceID)
-			// Remove it from ClientManager
-			cm.RemoveClient(deviceID)
-			continue
-		}
-		
-		// Validate UUID format (should be 36 characters)
-		if len(deviceID) != 36 {
-			logrus.Warnf("Invalid device ID format: %s", deviceID)
+		// Use proper validation
+		if !IsValidDeviceID(deviceID) {
+			logrus.Warnf("Removing invalid device ID from health monitor: %s", deviceID)
 			cm.RemoveClient(deviceID)
 			continue
 		}
@@ -103,22 +94,20 @@ func (dhm *DeviceHealthMonitor) checkAllDevices() {
 
 // checkDeviceHealth checks health of a single device
 func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whatsmeow.Client, userRepo *repository.UserRepository) {
-	// Clean device ID - remove any leading slashes or path prefixes
-	deviceID = strings.TrimPrefix(deviceID, "/")
-	if idx := strings.LastIndex(deviceID, "/"); idx != -1 {
-		deviceID = deviceID[idx+1:]
+	// Validate device ID first
+	if !IsValidDeviceID(deviceID) {
+		// This is a corrupted ID, remove it
+		logrus.Warnf("Found corrupted device ID in ClientManager: %s", deviceID)
+		cm := GetClientManager()
+		cm.RemoveClient(deviceID)
+		return
 	}
 	
 	// First check if this is a platform device
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		logrus.Warnf("Device %s not found in database: %v", deviceID, err)
-		// Try to remove this device from ClientManager if it's invalid
-		if strings.Contains(err.Error(), "invalid input syntax for type uuid") {
-			cm := GetClientManager()
-			cm.RemoveClient(deviceID)
-			logrus.Infof("Removed invalid device %s from ClientManager", deviceID)
-		}
+		// Don't remove if it's a valid UUID but just not in DB yet
 		return
 	}
 	

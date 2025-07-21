@@ -85,6 +85,12 @@ func (rsm *RealtimeSyncManager) syncAllDevices() {
 	userRepo := repository.GetUserRepository()
 	
 	for deviceID, client := range allClients {
+		// Skip invalid device IDs
+		if !IsValidDeviceID(deviceID) {
+			logrus.Debugf("Skipping invalid device ID in real-time sync: %s", deviceID)
+			continue
+		}
+		
 		if client == nil {
 			continue
 		}
