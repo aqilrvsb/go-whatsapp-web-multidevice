@@ -257,7 +257,7 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 		}
 		userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, jidStr)
 		
-		logrus.Infof("✅ Successfully reconnected device %s", deviceID)
+		logrus.Infof("✅ Successfully reconnected device %s and registered in ClientManager", deviceID)
 		
 		return c.JSON(utils.ResponseData{
 			Status:  200,
