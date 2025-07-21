@@ -33,15 +33,18 @@ type ParticipantStatus struct {
 }
 
 type GetCommunityInfoRequest struct {
+	DeviceID    string `json:"device_id" query:"device_id"`
 	CommunityID string `json:"community_id" query:"community_id"`
 }
 
 type LinkGroupRequest struct {
+	DeviceID    string `json:"device_id" form:"device_id"`
 	CommunityID string `json:"community_id" form:"community_id"`
 	GroupID     string `json:"group_id" form:"group_id"`
 }
 
 type UnlinkGroupRequest struct {
+	DeviceID    string `json:"device_id" form:"device_id"`
 	CommunityID string `json:"community_id" form:"community_id"`
 	GroupID     string `json:"group_id" form:"group_id"`
 }

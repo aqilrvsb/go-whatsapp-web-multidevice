@@ -17,11 +17,13 @@ type IGroupUsecase interface {
 }
 
 type JoinGroupWithLinkRequest struct {
-	Link string `json:"link" form:"link"`
+	DeviceID string `json:"device_id" form:"device_id"`
+	Link     string `json:"link" form:"link"`
 }
 
 type LeaveGroupRequest struct {
-	GroupID string `json:"group_id" form:"group_id"`
+	DeviceID string `json:"device_id" form:"device_id"`
+	GroupID  string `json:"group_id" form:"group_id"`
 }
 
 type CreateGroupRequest struct {
@@ -44,7 +46,8 @@ type ParticipantStatus struct {
 }
 
 type GetGroupRequestParticipantsRequest struct {
-	GroupID string `json:"group_id" query:"group_id"`
+	DeviceID string `json:"device_id" query:"device_id"`
+	GroupID  string `json:"group_id" query:"group_id"`
 }
 
 type GetGroupRequestParticipantsResponse struct {
@@ -53,6 +56,7 @@ type GetGroupRequestParticipantsResponse struct {
 }
 
 type GroupRequestParticipantsRequest struct {
+	DeviceID     string                             `json:"device_id" form:"device_id"`
 	GroupID      string                             `json:"group_id" form:"group_id"`
 	Participants []string                           `json:"participants" form:"participants"`
 	Action       whatsmeow.ParticipantRequestChange `json:"action" form:"action"`

@@ -6,6 +6,7 @@ import (
 	domainGroup "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/group"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v2"
 	"go.mau.fi/whatsmeow"
 )
@@ -16,16 +17,21 @@ type Group struct {
 
 func InitRestGroup(app *fiber.App, service domainGroup.IGroupUsecase) Group {
 	rest := Group{Service: service}
-	app.Post("/group", rest.CreateGroup)
-	app.Post("/group/join-with-link", rest.JoinGroupWithLink)
-	app.Post("/group/leave", rest.LeaveGroup)
-	app.Post("/group/participants", rest.AddParticipants)
-	app.Post("/group/participants/remove", rest.DeleteParticipants)
-	app.Post("/group/participants/promote", rest.PromoteParticipants)
-	app.Post("/group/participants/demote", rest.DemoteParticipants)
-	app.Get("/group/participant-requests", rest.ListParticipantRequests)
-	app.Post("/group/participant-requests/approve", rest.ApproveParticipantRequests)
-	app.Post("/group/participant-requests/reject", rest.RejectParticipantRequests)
+	
+	// Apply CustomAuth middleware to all group endpoints
+	groupRoutes := app.Group("/group", middleware.CustomAuth())
+	
+	groupRoutes.Post("/", rest.CreateGroup)
+	groupRoutes.Post("/join-with-link", rest.JoinGroupWithLink)
+	groupRoutes.Post("/leave", rest.LeaveGroup)
+	groupRoutes.Post("/participants", rest.AddParticipants)
+	groupRoutes.Post("/participants/remove", rest.DeleteParticipants)
+	groupRoutes.Post("/participants/promote", rest.PromoteParticipants)
+	groupRoutes.Post("/participants/demote", rest.DemoteParticipants)
+	groupRoutes.Get("/participant-requests", rest.ListParticipantRequests)
+	groupRoutes.Post("/participant-requests/approve", rest.ApproveParticipantRequests)
+	groupRoutes.Post("/participant-requests/reject", rest.RejectParticipantRequests)
+	
 	return rest
 }
 
@@ -33,6 +39,23 @@ func (controller *Group) JoinGroupWithLink(c *fiber.Ctx) error {
 	var request domainGroup.JoinGroupWithLinkRequest
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
+
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership if device_id is provided
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
 
 	response, err := controller.Service.JoinGroupWithLink(c.UserContext(), request)
 	utils.PanicIfNeeded(err)
@@ -52,6 +75,23 @@ func (controller *Group) LeaveGroup(c *fiber.Ctx) error {
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
 
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
+
 	whatsapp.SanitizePhone(&request.GroupID)
 
 	err = controller.Service.LeaveGroup(c.UserContext(), request)
@@ -69,6 +109,23 @@ func (controller *Group) CreateGroup(c *fiber.Ctx) error {
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
 
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
+
 	groupID, err := controller.Service.CreateGroup(c.UserContext(), request)
 	utils.PanicIfNeeded(err)
 
@@ -81,6 +138,7 @@ func (controller *Group) CreateGroup(c *fiber.Ctx) error {
 		},
 	})
 }
+
 func (controller *Group) AddParticipants(c *fiber.Ctx) error {
 	return controller.manageParticipants(c, whatsmeow.ParticipantChangeAdd, "Success add participants")
 }
@@ -110,6 +168,23 @@ func (controller *Group) ListParticipantRequests(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
+
 	whatsapp.SanitizePhone(&request.GroupID)
 
 	result, err := controller.Service.GetGroupRequestParticipants(c.UserContext(), request)
@@ -136,6 +211,24 @@ func (controller *Group) manageParticipants(c *fiber.Ctx, action whatsmeow.Parti
 	var request domainGroup.ParticipantRequest
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
+	
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
+	
 	whatsapp.SanitizePhone(&request.GroupID)
 	request.Action = action
 	result, err := controller.Service.ManageParticipant(c.UserContext(), request)
@@ -153,6 +246,24 @@ func (controller *Group) handleRequestedParticipants(c *fiber.Ctx, action whatsm
 	var request domainGroup.GroupRequestParticipantsRequest
 	err := c.BodyParser(&request)
 	utils.PanicIfNeeded(err)
+	
+	// Get user context from authentication
+	userID, ok := middleware.GetUserFromContext(c)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "User authentication required",
+		})
+	}
+	
+	// Validate device ownership
+	if request.DeviceID != "" {
+		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
+			return err
+		}
+	}
+	
 	whatsapp.SanitizePhone(&request.GroupID)
 	request.Action = action
 	result, err := controller.Service.ManageGroupRequestParticipants(c.UserContext(), request)

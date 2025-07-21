@@ -207,12 +207,12 @@ func (service serviceGroup) ManageGroupRequestParticipants(ctx context.Context, 
 	return result, nil
 }
 
-func (service serviceGroup) participantToJID(participants []string) ([]types.JID, error) {
+func (service serviceGroup) participantToJID(waClient *whatsmeow.Client, participants []string) ([]types.JID, error) {
 	var participantsJID []types.JID
 	for _, participant := range participants {
 		formattedParticipant := participant + config.WhatsappTypeUser
 
-		if !whatsapp.IsOnWhatsapp(service.WaCli, formattedParticipant) {
+		if !whatsapp.IsOnWhatsapp(waClient, formattedParticipant) {
 			return nil, pkgError.ErrUserNotRegistered
 		}
 
