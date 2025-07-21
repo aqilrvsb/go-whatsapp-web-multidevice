@@ -4968,7 +4968,7 @@
                         </div>
                         <button class="btn btn-sm btn-danger delete-flow-btn" 
                                 style="position: absolute; top: 5px; right: 5px; padding: 2px 6px; font-size: 11px;"
-                                onclick="deleteSequenceStep(${i}, event)"
+                                onclick="deleteSequenceStep(${i}, event); return false;"
                                 title="Delete Flow ${i}">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -5007,7 +5007,10 @@
         
         // Delete sequence step function
         function deleteSequenceStep(dayNumber, event) {
-            event.stopPropagation(); // Prevent opening the modal
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation(); // Prevent opening the modal
+            }
             
             Swal.fire({
                 title: `Delete Flow ${dayNumber}?`,
@@ -5025,13 +5028,21 @@
                     // Refresh the grid
                     initializeSequenceDaysGrid(true);
                     
-                    Swal.fire(
-                        'Deleted!',
-                        `Flow ${dayNumber} has been removed.`,
-                        'success'
-                    );
+                    // Show success without timer to prevent auto-close
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: `Flow ${dayNumber} has been removed.`,
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    
+                    // Keep the modal open
+                    return false;
                 }
             });
+            
+            return false; // Prevent any default action
         }
         
         // Open flow message modal
