@@ -63,10 +63,37 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 			switch v := evt.(type) {
 			case *events.Disconnected:
 				logrus.Warnf("Device disconnected event received")
-				// Don't panic, let connection manager handle it
+				// Attempt immediate reconnection
+				go func() {
+					time.Sleep(2 * time.Second) // Brief delay before reconnecting
+					if !newClient.IsConnected() {
+						logrus.Info("Attempting to reconnect disconnected device...")
+						err := newClient.Connect()
+						if err != nil {
+							logrus.Errorf("Failed to reconnect: %v", err)
+							// Try again after a longer delay
+							time.Sleep(5 * time.Second)
+							newClient.Connect()
+						} else {
+							logrus.Info("Successfully reconnected after disconnect")
+						}
+					}
+				}()
 			case *events.StreamError:
 				logrus.Errorf("Stream error: %v", v)
-				// Let auto-reconnect handle it
+				// Attempt reconnection on stream error
+				go func() {
+					time.Sleep(3 * time.Second) // Wait a bit before reconnecting
+					if !newClient.IsConnected() {
+						logrus.Info("Attempting to reconnect after stream error...")
+						err := newClient.Connect()
+						if err != nil {
+							logrus.Errorf("Failed to reconnect after stream error: %v", err)
+						} else {
+							logrus.Info("Successfully reconnected after stream error")
+						}
+					}
+				}()
 			case *events.StreamReplaced:
 				logrus.Warn("Stream replaced - another client connected with same credentials")
 			case *events.PairSuccess:
@@ -112,6 +139,26 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 							"deviceId": deviceID,
 						},
 					}
+					
+					// Start keepalive monitoring for this client
+					go func(client *whatsmeow.Client, devID string) {
+						ticker := time.NewTicker(15 * time.Second) // More aggressive keepalive
+						defer ticker.Stop()
+						
+						logrus.Infof("Started keepalive monitor for device %s", devID)
+						
+						for range ticker.C {
+							if !client.IsConnected() {
+								logrus.Warnf("Keepalive: Device %s disconnected, attempting reconnect...", devID)
+								err := client.Connect()
+								if err != nil {
+									logrus.Errorf("Keepalive reconnect failed for %s: %v", devID, err)
+								} else {
+									logrus.Infof("Keepalive reconnect successful for %s", devID)
+								}
+							}
+						}
+					}(newClient, deviceID)
 				}
 			}
 			
