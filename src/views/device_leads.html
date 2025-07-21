@@ -1691,6 +1691,7 @@
 
             try {
                 // First, add participants to WhatsApp community
+                // Note: Backend will use the user's primary connected device
                 const response = await fetch('/community/participants', {
                     method: 'POST',
                     headers: {
@@ -1698,7 +1699,6 @@
                     },
                     credentials: 'include',
                     body: JSON.stringify({
-                        device_id: deviceId,
                         community_id: communityId,
                         participants: participants
                     })
@@ -1769,6 +1769,7 @@
 
             try {
                 // First, add participants to WhatsApp group
+                // Note: Backend will use the user's primary connected device
                 const response = await fetch('/group/participants', {
                     method: 'POST',
                     headers: {
@@ -1776,7 +1777,6 @@
                     },
                     credentials: 'include',
                     body: JSON.stringify({
-                        device_id: deviceId,
                         group_id: groupId,
                         participants: participants
                     })

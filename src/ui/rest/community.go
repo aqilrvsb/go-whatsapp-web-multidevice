@@ -6,6 +6,7 @@ import (
 	domainCommunity "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/community"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v2"
 )
@@ -126,8 +127,45 @@ func (controller *Community) AddParticipants(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Validate device ownership
-	if request.DeviceID != "" {
+	// If no device_id provided, get user's primary connected device
+	if request.DeviceID == "" {
+		userRepo := repository.GetUserRepository()
+		devices, err := userRepo.GetUserDevices(userID)
+		if err != nil || len(devices) == 0 {
+			return c.Status(400).JSON(utils.ResponseData{
+				Status:  400,
+				Code:    "NO_DEVICE",
+				Message: "No WhatsApp device found for user",
+			})
+		}
+		
+		// Find first connected device
+		cm := whatsapp.GetClientManager()
+		deviceFound := false
+		for _, device := range devices {
+			// Skip platform devices
+			if device.Platform != "" {
+				continue
+			}
+			
+			// Check if device is connected
+			client, err := cm.GetClient(device.ID)
+			if err == nil && client != nil && client.IsConnected() && client.IsLoggedIn() {
+				request.DeviceID = device.ID
+				deviceFound = true
+				break
+			}
+		}
+		
+		if !deviceFound {
+			return c.Status(400).JSON(utils.ResponseData{
+				Status:  400,
+				Code:    "NO_CONNECTED_DEVICE",
+				Message: "No connected WhatsApp device found. Please connect a device first.",
+			})
+		}
+	} else {
+		// Validate device ownership if device_id is provided
 		if err := validateDeviceOwnership(c, userID, request.DeviceID); err != nil {
 			return err
 		}
