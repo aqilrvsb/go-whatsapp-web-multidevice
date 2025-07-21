@@ -88,9 +88,14 @@ func GetUserGroups(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Convert to our format
+	// Convert to our format - filter out communities (parent groups)
 	groupList := make([]GroupInfo, 0, len(groups))
 	for _, group := range groups {
+		// Skip communities (parent groups) - only include regular groups
+		if group.IsParent {
+			continue
+		}
+		
 		groupInfo := GroupInfo{
 			JID:         group.JID.String(),
 			Name:        group.GroupName.Name,
