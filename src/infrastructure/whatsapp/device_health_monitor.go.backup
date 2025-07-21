@@ -89,13 +89,7 @@ func (dhm *DeviceHealthMonitor) checkAllDevices() {
 func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whatsmeow.Client, userRepo *repository.UserRepository) {
 	// First check if this is a platform device
 	device, err := userRepo.GetDeviceByID(deviceID)
-	if err != nil {
-		logrus.Warnf("Device %s not found in database: %v", deviceID, err)
-		return
-	}
-	
-	// Skip health check for platform devices
-	if device != nil && device.Platform != "" {
+	if err == nil && device.Platform != "" {
 		// Skip health check for platform devices (Wablas, Whacenter, etc)
 		return
 	}
@@ -103,11 +97,7 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	if client == nil {
 		logrus.Warnf("Device %s has nil client in health monitor", deviceID)
 		// Don't remove from manager - just update status
-		if device != nil {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
-		} else {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
-		}
+		userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
 		return
 	}
 	
@@ -116,21 +106,14 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 		logrus.Warnf("Device %s is disconnected", deviceID)
 		
 		// Update status to offline - NO RECONNECTION
-		if device != nil {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
-		} else {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
-		}
+		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 	} else if !client.IsLoggedIn() {
 		logrus.Warnf("Device %s is connected but not logged in", deviceID)
-		if device != nil {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
-		} else {
-			userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
-		}
+		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 	} else {
 		// Device is healthy, ensure status is correct
-		if device != nil && device.Status != "online" {
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err == nil && device.Status != "online" {
 			userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, device.JID)
 		}
 	}
