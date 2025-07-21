@@ -181,11 +181,19 @@
             margin: 0 4px;
             cursor: pointer;
             transition: all 0.2s;
+            font-size: 13px;
         }
 
         .filter-chip.active {
             background: var(--primary);
             color: white;
+        }
+        
+        #nicheFilters, #triggerFilters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
         }
 
         .lead-journey {
@@ -284,7 +292,7 @@
                 </div>
             </div>
             <div class="row mt-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <div class="d-flex align-items-center">
                         <span class="me-2">Niche:</span>
                         <div id="nicheFilters">
@@ -293,7 +301,16 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6 text-end">
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Trigger:</span>
+                        <div id="triggerFilters">
+                            <span class="filter-chip active" data-trigger="all">All</span>
+                            <!-- Dynamic trigger filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                         <label class="form-check-label" for="selectAll">
@@ -556,6 +573,7 @@
         let leads = [];
         let currentFilter = 'all';
         let currentNicheFilter = 'all';
+        let currentTriggerFilter = 'all';
         let leadModal;
         let importModal;
         let bulkUpdateModal;
@@ -646,19 +664,23 @@
             updateBulkActionsVisibility();
         }
         
-        // Build niche filters from leads
+        // Build niche and trigger filters from leads
         function buildNicheFilters() {
             const nicheSet = new Set();
+            const triggerSet = new Set();
             
-            // Collect all unique niches
+            // Collect all unique niches and triggers
             leads.forEach(lead => {
                 if (lead.niche) {
                     const niches = lead.niche.split(',').map(n => n.trim());
                     niches.forEach(niche => nicheSet.add(niche));
                 }
+                if (lead.trigger) {
+                    triggerSet.add(lead.trigger);
+                }
             });
             
-            // Build filter HTML
+            // Build niche filter HTML
             const nicheFilters = document.getElementById('nicheFilters');
             nicheFilters.innerHTML = '<span class="filter-chip active" data-niche="all">All</span>';
             
@@ -666,12 +688,30 @@
                 nicheFilters.innerHTML += `<span class="filter-chip" data-niche="${niche}">${niche}</span>`;
             });
             
-            // Add click handlers
+            // Add click handlers for niche filters
             nicheFilters.querySelectorAll('.filter-chip').forEach(chip => {
                 chip.addEventListener('click', function() {
                     nicheFilters.querySelector('.filter-chip.active').classList.remove('active');
                     this.classList.add('active');
                     currentNicheFilter = this.dataset.niche;
+                    filterLeads();
+                });
+            });
+            
+            // Build trigger filter HTML
+            const triggerFilters = document.getElementById('triggerFilters');
+            triggerFilters.innerHTML = '<span class="filter-chip active" data-trigger="all">All</span>';
+            
+            Array.from(triggerSet).sort().forEach(trigger => {
+                triggerFilters.innerHTML += `<span class="filter-chip" data-trigger="${trigger}">${trigger}</span>`;
+            });
+            
+            // Add click handlers for trigger filters
+            triggerFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    triggerFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentTriggerFilter = this.dataset.trigger;
                     filterLeads();
                 });
             });
@@ -744,6 +784,14 @@
                     // Split niche by comma and check if any match
                     const niches = lead.niche.split(',').map(n => n.trim());
                     return niches.includes(currentNicheFilter);
+                });
+            }
+            
+            // Trigger filter
+            if (currentTriggerFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.trigger) return false;
+                    return lead.trigger === currentTriggerFilter;
                 });
             }
             
