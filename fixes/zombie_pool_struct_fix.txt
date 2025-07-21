@@ -1,0 +1,20 @@
+// Add this field to BroadcastWorkerPool struct around line 30
+type BroadcastWorkerPool struct {
+	broadcastID   string
+	broadcastType string // "campaign" or "sequence"
+	workers       map[string]*BroadcastWorker // key: deviceID
+	maxWorkers    int
+	config        *config.BroadcastConfig
+	mu            sync.RWMutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	redisClient   *redis.Client
+	manager       *UltraScaleBroadcastManager // ADD THIS LINE
+	
+	// Statistics
+	totalMessages    int64
+	processedCount   int64
+	failedCount      int64
+	startTime        time.Time
+	completionTime   *time.Time
+}
