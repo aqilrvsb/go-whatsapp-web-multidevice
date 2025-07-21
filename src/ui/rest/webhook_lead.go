@@ -47,12 +47,12 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 	}
 
 	// Log the incoming request for debugging
-	logrus.Info("Webhook Lead: Received request - ", request)
+	logrus.Debug("Webhook Lead: Received request - ", request)
 	
 	// Create a unique key based on phone + user_id to prevent duplicates
 	// This helps if the webhook is called multiple times quickly
 	dedupeKey := request.Phone + "_" + request.UserID
-	logrus.Info("Webhook Lead: Processing request with dedupe key: ", dedupeKey)
+	logrus.Debug("Webhook Lead: Processing request with dedupe key: ", dedupeKey)
 
 	// Basic validation - only check required fields
 	if request.Name == "" {
@@ -104,7 +104,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		}
 	}
 	
-	logrus.Info("Webhook Lead: Using device name: ", deviceName)
+	logrus.Debug("Webhook Lead: Using device name: ", deviceName)
 	
 	// First check if a device with this user_id and device_name already exists
 	userRepo := repository.GetUserRepository()
@@ -118,7 +118,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 	// If device exists, update JID; otherwise create new
 	if device != nil {
 		// Device exists - just update the JID
-		logrus.Info("Webhook Lead: Device found, updating JID from ", device.JID, " to ", request.DeviceID)
+		logrus.Debug("Webhook Lead: Device found, updating JID from ", device.JID, " to ", request.DeviceID)
 		
 		updateQuery := `
 			UPDATE user_devices 
@@ -129,11 +129,11 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		if err != nil {
 			logrus.Error("Webhook Lead: Failed to update device JID - ", err)
 		} else {
-			logrus.Info("Webhook Lead: Successfully updated device JID")
+			logrus.Debug("Webhook Lead: Successfully updated device JID")
 		}
 	} else {
 		// Device doesn't exist, create it
-		logrus.Info("Webhook Lead: Device not found, creating new device - ", request.DeviceID)
+		logrus.Debug("Webhook Lead: Device not found, creating new device - ", request.DeviceID)
 		
 		// Handle device ID based on whether it's a valid UUID or not
 		var deviceID string
@@ -142,11 +142,11 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		if _, err := uuid.Parse(request.DeviceID); err != nil {
 			// Not a valid UUID, generate new UUID
 			deviceID = uuid.New().String()
-			logrus.Info("Webhook Lead: Non-UUID device_id. Generated UUID: ", deviceID)
+			logrus.Debug("Webhook Lead: Non-UUID device_id. Generated UUID: ", deviceID)
 		} else {
 			// It's a valid UUID, use it
 			deviceID = request.DeviceID
-			logrus.Info("Webhook Lead: Valid UUID device_id, using as-is")
+			logrus.Debug("Webhook Lead: Valid UUID device_id, using as-is")
 		}
 		
 		// Create new device
@@ -180,7 +180,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 			})
 		}
 		
-		logrus.Info("Webhook Lead: Device created successfully - ID: ", newDevice.ID, ", JID: ", newDevice.JID)
+		logrus.Debug("Webhook Lead: Device created successfully - ID: ", newDevice.ID, ", JID: ", newDevice.JID)
 		device = newDevice
 	}
 
@@ -244,7 +244,7 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	logrus.Info("Webhook Lead: Successfully created lead - ", lead.ID)
+	logrus.Debug("Webhook Lead: Successfully created lead - ", lead.ID)
 
 	// Return success response with all the data that was saved
 	return c.JSON(utils.ResponseData{
