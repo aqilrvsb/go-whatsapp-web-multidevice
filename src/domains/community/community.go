@@ -3,7 +3,6 @@ package community
 import (
 	"context"
 	
-	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
 

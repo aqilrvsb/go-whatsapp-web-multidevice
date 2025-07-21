@@ -14,11 +14,11 @@ import (
 
 // Enhanced group service with additional functionality
 type groupServiceEnhanced struct {
-	*groupService
+	*serviceGroup
 }
 
 // CreateGroupWithParticipants creates a new group and adds participants in one operation
-func (service *groupService) CreateGroupWithParticipants(ctx context.Context, request domainGroup.CreateGroupRequest) (groupID string, addResults []domainGroup.ParticipantStatus, err error) {
+func (service *serviceGroup) CreateGroupWithParticipants(ctx context.Context, request domainGroup.CreateGroupRequest) (groupID string, addResults []domainGroup.ParticipantStatus, err error) {
 	// Validate request
 	err = validations.ValidateCreateGroup(ctx, request)
 	if err != nil {
@@ -29,9 +29,8 @@ func (service *groupService) CreateGroupWithParticipants(ctx context.Context, re
 	
 	// First, create the group
 	req := whatsmeow.ReqCreateGroup{
-		Name:        request.Title,
+		Name:         request.Title,
 		Participants: []types.JID{}, // Start with empty, we'll add participants after
-		CreateKey:   types.GenerateMessageID(),
 	}
 	
 	groupInfo, err := service.WaCli.CreateGroup(req)
@@ -113,7 +112,7 @@ func (service *groupService) CreateGroupWithParticipants(ctx context.Context, re
 }
 
 // GetGroupInviteLink gets the invite link for a group
-func (service *groupService) GetGroupInviteLink(ctx context.Context, groupID string) (inviteLink string, err error) {
+func (service *serviceGroup) GetGroupInviteLink(ctx context.Context, groupID string) (inviteLink string, err error) {
 	whatsapp.MustLogin(service.WaCli)
 	
 	// Parse group JID
@@ -132,7 +131,7 @@ func (service *groupService) GetGroupInviteLink(ctx context.Context, groupID str
 }
 
 // RevokeGroupInviteLink revokes and regenerates the invite link for a group
-func (service *groupService) RevokeGroupInviteLink(ctx context.Context, groupID string) (newInviteLink string, err error) {
+func (service *serviceGroup) RevokeGroupInviteLink(ctx context.Context, groupID string) (newInviteLink string, err error) {
 	whatsapp.MustLogin(service.WaCli)
 	
 	// Parse group JID
@@ -151,7 +150,7 @@ func (service *groupService) RevokeGroupInviteLink(ctx context.Context, groupID 
 }
 
 // GetAllGroups gets all groups the user is part of
-func (service *groupService) GetAllGroups(ctx context.Context) ([]types.GroupInfo, error) {
+func (service *serviceGroup) GetAllGroups(ctx context.Context) ([]*types.GroupInfo, error) {
 	whatsapp.MustLogin(service.WaCli)
 	
 	// Get all groups
@@ -164,7 +163,7 @@ func (service *groupService) GetAllGroups(ctx context.Context) ([]types.GroupInf
 }
 
 // SetGroupIcon sets the group profile picture
-func (service *groupService) SetGroupIcon(ctx context.Context, groupID string, imageData []byte) error {
+func (service *serviceGroup) SetGroupIcon(ctx context.Context, groupID string, imageData []byte) error {
 	whatsapp.MustLogin(service.WaCli)
 	
 	// Parse group JID
@@ -183,7 +182,7 @@ func (service *groupService) SetGroupIcon(ctx context.Context, groupID string, i
 }
 
 // SetGroupDescription sets the group description/topic
-func (service *groupService) SetGroupDescription(ctx context.Context, groupID string, description string) error {
+func (service *serviceGroup) SetGroupDescription(ctx context.Context, groupID string, description string) error {
 	whatsapp.MustLogin(service.WaCli)
 	
 	// Parse group JID

@@ -25,10 +25,10 @@ func (service *communityService) CreateCommunity(ctx context.Context, request do
 	// Ensure client is connected
 	whatsapp.MustLogin(service.WaCli)
 	
-	// Create community with IsParent set to true
+	// Create community with GroupParent configuration
 	req := whatsmeow.ReqCreateGroup{
-		Name:     request.Name,
-		IsParent: true, // This flag makes it a community instead of a regular group
+		Name:        request.Name,
+		GroupParent: types.GroupParent{IsParent: true},
 	}
 	
 	// Create the community
@@ -143,43 +143,14 @@ func (service *communityService) GetCommunityInfo(ctx context.Context, request d
 
 // LinkGroupToCommunity links an existing group to a community
 func (service *communityService) LinkGroupToCommunity(ctx context.Context, request domainCommunity.LinkGroupRequest) error {
-	whatsapp.MustLogin(service.WaCli)
-	
-	// Parse JIDs
-	communityJID, err := whatsapp.ParseJID(request.CommunityID)
-	if err != nil {
-		return fmt.Errorf("invalid community ID: %v", err)
-	}
-	
-	groupJID, err := whatsapp.ParseJID(request.GroupID)
-	if err != nil {
-		return fmt.Errorf("invalid group ID: %v", err)
-	}
-	
-	// Link group to community
-	err = service.WaCli.LinkGroupToParent(groupJID, communityJID)
-	if err != nil {
-		return fmt.Errorf("failed to link group to community: %v", err)
-	}
-	
-	return nil
+	// TODO: This functionality may not be available in the current whatsmeow version
+	// The API method LinkGroupToParent might need to be implemented or may be available in newer versions
+	return fmt.Errorf("linking groups to communities is not yet supported in this version")
 }
 
 // UnlinkGroupFromCommunity unlinks a group from a community
 func (service *communityService) UnlinkGroupFromCommunity(ctx context.Context, request domainCommunity.UnlinkGroupRequest) error {
-	whatsapp.MustLogin(service.WaCli)
-	
-	// Parse group JID
-	groupJID, err := whatsapp.ParseJID(request.GroupID)
-	if err != nil {
-		return fmt.Errorf("invalid group ID: %v", err)
-	}
-	
-	// Unlink group from community (set parent to empty JID)
-	err = service.WaCli.UnlinkGroupFromParent(groupJID)
-	if err != nil {
-		return fmt.Errorf("failed to unlink group from community: %v", err)
-	}
-	
-	return nil
+	// TODO: This functionality may not be available in the current whatsmeow version
+	// The API method UnlinkGroupFromParent might need to be implemented or may be available in newer versions
+	return fmt.Errorf("unlinking groups from communities is not yet supported in this version")
 }

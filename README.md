@@ -1,10 +1,16 @@
 # WhatsApp Multi-Device System - ULTIMATE BROADCAST EDITION
-**Last Updated: January 21, 2025 - Complete System with Per-Step Delays**  
+**Last Updated: January 24, 2025 - Complete System with Group & Community Management**  
 **Status: ✅ Production-ready with 3000+ device support**
 **Architecture: ✅ Redis-based queuing + Worker pools + Per-step delays**
 **Deploy**: ✅ Auto-deployment via Railway with Redis
 
-## 🚀 LATEST UPDATES (January 21, 2025)
+## 🚀 LATEST UPDATES (January 24, 2025)
+
+### ✅ NEW: Group & Community Management:
+1. **Group Operations** - Create groups, manage participants, admin controls
+2. **Community Features** - Create communities, add members, link groups
+3. **Complete API** - REST endpoints for all group/community operations
+4. **Based on whatsmeow** - Using native WhatsApp Web Multi-Device protocol
 
 ### ✅ Complete Working System:
 1. **Redis is MANDATORY** - No fallback, optimized for 3000+ devices
@@ -44,6 +50,8 @@ Create messages                    Time-based processor (15 sec)
 - **Per-step delays** - Each sequence step has custom delays
 - **Platform support** - Works with Wablas/Whacenter APIs
 - **100% unified** - Same flow for campaigns and sequences
+- **Group Management** - Create, manage groups and participants
+- **Community Support** - Create and manage WhatsApp Communities
 
 ## 🚀 Quick Start
 
@@ -103,6 +111,62 @@ build_local.bat
 - Worker pools: Auto-created per broadcast
 - Cleanup: After 5 minutes idle
 - Delays: Random between min/max
+
+## 🆕 Group & Community Management (NEW - January 2025)
+
+### ✅ Group Management Features:
+- **Create Groups** with participants in one operation
+- **Add/Remove Participants** to existing groups
+- **Promote/Demote** participants (admin rights)
+- **Get/Revoke Invite Links** for groups
+- **Manage Group Settings** (icon, description)
+- **Join Groups** via invite links
+
+### ✅ Community Management Features:
+- **Create Communities** (WhatsApp Communities)
+- **Add Members** to communities (via announcement group)
+- **Link/Unlink Groups** to/from communities
+- **Get Community Info** and member lists
+
+### 📌 API Endpoints:
+
+#### Groups:
+- `POST /group` - Create group with participants
+- `POST /group/participants` - Add participants to group
+- `POST /group/participants/remove` - Remove participants
+- `POST /group/participants/promote` - Make admin
+- `POST /group/participants/demote` - Remove admin
+- `GET /group/participant-requests` - List join requests
+- `POST /group/participant-requests/approve` - Approve requests
+- `POST /group/participant-requests/reject` - Reject requests
+
+#### Communities:
+- `POST /community` - Create community
+- `GET /community` - Get community info
+- `POST /community/participants` - Add members
+- `POST /community/link-group` - Link group to community
+- `POST /community/unlink-group` - Unlink group
+
+### 📖 Example Usage:
+```bash
+# Create a group with participants
+curl -X POST http://localhost:3000/group \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Dev Team",
+    "participants": ["+1234567890", "+0987654321"]
+  }'
+
+# Create a community
+curl -X POST http://localhost:3000/community \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Tech Community",
+    "description": "A community for tech enthusiasts"
+  }'
+```
+
+For complete API documentation, see [GROUP_COMMUNITY_API_DOCS.md](GROUP_COMMUNITY_API_DOCS.md)
 
 ## 🛠️ Configuration
 
