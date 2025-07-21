@@ -131,24 +131,39 @@ func handleDevicePairSuccess(ctx context.Context, deviceID string, evt *events.P
 func handleDeviceConnected(ctx context.Context, deviceID string) {
 	logrus.Infof("Device %s fully connected", deviceID)
 	
-	// Get device connection
+	// Try to get device connection from DeviceManager first
 	dm := multidevice.GetDeviceManager()
 	conn, err := dm.GetDeviceConnection(deviceID)
+	
+	// If not in DeviceManager, try ClientManager (happens during reconnect)
+	var client *whatsmeow.Client
 	if err != nil {
-		logrus.Errorf("Failed to get device connection: %v", err)
-		return
+		logrus.Debugf("Device not in DeviceManager, checking ClientManager: %v", err)
+		cm := GetClientManager()
+		client, err = cm.GetClient(deviceID)
+		if err != nil {
+			logrus.Errorf("Device not found in either manager: %v", err)
+			return
+		}
+		// Use the client from ClientManager
+		conn = &multidevice.DeviceConnection{
+			DeviceID: deviceID,
+			Client:   client,
+		}
+	} else {
+		client = conn.Client
 	}
 	
-	if conn.Client == nil || !conn.Client.IsLoggedIn() {
+	if client == nil || !client.IsLoggedIn() {
 		logrus.Warnf("Device %s connected event but client not logged in", deviceID)
 		return
 	}
 	
 	// Get WhatsApp info
 	var phoneNumber, jid string
-	if conn.Client.Store.ID != nil {
-		jid = conn.Client.Store.ID.String()
-		phoneNumber = conn.Client.Store.ID.User
+	if client.Store.ID != nil {
+		jid = client.Store.ID.String()
+		phoneNumber = client.Store.ID.User
 		logrus.Infof("Device %s connected as: %s (Phone: %s)", deviceID, jid, phoneNumber)
 	}
 	
@@ -161,12 +176,14 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 		logrus.Infof("Successfully updated device %s to online status", deviceID)
 	}
 	
-	// Update device manager
-	dm.UpdateDeviceStatus(deviceID, true, phoneNumber)
+	// Update device manager only if device exists there
+	if conn != nil && conn.Client != nil {
+		dm.UpdateDeviceStatus(deviceID, true, phoneNumber)
+	}
 	
-	// Register with client manager for broadcasts
+	// Register with client manager for broadcasts (ensure it's there)
 	cm := GetClientManager()
-	cm.AddClient(deviceID, conn.Client)
+	cm.AddClient(deviceID, client)
 	logrus.Infof("Registered device %s with client manager", deviceID)
 	
 	// Clear QR channel
