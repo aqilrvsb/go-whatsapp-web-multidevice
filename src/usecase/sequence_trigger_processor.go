@@ -150,14 +150,14 @@ func (s *SequenceTriggerProcessor) processTriggers() {
 		}
 	}
 	
-	logrus.Infof("Sequence processing completed: enrolled=%d, processed=%d, devices=%d/%d, duration=%v", 
+	logrus.Debugf("Sequence processing completed: enrolled=%d, processed=%d, devices=%d/%d, duration=%v", 
 		enrolledCount, processedCount, activeDevices, totalDevices, duration)
 	
 	// Log performance metrics
 	if processedCount > 0 {
 		avgTimePerMessage := duration / time.Duration(processedCount)
 		messagesPerMinute := float64(processedCount) / duration.Minutes()
-		logrus.Infof("Performance: %.2f msg/min, %v avg/msg", messagesPerMinute, avgTimePerMessage)
+		logrus.Debugf("Performance: %.2f msg/min, %v avg/msg", messagesPerMinute, avgTimePerMessage)
 	}
 }
 
@@ -261,7 +261,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		return fmt.Errorf("no steps found for sequence %s", sequenceID)
 	}
 	
-	logrus.Infof("Enrolling contact %s in sequence %s - creating ALL %d steps", 
+	logrus.Debugf("Enrolling contact %s in sequence %s - creating ALL %d steps", 
 		lead.Phone, sequenceID, len(steps))
 	
 	// Create records for ALL steps
@@ -277,7 +277,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 			// FIRST STEP: PENDING with 5 minute delay
 			nextTriggerTime = currentTime.Add(5 * time.Minute)
 			status = "pending" // CHANGED: Now PENDING instead of active
-			logrus.Infof("Step 1: PENDING - will trigger at %v (NOW + 5 minutes)", 
+			logrus.Debugf("Step pending - will trigger at %v (NOW + 5 minutes)", 
 				nextTriggerTime.Format("15:04:05"))
 		} else {
 			// Subsequent steps - PENDING with calculated time
@@ -327,7 +327,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequence(sequenceID string, le
 		}
 		
 		// Debug log the lead name being used
-		logrus.Infof("[ENROLLMENT] Created step %d for %s - Name: '%s', status: %s", 
+		logrus.Debugf("[ENROLLMENT] Created step %d for %s - Name: '%s', status: %s", 
 			step.DayNumber, lead.Phone, lead.Name, status)
 	}
 	
@@ -449,9 +449,6 @@ func (s *SequenceTriggerProcessor) processSequenceContacts(deviceLoads map[strin
 			job.sequenceStepID = sequenceStepID
 			job.nextTriggerTime = triggerTime
 			
-			// Debug logging for name issue
-			logrus.Infof("[SEQUENCE-NAME] Contact: %s, Name from sequence_contacts: '%s'", job.phone, job.name)
-			
 			jobs <- job
 		}
 		close(jobs)
@@ -480,7 +477,7 @@ func (s *SequenceTriggerProcessor) processContactWithNewLogic(job contactJob, de
 	if job.nextTriggerTime.After(now) {
 		// Not time yet - mark as ACTIVE to track it
 		timeRemaining := time.Until(job.nextTriggerTime)
-		logrus.Infof("⏰ Step %d for %s not ready (triggers in %v at %v)", 
+		logrus.Debugf("Step %d for %s not ready (triggers in %v at %v)", 
 			job.currentStep, job.phone, timeRemaining, 
 			job.nextTriggerTime.Format("15:04:05"))
 		
