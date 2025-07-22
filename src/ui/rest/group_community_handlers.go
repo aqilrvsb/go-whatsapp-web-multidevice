@@ -1,6 +1,9 @@
 package rest
 
 import (
+	"fmt"
+	"strings"
+	
 	"github.com/gofiber/fiber/v2"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -105,19 +108,24 @@ func AddGroupParticipants(c *fiber.Ctx) error {
 	
 	// Convert phone numbers to JIDs
 	var participantJIDs []types.JID
+	phoneMap := make(map[string]string) // Clean phone -> original phone	
 	for _, phone := range request.Participants {
-		// Clean phone number - remove any non-digits
+		// Clean phone number - remove any non-digits except +
 		cleanPhone := ""
 		for _, ch := range phone {
-			if ch >= '0' && ch <= '9' {
+			if (ch >= '0' && ch <= '9') || ch == '+' {
 				cleanPhone += string(ch)
 			}
 		}
+		
+		// Remove leading + if present
+		cleanPhone = strings.TrimPrefix(cleanPhone, "+")
 		
 		if cleanPhone != "" {
 			jid, err := types.ParseJID(cleanPhone + "@s.whatsapp.net")
 			if err == nil {
 				participantJIDs = append(participantJIDs, jid)
+				phoneMap[cleanPhone] = phone
 			}
 		}
 	}
@@ -137,45 +145,70 @@ func AddGroupParticipants(c *fiber.Ctx) error {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
-			Message: "Failed to add participants to group",
+			Message: fmt.Sprintf("Failed to add participants: %v", err),
 		})
 	}
 	
-	// Process response
+	// Process response - resp is []types.GroupParticipant
 	results := make([]map[string]interface{}, 0)
-	for jid, result := range resp {
+	
+	// Create a map of JIDs we tried to add
+	attemptedJIDs := make(map[string]bool)
+	for _, jid := range participantJIDs {
+		attemptedJIDs[jid.User] = true
+	}
+	
+	// Process each participant in response
+	for _, participant := range resp {
+		phone := participant.JID.User
+		originalPhone := phoneMap[phone]
+		if originalPhone == "" {
+			originalPhone = phone
+		}
+		
 		status := "success"
 		message := "Added to group successfully"
 		
-		// Check if failed
-		if result.Error != 0 {
+		// Check error status
+		if participant.Error != 0 {
 			status = "failed"
-			switch result.Error {
+			switch participant.Error {
 			case 403:
 				message = "Not authorized"
 			case 404:
-				message = "User not found"
+				message = "User not found on WhatsApp"
 			case 409:
 				message = "Already in group"
 			case 500:
 				message = "Server error"
 			default:
-				if result.AddRequest != nil {
-					message = "Invite sent"
-					status = "pending"
-				} else {
-					message = "Failed to add"
-				}
+				message = fmt.Sprintf("Error code: %d", participant.Error)
 			}
+		} else if participant.AddRequest != nil {
+			status = "pending"
+			message = "Invite sent"
 		}
 		
-		// Get phone number from JID
-		phone := jid
-		
 		results = append(results, map[string]interface{}{
-			"participant": phone,
+			"participant": originalPhone,
 			"status":      status,
 			"message":     message,
+		})
+		
+		// Mark as processed
+		delete(attemptedJIDs, phone)
+	}
+	
+	// Add failed participants that weren't in response
+	for phone := range attemptedJIDs {
+		originalPhone := phoneMap[phone]
+		if originalPhone == "" {
+			originalPhone = phone
+		}
+		results = append(results, map[string]interface{}{
+			"participant": originalPhone,
+			"status":      "failed",
+			"message":     "No response from server",
 		})
 	}
 	
@@ -222,8 +255,7 @@ func AddCommunityParticipants(c *fiber.Ctx) error {
 			Code:    "UNAUTHORIZED",
 			Message: "Invalid session",
 		})
-	}
-	
+	}	
 	// If device_id not provided, get first connected device
 	deviceID := request.DeviceID
 	if deviceID == "" {
@@ -278,70 +310,67 @@ func AddCommunityParticipants(c *fiber.Ctx) error {
 			Code:    "INVALID_JID",
 			Message: "Invalid community ID",
 		})
-	}
-	
-	// Get community info to find announcement group
+	}	
+	// For communities, we need to find a group to add participants to
+	// Communities themselves cannot have participants added directly
 	groups, err := client.GetJoinedGroups()
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
-			Code:    "ERROR",
+			Code:    "ERROR", 
 			Message: "Failed to get groups",
 		})
 	}
 	
-	// Find the announcement group for this community
-	var announcementGroupJID types.JID
+	// Find a suitable group linked to this community
+	var targetGroupJID types.JID
 	for _, group := range groups {
-		// Check if this is the community's announcement group
-		if group.IsParent && group.JID.String() == communityJID.String() {
-			// For communities, we need to add to a linked group, not the parent
-			// Try to get sub-groups
-			subGroups, err := client.GetSubGroups(communityJID)
-			if err == nil && len(subGroups) > 0 {
-				// Use the first sub-group (usually announcement group)
-				announcementGroupJID = subGroups[0].JID
-				break
-			}
-		}
-		
-		// Alternative: check if it's linked to the community
+		// Check if this group is linked to the community
 		if !group.LinkedParentJID.IsEmpty() && group.LinkedParentJID.String() == communityJID.String() {
-			// This is a group linked to our community
-			if group.IsAnnounce {
-				// Prefer announcement groups
-				announcementGroupJID = group.JID
+			// Prefer general groups over announcement groups
+			if !group.IsAnnounce {
+				targetGroupJID = group.JID
 				break
-			} else if announcementGroupJID.IsEmpty() {
-				// Use any linked group if no announcement group found
-				announcementGroupJID = group.JID
+			} else if targetGroupJID.IsEmpty() {
+				targetGroupJID = group.JID
 			}
 		}
 	}
 	
-	if announcementGroupJID.IsEmpty() {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Community announcement group not found",
-		})
-	}
-	
+	if targetGroupJID.IsEmpty() {
+		// Try to get sub-groups if we have the community
+		subGroups, err := client.GetSubGroups(communityJID)
+		if err == nil && len(subGroups) > 0 {
+			targetGroupJID = subGroups[0].JID
+		} else {
+			return c.Status(404).JSON(utils.ResponseData{
+				Status:  404,
+				Code:    "NOT_FOUND",
+				Message: "No suitable group found for this community. Please ensure the community has at least one group.",
+			})
+		}
+	}	
 	// Convert phone numbers to JIDs
 	var participantJIDs []types.JID
+	phoneMap := make(map[string]string) // Clean phone -> original phone
+	
 	for _, phone := range request.Participants {
-		// Clean phone number - remove any non-digits
+		// Clean phone number - remove any non-digits except +
 		cleanPhone := ""
 		for _, ch := range phone {
-			if ch >= '0' && ch <= '9' {
+			if (ch >= '0' && ch <= '9') || ch == '+' {
 				cleanPhone += string(ch)
 			}
 		}
+		
+		// Remove leading + if present
+		cleanPhone = strings.TrimPrefix(cleanPhone, "+")
 		
 		if cleanPhone != "" {
 			jid, err := types.ParseJID(cleanPhone + "@s.whatsapp.net")
 			if err == nil {
 				participantJIDs = append(participantJIDs, jid)
+				phoneMap[cleanPhone] = phone
 			}
 		}
 	}
@@ -354,52 +383,76 @@ func AddCommunityParticipants(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Add participants to announcement group
-	resp, err := client.UpdateGroupParticipants(announcementGroupJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
+	// Add participants to the target group
+	resp, err := client.UpdateGroupParticipants(targetGroupJID, participantJIDs, whatsmeow.ParticipantChangeAdd)
 	if err != nil {
-		logrus.Errorf("Failed to add participants to community: %v", err)
+		logrus.Errorf("Failed to add participants to community group: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
-			Message: "Failed to add participants to community",
+			Message: fmt.Sprintf("Failed to add participants: %v", err),
 		})
+	}	
+	// Process response - resp is []types.GroupParticipant
+	results := make([]map[string]interface{}, 0)
+	
+	// Create a map of JIDs we tried to add
+	attemptedJIDs := make(map[string]bool)
+	for _, jid := range participantJIDs {
+		attemptedJIDs[jid.User] = true
 	}
 	
-	// Process response
-	results := make([]map[string]interface{}, 0)
-	for jid, result := range resp {
+	// Process each participant in response
+	for _, participant := range resp {
+		phone := participant.JID.User
+		originalPhone := phoneMap[phone]
+		if originalPhone == "" {
+			originalPhone = phone
+		}
+		
 		status := "success"
 		message := "Added to community successfully"
 		
-		// Check if failed
-		if result.Error != 0 {
+		// Check error status
+		if participant.Error != 0 {
 			status = "failed"
-			switch result.Error {
+			switch participant.Error {
 			case 403:
 				message = "Not authorized"
 			case 404:
-				message = "User not found"
+				message = "User not found on WhatsApp"
 			case 409:
 				message = "Already in community"
 			case 500:
 				message = "Server error"
 			default:
-				if result.AddRequest != nil {
-					message = "Invite sent"
-					status = "pending"
-				} else {
-					message = "Failed to add"
-				}
+				message = fmt.Sprintf("Error code: %d", participant.Error)
 			}
+		} else if participant.AddRequest != nil {
+			status = "pending"
+			message = "Invite sent"
 		}
 		
-		// Get phone number from JID
-		phone := jid
-		
 		results = append(results, map[string]interface{}{
-			"participant": phone,
+			"participant": originalPhone,
 			"status":      status,
 			"message":     message,
+		})
+		
+		// Mark as processed
+		delete(attemptedJIDs, phone)
+	}
+	
+	// Add failed participants that weren't in response
+	for phone := range attemptedJIDs {
+		originalPhone := phoneMap[phone]
+		if originalPhone == "" {
+			originalPhone = phone
+		}
+		results = append(results, map[string]interface{}{
+			"participant": originalPhone,
+			"status":      "failed",
+			"message":     "No response from server",
 		})
 	}
 	
