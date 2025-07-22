@@ -23,17 +23,12 @@ func AddGroupParticipants(c *fiber.Ctx) error {
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
-		logrus.Errorf("Failed to parse request body: %v", err)
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "BAD_REQUEST",
 			Message: "Invalid request body",
 		})
 	}
-	
-	// Log request for debugging
-	logrus.Infof("AddGroupParticipants request: device=%s, group=%s, participants=%d", 
-		request.DeviceID, request.GroupID, len(request.Participants))
 	
 	// Validate session
 	sessionToken := c.Cookies("session_token")
@@ -101,28 +96,13 @@ func AddGroupParticipants(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Validate and parse group JID
-	if request.GroupID == "" {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "INVALID_GROUP_ID",
-			Message: "Group ID is required",
-		})
-	}
-	
-	// Ensure group ID has proper format
-	groupIDStr := request.GroupID
-	if !strings.Contains(groupIDStr, "@") {
-		groupIDStr = groupIDStr + "@g.us"
-	}
-	
-	groupJID, err := types.ParseJID(groupIDStr)
+	// Parse group JID
+	groupJID, err := types.ParseJID(request.GroupID)
 	if err != nil {
-		logrus.Errorf("Failed to parse group JID %s: %v", groupIDStr, err)
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "INVALID_JID",
-			Message: "Invalid group ID format",
+			Message: "Invalid group ID",
 		})
 	}
 	
@@ -250,17 +230,12 @@ func AddCommunityParticipants(c *fiber.Ctx) error {
 	}
 	
 	if err := c.BodyParser(&request); err != nil {
-		logrus.Errorf("Failed to parse request body: %v", err)
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "BAD_REQUEST",
 			Message: "Invalid request body",
 		})
 	}
-	
-	// Log request for debugging
-	logrus.Infof("AddCommunityParticipants request: device=%s, community=%s, participants=%d", 
-		request.DeviceID, request.CommunityID, len(request.Participants))
 	
 	// Validate session
 	sessionToken := c.Cookies("session_token")
@@ -320,55 +295,20 @@ func AddCommunityParticipants(c *fiber.Ctx) error {
 	cm := whatsapp.GetClientManager()
 	client, err := cm.GetClient(deviceID)
 	if err != nil {
-		logrus.Errorf("Failed to get client for device %s: %v", deviceID, err)
 		return c.Status(404).JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_FOUND",
-			Message: "Device not found or not connected",
+			Message: "Device not connected",
 		})
 	}
 	
-	// Check if client is connected and logged in
-	if !client.IsConnected() {
-		logrus.Warnf("Device %s is not connected", deviceID)
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "DEVICE_DISCONNECTED",
-			Message: "Device is not connected to WhatsApp",
-		})
-	}
-	
-	if !client.IsLoggedIn() {
-		logrus.Warnf("Device %s is not logged in", deviceID)
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "DEVICE_NOT_LOGGED_IN",
-			Message: "Device is not logged in to WhatsApp",
-		})
-	}
-	
-	// Validate and parse community JID
-	if request.CommunityID == "" {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "INVALID_COMMUNITY_ID",
-			Message: "Community ID is required",
-		})
-	}
-	
-	// Ensure community ID has proper format
-	communityIDStr := request.CommunityID
-	if !strings.Contains(communityIDStr, "@") {
-		communityIDStr = communityIDStr + "@g.us"
-	}
-	
-	communityJID, err := types.ParseJID(communityIDStr)
+	// Parse community JID
+	communityJID, err := types.ParseJID(request.CommunityID)
 	if err != nil {
-		logrus.Errorf("Failed to parse community JID %s: %v", communityIDStr, err)
 		return c.Status(400).JSON(utils.ResponseData{
 			Status:  400,
 			Code:    "INVALID_JID",
-			Message: "Invalid community ID format",
+			Message: "Invalid community ID",
 		})
 	}	
 	// For communities, we need to find a group to add participants to
