@@ -623,3 +623,20 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 	
 	return nil
 }
+
+// DeleteSequenceContactsByStatus deletes broadcast messages for a sequence based on status
+func (s *sequenceService) DeleteSequenceContactsByStatus(sequenceID string, status string) (int64, error) {
+	validStatuses := map[string]bool{"pending": true, "sent": true, "failed": true}
+	if !validStatuses[status] {
+		return 0, fmt.Errorf("invalid status: %s", status)
+	}
+	
+	repo := repository.GetBroadcastRepository()
+	return repo.DeleteBySequenceAndStatus(sequenceID, status)
+}
+
+// DeleteAllSequenceContacts deletes all broadcast messages for a sequence
+func (s *sequenceService) DeleteAllSequenceContacts(sequenceID string) (int64, error) {
+	repo := repository.GetBroadcastRepository()
+	return repo.DeleteBySequence(sequenceID)
+}

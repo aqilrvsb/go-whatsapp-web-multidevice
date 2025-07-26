@@ -21,6 +21,8 @@ type ISequenceUsecase interface {
 	StartSequence(sequenceID string) error
 	PauseSequence(sequenceID string) error
 	ProcessSequences() error // Called by cron job
+	DeleteSequenceContactsByStatus(sequenceID string, status string) (int64, error)
+	DeleteAllSequenceContacts(sequenceID string) (int64, error)
 }
 
 // CreateSequenceRequest for creating new sequence - simplified
