@@ -275,7 +275,7 @@ func (s *SequenceTriggerProcessor) enrollContactInSequenceDirectBroadcast(sequen
 			var nextSequenceID string
 			err := tx.QueryRow(`
 				SELECT id FROM sequences 
-				WHERE trigger = $1 AND is_active = true
+				WHERE trigger = $1
 				LIMIT 1
 			`, lastStepNextTrigger).Scan(&nextSequenceID)
 			
