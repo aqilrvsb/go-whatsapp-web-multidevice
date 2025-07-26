@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 )
 
 // SequenceTriggerProcessor handles trigger-based sequence processing
@@ -289,18 +290,27 @@ func (s *SequenceTriggerProcessor) enrollContactInSequenceDirectBroadcast(sequen
 	
 	// Insert all messages into broadcast_messages
 	for _, msg := range allMessages {
+		// Generate UUID for message ID
+		messageID := uuid.New().String()
+		
 		insertQuery := `
 			INSERT INTO broadcast_messages (
-				user_id, device_id, sequence_id, sequence_stepid,
+				id, user_id, device_id, sequence_id, sequence_stepid,
 				recipient_phone, recipient_name, message_type,
 				content, media_url, status, scheduled_at
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		`
 		
+		// Handle potential nil values for media_url
+		var mediaURL interface{} = nil
+		if msg.MediaURL != "" {
+			mediaURL = msg.MediaURL
+		}
+		
 		_, err = tx.Exec(insertQuery,
-			msg.UserID, msg.DeviceID, msg.SequenceID, msg.SequenceStepID,
+			messageID, msg.UserID, msg.DeviceID, msg.SequenceID, msg.SequenceStepID,
 			msg.RecipientPhone, msg.RecipientName, msg.Type,
-			msg.Content, msg.MediaURL, msg.Status, msg.ScheduledAt)
+			msg.Content, mediaURL, msg.Status, msg.ScheduledAt)
 		
 		if err != nil {
 			logrus.Errorf("Failed to insert broadcast message: %v", err)
