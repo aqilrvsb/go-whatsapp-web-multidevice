@@ -355,4 +355,30 @@ func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) 
 // GetDB returns the database connection
 func (r *BroadcastRepository) GetDB() *sql.DB {
 	return r.db
+}// DeleteBySequenceAndStatus deletes messages by sequence and status
+func (r *BroadcastRepository) DeleteBySequenceAndStatus(sequenceID, status string) (int64, error) {
+	result, err := r.db.Exec(`
+		DELETE FROM broadcast_messages 
+		WHERE sequence_id = $1 AND status = $2
+	`, sequenceID, status)
+	
+	if err != nil {
+		return 0, err
+	}
+	
+	return result.RowsAffected()
+}
+
+// DeleteBySequence deletes all messages for a sequence
+func (r *BroadcastRepository) DeleteBySequence(sequenceID string) (int64, error) {
+	result, err := r.db.Exec(`
+		DELETE FROM broadcast_messages 
+		WHERE sequence_id = $1
+	`, sequenceID)
+	
+	if err != nil {
+		return 0, err
+	}
+	
+	return result.RowsAffected()
 }
