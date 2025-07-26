@@ -1,117 +1,91 @@
--- Fix for duplicate sequence_contacts records
--- Run this SQL to clean up duplicates and add proper constraints
+-- FIX SEQUENCE DUPLICATE ISSUE
+-- The problem: System is creating multiple sequence_contact records per contact/sequence
+-- Instead of updating a single record as the contact progresses through steps
 
--- 1. First, let's see the duplicates
-SELECT sequence_id, contact_phone, current_step, COUNT(*) as count
+-- 1. First, let's see the extent of the problem
+SELECT 
+    'BEFORE FIX: Duplicate sequence_contacts' as status,
+    COUNT(*) as total_duplicates
+FROM (
+    SELECT contact_phone, sequence_id, COUNT(*) as cnt
+    FROM sequence_contacts
+    GROUP BY contact_phone, sequence_id
+    HAVING COUNT(*) > 1
+) duplicates;
+
+-- 2. Show some examples
+SELECT 
+    'Example duplicates (first 5):' as info,
+    contact_phone,
+    sequence_id,
+    COUNT(*) as duplicate_count,
+    STRING_AGG(current_step::text, ', ' ORDER BY current_step) as steps
 FROM sequence_contacts
-GROUP BY sequence_id, contact_phone, current_step
-HAVING COUNT(*) > 1;
+GROUP BY contact_phone, sequence_id
+HAVING COUNT(*) > 1
+ORDER BY COUNT(*) DESC
+LIMIT 5;
 
--- 2. Delete duplicate records, keeping only one per contact/step
--- Keep the 'active' or 'completed' one if exists, otherwise keep the first 'pending'
-WITH duplicates AS (
-    SELECT id,
-           ROW_NUMBER() OVER (
-               PARTITION BY sequence_id, contact_phone, current_step 
-               ORDER BY 
-                   CASE status 
-                       WHEN 'completed' THEN 1
-                       WHEN 'active' THEN 2
-                       WHEN 'pending' THEN 3
-                       ELSE 4
-                   END,
-                   created_at ASC
-           ) as rn
+-- 3. Create a backup table before fixing
+CREATE TABLE IF NOT EXISTS sequence_contacts_backup_20250123 AS 
+SELECT * FROM sequence_contacts;
+
+-- 4. Delete duplicate records, keeping only the one with the highest step number
+-- This assumes the contact should be at their furthest progress point
+WITH ranked_contacts AS (
+    SELECT 
+        id,
+        contact_phone,
+        sequence_id,
+        current_step,
+        ROW_NUMBER() OVER (
+            PARTITION BY contact_phone, sequence_id 
+            ORDER BY current_step DESC, created_at DESC
+        ) as rn
     FROM sequence_contacts
 )
 DELETE FROM sequence_contacts
 WHERE id IN (
-    SELECT id FROM duplicates WHERE rn > 1
+    SELECT id FROM ranked_contacts WHERE rn > 1
 );
 
--- 3. Add unique constraint to prevent future duplicates
--- Drop existing constraint if exists
-ALTER TABLE sequence_contacts 
-DROP CONSTRAINT IF EXISTS uk_sequence_contact_step;
-
--- Add new unique constraint
-ALTER TABLE sequence_contacts
-ADD CONSTRAINT uk_sequence_contact_step 
-UNIQUE (sequence_id, contact_phone, current_step);
-
--- 4. Fix the ON CONFLICT issue in enrollContactInSequence
--- The error "no unique or exclusion constraint matching ON CONFLICT" means
--- the unique constraint doesn't match what the code expects
--- Let's check existing constraints
+-- 5. Verify the fix
 SELECT 
-    tc.constraint_name,
-    tc.constraint_type,
-    kcu.column_name
-FROM information_schema.table_constraints tc
-JOIN information_schema.key_column_usage kcu 
-    ON tc.constraint_name = kcu.constraint_name
-WHERE tc.table_name = 'sequence_contacts'
-ORDER BY tc.constraint_name, kcu.ordinal_position;
-
--- 5. Add the constraint that matches the code's ON CONFLICT clause
-ALTER TABLE sequence_contacts
-DROP CONSTRAINT IF EXISTS uk_sequence_contact_stepid;
-
-ALTER TABLE sequence_contacts
-ADD CONSTRAINT uk_sequence_contact_stepid
-UNIQUE (sequence_id, contact_phone, sequence_stepid);
-
--- 6. Clean up any contacts in weird states
--- Reset stuck 'active' contacts that have been processing too long
-UPDATE sequence_contacts
-SET status = 'pending',
-    processing_device_id = NULL,
-    processing_started_at = NULL
-WHERE status = 'active'
-  AND processing_started_at < NOW() - INTERVAL '1 hour';
-
--- 7. Ensure only one active step per sequence/contact
--- Find cases where multiple steps are active
-WITH multiple_active AS (
-    SELECT sequence_id, contact_phone, COUNT(*) as active_count
+    'AFTER FIX: Remaining duplicates' as status,
+    COUNT(*) as should_be_zero
+FROM (
+    SELECT contact_phone, sequence_id, COUNT(*) as cnt
     FROM sequence_contacts
-    WHERE status = 'active'
-    GROUP BY sequence_id, contact_phone
+    GROUP BY contact_phone, sequence_id
     HAVING COUNT(*) > 1
-)
-SELECT sc.*
-FROM sequence_contacts sc
-JOIN multiple_active ma 
-  ON sc.sequence_id = ma.sequence_id 
-  AND sc.contact_phone = ma.contact_phone
-WHERE sc.status = 'active'
-ORDER BY sc.contact_phone, sc.current_step;
+) duplicates;
 
--- 8. If multiple active found, keep only the lowest step active
-WITH ranked_active AS (
-    SELECT id,
-           ROW_NUMBER() OVER (
-               PARTITION BY sequence_id, contact_phone 
-               ORDER BY current_step ASC
-           ) as rn
-    FROM sequence_contacts
-    WHERE status = 'active'
-)
-UPDATE sequence_contacts
-SET status = 'pending'
-WHERE id IN (
-    SELECT id FROM ranked_active WHERE rn > 1
-);
-
--- 9. Verify the fix
+-- 6. Show current state of sequence_contacts
 SELECT 
-    sequence_id,
-    contact_phone,
-    contact_name,
+    'Current sequence_contacts summary:' as info,
+    COUNT(DISTINCT contact_phone) as unique_contacts,
+    COUNT(*) as total_records,
+    COUNT(DISTINCT sequence_id) as unique_sequences;
+
+-- 7. Reset active sequences if needed (optional - uncomment to use)
+-- This will restart sequences from step 1 for testing
+/*
+UPDATE sequence_contacts
+SET 
+    current_step = 1,
+    status = 'active',
+    next_trigger_time = NOW() + INTERVAL '5 minutes'
+WHERE sequence_id IN (
+    SELECT id FROM sequences WHERE is_active = true
+)
+AND status = 'completed';
+*/
+
+-- 8. Show the distribution of contacts by step
+SELECT 
     current_step,
     status,
-    next_trigger_time,
-    completed_at
+    COUNT(*) as contact_count
 FROM sequence_contacts
-WHERE sequence_id = '1-4ed6-891c-bcb7d12baa8a'
-ORDER BY contact_phone, current_step;
+GROUP BY current_step, status
+ORDER BY current_step, status;
