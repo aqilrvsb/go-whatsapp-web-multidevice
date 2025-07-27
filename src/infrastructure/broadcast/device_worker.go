@@ -20,6 +20,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"google.golang.org/protobuf/proto"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 )
 
 // DeviceWorker handles broadcasting for a single device
@@ -37,6 +38,8 @@ type DeviceWorker struct {
 	failedCount     int
 	lastActivity    time.Time
 	broadcastRepo   *repository.BroadcastRepository
+	greetingProcessor *antipattern.GreetingProcessor
+	messageRandomizer *antipattern.MessageRandomizer
 }
 
 // NewDeviceWorker creates a new device worker
@@ -54,6 +57,8 @@ func NewDeviceWorker(deviceID string, client *whatsmeow.Client, minDelay, maxDel
 		status:        "idle",
 		lastActivity:  time.Now(),
 		broadcastRepo: repository.GetBroadcastRepository(),
+		greetingProcessor: antipattern.NewGreetingProcessor(),
+		messageRandomizer: antipattern.NewMessageRandomizer(),
 	}
 }
 
@@ -206,9 +211,20 @@ func (dw *DeviceWorker) sendMessage(msg domainBroadcast.BroadcastMessage) error 
 
 // sendTextMessage sends text message
 func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast.BroadcastMessage) error {
+	// Process greeting with spintax
+	processedContent := dw.greetingProcessor.PrepareMessageWithGreeting(
+		msg.Content,
+		msg.RecipientName,
+		dw.deviceID,
+		msg.RecipientPhone,
+	)
+	
+	// Apply randomization techniques
+	finalContent := dw.messageRandomizer.RandomizeMessage(processedContent)
+	
 	message := &waProto.Message{
 		ExtendedTextMessage: &waProto.ExtendedTextMessage{
-			Text: &msg.Content,
+			Text: &finalContent,
 		},
 	}
 	

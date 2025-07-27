@@ -1,153 +1,104 @@
 import psycopg2
 
-# Database connection
-DB_URI = "postgres://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway?sslmode=require"
+DB_URI = "postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway"
 
 try:
-    # Connect to database
     conn = psycopg2.connect(DB_URI)
     cur = conn.cursor()
     
-    print("Connected to PostgreSQL database...")
-    print("=" * 60)
+    print("=== Checking Sequence Enrollment Issues ===\n")
     
-    # 1. Check the sequence enrollment query - what leads should be enrolled
-    print("\n1. Checking leads that should be enrolled in sequences...")
+    # 1. Check active sequences with entry points
+    print("1. Active sequences with entry points:")
     cur.execute("""
-        SELECT DISTINCT 
-            l.id, l.phone, l.name, l.device_id, l.user_id, 
-            s.id as sequence_id, s.name as sequence_name,
-            ss.trigger as entry_trigger, ss.id as step_id
+        SELECT s.id, s.name, ss.trigger, count(ss.id) as step_count
+        FROM sequences s
+        JOIN sequence_steps ss ON s.id = ss.sequence_id
+        WHERE s.is_active = true AND ss.is_entry_point = true
+        GROUP BY s.id, s.name, ss.trigger
+    """)
+    
+    sequences = cur.fetchall()
+    for seq in sequences:
+        print(f"   - {seq[1]}: trigger='{seq[2]}', steps={seq[3]}")
+    
+    # 2. Check leads with triggers
+    print("\n2. Leads with triggers:")
+    cur.execute("""
+        SELECT trigger, COUNT(*) 
+        FROM leads 
+        WHERE trigger IS NOT NULL AND trigger != ''
+        AND device_id IS NOT NULL AND user_id IS NOT NULL
+        GROUP BY trigger
+        ORDER BY COUNT(*) DESC
+    """)
+    
+    triggers = cur.fetchall()
+    for trig in triggers:
+        print(f"   - {trig[0]}: {trig[1]} leads")
+    
+    # 3. Check if leads already have messages
+    print("\n3. Checking enrollment blockers:")
+    cur.execute("""
+        SELECT l.phone, l.trigger, 
+               (SELECT COUNT(*) FROM broadcast_messages bm 
+                WHERE bm.recipient_phone = l.phone 
+                AND bm.status IN ('pending', 'sent')) as msg_count
+        FROM leads l
+        WHERE l.trigger IS NOT NULL AND l.trigger != ''
+        AND l.device_id IS NOT NULL AND l.user_id IS NOT NULL
+        LIMIT 10
+    """)
+    
+    leads = cur.fetchall()
+    for lead in leads:
+        print(f"   - {lead[0]}: trigger='{lead[1]}', existing_messages={lead[2]}")
+    
+    # 4. Check exact matching
+    print("\n4. Testing trigger matching:")
+    cur.execute("""
+        SELECT DISTINCT l.phone, l.trigger, ss.trigger as step_trigger,
+               position(ss.trigger in l.trigger) as match_pos
         FROM leads l
         CROSS JOIN sequences s
         INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
         WHERE s.is_active = true 
-            AND ss.is_entry_point = true
-            AND l.trigger IS NOT NULL 
-            AND l.trigger != ''
-            AND position(ss.trigger in l.trigger) > 0
-            AND NOT EXISTS (
-                SELECT 1 FROM sequence_contacts sc
-                WHERE sc.sequence_id = s.id 
-                AND sc.contact_phone = l.phone
-                AND sc.current_step = 1
-            )
+        AND ss.is_entry_point = true
+        AND l.trigger IS NOT NULL AND l.trigger != ''
+        AND l.device_id IS NOT NULL AND l.user_id IS NOT NULL
         LIMIT 10
     """)
     
-    enrollable_leads = cur.fetchall()
-    print(f"Found {len(enrollable_leads)} leads ready for enrollment:")
-    for lead in enrollable_leads:
-        print(f"  Phone: {lead[1]}, Name: {lead[2]}, Trigger: {lead[6]}")
-        print(f"  Sequence: {lead[6]}, Entry Step: {lead[8]}")
+    matches = cur.fetchall()
+    for match in matches:
+        print(f"   - Lead {match[0]}: '{match[1]}' vs Step '{match[2]}' = position {match[3]}")
+        if match[3] > 0:
+            print(f"     ✅ MATCH!")
     
-    # 2. Check sequence steps for WARM Sequence
-    print("\n2. Checking steps for WARM Sequence...")
+    # 5. Final eligibility check
+    print("\n5. Final eligibility query:")
     cur.execute("""
-        SELECT id, day_number, trigger, next_trigger, trigger_delay_hours, is_entry_point
-        FROM sequence_steps
-        WHERE sequence_id = (SELECT id FROM sequences WHERE name = 'WARM Sequence')
-        ORDER BY day_number
-    """)
-    
-    steps = cur.fetchall()
-    print(f"Found {len(steps)} steps:")
-    for step in steps:
-        print(f"  Day {step[1]}: {step[2]} -> {step[3]} (delay: {step[4]}h, entry: {step[5]})")
-        print(f"    Step ID: {step[0]}")
-    
-    # 3. Check existing enrollments
-    print("\n3. Checking existing sequence_contacts...")
-    cur.execute("""
-        SELECT sequence_id, contact_phone, sequence_stepid, status, current_step
-        FROM sequence_contacts
-        WHERE contact_phone IN (
-            SELECT phone FROM leads WHERE trigger = 'WARMEXAMA' LIMIT 5
+        SELECT COUNT(DISTINCT l.phone)
+        FROM leads l
+        CROSS JOIN sequences s
+        INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
+        WHERE s.is_active = true 
+        AND ss.is_entry_point = true
+        AND l.trigger IS NOT NULL AND l.trigger != ''
+        AND l.device_id IS NOT NULL AND l.user_id IS NOT NULL
+        AND position(ss.trigger in l.trigger) > 0
+        AND NOT EXISTS (
+            SELECT 1 FROM broadcast_messages bm
+            WHERE bm.sequence_id = s.id 
+            AND bm.recipient_phone = l.phone
+            AND bm.status IN ('pending', 'sent')
         )
     """)
     
-    existing = cur.fetchall()
-    if existing:
-        print(f"Found {len(existing)} existing enrollments:")
-        for e in existing:
-            print(f"  Phone: {e[1]}, Step: {e[4]}, Status: {e[3]}")
-    else:
-        print("No existing enrollments found for WARMEXAMA leads")
+    eligible = cur.fetchone()[0]
+    print(f"   Total eligible leads for enrollment: {eligible}")
     
-    # 4. Try manual enrollment to test
-    print("\n4. Testing manual enrollment...")
-    
-    # Get first WARMEXAMA lead and sequence info
-    cur.execute("""
-        SELECT l.phone, l.name, l.device_id, l.user_id,
-               s.id as seq_id, ss.id as step_id
-        FROM leads l, sequences s, sequence_steps ss
-        WHERE l.trigger = 'WARMEXAMA'
-        AND s.name = 'WARM Sequence'
-        AND ss.sequence_id = s.id
-        AND ss.day_number = 1
-        LIMIT 1
-    """)
-    
-    test_data = cur.fetchone()
-    if test_data:
-        phone, name, device_id, user_id, seq_id, step_id = test_data
-        
-        print(f"Testing with phone: {phone}")
-        
-        # Try the insert
-        try:
-            cur.execute("""
-                INSERT INTO sequence_contacts (
-                    sequence_id, contact_phone, contact_name, 
-                    current_step, status, completed_at, current_trigger,
-                    next_trigger_time, sequence_stepid, assigned_device_id,
-                    user_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (sequence_id, contact_phone, sequence_stepid) DO NOTHING
-                RETURNING id
-            """, (
-                seq_id,           # sequence_id
-                phone + '_test',  # contact_phone (adding _test to avoid real conflict)
-                name,             # contact_name
-                1,                # current_step
-                'active',         # status
-                'NOW()',          # completed_at
-                'WARMEXAMA',      # current_trigger
-                'NOW()',          # next_trigger_time
-                step_id,          # sequence_stepid
-                device_id,        # assigned_device_id
-                user_id           # user_id
-            ))
-            
-            result = cur.fetchone()
-            if result:
-                print(f"SUCCESS: Inserted test enrollment with ID: {result[0]}")
-                # Clean up
-                cur.execute("DELETE FROM sequence_contacts WHERE id = %s", (result[0],))
-            else:
-                print("Insert was skipped due to ON CONFLICT")
-                
-        except Exception as e:
-            print(f"ERROR: {e}")
-    
-    # 5. Check constraints one more time
-    print("\n5. Final constraint check...")
-    cur.execute("""
-        SELECT conname, pg_get_constraintdef(oid) as definition
-        FROM pg_constraint 
-        WHERE conrelid = 'sequence_contacts'::regclass
-        AND contype = 'u'
-    """)
-    
-    constraints = cur.fetchall()
-    for name, definition in constraints:
-        print(f"  {name}: {definition}")
-    
-    cur.close()
     conn.close()
     
 except Exception as e:
     print(f"Error: {e}")
-    if conn:
-        conn.close()
