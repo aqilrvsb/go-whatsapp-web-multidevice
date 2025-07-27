@@ -43,15 +43,16 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 	// Select template based on time if applicable
 	template := g.selectTimeAppropriateTemplate()
 	
-	// Process spintax
-	greeting := g.processSpintax(template)
-	
-	// Handle name - if phone number or empty, use "Cik"
+	// Handle name FIRST - if phone number or empty, use "Cik"
 	if isPhoneNumber(name) || name == "" {
 		name = "Cik"
 	}
 	
-	greeting = strings.ReplaceAll(greeting, "{name}", name)
+	// Replace {name} placeholder BEFORE processing spintax
+	template = strings.ReplaceAll(template, "{name}", name)
+	
+	// Process spintax AFTER name replacement
+	greeting := g.processSpintax(template)
 	
 	// Apply micro-variations
 	return g.applyMicroVariations(greeting)
