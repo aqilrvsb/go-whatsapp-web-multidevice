@@ -166,13 +166,8 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 	
 	// Register with client manager for broadcasts
 	cm := GetClientManager()
-	// Check if already registered to prevent duplicate registration
-	if existingClient, err := cm.GetClient(deviceID); err != nil || existingClient != conn.Client {
-		cm.AddClient(deviceID, conn.Client)
-		logrus.Infof("Registered device %s with client manager", deviceID)
-	} else {
-		logrus.Debugf("Device %s already registered with client manager, skipping duplicate registration", deviceID)
-	}
+	cm.AddClient(deviceID, conn.Client)
+	logrus.Infof("Registered device %s with client manager", deviceID)
 	
 	// Clear QR channel
 	ClearDeviceQRChannel(deviceID)

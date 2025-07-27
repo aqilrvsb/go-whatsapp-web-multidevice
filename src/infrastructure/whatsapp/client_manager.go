@@ -9,15 +9,16 @@ import (
 	"time"
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
 
 // ClientManager manages multiple WhatsApp client instances
+// Now it's just a wrapper around DeviceManager for backward compatibility
 type ClientManager struct {
-	clients map[string]*whatsmeow.Client
-	mutex   sync.RWMutex
+	mutex sync.RWMutex
 }
 
 var (
@@ -28,83 +29,82 @@ var (
 // GetClientManager returns the singleton client manager
 func GetClientManager() *ClientManager {
 	once.Do(func() {
-		clientManager = &ClientManager{
-			clients: make(map[string]*whatsmeow.Client),
-		}
+		clientManager = &ClientManager{}
 	})
 	return clientManager
 }
 
 // AddClient adds a WhatsApp client for a device
 func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
+	// Just delegate to DeviceManager - don't maintain separate storage
+	dm := multidevice.GetDeviceManager()
 	
-	// Check if client already exists
-	if existingClient, exists := cm.clients[deviceID]; exists {
-		if existingClient == client {
-			logrus.Debugf("Same client already registered for device %s, skipping", deviceID)
+	// Check if device already exists in DeviceManager
+	if _, err := dm.GetDeviceConnection(deviceID); err != nil {
+		// Device doesn't exist, we need to get user info
+		userRepo := repository.GetUserRepository()
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err != nil {
+			logrus.Errorf("Failed to get device info for %s: %v", deviceID, err)
 			return
 		}
-		logrus.Warnf("Replacing existing client for device %s", deviceID)
+		
+		// Register with DeviceManager
+		dm.RegisterDevice(deviceID, device.UserID, device.Phone, client)
 	}
-	
-	cm.clients[deviceID] = client
 	
 	// Start keepalive for this device
 	km := GetKeepaliveManager()
 	km.StartKeepalive(deviceID, client)
 	
-	logrus.Infof("Added WhatsApp client for device: %s (total clients: %d)", deviceID, len(cm.clients))
+	logrus.Infof("Added WhatsApp client for device: %s", deviceID)
 }
 
 // GetClient retrieves a WhatsApp client for a device
 func (cm *ClientManager) GetClient(deviceID string) (*whatsmeow.Client, error) {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
-	
-	// Log all registered clients for debugging
-	logrus.Debugf("Looking for device %s, registered clients: %d", deviceID, len(cm.clients))
-	for id := range cm.clients {
-		logrus.Debugf("Registered client: %s", id)
-	}
-	
-	client, exists := cm.clients[deviceID]
-	if !exists {
+	// ALWAYS use DeviceManager as the single source of truth
+	dm := multidevice.GetDeviceManager()
+	conn, err := dm.GetDeviceConnection(deviceID)
+	if err != nil {
 		return nil, fmt.Errorf("no WhatsApp client found for device %s", deviceID)
 	}
 	
-	if !client.IsConnected() {
+	if conn.Client == nil {
+		return nil, fmt.Errorf("device %s has nil client", deviceID)
+	}
+	
+	if !conn.Client.IsConnected() {
 		return nil, fmt.Errorf("WhatsApp client for device %s is not connected", deviceID)
 	}
 	
-	return client, nil
+	return conn.Client, nil
 }
 
 // RemoveClient removes a WhatsApp client for a device
 func (cm *ClientManager) RemoveClient(deviceID string) {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-	
 	// Stop keepalive
 	km := GetKeepaliveManager()
 	km.StopKeepalive(deviceID)
 	
-	delete(cm.clients, deviceID)
+	// Remove from DeviceManager
+	dm := multidevice.GetDeviceManager()
+	dm.UnregisterDevice(deviceID)
+	
 	logrus.Infof("Removed WhatsApp client for device: %s", deviceID)
 }
 
 // GetAllClients returns all registered clients (for debugging)
 func (cm *ClientManager) GetAllClients() map[string]*whatsmeow.Client {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
+	dm := multidevice.GetDeviceManager()
+	connections := dm.GetAllDeviceConnections()
 	
-	// Make a copy to avoid race conditions
-	clientsCopy := make(map[string]*whatsmeow.Client)
-	for k, v := range cm.clients {
-		clientsCopy[k] = v
+	clients := make(map[string]*whatsmeow.Client)
+	for deviceID, conn := range connections {
+		if conn.Client != nil && conn.Client.IsConnected() {
+			clients[deviceID] = conn.Client
+		}
 	}
-	return clientsCopy
+	return clients
 }
 
 // GetChatsForDevice fetches and saves chats for a specific device (personal chats only)
@@ -385,12 +385,12 @@ func (cm *ClientManager) RegisterDeviceOnConnection(deviceID string, client *wha
 
 // GetConnectedDeviceCount returns number of connected devices
 func (cm *ClientManager) GetConnectedDeviceCount() int {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
+	dm := multidevice.GetDeviceManager()
+	connections := dm.GetAllDeviceConnections()
 	
 	count := 0
-	for _, client := range cm.clients {
-		if client != nil && client.IsConnected() {
+	for _, conn := range connections {
+		if conn.Client != nil && conn.Client.IsConnected() {
 			count++
 		}
 	}
@@ -399,19 +399,22 @@ func (cm *ClientManager) GetConnectedDeviceCount() int {
 
 // GetDeviceStatus returns detailed status of a device
 func (cm *ClientManager) GetDeviceStatus(deviceID string) (status string, connected bool) {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
+	dm := multidevice.GetDeviceManager()
+	conn, err := dm.GetDeviceConnection(deviceID)
 	
-	client, exists := cm.clients[deviceID]
-	if !exists || client == nil {
+	if err != nil || conn == nil {
 		return "not_registered", false
 	}
 	
-	if !client.IsConnected() {
+	if conn.Client == nil {
+		return "no_client", false
+	}
+	
+	if !conn.Client.IsConnected() {
 		return "disconnected", false
 	}
 	
-	if !client.IsLoggedIn() {
+	if !conn.Client.IsLoggedIn() {
 		return "not_logged_in", false
 	}
 	
@@ -420,24 +423,14 @@ func (cm *ClientManager) GetDeviceStatus(deviceID string) (status string, connec
 
 // CleanupDisconnectedClients removes disconnected clients from manager
 func (cm *ClientManager) CleanupDisconnectedClients() int {
-	cm.mutex.Lock()
-	defer cm.mutex.Unlock()
-	
-	removed := 0
-	for deviceID, client := range cm.clients {
-		if client == nil || !client.IsConnected() {
-			delete(cm.clients, deviceID)
-			removed++
-			logrus.Infof("Removed disconnected client for device %s", deviceID)
-		}
-	}
-	
-	return removed
+	// This is now handled by DeviceManager
+	// Just return 0 for backward compatibility
+	return 0
 }
 
 // GetClientCount returns the number of registered clients
 func (cm *ClientManager) GetClientCount() int {
-	cm.mutex.RLock()
-	defer cm.mutex.RUnlock()
-	return len(cm.clients)
+	dm := multidevice.GetDeviceManager()
+	connections := dm.GetAllDeviceConnections()
+	return len(connections)
 }

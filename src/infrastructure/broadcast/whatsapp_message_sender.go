@@ -93,7 +93,14 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 	// Get WhatsApp client for device
 	waClient, err := w.clientManager.GetClient(deviceID)
 	if err != nil {
-		return fmt.Errorf("device not connected: %v", err)
+		// Try MultiDeviceManager as fallback
+		mdm := whatsapp.GetMultiDeviceManager()
+		if client, exists := mdm.GetDevice(deviceID); exists && client != nil {
+			waClient = client
+			logrus.Warnf("Device %s found in MultiDeviceManager but not ClientManager, using backup", deviceID)
+		} else {
+			return fmt.Errorf("device not connected: %v", err)
+		}
 	}
 	
 	if !waClient.IsConnected() {

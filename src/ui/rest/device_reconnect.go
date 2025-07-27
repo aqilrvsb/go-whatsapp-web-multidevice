@@ -256,6 +256,10 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 		// Don't register here - already done by event handler
 		// Just update status and return success
 		
+		// But ensure it's registered in MultiDeviceManager as backup
+		mdm := whatsapp.GetMultiDeviceManager()
+		mdm.EnsureDeviceRegistered(deviceID, client)
+		
 		// Update device status
 		jidStr := ""
 		if client.Store.ID != nil {
