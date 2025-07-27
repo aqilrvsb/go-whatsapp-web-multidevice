@@ -44,7 +44,8 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			bm.recipient_phone, bm.content as message, bm.media_url as image_url,
 			COALESCE(c.min_delay_seconds, 5) as min_delay,
 			COALESCE(c.max_delay_seconds, 15) as max_delay,
-			d.status as device_status
+			d.status as device_status,
+			COALESCE(d.platform, '') as platform
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN user_devices d ON bm.device_id = d.id
@@ -70,12 +71,13 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		var sequenceID *string
 		var minDelay, maxDelay int
 		var deviceStatus string
+		var devicePlatform string
 		var imageURL sql.NullString // Use sql.NullString for nullable fields
 		
 		err := rows.Scan(
 			&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
 			&msg.RecipientPhone, &msg.Message, &imageURL, // Scan into sql.NullString
-			&minDelay, &maxDelay, &deviceStatus,
+			&minDelay, &maxDelay, &deviceStatus, &devicePlatform,
 		)
 		
 		if err != nil {
@@ -90,9 +92,9 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			msg.ImageURL = ""
 		}
 		
-		// Check device status
-		if deviceStatus != "connected" && deviceStatus != "online" {
-			// Skip this device - mark messages as skipped
+		// Check device status - platform devices are always considered online
+		if devicePlatform == "" && deviceStatus != "connected" && deviceStatus != "online" {
+			// Skip this WhatsApp Web device - mark messages as skipped
 			db.Exec(`UPDATE broadcast_messages SET status = 'skipped', error_message = 'Device offline' 
 					 WHERE device_id = $1 AND status = 'pending'`, msg.DeviceID)
 			continue
