@@ -24,15 +24,20 @@ func StartQueuedMessageCleaner() {
 func cleanStuckMessages() {
 	db := database.GetDB()
 	
-	// Find messages that have been queued for more than 5 minutes
-	// Mark them as failed instead of pending to avoid infinite loops
+	// 12 HOUR TIMEOUT FOR ALL DEVICES
+	// This gives plenty of time for:
+	// - WhatsApp Web: Anti-ban delays (30-60s per message) 
+	// - Platform: API rate limits
+	// - Processing 1000+ messages safely
+	
+	// Clean messages that have been queued for more than 12 hours
 	result, err := db.Exec(`
 		UPDATE broadcast_messages 
 		SET status = 'failed', 
 		    updated_at = CURRENT_TIMESTAMP,
-		    error_message = 'Message timeout - device was not available'
+		    error_message = 'Message timeout - could not be delivered within 12 hours'
 		WHERE status = 'queued' 
-		AND updated_at < (CURRENT_TIMESTAMP - INTERVAL '5 minutes')
+		AND updated_at < (CURRENT_TIMESTAMP - INTERVAL '12 hours')
 	`)
 	
 	if err != nil {
@@ -42,6 +47,17 @@ func cleanStuckMessages() {
 	
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected > 0 {
-		logrus.Warnf("Marked %d stuck queued messages as failed after timeout", rowsAffected)
+		logrus.Warnf("Marked %d stuck queued messages as failed after 12 hour timeout", rowsAffected)
+	}
+	
+	// Log current queue status
+	var queuedCount int
+	err = db.QueryRow(`
+		SELECT COUNT(*) FROM broadcast_messages 
+		WHERE status = 'queued'
+	`).Scan(&queuedCount)
+	
+	if err == nil && queuedCount > 0 {
+		logrus.Debugf("Currently %d messages in queue (12 hour timeout applied)", queuedCount)
 	}
 }
