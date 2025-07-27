@@ -104,6 +104,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 	var allMessages []domainBroadcast.BroadcastMessage
 	scheduledAt := time.Now().Add(5 * time.Minute) // First message in 5 minutes
 	currentSequenceID := sequenceID
+	originalSequenceID := sequenceID  // Keep track of the original sequence
 	processedSequences := make(map[string]bool)
 
 	// Process sequence chain (COLD → WARM → HOT)
@@ -180,10 +181,16 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			}
 
 			// Create broadcast message with proper sequence references
+			// Use current sequence ID, but fallback to original if empty
+			sequenceIDToUse := currentSequenceID
+			if sequenceIDToUse == "" {
+				sequenceIDToUse = originalSequenceID
+			}
+			
 			msg := domainBroadcast.BroadcastMessage{
 				UserID:         lead.UserID,
 				DeviceID:       lead.DeviceID,
-				SequenceID:     &currentSequenceID,
+				SequenceID:     &sequenceIDToUse,
 				SequenceStepID: &step.ID,  // Re-enable this since we validated step.ID above
 				RecipientPhone: lead.Phone,
 				RecipientName:  lead.Name,
@@ -205,6 +212,12 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			// Debug log before queueing
 			logrus.Debugf("Queueing message - UserID: '%s', DeviceID: '%s', SequenceID: '%s', StepID: '%s'", 
 				msg.UserID, msg.DeviceID, *msg.SequenceID, *msg.SequenceStepID)
+			
+			// Validate both IDs are set
+			if *msg.SequenceID == "" || *msg.SequenceStepID == "" {
+				logrus.Errorf("WARNING: Creating message with empty IDs - SequenceID: '%s', StepID: '%s'", 
+					*msg.SequenceID, *msg.SequenceStepID)
+			}
 
 			allMessages = append(allMessages, msg)
 
