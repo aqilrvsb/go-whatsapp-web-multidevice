@@ -56,14 +56,20 @@ func StartBroadcastWorkerProcessor() {
 					continue
 				}
 				
-				// Check if device is online
-				if device.Status != "online" && device.Status != "Online" && 
-				   device.Status != "connected" && device.Status != "Connected" {
-					logrus.Debugf("Device %s is not online (status: %s), skipping", deviceID, device.Status)
-					continue
+				// PLATFORM FIX: Skip status check for platform devices
+				if device.Platform != "" {
+					// Platform device (Wablas/Whacenter) - always available via API
+					logrus.Infof("Processing %d messages for platform device %s (%s)", 
+						len(messages), deviceID, device.Platform)
+				} else {
+					// WhatsApp Web device - check if online
+					if device.Status != "online" && device.Status != "Online" && 
+					   device.Status != "connected" && device.Status != "Connected" {
+						logrus.Debugf("Device %s is not online (status: %s), skipping", deviceID, device.Status)
+						continue
+					}
+					logrus.Infof("Processing %d messages for WhatsApp device %s", len(messages), deviceID)
 				}
-				
-				logrus.Infof("Processing %d messages for device %s", len(messages), deviceID)
 				
 				// Process messages directly
 				for _, msg := range messages {
