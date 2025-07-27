@@ -117,17 +117,9 @@ func (km *KeepaliveManager) runKeepalive(deviceID string, client *whatsmeow.Clie
 		case <-km.ctx.Done():
 			return
 		case <-time.After(interval):
-			// Check if still connected - but don't skip if disconnected
-			if !client.IsConnected() {
-				logrus.Debugf("Device %s not connected, attempting to help reconnection with keepalive", deviceID)
-				// Try to reconnect
-				go func() {
-					if err := client.Connect(); err != nil {
-						logrus.Debugf("Keepalive reconnect attempt failed for %s: %v", deviceID, err)
-					} else {
-						logrus.Infof("Keepalive successfully reconnected device %s", deviceID)
-					}
-				}()
+			// Check if still connected
+			if !client.IsConnected() || !client.IsLoggedIn() {
+				logrus.Debugf("Device %s not connected/logged in, skipping keepalive", deviceID)
 				continue
 			}
 			

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 	
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -104,7 +103,15 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 		return
 	}
 	
-	// Get or create device state first
+	if client == nil {
+		logrus.Warnf("Device %s has nil client, removing from manager", deviceID)
+		cm := GetClientManager()
+		cm.RemoveClient(deviceID)
+		userRepo.UpdateDeviceStatus(deviceID, "offline", "", "")
+		return
+	}
+	
+	// Get or create device state
 	dhm.mu.Lock()
 	state, exists := dhm.deviceStates[deviceID]
 	if !exists {
@@ -117,70 +124,25 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 	}
 	dhm.mu.Unlock()
 	
-	if client == nil {
-		logrus.Warnf("Device %s has nil client, attempting to restore connection", deviceID)
-		// Try to get client from DeviceManager
-		dm := multidevice.GetDeviceManager()
-		if conn, err := dm.GetDeviceConnection(deviceID); err == nil && conn.Client != nil {
-			client = conn.Client
-			logrus.Infof("Successfully restored client for device %s from DeviceManager", deviceID)
-		} else {
-			// Mark for reconnection but DON'T remove
-			logrus.Warnf("Could not restore client for device %s, will retry later", deviceID)
-			state.ConsecutiveFails = 3 // Trigger reconnect attempt
-			return
-		}
-	}
-	
 	// Check if client is connected
 	if !client.IsConnected() {
 		state.ConsecutiveFails++
 		
-		// Only log after multiple failures with better messages
+		// Only log after multiple failures
 		if state.ConsecutiveFails == 1 {
-			logrus.Debugf("Device %s disconnected (check %d/1440 before removal)", deviceID, state.ConsecutiveFails)
+			logrus.Debugf("Device %s disconnected (attempt %d)", deviceID, state.ConsecutiveFails)
 		} else if state.ConsecutiveFails == 3 {
-			logrus.Warnf("Device %s disconnected for %d checks, will attempt reconnection", deviceID, state.ConsecutiveFails)
-		} else if state.ConsecutiveFails == 10 {
-			logrus.Warnf("Device %s still disconnected after %d checks (5 minutes)", deviceID, state.ConsecutiveFails)
-		} else if state.ConsecutiveFails == 120 {
-			logrus.Errorf("Device %s disconnected for 1 hour (%d checks)", deviceID, state.ConsecutiveFails)
-		} else if state.ConsecutiveFails == 720 {
-			logrus.Errorf("Device %s disconnected for 6 hours (%d checks) - will remove after 12 hours", deviceID, state.ConsecutiveFails)
+			logrus.Warnf("Device %s disconnected for %d checks", deviceID, state.ConsecutiveFails)
 		}
 		
-		// Give device 12 hours (1440 checks) before removing
-		// But try to reconnect after 3 failures (1.5 minutes)
-		if state.ConsecutiveFails == 3 {
-			logrus.Infof("Device %s disconnected for 3 checks, attempting reconnection", deviceID)
-			go func() {
-				if err := client.Connect(); err != nil {
-					logrus.Warnf("Failed to reconnect device %s: %v", deviceID, err)
-				} else {
-					logrus.Infof("Successfully reconnected device %s", deviceID)
-					// Update status to online
-					userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, device.JID)
-				}
-			}()
-		} else if state.ConsecutiveFails == 10 {
-			logrus.Warnf("Device %s disconnected for 5 minutes, trying reconnect again", deviceID)
-			go func() {
-				client.Disconnect() // Force disconnect first
-				time.Sleep(2 * time.Second)
-				if err := client.Connect(); err != nil {
-					logrus.Errorf("Second reconnect attempt failed for device %s: %v", deviceID, err)
-				}
-			}()
-		} else if state.ConsecutiveFails >= 1440 { // 12 hours
+		// Give device 3 minutes (6 checks) before marking offline
+		// This prevents temporary network hiccups from marking device offline
+		if state.ConsecutiveFails >= 6 {
 			timeSinceLastSeen := time.Since(state.LastSeen)
-			logrus.Errorf("Device %s has been disconnected for %v (12 hours), removing from system", deviceID, timeSinceLastSeen)
-			
-			// NOW we remove after 12 hours
-			cm := GetClientManager()
-			cm.RemoveClient(deviceID)
+			logrus.Warnf("Device %s has been disconnected for %v, marking offline", deviceID, timeSinceLastSeen)
 			userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 			
-			// Stop keepalive
+			// Stop keepalive when marking offline
 			km := GetKeepaliveManager()
 			km.StopKeepalive(deviceID)
 		}
