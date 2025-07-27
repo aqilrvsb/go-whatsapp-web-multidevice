@@ -58,21 +58,21 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	}
 	
 	var sequenceID interface{}
-	if msg.SequenceID != nil {
+	if msg.SequenceID != nil && *msg.SequenceID != "" {
 		sequenceID = *msg.SequenceID
 	} else {
 		sequenceID = nil
 	}
 	
 	var sequenceStepID interface{}
-	if msg.SequenceStepID != nil {
+	if msg.SequenceStepID != nil && *msg.SequenceStepID != "" {
 		sequenceStepID = *msg.SequenceStepID
 	} else {
 		sequenceStepID = nil
 	}
 	
 	var groupID interface{}
-	if msg.GroupID != nil {
+	if msg.GroupID != nil && *msg.GroupID != "" {
 		groupID = *msg.GroupID
 	} else {
 		groupID = nil
