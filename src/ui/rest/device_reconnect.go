@@ -207,7 +207,12 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 	client.EnableAutoReconnect = true
 	client.AutoTrustIdentity = true
 	
-	// Add event handlers
+	// IMPORTANT: Register with DeviceManager BEFORE adding event handlers
+	// This ensures the event handler can find the device
+	dm := multidevice.GetDeviceManager()
+	dm.RegisterDevice(deviceID, device.UserID, device.Phone, client)
+	
+	// Add event handlers AFTER registration
 	client.AddEventHandler(func(evt interface{}) {
 		whatsapp.HandleDeviceEvent(context.Background(), deviceID, evt)
 	})
@@ -248,12 +253,8 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 	}
 	
 	if connected {
-		// Register with ClientManager
-		cm.AddClient(deviceID, client)
-		
-		// IMPORTANT: Also register with DeviceManager for multidevice support
-		dm := multidevice.GetDeviceManager()
-		dm.RegisterDevice(deviceID, device.UserID, device.Phone, client)
+		// Don't register here - already done by event handler
+		// Just update status and return success
 		
 		// Update device status
 		jidStr := ""

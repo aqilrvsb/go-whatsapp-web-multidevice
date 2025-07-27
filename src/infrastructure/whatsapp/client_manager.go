@@ -39,6 +39,16 @@ func GetClientManager() *ClientManager {
 func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
+	
+	// Check if client already exists
+	if existingClient, exists := cm.clients[deviceID]; exists {
+		if existingClient == client {
+			logrus.Debugf("Same client already registered for device %s, skipping", deviceID)
+			return
+		}
+		logrus.Warnf("Replacing existing client for device %s", deviceID)
+	}
+	
 	cm.clients[deviceID] = client
 	
 	// Start keepalive for this device

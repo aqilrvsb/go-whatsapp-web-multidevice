@@ -45,10 +45,10 @@ func (km *KeepaliveManager) StartKeepalive(deviceID string, client *whatsmeow.Cl
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	
-	// Stop existing keepalive if any
-	if stopChan, exists := km.activeKeepalives[deviceID]; exists {
-		close(stopChan)
-		delete(km.activeKeepalives, deviceID)
+	// Check if keepalive already exists and is the same client
+	if _, exists := km.activeKeepalives[deviceID]; exists {
+		logrus.Debugf("Keepalive already active for device %s, skipping duplicate", deviceID)
+		return
 	}
 	
 	// Check if this is a platform device
