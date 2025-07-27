@@ -145,10 +145,14 @@ func (ubm *UltraScaleBroadcastManager) QueueMessageToBroadcast(msg *domainBroadc
 	// Determine which pool this message belongs to
 	if msg.CampaignID != nil {
 		poolKey = fmt.Sprintf("campaign:%d", *msg.CampaignID)
+	} else if msg.SequenceStepID != nil {
+		// Use sequence_stepid for sequences instead of sequence_id
+		poolKey = fmt.Sprintf("sequence:step:%s", *msg.SequenceStepID)
 	} else if msg.SequenceID != nil {
+		// Fallback to sequence_id if no step_id
 		poolKey = fmt.Sprintf("sequence:%s", *msg.SequenceID)
 	} else {
-		return fmt.Errorf("message has no campaign or sequence ID")
+		return fmt.Errorf("message has no campaign ID or sequence step ID")
 	}
 	
 	ubm.mu.RLock()
@@ -161,6 +165,9 @@ func (ubm *UltraScaleBroadcastManager) QueueMessageToBroadcast(msg *domainBroadc
 		broadcastID := ""
 		if msg.CampaignID != nil {
 			broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
+		} else if msg.SequenceStepID != nil {
+			broadcastType = "sequence"
+			broadcastID = *msg.SequenceStepID
 		} else if msg.SequenceID != nil {
 			broadcastType = "sequence"
 			broadcastID = *msg.SequenceID
