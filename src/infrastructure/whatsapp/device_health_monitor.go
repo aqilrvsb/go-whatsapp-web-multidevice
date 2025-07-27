@@ -39,7 +39,7 @@ func GetDeviceHealthMonitor(db *sqlstore.Container) *DeviceHealthMonitor {
 	healthMonitorOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		healthMonitor = &DeviceHealthMonitor{
-			monitorInterval: 30 * time.Second,
+			monitorInterval: 2 * time.Minute, // Increased for 3000 devices
 			ctx:             ctx,
 			cancel:          cancel,
 			db:              db,
@@ -69,7 +69,7 @@ func (dhm *DeviceHealthMonitor) monitorLoop() {
 	defer ticker.Stop()
 	
 	// Initial check after 10 seconds
-	time.Sleep(10 * time.Second)
+	time.Sleep(30 * time.Second) // Delayed start for 3000 devices
 	dhm.checkAllDevices()
 	
 	for {
@@ -131,7 +131,7 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 		// Only log after multiple failures
 		if state.ConsecutiveFails == 1 {
 			logrus.Debugf("Device %s disconnected (attempt %d)", deviceID, state.ConsecutiveFails)
-		} else if state.ConsecutiveFails == 3 {
+		} else if state.ConsecutiveFails == 30 { // 15 minutes before reconnect
 			logrus.Warnf("Device %s disconnected for %d checks", deviceID, state.ConsecutiveFails)
 		}
 		

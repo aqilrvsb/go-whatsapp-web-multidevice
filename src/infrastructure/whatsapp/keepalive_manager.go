@@ -103,9 +103,9 @@ func (km *KeepaliveManager) runKeepalive(deviceID string, client *whatsmeow.Clie
 	rand.Seed(time.Now().UnixNano())
 	
 	// Keepalive parameters
-	minInterval := 45 * time.Second
-	maxInterval := 90 * time.Second
-	activityThreshold := 3 * time.Minute
+	minInterval := 3 * time.Minute // Reduced frequency for 3000 devices
+	maxInterval := 5 * time.Minute // Reduced frequency for 3000 devices
+	activityThreshold := 10 * time.Minute // Less aggressive keepalive
 	
 	for {
 		// Calculate random interval
