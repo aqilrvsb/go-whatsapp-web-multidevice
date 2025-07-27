@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -69,16 +70,24 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		var sequenceID *string
 		var minDelay, maxDelay int
 		var deviceStatus string
+		var imageURL sql.NullString // Use sql.NullString for nullable fields
 		
 		err := rows.Scan(
 			&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Message, &msg.ImageURL,
+			&msg.RecipientPhone, &msg.Message, &imageURL, // Scan into sql.NullString
 			&minDelay, &maxDelay, &deviceStatus,
 		)
 		
 		if err != nil {
 			logrus.Errorf("Failed to scan message: %v", err)
 			continue
+		}
+		
+		// Convert NullString to string
+		if imageURL.Valid {
+			msg.ImageURL = imageURL.String
+		} else {
+			msg.ImageURL = ""
 		}
 		
 		// Check device status
