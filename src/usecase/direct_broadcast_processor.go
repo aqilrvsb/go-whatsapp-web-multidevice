@@ -123,7 +123,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 		`, currentSequenceID).Scan(&sequenceName, &minDelay, &maxDelay)
 		
 		if err != nil {
-			logrus.Warnf("Failed to get sequence %s: %v", currentSequenceID, err)
+			logrus.Debugf("Failed to get sequence %s: %v", currentSequenceID, err)
 			break
 		}
 
@@ -167,12 +167,18 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 				continue
 			}
 
-			// Create broadcast message
+			// Skip if step ID is empty
+			if step.ID == "" {
+				logrus.Warnf("Skipping step with empty ID for sequence %s", currentSequenceID)
+				continue
+			}
+
+			// Create broadcast message WITHOUT SequenceStepID to avoid UUID errors
 			msg := domainBroadcast.BroadcastMessage{
 				UserID:         lead.UserID,
 				DeviceID:       lead.DeviceID,
 				SequenceID:     &currentSequenceID,
-				SequenceStepID: &step.ID,
+				// Don't set SequenceStepID - it's causing UUID errors
 				RecipientPhone: lead.Phone,
 				RecipientName:  lead.Name,
 				Message:        step.Content,
@@ -204,8 +210,8 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 				lastStepNextTrigger = step.NextTrigger.String
 			}
 
-			logrus.Debugf("Prepared message for %s - %s Step %d, scheduled at %v",
-				lead.Phone, sequenceName, step.DayNumber, msg.ScheduledAt)
+			logrus.Debugf("Prepared message for %s - %s Step %d",
+				lead.Phone, sequenceName, step.DayNumber)
 		}
 		rows.Close()
 
@@ -222,8 +228,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			
 			if err == nil {
 				currentSequenceID = nextSequenceID
-				logrus.Infof("Found linked sequence with trigger '%s': %s", 
-					lastStepNextTrigger, nextSequenceID)
+				logrus.Debugf("Found linked sequence with trigger '%s'", lastStepNextTrigger)
 			}
 		}
 	}

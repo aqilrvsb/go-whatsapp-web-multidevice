@@ -53,7 +53,7 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	}
 	
 	// Log steps
-	logrus.Infof("Creating %d steps for sequence %s", len(request.Steps), sequence.ID)
+	logrus.Debugf("Creating %d steps for sequence %s", len(request.Steps), sequence.ID)
 	
 	// Create steps
 	for i, stepReq := range request.Steps {
@@ -122,12 +122,12 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			logrus.Errorf("Error getting steps for sequence %s: %v", seq.ID, err)
 			steps = []models.SequenceStep{} // Initialize empty slice to prevent nil
 		}
-		logrus.Infof("Retrieved %d steps for sequence %s", len(steps), seq.ID)
+		logrus.Debugf("Retrieved %d steps for sequence %s", len(steps), seq.ID)
 		
 		// Debug log the steps only for active sequences
 		if seq.IsActive {
 			for i, step := range steps {
-				logrus.Infof("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
+				logrus.Debugf("Step %d: Day=%d, Content='%s', Trigger='%s'", i+1, step.DayNumber, step.Content, step.Trigger)
 			}
 		}
 		
@@ -137,7 +137,7 @@ func (s *sequenceService) GetSequences(userID string) ([]domainSequence.Sequence
 			statusStr = "ACTIVE"
 		}
 		
-		logrus.Infof("Processing sequence: ID=%s, Name=%s, Status=%s, TimeSchedule=%s", seq.ID, seq.Name, statusStr, seq.TimeSchedule)
+		logrus.Debugf("Processing sequence: ID=%s, Name=%s, Status=%s, TimeSchedule=%s", seq.ID, seq.Name, statusStr, seq.TimeSchedule)
 		
 		response := domainSequence.SequenceResponse{
 			ID:              seq.ID,
