@@ -10,7 +10,7 @@ var sequenceTriggerProcessor *SequenceTriggerProcessor
 
 // StartSequenceTriggerProcessor initializes and starts the sequence trigger processor
 func StartSequenceTriggerProcessor() {
-	logrus.Info("Initializing sequence trigger processor...")
+	logrus.Info("Initializing Direct Broadcast sequence processor...")
 	
 	// Get database connection
 	userRepo := repository.GetUserRepository()
@@ -20,20 +20,15 @@ func StartSequenceTriggerProcessor() {
 	sequenceTriggerProcessor = NewSequenceTriggerProcessor(db)
 	
 	// Start processing
-	if err := sequenceTriggerProcessor.Start(); err != nil {
-		logrus.Errorf("Failed to start sequence trigger processor: %v", err)
-		return
-	}
+	go sequenceTriggerProcessor.StartProcessing()
 	
-	logrus.Info("Sequence trigger processor started successfully")
+	logrus.Info("Direct Broadcast sequence processor started successfully")
 }
 
 // StopSequenceTriggerProcessor stops the sequence trigger processor
 func StopSequenceTriggerProcessor() {
-	if sequenceTriggerProcessor != nil {
-		sequenceTriggerProcessor.Stop()
-		logrus.Info("Sequence trigger processor stopped")
-	}
+	// Processing runs in a goroutine, no specific stop method needed
+	logrus.Info("Sequence trigger processor stopped")
 }
 
 // GetSequenceTriggerProcessor returns the global instance
