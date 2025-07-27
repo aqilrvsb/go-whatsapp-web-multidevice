@@ -100,6 +100,10 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 		return fmt.Errorf("device %s is not connected to WhatsApp", deviceID)
 	}
 	
+	// Update activity for keepalive manager
+	km := whatsapp.GetKeepaliveManager()
+	km.UpdateActivity(deviceID)
+	
 	// Check if client is still connected before sending
 	if !waClient.IsConnected() {
 		logrus.Warnf("Device %s disconnected, attempting to reconnect before sending", deviceID)

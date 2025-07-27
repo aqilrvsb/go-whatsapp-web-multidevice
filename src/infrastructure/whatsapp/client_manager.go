@@ -40,6 +40,11 @@ func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 	cm.clients[deviceID] = client
+	
+	// Start keepalive for this device
+	km := GetKeepaliveManager()
+	km.StartKeepalive(deviceID, client)
+	
 	logrus.Infof("Added WhatsApp client for device: %s (total clients: %d)", deviceID, len(cm.clients))
 }
 
@@ -70,6 +75,11 @@ func (cm *ClientManager) GetClient(deviceID string) (*whatsmeow.Client, error) {
 func (cm *ClientManager) RemoveClient(deviceID string) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
+	
+	// Stop keepalive
+	km := GetKeepaliveManager()
+	km.StopKeepalive(deviceID)
+	
 	delete(cm.clients, deviceID)
 	logrus.Infof("Removed WhatsApp client for device: %s", deviceID)
 }

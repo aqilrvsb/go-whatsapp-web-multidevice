@@ -19,6 +19,14 @@ type DeviceHealthMonitor struct {
 	ctx             context.Context
 	cancel          context.CancelFunc
 	db              *sqlstore.Container
+	deviceStates    map[string]*DeviceState // Track device connection states
+}
+
+// DeviceState tracks the connection state of a device
+type DeviceState struct {
+	LastSeen         time.Time
+	ConsecutiveFails int
+	IsReconnecting   bool
 }
 
 var (
@@ -35,6 +43,7 @@ func GetDeviceHealthMonitor(db *sqlstore.Container) *DeviceHealthMonitor {
 			ctx:             ctx,
 			cancel:          cancel,
 			db:              db,
+			deviceStates:    make(map[string]*DeviceState),
 		}
 	})
 	return healthMonitor
@@ -102,17 +111,53 @@ func (dhm *DeviceHealthMonitor) checkDeviceHealth(deviceID string, client *whats
 		return
 	}
 	
+	// Get or create device state
+	dhm.mu.Lock()
+	state, exists := dhm.deviceStates[deviceID]
+	if !exists {
+		state = &DeviceState{
+			LastSeen:         time.Now(),
+			ConsecutiveFails: 0,
+			IsReconnecting:   false,
+		}
+		dhm.deviceStates[deviceID] = state
+	}
+	dhm.mu.Unlock()
+	
 	// Check if client is connected
 	if !client.IsConnected() {
-		logrus.Warnf("Device %s is disconnected", deviceID)
+		state.ConsecutiveFails++
 		
-		// Update status to offline - NO RECONNECTION
-		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
+		// Only log after multiple failures
+		if state.ConsecutiveFails == 1 {
+			logrus.Debugf("Device %s disconnected (attempt %d)", deviceID, state.ConsecutiveFails)
+		} else if state.ConsecutiveFails == 3 {
+			logrus.Warnf("Device %s disconnected for %d checks", deviceID, state.ConsecutiveFails)
+		}
+		
+		// Give device 3 minutes (6 checks) before marking offline
+		// This prevents temporary network hiccups from marking device offline
+		if state.ConsecutiveFails >= 6 {
+			timeSinceLastSeen := time.Since(state.LastSeen)
+			logrus.Warnf("Device %s has been disconnected for %v, marking offline", deviceID, timeSinceLastSeen)
+			userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
+			
+			// Stop keepalive when marking offline
+			km := GetKeepaliveManager()
+			km.StopKeepalive(deviceID)
+		}
 	} else if !client.IsLoggedIn() {
 		logrus.Warnf("Device %s is connected but not logged in", deviceID)
 		userRepo.UpdateDeviceStatus(deviceID, "offline", device.Phone, device.JID)
 	} else {
-		// Device is healthy, ensure status is correct
+		// Device is healthy, reset failure count
+		if state.ConsecutiveFails > 0 {
+			logrus.Infof("Device %s reconnected after %d failed checks", deviceID, state.ConsecutiveFails)
+		}
+		state.ConsecutiveFails = 0
+		state.LastSeen = time.Now()
+		
+		// Ensure status is correct
 		device, err := userRepo.GetDeviceByID(deviceID)
 		if err == nil && device.Status != "online" {
 			userRepo.UpdateDeviceStatus(deviceID, "online", device.Phone, device.JID)
