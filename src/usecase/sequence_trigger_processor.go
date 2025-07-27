@@ -954,3 +954,26 @@ func (s *SequenceTriggerProcessor) monitorBroadcastResults() {
 		}
 	}
 }
+// Add this function to sequence_trigger_processor.go to use direct broadcast
+
+// ProcessDirectBroadcast is the new entry point for direct sequence enrollment
+func (s *SequenceTriggerProcessor) ProcessDirectBroadcast() error {
+	start := time.Now()
+	
+	// Create direct broadcast processor
+	directProcessor := NewDirectBroadcastProcessor(s.db)
+	
+	// Process enrollments
+	enrolledCount, err := directProcessor.ProcessDirectEnrollments()
+	if err != nil {
+		logrus.Errorf("Error in direct broadcast enrollment: %v", err)
+		return err
+	}
+	
+	if enrolledCount > 0 {
+		logrus.Infof("✅ Direct Broadcast: Enrolled %d leads in %v", 
+			enrolledCount, time.Since(start))
+	}
+	
+	return nil
+}
