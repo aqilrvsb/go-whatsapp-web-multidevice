@@ -125,7 +125,7 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 		SELECT 
 			id, user_id, title, niche, 
 			COALESCE(target_status, 'all') as target_status,
-			message, image_url, campaign_date, 
+			message, COALESCE(image_url, '') as image_url, campaign_date, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -162,7 +162,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 		SELECT 
 			id, user_id, title, niche, 
 			COALESCE(target_status, 'all') as target_status,
-			message, image_url, campaign_date, 
+			message, COALESCE(image_url, '') as image_url, campaign_date, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -198,7 +198,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 		SELECT 
 			id, user_id, title, niche, 
 			COALESCE(target_status, 'all') as target_status,
-			message, image_url, campaign_date, 
+			message, COALESCE(image_url, '') as image_url, campaign_date, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -250,7 +250,7 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 		SELECT 
 			id, user_id, title, niche, 
 			COALESCE(target_status, 'all') as target_status,
-			message, image_url, campaign_date, 
+			message, COALESCE(image_url, '') as image_url, campaign_date, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
@@ -481,7 +481,7 @@ func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, start
 		SELECT 
 			id, user_id, title, niche, 
 			COALESCE(target_status, 'all') as target_status,
-			message, image_url, campaign_date, 
+			message, COALESCE(image_url, '') as image_url, campaign_date, 
 			COALESCE(time_schedule, '') as time_schedule,
 			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,

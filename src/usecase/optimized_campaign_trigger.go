@@ -35,7 +35,7 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 		SELECT 
 			c.id, c.user_id, c.title, c.message, c.niche, 
 			COALESCE(c.target_status, 'all') as target_status, 
-			c.image_url, c.min_delay_seconds, c.max_delay_seconds,
+			COALESCE(c.image_url, '') as image_url, c.min_delay_seconds, c.max_delay_seconds,
 			c.campaign_date, c.time_schedule
 		FROM campaigns c
 		WHERE c.status = 'pending'
