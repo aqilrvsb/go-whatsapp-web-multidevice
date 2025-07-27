@@ -1,34 +1,30 @@
 import psycopg2
+import time
 
-DB_URI = "postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway"
+# Wait a bit for connections to clear
+time.sleep(2)
 
 try:
-    conn = psycopg2.connect(DB_URI)
-    cur = conn.cursor()
+    # Connect
+    conn = psycopg2.connect("postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway")
+    cursor = conn.cursor()
     
-    print("=== Deleting ALL records from broadcast_messages ===\n")
+    # Delete all records
+    cursor.execute("DELETE FROM broadcast_messages")
+    deleted_count = cursor.rowcount
     
-    # Check current count
-    cur.execute("SELECT COUNT(*) FROM broadcast_messages")
-    count_before = cur.fetchone()[0]
-    print(f"Current records in broadcast_messages: {count_before}")
+    # Commit
+    conn.commit()
     
-    if count_before > 0:
-        # Delete all records
-        print("\nDeleting all records...")
-        cur.execute("DELETE FROM broadcast_messages")
-        
-        # Commit the changes
-        conn.commit()
-        
-        # Verify deletion
-        cur.execute("SELECT COUNT(*) FROM broadcast_messages")
-        count_after = cur.fetchone()[0]
-        print(f"Records after deletion: {count_after}")
-        print(f"\nSuccessfully deleted {count_before} records!")
-    else:
-        print("No records to delete.")
+    # Verify
+    cursor.execute("SELECT COUNT(*) FROM broadcast_messages")
+    remaining = cursor.fetchone()[0]
     
+    print(f"Successfully deleted {deleted_count} records")
+    print(f"Records remaining: {remaining}")
+    
+    # Close
+    cursor.close()
     conn.close()
     
 except Exception as e:

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"time"
+	"math/rand"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
@@ -72,7 +73,34 @@ func StartBroadcastWorkerProcessor() {
 				}
 				
 				// Process messages directly
-				for _, msg := range messages {
+				for i, msg := range messages {
+					// Add delay BEFORE sending (except for first message)
+					if i > 0 {
+						if msg.MinDelay > 0 && msg.MaxDelay > 0 {
+							// Calculate random delay between min and max
+							minDelay := msg.MinDelay
+							maxDelay := msg.MaxDelay
+							
+							// Random delay between min and max
+							randomDelay := minDelay
+							if maxDelay > minDelay {
+								// Use proper random number generation
+								delayRange := maxDelay - minDelay
+								randomDelay = minDelay + rand.Intn(delayRange+1)
+							}
+							
+							delay := time.Duration(randomDelay) * time.Second
+							logrus.Infof("Applying delay of %d seconds before sending to %s", randomDelay, msg.RecipientPhone)
+							time.Sleep(delay)
+						} else {
+							// Default delay
+							logrus.Info("Applying default 5 second delay")
+							time.Sleep(5 * time.Second)
+						}
+					} else {
+						logrus.Infof("First message in batch - no delay for %s", msg.RecipientPhone)
+					}
+					
 					// Update status to processing
 					err := broadcastRepo.UpdateMessageStatus(msg.ID, "processing", "")
 					if err != nil {
@@ -90,19 +118,6 @@ func StartBroadcastWorkerProcessor() {
 						logrus.Infof("Successfully sent message %s to %s", msg.ID, msg.RecipientPhone)
 						// Update status to sent
 						broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
-					}
-					
-					// Add delay between messages
-					if msg.MinDelay > 0 && msg.MaxDelay > 0 {
-						delay := time.Duration(msg.MinDelay) * time.Second
-						if msg.MaxDelay > msg.MinDelay {
-							// Random delay between min and max
-							delay = time.Duration(msg.MinDelay + (msg.MaxDelay-msg.MinDelay)/2) * time.Second
-						}
-						time.Sleep(delay)
-					} else {
-						// Default delay
-						time.Sleep(5 * time.Second)
 					}
 				}
 			}
