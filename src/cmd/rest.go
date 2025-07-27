@@ -9,11 +9,13 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/dustin/go-humanize"
 	"github.com/gofiber/fiber/v2"
@@ -140,6 +142,52 @@ func restServer(_ *cobra.Command, _ []string) {
 	healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
 	healthMonitor.Start()
 	logrus.Info("Device health monitor started - STATUS CHECK ONLY (no auto reconnect)")
+	
+	// Restore all online devices on startup
+	go func() {
+		time.Sleep(5 * time.Second) // Wait for system to initialize
+		logrus.Info("Restoring connections for all online devices...")
+		
+		userRepo := repository.GetUserRepository()
+		devices, err := userRepo.GetAllDevices()
+		if err != nil {
+			logrus.Errorf("Failed to get devices for restoration: %v", err)
+			return
+		}
+		
+		restored := 0
+		for _, device := range devices {
+			// Skip platform devices
+			if device.Platform != "" {
+				continue
+			}
+			
+			// Only restore devices marked as online
+			if device.Status == "online" || device.Status == "connected" {
+				logrus.Infof("Attempting to restore connection for device %s", device.DeviceName)
+				
+				// Try to get existing connection
+				dm := multidevice.GetDeviceManager()
+				conn, err := dm.GetOrCreateDeviceConnection(device.ID, device.UserID, device.Phone)
+				if err != nil {
+					logrus.Warnf("Failed to restore device %s: %v", device.DeviceName, err)
+					// Mark as offline if can't restore
+					userRepo.UpdateDeviceStatus(device.ID, "offline", device.Phone, device.JID)
+					continue
+				}
+				
+				if conn.Client != nil && conn.Client.IsConnected() {
+					restored++
+					logrus.Infof("✅ Restored connection for device %s", device.DeviceName)
+				} else {
+					// Mark as offline if not connected
+					userRepo.UpdateDeviceStatus(device.ID, "offline", device.Phone, device.JID)
+				}
+			}
+		}
+		
+		logrus.Infof("Device restoration complete: %d devices restored", restored)
+	}()
 	
 	// Start the ultra-optimized broadcast processor for 3000+ devices
 	// This processor creates broadcast-specific worker pools
