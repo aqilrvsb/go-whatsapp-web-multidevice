@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -145,10 +146,23 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartUltraOptimizedBroadcastProcessor()
 	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
 	
-	// Start campaign/sequence trigger processor
-	// DISABLED: Old sequence processor that causes issues
-	// go usecase.StartTriggerProcessor()
-	// logrus.Info("Campaign trigger processor started")
+	// Start campaign trigger processor using optimized version
+	go func() {
+		db := database.GetDB()
+		campaignTrigger := usecase.NewOptimizedCampaignTrigger(db)
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		
+		logrus.Info("Campaign trigger processor started (checks every minute)")
+		
+		// Process immediately on start
+		campaignTrigger.ProcessCampaigns()
+		
+		// Then process every minute
+		for range ticker.C {
+			campaignTrigger.ProcessCampaigns()
+		}
+	}()
 	
 	// Start sequence trigger processor for trigger-based flow
 	go usecase.StartSequenceTriggerProcessor()
