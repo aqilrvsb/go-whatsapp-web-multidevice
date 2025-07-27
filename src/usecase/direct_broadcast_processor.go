@@ -173,12 +173,18 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 				continue
 			}
 
-			// Create broadcast message WITHOUT SequenceStepID to avoid UUID errors
+			// Validate sequence ID is not empty
+			if currentSequenceID == "" {
+				logrus.Errorf("Current sequence ID is empty - skipping message creation")
+				continue
+			}
+
+			// Create broadcast message with proper sequence references
 			msg := domainBroadcast.BroadcastMessage{
 				UserID:         lead.UserID,
 				DeviceID:       lead.DeviceID,
 				SequenceID:     &currentSequenceID,
-				// Don't set SequenceStepID - it's causing UUID errors
+				SequenceStepID: &step.ID,  // Re-enable this since we validated step.ID above
 				RecipientPhone: lead.Phone,
 				RecipientName:  lead.Name,
 				Message:        step.Content,
@@ -197,8 +203,8 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			}
 
 			// Debug log before queueing
-			logrus.Debugf("Queueing message - UserID: '%s', DeviceID: '%s', SequenceID: '%s'", 
-				msg.UserID, msg.DeviceID, *msg.SequenceID)
+			logrus.Debugf("Queueing message - UserID: '%s', DeviceID: '%s', SequenceID: '%s', StepID: '%s'", 
+				msg.UserID, msg.DeviceID, *msg.SequenceID, *msg.SequenceStepID)
 
 			allMessages = append(allMessages, msg)
 
