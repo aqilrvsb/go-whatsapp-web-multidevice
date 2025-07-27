@@ -161,7 +161,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 			Content:        campaign.Message,
 			MediaURL:       campaign.ImageURL,
 			ScheduledAt:    time.Now(),
-			// MinDelay and MaxDelay removed - will be fetched from campaigns table during processing
+			// REMOVED MinDelay and MaxDelay - they will be fetched from campaigns table during processing
 		}
 		
 		err := broadcastRepo.QueueMessage(msg)

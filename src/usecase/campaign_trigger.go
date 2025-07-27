@@ -139,8 +139,7 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 				MediaURL:       campaign.ImageURL,
 				ScheduledAt:    time.Now(),
 				Status:         "pending",
-				MinDelay:       campaign.MinDelaySeconds,
-				MaxDelay:       campaign.MaxDelaySeconds,
+				// MinDelay and MaxDelay removed - will be fetched from campaigns table during processing
 			}
 			
 			// If image URL is provided, set type to image
