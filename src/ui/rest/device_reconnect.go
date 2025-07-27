@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -249,6 +250,10 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 	if connected {
 		// Register with ClientManager
 		cm.AddClient(deviceID, client)
+		
+		// IMPORTANT: Also register with DeviceManager for multidevice support
+		dm := multidevice.GetDeviceManager()
+		dm.RegisterDevice(deviceID, device.UserID, device.Phone, client)
 		
 		// Update device status
 		jidStr := ""
