@@ -11,13 +11,13 @@ type BroadcastConfig struct {
 	// Pool cleanup duration after completion (default: 5 minutes)
 	PoolCleanupDuration time.Duration
 	
-	// Maximum workers per pool (default: 3000)
+	// Maximum workers per pool (default: 5000 for high volume)
 	MaxWorkersPerPool int
 	
-	// Maximum pools per user (default: 10)
+	// Maximum pools per user (default: 50)
 	MaxPoolsPerUser int
 	
-	// Worker queue size (default: 1000)
+	// Worker queue size (default: 5000 for 5K messages)
 	WorkerQueueSize int
 	
 	// Completion check interval (default: 10 seconds)
@@ -31,9 +31,9 @@ type BroadcastConfig struct {
 func GetBroadcastConfig() *BroadcastConfig {
 	config := &BroadcastConfig{
 		PoolCleanupDuration:     5 * time.Minute,  // Default 5 minutes
-		MaxWorkersPerPool:       3000,
-		MaxPoolsPerUser:         10,
-		WorkerQueueSize:         1000,
+		MaxWorkersPerPool:       5000,             // Increased from 3000
+		MaxPoolsPerUser:         50,               // Increased from 10
+		WorkerQueueSize:         5000,             // Increased from 1000
 		CompletionCheckInterval: 10 * time.Second,
 		ProgressLogInterval:     30 * time.Second,
 	}

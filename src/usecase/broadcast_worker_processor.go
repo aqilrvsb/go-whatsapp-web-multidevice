@@ -12,8 +12,7 @@ import (
 func StartBroadcastWorkerProcessor() {
 	logrus.Info("Starting broadcast worker processor...")
 	
-	// Get the broadcast manager instance
-	manager := broadcast.GetBroadcastManager()
+	// Get repositories
 	broadcastRepo := repository.GetBroadcastRepository()
 	userRepo := repository.GetUserRepository()
 	
@@ -40,7 +39,7 @@ func StartBroadcastWorkerProcessor() {
 			// Process each device
 			for _, deviceID := range devices {
 				// Get pending messages for this device
-				messages, err := broadcastRepo.GetPendingMessages(deviceID, 10) // Get up to 10 messages
+				messages, err := broadcastRepo.GetPendingMessages(deviceID, 100) // Increased from 10 to 100 for better throughput
 				if err != nil {
 					logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 					continue
@@ -73,6 +72,9 @@ func StartBroadcastWorkerProcessor() {
 				}
 				
 				// Process messages directly
+				// Create self-healing message sender
+				messageSender := broadcast.NewWhatsAppMessageSender()
+				
 				for i, msg := range messages {
 					// Add delay BEFORE sending (except for first message)
 					if i > 0 {
@@ -108,8 +110,9 @@ func StartBroadcastWorkerProcessor() {
 						continue
 					}
 					
-					// Send message using the manager
-					err = manager.SendMessage(msg)
+					// SELF-HEALING: Use WhatsAppMessageSender instead of manager
+					// This ensures WhatsApp devices go through connection refresh
+					err = messageSender.SendMessage(msg.DeviceID, &msg)
 					if err != nil {
 						logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
 						// Update status to failed

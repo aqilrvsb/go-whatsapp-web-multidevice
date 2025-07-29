@@ -1,18 +1,18 @@
 package config
 
-// Worker configuration optimized for 200 users x 15 devices = 3,000 devices
+// Worker configuration optimized for high-volume messaging (5K per device)
 const (
-	// Worker Pool Settings
-	MaxWorkersPerDevice   = 1      // Each device gets 1 dedicated worker
-	MaxConcurrentWorkers  = 500    // Max concurrent workers system-wide
-	WorkerQueueSize       = 1000   // Message queue size per worker
-	WorkerHealthCheckSec  = 30     // Health check interval
-	WorkerIdleTimeoutMin  = 10     // Worker idle timeout before shutdown
+	// Worker Pool Settings - OPTIMIZED FOR 5K MESSAGES PER DEVICE
+	MaxWorkersPerDevice   = 5      // Increased from 1 to handle parallel processing
+	MaxConcurrentWorkers  = 2000   // Increased from 500 for better throughput
+	WorkerQueueSize       = 10000  // Increased from 1000 to handle 5K+ messages
+	WorkerHealthCheckSec  = 60     // Increased from 30 to reduce overhead
+	WorkerIdleTimeoutMin  = 30     // Increased from 10 to keep workers active longer
 	
-	// Message Processing
+	// Message Processing - OPTIMIZED FOR VOLUME
 	DefaultMinDelaySeconds = 5     // Min delay between messages
 	DefaultMaxDelaySeconds = 15    // Max delay between messages
-	BatchSize             = 100    // Messages to process per batch
+	BatchSize             = 500    // Increased from 100 for bulk processing
 	RetryAttempts         = 3      // Retry failed messages
 	RetryDelaySeconds     = 60     // Delay between retries
 	
@@ -20,9 +20,9 @@ const (
 	CampaignTriggerIntervalSec = 60  // Check for campaigns every minute
 	SequenceTriggerIntervalSec = 300 // Process sequences every 5 minutes
 	
-	// Performance Tuning
-	DatabaseMaxConnections = 200   // PostgreSQL connection pool
-	DatabaseMaxIdleConns   = 50    // Idle connections
+	// Performance Tuning - INCREASED FOR HIGH VOLUME
+	DatabaseMaxConnections = 500   // Increased from 200
+	DatabaseMaxIdleConns   = 100   // Increased from 50
 	DatabaseConnLifetime   = 3600  // Connection lifetime in seconds
 	
 	// Rate Limiting per Device - DEPRECATED
@@ -31,15 +31,15 @@ const (
 	// MessagesPerHour       = 80     // Not used  
 	// MessagesPerDay        = 800    // Not used
 	
-	// System Limits
-	MaxDevicesPerUser     = 20     // Max devices per user (with buffer)
-	MaxActiveUsers        = 250    // Max concurrent active users
-	MaxTotalDevices       = 5000   // Max total devices system can handle
+	// System Limits - INCREASED FOR SCALE
+	MaxDevicesPerUser     = 50     // Increased from 20
+	MaxActiveUsers        = 500    // Increased from 250
+	MaxTotalDevices       = 10000  // Increased from 5000
 	
 	// Memory Management
 	GCPercent            = 50      // Garbage collection percentage
-	MaxMemoryUsageGB     = 32      // Max memory usage
-	WorkerMemoryLimitMB  = 100     // Memory limit per worker
+	MaxMemoryUsageGB     = 64      // Increased from 32
+	WorkerMemoryLimitMB  = 200     // Increased from 100
 	
 	// Monitoring
 	MetricsIntervalSec   = 10      // Metrics collection interval
