@@ -233,7 +233,7 @@ func (bwp *BroadcastWorkerPool) getOrCreateWorker(deviceID string) *BroadcastWor
 		broadcastType: bwp.broadcastType,
 		messageSender: NewWhatsAppMessageSender(), // Use real sender
 		pool:          bwp, // Reference to parent pool
-		messageQueue:  make(chan *domainBroadcast.BroadcastMessage, 1000), // Large buffer
+		messageQueue:  make(chan *domainBroadcast.BroadcastMessage, config.WorkerQueueSize), // Use config value
 		status:        "idle",
 		ctx:           ctx,
 		cancel:        cancel,

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -51,7 +52,7 @@ func NewDeviceWorker(deviceID string, client *whatsmeow.Client, minDelay, maxDel
 		client:        client,
 		minDelay:      minDelay,
 		maxDelay:      maxDelay,
-		messageQueue:  make(chan domainBroadcast.BroadcastMessage, 1000),
+		messageQueue:  make(chan domainBroadcast.BroadcastMessage, config.WorkerQueueSize),
 		ctx:           ctx,
 		cancel:        cancel,
 		status:        "idle",

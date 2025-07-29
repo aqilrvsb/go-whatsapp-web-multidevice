@@ -183,6 +183,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartCampaignCompletionChecker()
 	logrus.Info("Campaign completion checker started")
 	
+	// Start automatic device refresh on startup (one-time only)
+	go usecase.StartupDeviceRefresh()
+	logrus.Info("Startup device refresh initiated - will check all devices in 10 seconds")
+	
 	// Auto-reconnect devices on startup - DISABLED
 	// Using MonitorDeviceErrors instead for continuous monitoring
 	/*
