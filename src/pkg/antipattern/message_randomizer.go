@@ -33,7 +33,7 @@ func (mr *MessageRandomizer) RandomizeMessage(message string) string {
 	}
 	
 	// Apply techniques in order
-	message = mr.applyHomoglyphs(message, 0.15) // 15% of characters
+	message = mr.applyHomoglyphs(message, 0.10) // Changed from 15% to 10%
 	message = mr.insertZeroWidthSpaces(message, 2) // 2 zero-width spaces
 	message = mr.randomizePunctuation(message)
 	

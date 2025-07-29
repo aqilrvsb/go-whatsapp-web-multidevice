@@ -413,3 +413,55 @@ func (r *leadRepository) GetLeadByDeviceUserPhoneNiche(deviceID, userID, phone, 
 	
 	return lead, nil
 }
+
+// GetLeadsByPhone gets leads by phone number
+func (r *leadRepository) GetLeadsByPhone(phone string) ([]models.Lead, error) {
+	query := `
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
+		       COALESCE(target_status, 'prospect') as target_status, trigger, created_at, updated_at
+		FROM leads
+		WHERE phone = $1
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := r.db.Query(query, phone)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var leads []models.Lead
+	for rows.Next() {
+		var lead models.Lead
+		var notes sql.NullString
+		
+		err := rows.Scan(
+			&lead.ID,
+			&lead.DeviceID,
+			&lead.UserID,
+			&lead.Name,
+			&lead.Phone,
+			&lead.Niche,
+			&notes,
+			&lead.Status,
+			&lead.TargetStatus,
+			&lead.Trigger,
+			&lead.CreatedAt,
+			&lead.UpdatedAt,
+		)
+		
+		if err != nil {
+			logrus.Errorf("Error scanning lead: %v", err)
+			continue
+		}
+		
+		// Map journey column to Notes field
+		if notes.Valid {
+			lead.Notes = notes.String
+		}
+		
+		leads = append(leads, lead)
+	}
+	
+	return leads, nil
+}

@@ -3,8 +3,8 @@ package usecase
 import (
 	"time"
 
-	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
+	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -183,50 +183,15 @@ func (cts *CampaignTriggerService) executeCampaign(campaign *models.Campaign) {
 
 // ProcessSequenceTriggers processes new leads for sequence enrollment
 func (cts *CampaignTriggerService) ProcessSequenceTriggers() error {
-	// Only log when there's actual work to do
+	// Direct enrollment is handled by DirectBroadcastProcessor
+	// This function now only logs for monitoring
 	
-	sequenceRepo := repository.GetSequenceRepository()
-	leadRepo := repository.GetLeadRepository()
+	// Log message about direct enrollment
+	logrus.Info("Sequence enrollment is handled by DirectBroadcastProcessor")
 	
-	// Get all active sequences with niche
-	sequences, err := sequenceRepo.GetActiveSequencesWithNiche()
-	if err != nil {
-		return err
-	}
-	
-	for _, sequence := range sequences {
-		if sequence.Niche == "" {
-			continue
-		}
-		
-		// Get new leads matching this niche that aren't in sequence yet
-		newLeads, err := leadRepo.GetNewLeadsForSequence(sequence.Niche, sequence.ID)
-		if err != nil {
-			logrus.Errorf("Failed to get new leads for sequence %s: %v", sequence.ID, err)
-			continue
-		}
-		
-		if len(newLeads) > 0 {
-			logrus.Infof("Found %d new leads for sequence %s (niche: %s)", 
-				len(newLeads), sequence.Name, sequence.Niche)
-			
-			// Add leads to sequence
-			for _, lead := range newLeads {
-				contact := &models.SequenceContact{
-					SequenceID:   sequence.ID,
-					ContactPhone: lead.Phone,
-					ContactName:  lead.Name,
-				}
-				
-				err := sequenceRepo.AddContactToSequence(contact)
-				if err != nil {
-					logrus.Errorf("Failed to add lead %s to sequence: %v", lead.Phone, err)
-				} else {
-					logrus.Infof("Added lead %s to sequence %s", lead.Phone, sequence.Name)
-				}
-			}
-		}
-	}
+	// NOTE: Niche-based enrollment is DISABLED
+	// All enrollments should use triggers for proper sequence selection
+	// To enroll leads: set their trigger field (e.g., COLDVITAC, COLDEXSTART)
 	
 	return nil
 }
@@ -280,14 +245,13 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 				continue // No step found for this day
 			}
 			
-			// Get the lead's assigned device from database
-			db := database.GetDB()
+			// Get the lead's assigned device from repository
+			leadRepo := repository.GetLeadRepository()
+			leads, err := leadRepo.GetLeadsByPhone(contact.ContactPhone)
 			var leadDeviceID string
-			err = db.QueryRow(`
-				SELECT device_id FROM leads 
-				WHERE phone = $1 AND user_id = $2
-				LIMIT 1
-			`, contact.ContactPhone, sequence.UserID).Scan(&leadDeviceID)
+			if err == nil && len(leads) > 0 {
+				leadDeviceID = leads[0].DeviceID
+			}
 			
 			if err != nil {
 				logrus.Errorf("Failed to get device for contact %s: %v", contact.ContactPhone, err)
@@ -318,6 +282,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			
 			// Check if we already created a message for this contact/day
 			var existingCount int
+			db := database.GetDB()
 			err = db.QueryRow(`
 				SELECT COUNT(*) FROM broadcast_messages 
 				WHERE sequence_id = $1 

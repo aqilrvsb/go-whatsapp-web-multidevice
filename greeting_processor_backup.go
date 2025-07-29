@@ -158,15 +158,6 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	// Process original message to handle any spintax it might contain
 	processedMessage := g.processSpintax(originalMessage)
 	
-	// Fix line breaks for WhatsApp
-	// Replace common line break patterns with proper WhatsApp line breaks
-	processedMessage = strings.ReplaceAll(processedMessage, "\\n", "\n")
-	processedMessage = strings.ReplaceAll(processedMessage, "%0A", "\n")
-	processedMessage = strings.ReplaceAll(processedMessage, "%0a", "\n")
-	processedMessage = strings.ReplaceAll(processedMessage, "<br>", "\n")
-	processedMessage = strings.ReplaceAll(processedMessage, "<br/>", "\n")
-	processedMessage = strings.ReplaceAll(processedMessage, "<br />", "\n")
-	
 	// Combine with proper line breaks for WhatsApp
 	// Using \n\n for double line break - WhatsApp will handle the encoding
 	return greeting + "\n\n" + processedMessage

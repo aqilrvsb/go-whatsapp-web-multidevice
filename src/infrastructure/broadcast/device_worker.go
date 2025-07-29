@@ -247,10 +247,23 @@ func (dw *DeviceWorker) sendImageMessage(recipient types.JID, msg domainBroadcas
 		return fmt.Errorf("failed to upload image: %v", err)
 	}
 	
+	// Process caption with spintax (same as text messages)
+	processedCaption := ""
+	if msg.Content != "" {
+		processedCaption = dw.greetingProcessor.PrepareMessageWithGreeting(
+			msg.Content,
+			msg.RecipientName,
+			dw.deviceID,
+			msg.RecipientPhone,
+		)
+		// Apply randomization techniques
+		processedCaption = dw.messageRandomizer.RandomizeMessage(processedCaption)
+	}
+	
 	// Create image message
 	message := &waProto.Message{
 		ImageMessage: &waProto.ImageMessage{
-			Caption:       &msg.Content,
+			Caption:       &processedCaption,
 			URL:           &uploaded.URL,
 			DirectPath:    &uploaded.DirectPath,
 			MediaKey:      uploaded.MediaKey,
