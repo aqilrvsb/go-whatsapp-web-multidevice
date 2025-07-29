@@ -45,14 +45,6 @@ func GetWorkerClientManager() *WorkerClientManager {
 
 // GetOrRefreshClient gets client or refreshes if needed - CORE FUNCTION FOR WORKERS
 func (wcm *WorkerClientManager) GetOrRefreshClient(deviceID string) (*whatsmeow.Client, error) {
-	// First, try to get existing healthy client
-	cm := GetClientManager()
-	client, err := cm.GetClient(deviceID)
-	if err == nil && client != nil && client.IsConnected() && client.IsLoggedIn() {
-		logrus.Debugf("✅ Device %s client is healthy", deviceID)
-		return client, nil
-	}
-	
 	// Get device info first
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
@@ -60,9 +52,18 @@ func (wcm *WorkerClientManager) GetOrRefreshClient(deviceID string) (*whatsmeow.
 		return nil, fmt.Errorf("device %s not found: %v", deviceID, err)
 	}
 	
-	// Platform devices don't need refresh
+	// Platform devices don't need refresh - they use external APIs
 	if device.Platform != "" {
-		return nil, fmt.Errorf("device %s is platform device", deviceID)
+		return nil, fmt.Errorf("device %s is platform device (%s) - no WhatsApp client needed", deviceID, device.Platform)
+	}
+	
+	// For WhatsApp devices only (platform is null/empty)
+	// First, try to get existing healthy client
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err == nil && client != nil && client.IsConnected() && client.IsLoggedIn() {
+		logrus.Debugf("✅ Device %s client is healthy", deviceID)
+		return client, nil
 	}
 	
 	// Check if device has JID (previous session)
@@ -108,9 +109,9 @@ func (wcm *WorkerClientManager) GetOrRefreshClient(deviceID string) (*whatsmeow.
 		wcm.mu.Unlock()
 	}()
 	
-	logrus.Infof("🔄 Refreshing device %s for worker message sending...", deviceID)
+	logrus.Infof("🔄 Refreshing WhatsApp device %s for worker message sending...", deviceID)
 	
-	// Attempt refresh
+	// Attempt refresh using same logic as refresh button
 	refreshedClient, err := wcm.performRefresh(deviceID, device)
 	if err != nil {
 		logrus.Warnf("❌ Failed to refresh device %s: %v", deviceID, err)
