@@ -13,7 +13,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/dustin/go-humanize"
 	"github.com/gofiber/fiber/v2"
@@ -136,10 +135,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Optimize system for 3000 devices
 	broadcast.OptimizeFor3000Devices()
 	
-	// Start device health monitor - STATUS CHECK ONLY (no reconnection)
-	healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
-	healthMonitor.Start()
-	logrus.Info("Device health monitor started - STATUS CHECK ONLY (no auto reconnect)")
+	// DISABLED - Using self-healing per message instead
+	// healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
+	// healthMonitor.Start()
+	logrus.Info("🔄 SELF-HEALING MODE: Workers refresh clients per message (no background keepalive)")
 	
 	// Start the ultra-optimized broadcast processor for 3000+ devices
 	// This processor creates broadcast-specific worker pools

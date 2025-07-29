@@ -53,9 +53,9 @@ func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
 		dm.RegisterDevice(deviceID, device.UserID, device.Phone, client)
 	}
 	
-	// Start keepalive for this device
-	km := GetKeepaliveManager()
-	km.StartKeepalive(deviceID, client)
+	// DISABLED - Using self-healing instead
+	// km := GetKeepaliveManager()
+	// km.StartKeepalive(deviceID, client)
 	
 	logrus.Infof("Added WhatsApp client for device: %s", deviceID)
 }
@@ -82,9 +82,9 @@ func (cm *ClientManager) GetClient(deviceID string) (*whatsmeow.Client, error) {
 
 // RemoveClient removes a WhatsApp client for a device
 func (cm *ClientManager) RemoveClient(deviceID string) {
-	// Stop keepalive
-	km := GetKeepaliveManager()
-	km.StopKeepalive(deviceID)
+	// DISABLED - Using self-healing instead
+	// km := GetKeepaliveManager()
+	// km.StopKeepalive(deviceID)
 	
 	// Remove from DeviceManager
 	dm := multidevice.GetDeviceManager()

@@ -20,9 +20,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// WhatsAppMessageSender handles actual WhatsApp message sending
+// WhatsAppMessageSender handles actual WhatsApp message sending with self-healing
 type WhatsAppMessageSender struct {
-	clientManager     *whatsapp.ClientManager
 	platformSender    *external.PlatformSender
 	userRepo         *repository.UserRepository
 	messageRandomizer *antipattern.MessageRandomizer
@@ -32,7 +31,6 @@ type WhatsAppMessageSender struct {
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		clientManager:     whatsapp.GetClientManager(),
 		platformSender:    external.NewPlatformSender(),
 		userRepo:         repository.GetUserRepository(),
 		messageRandomizer: antipattern.NewMessageRandomizer(),
@@ -84,53 +82,26 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 		return nil
 	}
 	
-	// Normal WhatsApp sending
+	// Normal WhatsApp sending with self-healing
 	return w.sendViaWhatsApp(deviceID, msg)
 }
 
-// sendViaWhatsApp sends message via normal WhatsApp
+// sendViaWhatsApp sends message via normal WhatsApp with self-healing client refresh
 func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.BroadcastMessage) error {
-	// Get WhatsApp client for device
-	waClient, err := w.clientManager.GetClient(deviceID)
+	// 🔄 SELF-HEALING: Use WorkerClientManager for automatic refresh
+	wcm := whatsapp.GetWorkerClientManager()
+	waClient, err := wcm.GetOrRefreshClient(deviceID)
 	if err != nil {
-		// Try MultiDeviceManager as fallback
-		mdm := whatsapp.GetMultiDeviceManager()
-		if client, exists := mdm.GetDevice(deviceID); exists && client != nil {
-			waClient = client
-			logrus.Warnf("Device %s found in MultiDeviceManager but not ClientManager, using backup", deviceID)
-		} else {
-			return fmt.Errorf("device not connected: %v", err)
-		}
+		return fmt.Errorf("failed to get/refresh client for device %s: %v", deviceID, err)
 	}
 	
-	if !waClient.IsConnected() {
-		return fmt.Errorf("device %s is not connected to WhatsApp", deviceID)
+	// Double-check client health before sending
+	if !wcm.IsClientHealthy(waClient) {
+		return fmt.Errorf("device %s client is not healthy after refresh", deviceID)
 	}
 	
-	// Update activity for keepalive manager
-	km := whatsapp.GetKeepaliveManager()
-	km.UpdateActivity(deviceID)
-	
-	// Check if client is still connected before sending
-	if !waClient.IsConnected() {
-		logrus.Warnf("Device %s disconnected, attempting to reconnect before sending", deviceID)
-		
-		// Try to reconnect
-		err := waClient.Connect()
-		if err != nil {
-			return fmt.Errorf("device %s failed to reconnect: %v", deviceID, err)
-		}
-		
-		// Wait a bit for connection to stabilize
-		time.Sleep(2 * time.Second)
-		
-		// Check again
-		if !waClient.IsConnected() {
-			return fmt.Errorf("device %s still not connected after reconnection attempt", deviceID)
-		}
-		
-		logrus.Infof("Device %s reconnected successfully", deviceID)
-	}
+	// No more keepalive or manual reconnection - client is guaranteed healthy
+	logrus.Debugf("📤 Sending message via healthy client for device %s", deviceID)
 	
 	if !waClient.IsLoggedIn() {
 		return fmt.Errorf("device %s is not logged in", deviceID)
@@ -167,30 +138,9 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 
 // sendTextMessage sends a text message
 func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, recipient types.JID, msg *broadcast.BroadcastMessage) error {
-	// Get device ID from the message context
-	deviceID := msg.DeviceID
-	
-	// Prepare message with greeting
-	messageWithGreeting := w.greetingProcessor.PrepareMessageWithGreeting(
-		msg.Message, 
-		msg.RecipientName, 
-		deviceID, 
-		msg.RecipientPhone,
-	)
-	
-	// Apply anti-pattern techniques to the message
-	randomizedMessage := w.messageRandomizer.RandomizeMessage(messageWithGreeting)
-	
-	// Add typing delay for human-like behavior (but no presence)
-	typingDelay := antipattern.AddTypingDelay(len(msg.Message))
-	logrus.Debugf("Simulating typing delay for %v", typingDelay)
-	
-	// Just wait, don't send presence
-	time.Sleep(typingDelay)
-	
-	// Create message with randomized content
+	// Create message
 	message := &waE2E.Message{
-		Conversation: proto.String(randomizedMessage),
+		Conversation: proto.String(msg.Message),
 	}
 	
 	// Send message
@@ -198,8 +148,6 @@ func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, reci
 	if err != nil {
 		return fmt.Errorf("failed to send text message: %v", err)
 	}
-	
-	// No presence update after sending
 	
 	logrus.Infof("Text message sent to %s (ID: %s)", recipient.String(), resp.ID)
 	return nil
@@ -243,17 +191,8 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		return fmt.Errorf("failed to upload image: %v", err)
 	}
 	
-	// Apply anti-pattern to caption if exists
-	caption := msg.Message
-	if caption != "" {
-		caption = w.messageRandomizer.RandomizeMessage(caption)
-		
-		// Add typing delay for caption (but no presence)
-		typingDelay := antipattern.AddTypingDelay(len(caption))
-		time.Sleep(typingDelay)
-	}
-	
 	// Create image message
+	caption := msg.Message
 	message := &waE2E.Message{
 		ImageMessage: &waE2E.ImageMessage{
 			Caption:       proto.String(caption),
@@ -273,12 +212,6 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		return fmt.Errorf("failed to send image message: %v", err)
 	}
 	
-	// No presence update after sending
-	
 	logrus.Infof("Image message sent to %s (ID: %s)", recipient.String(), resp.ID)
-	
-	// Note: Delay should be handled by the broadcast worker based on campaign settings
-	// Don't add hardcoded delays here
-	
 	return nil
 }
