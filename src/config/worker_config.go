@@ -8,6 +8,7 @@ const (
 	WorkerQueueSize       = 10000  // Increased from 1000 to handle 5K+ messages
 	WorkerHealthCheckSec  = 60     // Increased from 30 to reduce overhead
 	WorkerIdleTimeoutMin  = 30     // Increased from 10 to keep workers active longer
+	MessageQueueTimeout   = 30     // Timeout for queueing messages (seconds)
 	
 	// Message Processing - OPTIMIZED FOR VOLUME
 	DefaultMinDelaySeconds = 5     // Min delay between messages

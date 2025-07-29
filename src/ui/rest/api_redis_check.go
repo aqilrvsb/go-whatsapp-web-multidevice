@@ -29,18 +29,7 @@ func (rest *App) CheckRedisStatus(c *fiber.Ctx) error {
 	
 	// Check which broadcast manager is being used
 	manager := broadcast.GetBroadcastManager()
-	managerType := "unknown"
-	
-	switch manager.(type) {
-	case *broadcast.UltraScaleRedisManager:
-		managerType = "Ultra Scale Redis Manager (3000+ devices)"
-	case *broadcast.RedisOptimizedBroadcastManager:
-		managerType = "Redis Optimized Manager"
-	case *broadcast.BasicBroadcastManager:
-		managerType = "Basic In-Memory Manager"
-	default:
-		managerType = "Unknown Manager Type"
-	}
+	managerType := getManagerType(manager)
 	
 	// Check Redis URL validation
 	redisURL := config.RedisURL

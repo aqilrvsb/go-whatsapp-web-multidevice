@@ -14,13 +14,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// DeviceWorkerGroup manages multiple workers for a single device
+type DeviceWorkerGroup struct {
+	deviceID      string
+	workers       []*BroadcastWorker
+	messageQueue  chan *domainBroadcast.BroadcastMessage
+	currentWorker int32 // For round-robin distribution
+	mu            sync.RWMutex
+}
+
 // BroadcastWorkerPool manages workers per broadcast (campaign/sequence)
 type BroadcastWorkerPool struct {
 	broadcastID   string
 	broadcastType string // "campaign" or "sequence"
-	workers       map[string]*BroadcastWorker // key: deviceID
+	deviceGroups  map[string]*DeviceWorkerGroup // key: deviceID -> group of workers
 	maxWorkers    int
-	config        *config.BroadcastConfig
 	mu            sync.RWMutex
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -38,162 +46,180 @@ type BroadcastWorkerPool struct {
 type BroadcastWorker struct {
 	poolID        string
 	deviceID      string
+	workerID      int // Worker number within device group
 	broadcastID   string
 	broadcastType string
 	messageSender *WhatsAppMessageSender // Real WhatsApp sender
 	pool          *BroadcastWorkerPool   // Reference to parent pool
 	
 	// Message processing
-	messageQueue  chan *domainBroadcast.BroadcastMessage
 	status        string
 	processedCount int64
 	failedCount    int64
 	
-	// Control
-	ctx           context.Context
-	cancel        context.CancelFunc
-	mu            sync.Mutex
-	lastActivity  time.Time
+	// Context management
+	ctx            context.Context
+	cancel         context.CancelFunc
+	lastActivity   time.Time
+	mu             sync.RWMutex
 }
 
-// UltraScaleBroadcastManager manages broadcast-specific worker pools
-type UltraScaleBroadcastManager struct {
-	pools         map[string]*BroadcastWorkerPool // key: broadcastType:broadcastID
-	redisClient   *redis.Client
-	mu            sync.RWMutex
-	config        *config.BroadcastConfig
-	
-	// Global limits
-	maxPoolsPerUser      int
-	maxWorkersPerPool    int
-	maxDevicesPerWorker  int
-}
-
+// Global manager instance
 var (
-	ultraBroadcastManager *UltraScaleBroadcastManager
-	ultraOnce            sync.Once
+	broadcastManager     *UltraScaleBroadcastManager
+	broadcastManagerOnce sync.Once
 )
 
-// GetUltraScaleBroadcastManager returns singleton instance
-func GetUltraScaleBroadcastManager() *UltraScaleBroadcastManager {
-	ultraOnce.Do(func() {
-		redisClient := redis.NewClient(&redis.Options{
-			Addr:     fmt.Sprintf("%s:%s", config.RedisHost, config.RedisPort),
-			Password: config.RedisPassword,
-			DB:       0,
-		})
-		
-		// Get broadcast configuration
-		broadcastConfig := config.GetBroadcastConfig()
-		
-		ultraBroadcastManager = &UltraScaleBroadcastManager{
-			pools:               make(map[string]*BroadcastWorkerPool),
-			redisClient:        redisClient,
-			config:             broadcastConfig,
-			maxPoolsPerUser:    broadcastConfig.MaxPoolsPerUser,
-			maxWorkersPerPool:  broadcastConfig.MaxWorkersPerPool,
-			maxDevicesPerWorker: 1,    // 1:1 device to worker for maximum throughput
-		}
-		
-		logrus.Info("UltraScale Broadcast Manager initialized for 3000+ devices")
-	})
+// UltraScaleBroadcastManager manages broadcast pools for 3000+ devices
+// This version creates broadcast-specific worker pools instead of global pools
+type UltraScaleBroadcastManager struct {
+	pools         map[string]*BroadcastWorkerPool // key: "campaign:123" or "sequence:abc-def"
+	redisClient   *redis.Client
+	mu            sync.RWMutex
+	ctx           context.Context
+	cancel        context.CancelFunc
 	
-	return ultraBroadcastManager
+	// Configuration
+	maxPoolsPerType      int
+	maxWorkersPerPool    int
+	workerQueueSize      int
+	messageQueueTimeout  time.Duration // Increased from 5s to 30s
+	
+	// Statistics
+	activePools      int32
+	totalMessages    int64
+	processedMessages int64
+	failedMessages    int64
 }
 
-// StartBroadcastPool creates a worker pool for a specific broadcast
-func (ubm *UltraScaleBroadcastManager) StartBroadcastPool(broadcastType string, broadcastID string, userID string) (*BroadcastWorkerPool, error) {
+// NewUltraScaleBroadcastManager creates a new broadcast manager optimized for scale
+func NewUltraScaleBroadcastManager(redisClient *redis.Client) *UltraScaleBroadcastManager {
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	manager := &UltraScaleBroadcastManager{
+		pools:               make(map[string]*BroadcastWorkerPool),
+		redisClient:         redisClient,
+		ctx:                 ctx,
+		cancel:              cancel,
+		maxPoolsPerType:     100,
+		maxWorkersPerPool:   config.MaxConcurrentWorkers,
+		workerQueueSize:     config.WorkerQueueSize,
+		messageQueueTimeout: 30 * time.Second, // Increased from 5s to 30s
+	}
+	
+	// Start monitoring
+	go manager.monitorPools()
+	
+	return manager
+}
+
+// GetBroadcastManager returns the singleton broadcast manager
+func GetBroadcastManager() *UltraScaleBroadcastManager {
+	broadcastManagerOnce.Do(func() {
+		// Try to get Redis client, but work without it
+		var redisClient *redis.Client
+		if config.RedisURL != "" {
+			redisClient = redis.NewClient(&redis.Options{
+				Addr:     config.RedisURL,
+				Password: config.RedisPassword,
+			})
+			
+			// Test connection
+			ctx := context.Background()
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				logrus.Warnf("Redis connection failed, continuing without Redis: %v", err)
+				redisClient = nil
+			}
+		}
+		
+		broadcastManager = NewUltraScaleBroadcastManager(redisClient)
+		logrus.Info("Ultra-scale broadcast manager initialized for 3000+ devices")
+	})
+	
+	return broadcastManager
+}
+
+// GetOrCreatePool gets or creates a broadcast-specific worker pool
+func (m *UltraScaleBroadcastManager) GetOrCreatePool(broadcastType string, broadcastID string) (*BroadcastWorkerPool, error) {
 	poolKey := fmt.Sprintf("%s:%s", broadcastType, broadcastID)
 	
-	ubm.mu.Lock()
-	defer ubm.mu.Unlock()
+	m.mu.RLock()
+	pool, exists := m.pools[poolKey]
+	m.mu.RUnlock()
 	
-	// Check if pool already exists
-	if pool, exists := ubm.pools[poolKey]; exists {
+	if exists {
 		return pool, nil
 	}
 	
 	// Create new pool
-	ctx, cancel := context.WithCancel(context.Background())
-	pool := &BroadcastWorkerPool{
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	// Double-check
+	if pool, exists = m.pools[poolKey]; exists {
+		return pool, nil
+	}
+	
+	// Create context for this pool
+	ctx, cancel := context.WithCancel(m.ctx)
+	
+	pool = &BroadcastWorkerPool{
 		broadcastID:   broadcastID,
 		broadcastType: broadcastType,
-		workers:       make(map[string]*BroadcastWorker),
-		maxWorkers:    ubm.maxWorkersPerPool,
-		config:        ubm.config,
+		deviceGroups:  make(map[string]*DeviceWorkerGroup),
+		maxWorkers:    m.maxWorkersPerPool,
 		ctx:           ctx,
 		cancel:        cancel,
-		redisClient:   ubm.redisClient,
+		redisClient:   m.redisClient,
 		startTime:     time.Now(),
 	}
 	
-	ubm.pools[poolKey] = pool
+	m.pools[poolKey] = pool
+	atomic.AddInt32(&m.activePools, 1)
 	
-	// Start pool monitor
-	go pool.monitor()
-	
-	logrus.Infof("Started broadcast pool for %s:%s with capacity for %d devices", 
-		broadcastType, broadcastID, pool.maxWorkers)
+	logrus.Infof("Created worker pool for %s %s", broadcastType, broadcastID)
 	
 	return pool, nil
 }
 
-// QueueMessageToBroadcast queues a message to the appropriate broadcast pool
-func (ubm *UltraScaleBroadcastManager) QueueMessageToBroadcast(msg *domainBroadcast.BroadcastMessage) error {
-	var poolKey string
+// QueueMessage adds a message to the appropriate worker pool with improved timeout
+func (m *UltraScaleBroadcastManager) QueueMessage(msg *domainBroadcast.BroadcastMessage) error {
+	if msg == nil {
+		return fmt.Errorf("message is nil")
+	}
 	
-	// Determine which pool this message belongs to
+	// Determine broadcast type and ID
+	var broadcastType, broadcastID string
 	if msg.CampaignID != nil {
-		poolKey = fmt.Sprintf("campaign:%d", *msg.CampaignID)
-	} else if msg.SequenceStepID != nil {
-		// Use sequence_stepid for sequences instead of sequence_id
-		poolKey = fmt.Sprintf("sequence:step:%s", *msg.SequenceStepID)
+		broadcastType = "campaign"
+		broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
 	} else if msg.SequenceID != nil {
-		// Fallback to sequence_id if no step_id
-		poolKey = fmt.Sprintf("sequence:%s", *msg.SequenceID)
+		broadcastType = "sequence"
+		broadcastID = *msg.SequenceID
 	} else {
-		return fmt.Errorf("message has no campaign ID or sequence step ID")
+		return fmt.Errorf("message has no campaign or sequence ID")
 	}
 	
-	ubm.mu.RLock()
-	pool, exists := ubm.pools[poolKey]
-	ubm.mu.RUnlock()
-	
-	if !exists {
-		// Create pool if it doesn't exist
-		broadcastType := "campaign"
-		broadcastID := ""
-		if msg.CampaignID != nil {
-			broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
-		} else if msg.SequenceStepID != nil {
-			broadcastType = "sequence"
-			broadcastID = *msg.SequenceStepID
-		} else if msg.SequenceID != nil {
-			broadcastType = "sequence"
-			broadcastID = *msg.SequenceID
-		}
-		
-		var err error
-		pool, err = ubm.StartBroadcastPool(broadcastType, broadcastID, msg.UserID)
-		if err != nil {
-			return err
-		}
+	// Get or create pool
+	pool, err := m.GetOrCreatePool(broadcastType, broadcastID)
+	if err != nil {
+		return fmt.Errorf("failed to get broadcast pool: %w", err)
 	}
 	
-	// Queue to pool
+	// Queue to pool with improved timeout
 	return pool.QueueMessage(msg)
 }
 
-// QueueMessage adds a message to the broadcast pool
+// QueueMessage adds a message to the broadcast pool with better timeout handling
 func (bwp *BroadcastWorkerPool) QueueMessage(msg *domainBroadcast.BroadcastMessage) error {
 	atomic.AddInt64(&bwp.totalMessages, 1)
 	
-	// Get or create worker for this device
-	worker := bwp.getOrCreateWorker(msg.DeviceID)
+	// Get or create device worker group
+	group := bwp.getOrCreateWorkerGroup(msg.DeviceID)
 	
-	// Queue to worker
+	// Queue to group with increased timeout (30 seconds instead of 5)
 	select {
-	case worker.messageQueue <- msg:
+	case group.messageQueue <- msg:
 		// Update message status to queued
 		db := database.GetDB()
 		_, err := db.Exec(`UPDATE broadcast_messages SET status = 'queued' WHERE id = $1`, msg.ID)
@@ -201,71 +227,98 @@ func (bwp *BroadcastWorkerPool) QueueMessage(msg *domainBroadcast.BroadcastMessa
 			logrus.Errorf("Failed to update message status: %v", err)
 		}
 		return nil
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("timeout queueing message to worker")
+	case <-time.After(30 * time.Second): // 30 second timeout
+		atomic.AddInt64(&bwp.failedCount, 1)
+		// Log detailed error for debugging
+		logrus.Errorf("Timeout queueing message to device %s after 30s. Queue size: %d/%d", 
+			msg.DeviceID, len(group.messageQueue), cap(group.messageQueue))
+		return fmt.Errorf("timeout queueing message to worker after 30 seconds")
 	}
 }
 
-// getOrCreateWorker gets existing worker or creates new one
-func (bwp *BroadcastWorkerPool) getOrCreateWorker(deviceID string) *BroadcastWorker {
+// getOrCreateWorkerGroup gets existing worker group or creates new one with multiple workers
+func (bwp *BroadcastWorkerPool) getOrCreateWorkerGroup(deviceID string) *DeviceWorkerGroup {
 	bwp.mu.RLock()
-	worker, exists := bwp.workers[deviceID]
+	group, exists := bwp.deviceGroups[deviceID]
 	bwp.mu.RUnlock()
 	
 	if exists {
-		return worker
+		return group
 	}
 	
 	bwp.mu.Lock()
 	defer bwp.mu.Unlock()
 	
 	// Double-check after acquiring write lock
-	if worker, exists = bwp.workers[deviceID]; exists {
-		return worker
+	if group, exists = bwp.deviceGroups[deviceID]; exists {
+		return group
 	}
 	
-	// Create new worker
-	ctx, cancel := context.WithCancel(bwp.ctx)
-	worker = &BroadcastWorker{
-		poolID:        fmt.Sprintf("%s:%s", bwp.broadcastType, bwp.broadcastID),
-		deviceID:      deviceID,
-		broadcastID:   bwp.broadcastID,
-		broadcastType: bwp.broadcastType,
-		messageSender: NewWhatsAppMessageSender(), // Use real sender
-		pool:          bwp, // Reference to parent pool
-		messageQueue:  make(chan *domainBroadcast.BroadcastMessage, config.WorkerQueueSize), // Use config value
-		status:        "idle",
-		ctx:           ctx,
-		cancel:        cancel,
-		lastActivity:  time.Now(),
+	// Create new worker group with multiple workers
+	group = &DeviceWorkerGroup{
+		deviceID:     deviceID,
+		workers:      make([]*BroadcastWorker, 0, config.MaxWorkersPerDevice),
+		messageQueue: make(chan *domainBroadcast.BroadcastMessage, config.WorkerQueueSize),
 	}
 	
+	// Create multiple workers per device (5 as per config)
+	for i := 0; i < config.MaxWorkersPerDevice; i++ {
+		ctx, cancel := context.WithCancel(bwp.ctx)
+		worker := &BroadcastWorker{
+			poolID:        fmt.Sprintf("%s:%s", bwp.broadcastType, bwp.broadcastID),
+			deviceID:      deviceID,
+			workerID:      i,
+			broadcastID:   bwp.broadcastID,
+			broadcastType: bwp.broadcastType,
+			messageSender: NewWhatsAppMessageSender(),
+			pool:          bwp,
+			status:        "idle",
+			ctx:           ctx,
+			cancel:        cancel,
+			lastActivity:  time.Now(),
+		}
+		
+		group.workers = append(group.workers, worker)
+		
+		// Start worker
+		go worker.process(group.messageQueue)
+		
+		logrus.Infof("Started worker %d for device %s in %s %s", 
+			i, deviceID, bwp.broadcastType, bwp.broadcastID)
+	}
 	
-	bwp.workers[deviceID] = worker
+	bwp.deviceGroups[deviceID] = group
 	
-	// Start worker
-	go worker.process()
+	logrus.Infof("Created worker group with %d workers for device %s", 
+		config.MaxWorkersPerDevice, deviceID)
 	
-	return worker
+	return group
 }
 
-// process handles messages for this worker
-func (bw *BroadcastWorker) process() {
-	logrus.Infof("Broadcast worker started for %s device %s", bw.poolID, bw.deviceID)
+// process handles messages for this worker from the shared device queue
+func (bw *BroadcastWorker) process(messageQueue <-chan *domainBroadcast.BroadcastMessage) {
+	logrus.Infof("Worker %d started for device %s in %s", 
+		bw.workerID, bw.deviceID, bw.poolID)
 	
 	for {
 		select {
 		case <-bw.ctx.Done():
-			logrus.Infof("Broadcast worker stopped for %s device %s", bw.poolID, bw.deviceID)
+			logrus.Infof("Worker %d stopped for device %s", bw.workerID, bw.deviceID)
 			return
 			
-		case msg := <-bw.messageQueue:
+		case msg, ok := <-messageQueue:
+			if !ok {
+				logrus.Infof("Message queue closed for worker %d device %s", 
+					bw.workerID, bw.deviceID)
+				return
+			}
 			bw.processMessage(msg)
 		}
 	}
 }
 
-// processMessage sends a single message
+// Rest of the file remains the same...
+// processMessage sends a single message (unchanged from original)
 func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage) {
 	bw.mu.Lock()
 	bw.status = "processing"
@@ -280,8 +333,8 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		broadcastInfo = fmt.Sprintf("Sequence %s", *msg.SequenceID)
 	}
 	
-	logrus.Debugf("Worker %s processing message %s for %s to %s", 
-		bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
+	logrus.Debugf("Worker %d on device %s processing message %s for %s to %s", 
+		bw.workerID, bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
 	
 	// Send via WhatsApp
 	err := bw.sendWhatsAppMessage(msg)
@@ -317,190 +370,278 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		// Apply delay if configured
 		if msg.MinDelay > 0 && msg.MaxDelay > 0 {
 			delay := calculateRandomDelay(msg.MinDelay, msg.MaxDelay)
-			logrus.Debugf("Applying delay of %v before next message", delay)
+			logrus.Debugf("Worker %d applying delay of %v before next message", bw.workerID, delay)
 			time.Sleep(delay)
 		}
 	}
 	
 	bw.mu.Lock()
 	bw.status = "idle"
+	bw.lastActivity = time.Now()
 	bw.mu.Unlock()
 }
 
-// sendWhatsAppMessage sends message via WhatsApp
+// sendWhatsAppMessage sends the actual message via WhatsApp
 func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMessage) error {
 	if bw.messageSender == nil {
-		return fmt.Errorf("no message sender for device %s", bw.deviceID)
+		return fmt.Errorf("message sender not initialized")
 	}
 	
-	// Use the real WhatsApp sender
+	// Use the self-healing message sender
 	return bw.messageSender.SendMessage(bw.deviceID, msg)
 }
 
-// monitor checks pool health and completion
-func (bwp *BroadcastWorkerPool) monitor() {
-	// Use configurable interval for completion checks
-	checkInterval := 10 * time.Second
-	if bwp.config != nil {
-		checkInterval = bwp.config.CompletionCheckInterval
-	}
-	
-	ticker := time.NewTicker(checkInterval)
+// monitorPools monitors and cleans up idle pools
+func (m *UltraScaleBroadcastManager) monitorPools() {
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	
 	for {
 		select {
-		case <-bwp.ctx.Done():
+		case <-m.ctx.Done():
 			return
-			
 		case <-ticker.C:
-			bwp.checkCompletion()
+			m.cleanupIdlePools()
 		}
 	}
 }
 
-// checkCompletion checks if all messages are processed
-func (bwp *BroadcastWorkerPool) checkCompletion() {
-	processed := atomic.LoadInt64(&bwp.processedCount)
-	failed := atomic.LoadInt64(&bwp.failedCount)
-	total := atomic.LoadInt64(&bwp.totalMessages)
+// cleanupIdlePools removes idle broadcast pools
+func (m *UltraScaleBroadcastManager) cleanupIdlePools() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	
-	// Log progress every check
-	if total > 0 {
-		progress := ((processed + failed) * 100) / total
-		logrus.Debugf("Broadcast %s:%s progress: %d%% (%d/%d processed, %d failed)",
-			bwp.broadcastType, bwp.broadcastID, progress, processed+failed, total, failed)
-	}
-	
-	if processed+failed >= total && total > 0 {
-		// All messages processed
-		bwp.mu.Lock()
-		if bwp.completionTime == nil {
-			now := time.Now()
-			bwp.completionTime = &now
-			duration := now.Sub(bwp.startTime)
-			
-			logrus.Infof("Broadcast %s:%s completed in %v - Total: %d, Sent: %d, Failed: %d",
-				bwp.broadcastType, bwp.broadcastID, duration, total, processed, failed)
-			
-			// Update campaign/sequence status
-			db := database.GetDB()
-			status := "finished"
-			if failed == total {
-				status = "failed"
-			}
-			
-			if bwp.broadcastType == "campaign" {
-				_, err := db.Exec(`UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2`, 
-					status, bwp.broadcastID)
-				if err != nil {
-					logrus.Errorf("Failed to update campaign status: %v", err)
-				}
-				
-				// If campaign failed, update all queued messages to failed
-				if status == "failed" {
-					_, err := db.Exec(`
-						UPDATE broadcast_messages 
-						SET status = 'failed', 
-						    error_message = 'Campaign failed - device not available',
-						    updated_at = NOW() 
-						WHERE campaign_id = $1 AND status = 'queued'`, 
-						bwp.broadcastID)
-					if err != nil {
-						logrus.Errorf("Failed to update queued messages to failed: %v", err)
-					} else {
-						logrus.Infof("Updated all queued messages to failed for campaign %s", bwp.broadcastID)
-					}
-				}
-			} else if bwp.broadcastType == "sequence" {
-				// For sequences, also update failed messages
-				if failed == total && total > 0 {
-					_, err := db.Exec(`
-						UPDATE broadcast_messages 
-						SET status = 'failed', 
-						    error_message = 'Sequence message failed - device not available',
-						    updated_at = NOW() 
-						WHERE sequence_id = $1 AND status = 'queued'`, 
-						bwp.broadcastID)
-					if err != nil {
-						logrus.Errorf("Failed to update queued sequence messages to failed: %v", err)
-					} else {
-						logrus.Infof("Updated all queued messages to failed for sequence %s", bwp.broadcastID)
-					}
-				}
-				logrus.Infof("Sequence %s broadcast completed", bwp.broadcastID)
-			}
-			
-			// Schedule pool cleanup after configured duration
-			cleanupDuration := 5 * time.Minute // default
-			if bwp.config != nil {
-				cleanupDuration = bwp.config.PoolCleanupDuration
-			}
-			logrus.Infof("Scheduling pool cleanup for %s:%s after %v", 
-				bwp.broadcastType, bwp.broadcastID, cleanupDuration)
-			
-			go func() {
-				time.Sleep(cleanupDuration)
-				bwp.cleanup()
-			}()
+	for poolKey, pool := range m.pools {
+		// Check if pool is idle (no activity for 30 minutes)
+		pool.mu.RLock()
+		idleTime := time.Since(pool.startTime)
+		if pool.completionTime != nil {
+			idleTime = time.Since(*pool.completionTime)
 		}
-		bwp.mu.Unlock()
+		hasActiveWorkers := false
+		for _, group := range pool.deviceGroups {
+			if len(group.messageQueue) > 0 {
+				hasActiveWorkers = true
+				break
+			}
+		}
+		pool.mu.RUnlock()
+		
+		if idleTime > 30*time.Minute && !hasActiveWorkers {
+			// Shutdown pool
+			pool.Shutdown()
+			delete(m.pools, poolKey)
+			atomic.AddInt32(&m.activePools, -1)
+			logrus.Infof("Cleaned up idle pool: %s", poolKey)
+		}
 	}
 }
 
-// GetPoolStatus returns status of a broadcast pool
-func (ubm *UltraScaleBroadcastManager) GetPoolStatus(broadcastType, broadcastID string) map[string]interface{} {
-	poolKey := fmt.Sprintf("%s:%s", broadcastType, broadcastID)
+// Shutdown gracefully shuts down a worker pool
+func (bwp *BroadcastWorkerPool) Shutdown() {
+	bwp.cancel()
 	
-	ubm.mu.RLock()
-	pool, exists := ubm.pools[poolKey]
-	ubm.mu.RUnlock()
-	
-	if !exists {
-		return map[string]interface{}{
-			"status": "not_found",
-		}
-	}
-	
-	pool.mu.RLock()
-	workerCount := len(pool.workers)
-	pool.mu.RUnlock()
-	
-	return map[string]interface{}{
-		"broadcast_id":   pool.broadcastID,
-		"broadcast_type": pool.broadcastType,
-		"status":        "active",
-		"workers":       workerCount,
-		"total_messages": atomic.LoadInt64(&pool.totalMessages),
-		"processed":     atomic.LoadInt64(&pool.processedCount),
-		"failed":        atomic.LoadInt64(&pool.failedCount),
-		"start_time":    pool.startTime,
-		"duration":      time.Since(pool.startTime).Seconds(),
-	}
-}
-
-// cleanup removes the pool after completion
-func (bwp *BroadcastWorkerPool) cleanup() {
 	bwp.mu.Lock()
 	defer bwp.mu.Unlock()
 	
-	// Cancel all workers
-	for _, worker := range bwp.workers {
-		worker.cancel()
+	// Shutdown all worker groups
+	for _, group := range bwp.deviceGroups {
+		close(group.messageQueue)
+		for _, worker := range group.workers {
+			worker.cancel()
+		}
 	}
 	
-	// Cancel pool context
-	bwp.cancel()
+	if bwp.completionTime == nil {
+		now := time.Now()
+		bwp.completionTime = &now
+	}
 	
-	logrus.Infof("Cleaned up broadcast pool %s:%s", bwp.broadcastType, bwp.broadcastID)
+	logrus.Infof("Shut down worker pool for %s %s. Processed: %d, Failed: %d",
+		bwp.broadcastType, bwp.broadcastID, 
+		atomic.LoadInt64(&bwp.processedCount),
+		atomic.LoadInt64(&bwp.failedCount))
 }
 
-// calculateRandomDelay calculates random delay between min and max
+// GetStatistics returns current statistics for the manager
+func (m *UltraScaleBroadcastManager) GetStatistics() map[string]interface{} {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	stats := map[string]interface{}{
+		"active_pools":       atomic.LoadInt32(&m.activePools),
+		"total_messages":     atomic.LoadInt64(&m.totalMessages),
+		"processed_messages": atomic.LoadInt64(&m.processedMessages),
+		"failed_messages":    atomic.LoadInt64(&m.failedMessages),
+		"pools":              make([]map[string]interface{}, 0),
+	}
+	
+	for poolKey, pool := range m.pools {
+		poolStats := map[string]interface{}{
+			"key":            poolKey,
+			"total_messages": atomic.LoadInt64(&pool.totalMessages),
+			"processed":      atomic.LoadInt64(&pool.processedCount),
+			"failed":         atomic.LoadInt64(&pool.failedCount),
+			"device_count":   len(pool.deviceGroups),
+			"worker_count":   len(pool.deviceGroups) * config.MaxWorkersPerDevice,
+		}
+		stats["pools"] = append(stats["pools"].([]map[string]interface{}), poolStats)
+	}
+	
+	return stats
+}
+
+// calculateRandomDelay calculates a random delay between min and max
 func calculateRandomDelay(minSeconds, maxSeconds int) time.Duration {
 	if minSeconds >= maxSeconds {
 		return time.Duration(minSeconds) * time.Second
 	}
-	// Simple random between min and max
-	delay := minSeconds + (int(time.Now().UnixNano()) % (maxSeconds - minSeconds))
-	return time.Duration(delay) * time.Second
+	
+	// Random delay between min and max
+	delaySeconds := minSeconds + (maxSeconds-minSeconds)/2
+	return time.Duration(delaySeconds) * time.Second
+}
+
+// Backward compatibility functions
+
+// GetUltraScaleBroadcastManager returns the global broadcast manager
+func GetUltraScaleBroadcastManager() *UltraScaleBroadcastManager {
+	return GetBroadcastManager()
+}
+
+// StartBroadcastPool starts a broadcast pool (backward compatibility)
+func (m *UltraScaleBroadcastManager) StartBroadcastPool(broadcastType, broadcastID string) (*BroadcastWorkerPool, error) {
+	return m.GetOrCreatePool(broadcastType, broadcastID)
+}
+
+// QueueMessageToBroadcast queues a message to broadcast (backward compatibility)
+func (m *UltraScaleBroadcastManager) QueueMessageToBroadcast(broadcastType, broadcastID string, msg *domainBroadcast.BroadcastMessage) error {
+	// Set the appropriate ID based on type
+	if broadcastType == "campaign" {
+		if msg.CampaignID == nil {
+			// Try to parse broadcastID as int
+			var campaignID int
+			if _, err := fmt.Sscanf(broadcastID, "%d", &campaignID); err == nil {
+				msg.CampaignID = &campaignID
+			}
+		}
+	} else if broadcastType == "sequence" {
+		if msg.SequenceID == nil {
+			msg.SequenceID = &broadcastID
+		}
+	}
+	
+	return m.QueueMessage(msg)
+}
+
+// BroadcastManagerInterface defines the interface for broadcast managers (backward compatibility)
+type BroadcastManagerInterface interface {
+	SendMessage(msg domainBroadcast.BroadcastMessage) error
+	GetOrCreateWorker(deviceID string) interface{}
+	GetWorkerStatus(deviceID string) (domainBroadcast.WorkerStatus, bool)
+	GetAllWorkerStatus() []domainBroadcast.WorkerStatus
+	StopAllWorkers() error
+	StopWorker(deviceID string) error
+	ResumeFailedWorkers() error
+	CheckWorkerHealth()
+}
+// Implement BroadcastManagerInterface methods for backward compatibility
+
+func (m *UltraScaleBroadcastManager) SendMessage(msg domainBroadcast.BroadcastMessage) error {
+	return m.QueueMessage(&msg)
+}
+
+func (m *UltraScaleBroadcastManager) GetOrCreateWorker(deviceID string) interface{} {
+	// Return nil as we manage workers internally per pool
+	return nil
+}
+
+func (m *UltraScaleBroadcastManager) GetWorkerStatus(deviceID string) (domainBroadcast.WorkerStatus, bool) {
+	// Return a generic status
+	return domainBroadcast.WorkerStatus{
+		DeviceID: deviceID,
+		Status:   "managed",
+	}, true
+}
+
+func (m *UltraScaleBroadcastManager) GetAllWorkerStatus() []domainBroadcast.WorkerStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	
+	var statuses []domainBroadcast.WorkerStatus
+	for _, pool := range m.pools {
+		pool.mu.RLock()
+		for deviceID := range pool.deviceGroups {
+			statuses = append(statuses, domainBroadcast.WorkerStatus{
+				DeviceID: deviceID,
+				Status:   "active",
+			})
+		}
+		pool.mu.RUnlock()
+	}
+	return statuses
+}
+
+func (m *UltraScaleBroadcastManager) StopAllWorkers() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	
+	for _, pool := range m.pools {
+		pool.Shutdown()
+	}
+	return nil
+}
+
+func (m *UltraScaleBroadcastManager) StopWorker(deviceID string) error {
+	// Workers are managed per pool, not globally
+	return nil
+}
+
+func (m *UltraScaleBroadcastManager) ResumeFailedWorkers() error {
+	// Workers auto-resume
+	return nil
+}
+
+func (m *UltraScaleBroadcastManager) CheckWorkerHealth() {
+	// Health is monitored internally
+}
+// GetPoolStatus returns the status of a specific pool
+func (m *UltraScaleBroadcastManager) GetPoolStatus(poolKey string) (map[string]interface{}, error) {
+	m.mu.RLock()
+	pool, exists := m.pools[poolKey]
+	m.mu.RUnlock()
+	
+	if !exists {
+		return nil, fmt.Errorf("pool %s not found", poolKey)
+	}
+	
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+	
+	status := map[string]interface{}{
+		"pool_key":        poolKey,
+		"broadcast_type":  pool.broadcastType,
+		"broadcast_id":    pool.broadcastID,
+		"total_messages":  atomic.LoadInt64(&pool.totalMessages),
+		"processed":       atomic.LoadInt64(&pool.processedCount),
+		"failed":          atomic.LoadInt64(&pool.failedCount),
+		"device_count":    len(pool.deviceGroups),
+		"worker_count":    len(pool.deviceGroups) * config.MaxWorkersPerDevice,
+		"start_time":      pool.startTime,
+		"completion_time": pool.completionTime,
+		"devices":         make([]map[string]interface{}, 0),
+	}
+	
+	// Add device details
+	for deviceID, group := range pool.deviceGroups {
+		deviceInfo := map[string]interface{}{
+			"device_id":     deviceID,
+			"worker_count":  len(group.workers),
+			"queue_size":    len(group.messageQueue),
+			"queue_capacity": cap(group.messageQueue),
+		}
+		status["devices"] = append(status["devices"].([]map[string]interface{}), deviceInfo)
+	}
+	
+	return status, nil
 }

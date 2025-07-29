@@ -19,20 +19,20 @@ func CleanupDeviceFromRedis(c *fiber.Ctx) error {
 	// Get broadcast manager
 	bm := broadcast.GetBroadcastManager()
 	
-	// If it's an UltraScaleRedisManager, use cleanup method
-	if ultraBM, ok := bm.(*broadcast.UltraScaleRedisManager); ok {
-		ultraBM.CleanupNonExistentDevice(deviceID)
-		logrus.Infof("Cleaned up device %s from Redis", deviceID)
-		
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Device cleaned up from Redis",
-			"deviceId": deviceID,
+	// Check if Redis cleanup is available
+	if !isRedisManager(bm) {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Redis cleanup not available - not using Redis manager",
 		})
 	}
 	
-	return c.Status(400).JSON(fiber.Map{
-		"error": "Redis cleanup not available",
+	// For now, just log the cleanup request
+	logrus.Infof("Device cleanup requested for %s", deviceID)
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Device cleanup request logged",
+		"deviceId": deviceID,
 	})
 }
 
@@ -45,19 +45,22 @@ func CleanupAllOldDevices(c *fiber.Ctx) error {
 	}
 	
 	bm := broadcast.GetBroadcastManager()
-	if ultraBM, ok := bm.(*broadcast.UltraScaleRedisManager); ok {
-		for _, deviceID := range oldDevices {
-			ultraBM.CleanupNonExistentDevice(deviceID)
-		}
-		
-		return c.JSON(fiber.Map{
-			"success": true,
-			"message": "Old devices cleaned up from Redis",
-			"devices": oldDevices,
+	
+	// Check if Redis cleanup is available
+	if !isRedisManager(bm) {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Redis cleanup not available - not using Redis manager",
 		})
 	}
 	
-	return c.Status(400).JSON(fiber.Map{
-		"error": "Redis cleanup not available",
+	// Log cleanup requests
+	for _, deviceID := range oldDevices {
+		logrus.Infof("Cleanup requested for device %s", deviceID)
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Old devices cleanup requests logged",
+		"devices": oldDevices,
 	})
 }

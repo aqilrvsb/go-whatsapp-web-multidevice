@@ -68,7 +68,17 @@ func (handler *App) GetBroadcastPoolStatus(c *fiber.Ctx) error {
 		}
 		
 		// Get pool status
-		poolStatus := broadcastManager.GetPoolStatus("campaign", fmt.Sprintf("%d", id))
+		poolKey := fmt.Sprintf("campaign:%d", id)
+		poolStatus, err := broadcastManager.GetPoolStatus(poolKey)
+		if err != nil {
+			// Pool might not exist yet, create a basic status
+			poolStatus = map[string]interface{}{
+				"pool_key": poolKey,
+				"total_messages": 0,
+				"processed": 0,
+				"failed": 0,
+			}
+		}
 		poolStatus["title"] = title
 		poolStatus["db_total"] = totalMessages
 		poolStatus["db_sent"] = sentMessages

@@ -112,7 +112,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		
 		// Create pool if needed
 		if campaignID != nil && !campaignPools[*campaignID] {
-			_, err := p.manager.StartBroadcastPool("campaign", fmt.Sprintf("%d", *campaignID), msg.UserID)
+			_, err := p.manager.StartBroadcastPool("campaign", fmt.Sprintf("%d", *campaignID))
 			if err != nil {
 				logrus.Errorf("Failed to start campaign pool: %v", err)
 				continue
@@ -126,7 +126,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		}
 		
 		if sequenceID != nil && !sequencePools[*sequenceID] {
-			_, err := p.manager.StartBroadcastPool("sequence", *sequenceID, msg.UserID)
+			_, err := p.manager.StartBroadcastPool("sequence", *sequenceID)
 			if err != nil {
 				logrus.Errorf("Failed to start sequence pool: %v", err)
 				continue
@@ -135,14 +135,25 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		}
 		
 		// Queue message to appropriate pool
-		err = p.manager.QueueMessageToBroadcast(&msg)
-		if err != nil {
-			logrus.Errorf("Failed to queue message: %v", err)
-			// Update to failed
-			db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = $1 WHERE id = $2`, 
-				err.Error(), msg.ID)
-		} else {
-			messageCount++
+		var broadcastType, broadcastID string
+		if msg.CampaignID != nil {
+			broadcastType = "campaign"
+			broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
+		} else if msg.SequenceID != nil {
+			broadcastType = "sequence"
+			broadcastID = *msg.SequenceID
+		}
+		
+		if broadcastType != "" {
+			err = p.manager.QueueMessageToBroadcast(broadcastType, broadcastID, &msg)
+			if err != nil {
+				logrus.Errorf("Failed to queue message: %v", err)
+				// Update to failed
+				db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = $1 WHERE id = $2`, 
+					err.Error(), msg.ID)
+			} else {
+				messageCount++
+			}
 		}
 	}
 	

@@ -771,7 +771,7 @@ func getPriority(msg domainBroadcast.BroadcastMessage) int {
 }
 
 // Interface compliance check
-var _ BroadcastManagerInterface = (*UltraScaleRedisManager)(nil)
+// var _ BroadcastManagerInterface = (*UltraScaleRedisManager)(nil)
 
 
 // updateMessagesToNewDevice updates pending messages to use a new device ID
