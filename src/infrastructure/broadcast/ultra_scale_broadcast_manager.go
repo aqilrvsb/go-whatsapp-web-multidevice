@@ -21,6 +21,10 @@ type DeviceWorkerGroup struct {
 	messageQueue  chan *domainBroadcast.BroadcastMessage
 	currentWorker int32 // For round-robin distribution
 	mu            sync.RWMutex
+	
+	// Rate limiting - ensures sequential sending
+	lastSentTime  time.Time
+	sendMutex     sync.Mutex  // Only one worker can send at a time
 }
 
 // BroadcastWorkerPool manages workers per broadcast (campaign/sequence)
@@ -317,13 +321,22 @@ func (bw *BroadcastWorker) process(messageQueue <-chan *domainBroadcast.Broadcas
 	}
 }
 
-// Rest of the file remains the same...
-// processMessage sends a single message (unchanged from original)
+// processMessage sends a single message with rate limiting
 func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage) {
 	bw.mu.Lock()
 	bw.status = "processing"
 	bw.lastActivity = time.Now()
 	bw.mu.Unlock()
+	
+	// Get the device worker group
+	bw.pool.mu.RLock()
+	group, exists := bw.pool.deviceGroups[bw.deviceID]
+	bw.pool.mu.RUnlock()
+	
+	if !exists {
+		logrus.Errorf("Worker %d: Device group not found for %s", bw.workerID, bw.deviceID)
+		return
+	}
 	
 	// Log which broadcast this message belongs to
 	broadcastInfo := "Unknown broadcast"
@@ -333,11 +346,28 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		broadcastInfo = fmt.Sprintf("Sequence %s", *msg.SequenceID)
 	}
 	
-	logrus.Debugf("Worker %d on device %s processing message %s for %s to %s", 
+	// CRITICAL: Acquire send permission (this enforces rate limiting)
+	minDelay := msg.MinDelay
+	maxDelay := msg.MaxDelay
+	if minDelay <= 0 {
+		minDelay = 5  // Default minimum
+	}
+	if maxDelay <= 0 {
+		maxDelay = 15 // Default maximum
+	}
+	
+	// This will block until it's this worker's turn to send
+	group.acquireSendPermission(minDelay, maxDelay)
+	
+	// Now we have exclusive permission to send
+	logrus.Debugf("Worker %d on device %s sending message %s for %s to %s", 
 		bw.workerID, bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
 	
 	// Send via WhatsApp
 	err := bw.sendWhatsAppMessage(msg)
+	
+	// IMPORTANT: Release permission after sending
+	group.releaseSendPermission()
 	
 	db := database.GetDB()
 	if err != nil {
@@ -367,12 +397,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			db.Exec(`SELECT update_sequence_progress($1)`, *msg.SequenceID)
 		}
 		
-		// Apply delay if configured
-		if msg.MinDelay > 0 && msg.MaxDelay > 0 {
-			delay := calculateRandomDelay(msg.MinDelay, msg.MaxDelay)
-			logrus.Debugf("Worker %d applying delay of %v before next message", bw.workerID, delay)
-			time.Sleep(delay)
-		}
+		logrus.Infof("Worker %d successfully sent message to %s", bw.workerID, msg.RecipientPhone)
 	}
 	
 	bw.mu.Lock()
@@ -500,6 +525,31 @@ func calculateRandomDelay(minSeconds, maxSeconds int) time.Duration {
 	// Random delay between min and max
 	delaySeconds := minSeconds + (maxSeconds-minSeconds)/2
 	return time.Duration(delaySeconds) * time.Second
+}
+
+// acquireSendPermission ensures only one worker sends at a time with proper delay
+func (dwg *DeviceWorkerGroup) acquireSendPermission(minDelay, maxDelay int) {
+	dwg.sendMutex.Lock()
+	// Don't unlock here - the worker will unlock after sending
+	
+	// Calculate time since last send
+	timeSinceLastSend := time.Since(dwg.lastSentTime)
+	
+	// Calculate required delay
+	requiredDelay := calculateRandomDelay(minDelay, maxDelay)
+	
+	// If not enough time has passed, wait
+	if timeSinceLastSend < requiredDelay {
+		waitTime := requiredDelay - timeSinceLastSend
+		logrus.Debugf("Device %s: Waiting %v before next send (rate limiting)", dwg.deviceID, waitTime)
+		time.Sleep(waitTime)
+	}
+}
+
+// releaseSendPermission updates last sent time and releases the mutex
+func (dwg *DeviceWorkerGroup) releaseSendPermission() {
+	dwg.lastSentTime = time.Now()
+	dwg.sendMutex.Unlock()
 }
 
 // Backward compatibility functions
