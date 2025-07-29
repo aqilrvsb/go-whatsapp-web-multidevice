@@ -263,7 +263,7 @@
                             <i class="bi bi-search"></i>
                         </span>
                         <input type="text" class="form-control border-start-0" id="searchInput" 
-                               placeholder="Search by name, phone, or niche..." onkeyup="searchLeads()">
+                               placeholder="Search by name, phone, niche, or trigger..." onkeyup="searchLeads()">
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -278,16 +278,27 @@
                 </div>
             </div>
             <div class="row mt-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <div class="d-flex align-items-center">
                         <span class="me-2">Niche:</span>
-                        <div id="nicheFilters">
+                        <div id="nicheFilters" style="max-width: 300px; overflow-x: auto; white-space: nowrap;">
                             <span class="filter-chip active" data-niche="all">All</span>
                             <!-- Dynamic niche filters will be added here -->
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6 text-end">
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Trigger:</span>
+                        <div id="triggerFilters" style="max-width: 300px; overflow-x: auto; white-space: nowrap;">
+                            <span class="filter-chip active" data-trigger="all">All</span>
+                            <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
+                            <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+                            <!-- Dynamic trigger filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                         <label class="form-check-label" for="selectAll">
@@ -464,6 +475,7 @@
         let leads = [];
         let currentFilter = 'all';
         let currentNicheFilter = 'all';
+        let currentTriggerFilter = 'all';
         let leadModal;
         let importModal;
         let bulkUpdateModal;
@@ -488,6 +500,16 @@
                     document.querySelector('#statusFilters .filter-chip.active').classList.remove('active');
                     this.classList.add('active');
                     currentFilter = this.dataset.status;
+                    filterLeads();
+                });
+            });
+            
+            // Setup trigger filter handlers
+            document.querySelectorAll('#triggerFilters .filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    document.querySelector('#triggerFilters .filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentTriggerFilter = this.dataset.trigger;
                     filterLeads();
                 });
             });
@@ -577,6 +599,49 @@
                     filterLeads();
                 });
             });
+            
+            // Build trigger filters too
+            buildTriggerFilters();
+        }
+        
+        // Build trigger filters from leads
+        function buildTriggerFilters() {
+            const triggerSet = new Set();
+            
+            // Collect all unique triggers
+            leads.forEach(lead => {
+                if (lead.trigger) {
+                    const triggers = lead.trigger.split(',').map(t => t.trim());
+                    triggers.forEach(trigger => triggerSet.add(trigger));
+                }
+            });
+            
+            // Build filter HTML
+            const triggerFilters = document.getElementById('triggerFilters');
+            triggerFilters.innerHTML = `
+                <span class="filter-chip active" data-trigger="all">All</span>
+                <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
+                <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+            `;
+            
+            // Add separator if there are triggers
+            if (triggerSet.size > 0) {
+                triggerFilters.innerHTML += '<span style="margin: 0 8px; color: #ccc;">|</span>';
+            }
+            
+            Array.from(triggerSet).sort().forEach(trigger => {
+                triggerFilters.innerHTML += `<span class="filter-chip" data-trigger="${trigger}">${trigger}</span>`;
+            });
+            
+            // Add click handlers
+            triggerFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    triggerFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentTriggerFilter = this.dataset.trigger;
+                    filterLeads();
+                });
+            });
         }
         
         // Create lead card HTML
@@ -649,6 +714,19 @@
                 });
             }
             
+            // Trigger filter
+            if (currentTriggerFilter === 'has-trigger') {
+                filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
+            } else if (currentTriggerFilter === 'no-trigger') {
+                filtered = filtered.filter(lead => !lead.trigger || lead.trigger.trim() === '');
+            } else if (currentTriggerFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.trigger) return false;
+                    const triggers = lead.trigger.split(',').map(t => t.trim());
+                    return triggers.includes(currentTriggerFilter);
+                });
+            }
+            
             // Search filter
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             if (searchTerm) {
@@ -656,6 +734,7 @@
                     lead.name.toLowerCase().includes(searchTerm) ||
                     lead.phone.includes(searchTerm) ||
                     (lead.niche && lead.niche.toLowerCase().includes(searchTerm)) ||
+                    (lead.trigger && lead.trigger.toLowerCase().includes(searchTerm)) ||
                     (lead.journey && lead.journey.toLowerCase().includes(searchTerm))
                 );
             }
