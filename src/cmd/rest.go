@@ -9,6 +9,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
@@ -135,6 +136,13 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Optimize system for 3000 devices
 	broadcast.OptimizeFor3000Devices()
 	
+	// Load all existing WhatsApp sessions on startup
+	go func() {
+		logrus.Info("Waiting 5 seconds before loading WhatsApp devices...")
+		time.Sleep(5 * time.Second)
+		whatsapp.LoadAllDevicesOnStartup()
+	}()
+	
 	// DISABLED - Using self-healing per message instead
 	// healthMonitor := whatsapp.GetDeviceHealthMonitor(whatsappDB)
 	// healthMonitor.Start()
@@ -182,10 +190,6 @@ func restServer(_ *cobra.Command, _ []string) {
 	// Start campaign completion checker
 	go usecase.StartCampaignCompletionChecker()
 	logrus.Info("Campaign completion checker started")
-	
-	// Start automatic device refresh on startup (one-time only)
-	go usecase.StartupDeviceRefresh()
-	logrus.Info("Startup device refresh initiated - will check all devices in 10 seconds")
 	
 	// Auto-reconnect devices on startup - DISABLED
 	// Using MonitorDeviceErrors instead for continuous monitoring
