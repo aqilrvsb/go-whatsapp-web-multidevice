@@ -62,22 +62,9 @@ func (cm *ClientManager) AddClient(deviceID string, client *whatsmeow.Client) {
 
 // GetClient retrieves a WhatsApp client for a device
 func (cm *ClientManager) GetClient(deviceID string) (*whatsmeow.Client, error) {
-	// ALWAYS use DeviceManager as the single source of truth
+	// Use DeviceManager's GetOrRefreshClient for self-healing
 	dm := multidevice.GetDeviceManager()
-	conn, err := dm.GetDeviceConnection(deviceID)
-	if err != nil {
-		return nil, fmt.Errorf("no WhatsApp client found for device %s", deviceID)
-	}
-	
-	if conn.Client == nil {
-		return nil, fmt.Errorf("device %s has nil client", deviceID)
-	}
-	
-	if !conn.Client.IsConnected() {
-		return nil, fmt.Errorf("WhatsApp client for device %s is not connected", deviceID)
-	}
-	
-	return conn.Client, nil
+	return dm.GetOrRefreshClient(deviceID)
 }
 
 // RemoveClient removes a WhatsApp client for a device

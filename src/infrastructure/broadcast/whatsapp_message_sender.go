@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
@@ -88,15 +88,15 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 
 // sendViaWhatsApp sends message via normal WhatsApp with self-healing client refresh
 func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.BroadcastMessage) error {
-	// 🔄 SELF-HEALING: Use WorkerClientManager for automatic refresh
-	wcm := whatsapp.GetWorkerClientManager()
-	waClient, err := wcm.GetOrRefreshClient(deviceID)
+	// 🔄 SELF-HEALING: Use DeviceManager for automatic refresh
+	dm := multidevice.GetDeviceManager()
+	waClient, err := dm.GetOrRefreshClient(deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get/refresh client for device %s: %v", deviceID, err)
 	}
 	
 	// Double-check client health before sending
-	if !wcm.IsClientHealthy(waClient) {
+	if !dm.IsClientHealthy(waClient) {
 		return fmt.Errorf("device %s client is not healthy after refresh", deviceID)
 	}
 	
