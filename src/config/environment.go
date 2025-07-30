@@ -24,6 +24,14 @@ func InitEnvironment() {
 		DBURI = dbUri
 	}
 	
+	// For Railway deployment, use DATABASE_URL for WhatsApp if DB_URI is MySQL
+	if strings.Contains(DBURI, "mysql") {
+		if postgresURL := os.Getenv("DATABASE_URL"); postgresURL != "" {
+			// Override DBURI with PostgreSQL for WhatsApp initialization
+			DBURI = postgresURL
+		}
+	}
+	
 	if basicAuth := os.Getenv("APP_BASIC_AUTH"); basicAuth != "" {
 		AppBasicAuthCredential = strings.Split(basicAuth, ",")
 	}
