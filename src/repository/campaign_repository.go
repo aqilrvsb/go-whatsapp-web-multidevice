@@ -67,7 +67,7 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	
 	query := `
 		INSERT INTO campaigns(user_id, campaign_date, title, niche, target_status, message, image_url, 
-		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, "limit", created_at, updated_at)
+		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, ` + "`limit`" + `, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
@@ -77,12 +77,22 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 		targetStatus = "all"
 	}
 	
-	err := r.db.QueryRow(query, campaign.UserID, campaign.CampaignDate,
+	result, err := r.db.Exec(query, campaign.UserID, campaign.CampaignDate,
 		campaign.Title, campaign.Niche, targetStatus, campaign.Message, campaign.ImageURL,
 		campaign.TimeSchedule, campaign.MinDelaySeconds, campaign.MaxDelaySeconds, 
-		campaign.Status, campaign.AI, campaign.Limit, campaign.CreatedAt, campaign.UpdatedAt).Scan(&campaign.ID)
+		campaign.Status, campaign.AI, campaign.Limit, campaign.CreatedAt, campaign.UpdatedAt)
 		
-	return err
+	if err != nil {
+		return err
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	
+	campaign.ID = int(id)
+	return nil
 }
 
 // GetCampaignByDateAndNiche gets campaigns by date and niche
@@ -126,7 +136,7 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 			COALESCE(time_schedule, '') AS time_schedule,
 			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
-			status, ai, COALESCE("limit", 0) AS campaign_limit, created_at, updated_at
+			status, ai, COALESCE(` + "`limit`" + `, 0) AS campaign_limit, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
@@ -162,7 +172,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 			COALESCE(time_schedule, '') AS time_schedule,
 			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
-			status, ai, COALESCE("limit", 0) AS campaign_limit, created_at, updated_at
+			status, ai, COALESCE(` + "`limit`" + `, 0) AS campaign_limit, created_at, updated_at
 		FROM campaigns
 		WHERE id = ?
 	`
@@ -299,7 +309,7 @@ func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 		SET title = ?, niche = ?, target_status = ?, message = ?, 
 		    image_url = ?, campaign_date = ?, time_schedule = ?,
 		    min_delay_seconds = ?, max_delay_seconds = ?, 
-		    status = ?, ai = ?, "limit" = ?, updated_at = ?
+		    status = ?, ai = ?, ` + "`limit`" + ` = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
 	
@@ -477,7 +487,7 @@ func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, start
 			COALESCE(time_schedule, '') AS time_schedule,
 			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
 			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
-			status, ai, COALESCE("limit", 0) AS campaign_limit, created_at, updated_at
+			status, ai, COALESCE(` + "`limit`" + `, 0) AS campaign_limit, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = ?
 	`

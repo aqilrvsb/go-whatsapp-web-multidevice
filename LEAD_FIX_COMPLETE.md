@@ -95,3 +95,36 @@ The SQL query expects parameters in this order:
 - ✅ Import/Export - Working
 
 All CRUD operations are now fully functional!
+
+
+## Create Lead Fix - Platform Field Issue
+
+### Issue Fixed
+- **Error**: 500 Internal Server Error on POST /api/leads
+- **Root Cause**: Missing Platform field in CreateLead handler causing SQL parameter count mismatch
+
+### Solution Applied
+Added the Platform field to the lead struct creation:
+
+```go
+lead := &models.Lead{
+    // ... other fields ...
+    Platform: "", // Add platform field (empty for manual leads)
+}
+```
+
+The SQL INSERT query expects 12 parameters including `platform`, but the handler wasn't setting it.
+
+### Debug Logging Added
+Added comprehensive debug logging to help diagnose future issues:
+- Logs all field values before query execution
+- Logs any SQL errors with details
+
+### Complete Fix Summary
+1. ✅ **Create Lead** - Fixed missing Platform field
+2. ✅ **Update Lead** - Fixed parameter order
+3. ✅ **Delete Lead** - Working
+4. ✅ **List/Read** - Working
+5. ✅ **Import/Export** - Working
+
+All lead CRUD operations are now fully functional!

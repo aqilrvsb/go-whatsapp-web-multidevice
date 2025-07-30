@@ -201,6 +201,10 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 		step.NextTrigger, step.TriggerDelayHours, step.IsEntryPoint,
 		step.MinDelaySeconds, step.MaxDelaySeconds, step.DelayDays)
 		
+	if err != nil {
+		logrus.Errorf("Failed to create sequence step: %v", err)
+	}
+	
 	return err
 }
 // GetSequenceSteps gets all steps for a sequence
