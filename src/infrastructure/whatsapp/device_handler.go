@@ -56,7 +56,7 @@ func GetDeviceQR(deviceID string) (string, error) {
 	}
 	
 	// Try to get QR with timeout
-	SELECT {
+	select {
 	case qrItem, ok := <-qrChan:
 		if !ok {
 			return "", fmt.Errorf("QR channel closed")
@@ -183,7 +183,7 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 		},
 	}
 	
-	// `trigger` initial sync after connection
+	// trigger initial sync after connection
 	go func() {
 		time.Sleep(3 * time.Second)
 		chats, err := GetChatsForDevice(deviceID)
@@ -297,7 +297,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		jidsToCheck = append(jidsToCheck, phoneJID)
 	}
 	
-	// Tables to clear in `order` (to avoid foreign key violations)
+	// Tables to clear in order (to avoid foreign key violations)
 	clearOperations := []struct {
 		name  string
 		query string

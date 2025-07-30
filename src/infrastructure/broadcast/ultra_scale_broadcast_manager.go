@@ -222,11 +222,11 @@ func (bwp *BroadcastWorkerPool) QueueMessage(msg *domainBroadcast.BroadcastMessa
 	group := bwp.getOrCreateWorkerGroup(msg.DeviceID)
 	
 	// Queue to group with increased timeout (30 seconds instead of 5)
-	SELECT {
+	select {
 	case group.messageQueue <- msg:
 		// Update message status to queued
 		db := database.GetDB()
-		_, err := db.Exec(`UPDATE broadcast_messages SET `status` = 'queued' WHERE id = ?`, msg.ID)
+		_, err := db.Exec(`UPDATE broadcast_messages SET STATUS = 'queued' WHERE id = ?`, msg.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update message status: %v", err)
 		}
@@ -305,7 +305,7 @@ func (bw *BroadcastWorker) process(messageQueue <-chan *domainBroadcast.Broadcas
 		bw.workerID, bw.deviceID, bw.poolID)
 	
 	for {
-		SELECT {
+		select {
 		case <-bw.ctx.Done():
 			logrus.Infof("Worker %d stopped for device %s", bw.workerID, bw.deviceID)
 			return
@@ -360,7 +360,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 	group.acquireSendPermission(minDelay, maxDelay)
 	
 	// Now we have exclusive permission to send
-	logrus.Debugf("Worker %d on device %s sending message %s for %s `to` %s", 
+	logrus.Debugf("Worker %d on device %s sending message %s for %s to %s", 
 		bw.workerID, bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
 	
 	// Send via WhatsApp
@@ -377,7 +377,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.failedCount, 1)
 		}
 		// Update status to failed
-		db.Exec(`UPDATE broadcast_messages SET `status` = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
+		db.Exec(`UPDATE broadcast_messages SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
 			err.Error(), msg.ID)
 		logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
 	} else {
@@ -387,7 +387,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.processedCount, 1)
 		}
 		// Update status to sent
-		db.Exec(`UPDATE broadcast_messages SET `status` = 'sent', sent_at = NOW() WHERE id = ?`, msg.ID)
+		db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ?`, msg.ID)
 		
 		// Update sequence progress if this is a sequence message
 		if msg.SequenceID != nil {
@@ -422,7 +422,7 @@ func (m *UltraScaleBroadcastManager) monitorPools() {
 	defer ticker.Stop()
 	
 	for {
-		SELECT {
+		select {
 		case <-m.ctx.Done():
 			return
 		case <-ticker.C:
@@ -585,7 +585,7 @@ func (m *UltraScaleBroadcastManager) QueueMessageToBroadcast(broadcastType, broa
 }
 
 // BroadcastManagerInterface defines the interface for broadcast managers (backward compatibility)
-`type` BroadcastManagerInterface interface {
+type BroadcastManagerInterface interface {
 	SendMessage(msg domainBroadcast.BroadcastMessage) error
 	GetOrCreateWorker(deviceID string) interface{}
 	GetWorkerStatus(deviceID string) (domainBroadcast.WorkerStatus, bool)
@@ -693,5 +693,5 @@ func (m *UltraScaleBroadcastManager) GetPoolStatus(poolKey string) (map[string]i
 		status["devices"] = append(status["devices"].([]map[string]interface{}), deviceInfo)
 	}
 	
-	return `status`, nil
+	return status, nil
 }

@@ -15,7 +15,7 @@ func StartCampaignStatusMonitor() {
 	defer ticker.Stop()
 	
 	for {
-		SELECT {
+		select {
 		case <-ticker.C:
 			updateCampaignStatuses()
 		}
@@ -33,7 +33,7 @@ func updateCampaignStatuses() {
 		AND (
 			-- Has messages
 			EXISTS (
-				SELECT 1 from broadcast_messages bm 
+				SELECT 1 FROM broadcast_messages bm 
 				WHERE bm.campaign_id = c.id
 			)
 			OR 
@@ -59,13 +59,13 @@ func updateCampaignStatuses() {
 		var oldestQueuedMinutes sql.NullFloat64
 		
 		err := db.QueryRow(`
-			SELECT COUNT(*) as total,
-				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-				COUNT(CASE WHEN status = 'queued' THEN 1 END) as queued,
-				COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped,
-				EXTRACT(EPOCH `from` (CURRENT_TIMESTAMP - MIN(CASE WHEN `status` = 'queued' THEN updated_at END)))/60 as oldest_queued
+			SELECT COUNT(*) AS total,
+				COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
+				COUNT(CASE WHEN status = 'queued' THEN 1 END) AS queued,
+				COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
+				COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
+				COUNT(CASE WHEN status = 'skipped' THEN 1 END) AS skipped,
+				EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(CASE WHEN status = 'queued' THEN updated_at END)))/60 AS oldest_queued
 			FROM broadcast_messages
 			WHERE campaign_id = ?
 		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped, &oldestQueuedMinutes)
@@ -85,7 +85,7 @@ func updateCampaignStatuses() {
 		var deviceCount int
 		err = db.QueryRow(`
 			SELECT COUNT(DISTINCT device_id) 
-			`from` broadcast_messages 
+			FROM broadcast_messages 
 			WHERE campaign_id = ?
 		`, campaignID).Scan(&deviceCount)
 		
@@ -99,7 +99,7 @@ func updateCampaignStatuses() {
 		if total == 0 && currentStatus == "pending" {
 			// No messages created yet but should have been triggered
 			var scheduledAt time.Time
-			err = db.QueryRow(`SELECT scheduled_at from campaigns WHERE id = ?`, campaignID).Scan(&scheduledAt)
+			err = db.QueryRow(`SELECT scheduled_at FROM campaigns WHERE id = ?`, campaignID).Scan(&scheduledAt)
 			if err == nil && scheduledAt.Before(time.Now()) {
 				// Campaign should have been triggered but wasn't - mark as failed
 				newStatus = "failed"
@@ -130,7 +130,7 @@ func updateCampaignStatuses() {
 		// Update status if changed
 		if newStatus != "" && newStatus != currentStatus {
 			_, err = db.Exec(`
-				UPDATE campaigns SET `status` = ?, updated_at = CURRENT_TIMESTAMP 
+				UPDATE campaigns SET status = ?, updated_at = CURRENT_TIMESTAMP 
 				WHERE id = ?
 			`, newStatus, campaignID)
 			
@@ -152,7 +152,7 @@ func updateCampaignStatuses() {
 				if newStatus == "finished" || newStatus == "failed" {
 					coordinator := NewBroadcastCoordinator()
 					var userID string
-					err = db.QueryRow(`SELECT user_id from campaigns WHERE id = ?`, campaignID).Scan(&userID)
+					err = db.QueryRow(`SELECT user_id FROM campaigns WHERE id = ?`, campaignID).Scan(&userID)
 					if err == nil {
 						coordinator.UnlockBroadcast(userID)
 						logrus.Infof("Broadcast lock released for user %s after campaign %d %s", userID, campaignID, newStatus)

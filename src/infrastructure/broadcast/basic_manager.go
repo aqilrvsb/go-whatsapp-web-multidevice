@@ -48,7 +48,7 @@ func (bm *BasicBroadcastManager) Run() {
 	defer ticker.Stop()
 	
 	for {
-		SELECT {
+		select {
 		case <-bm.ctx.Done():
 			bm.StopAllWorkers()
 			return

@@ -34,24 +34,24 @@ func (p *DirectBroadcastProcessor) ProcessDirectEnrollments() (int, error) {
 	query := `
 		SELECT DISTINCT 
 			l.id, l.phone, l.name, l.device_id, l.user_id, 
-			s.id as sequence_id, ss.``trigger`` as entry_trigger
+			s.id AS sequence_id, ss.trigger AS entry_trigger
 		FROM leads l
 		CROSS JOIN sequences s
 		INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
 		WHERE s.is_active = true 
 			AND ss.is_entry_point = true
-			AND l.`trigger` IS NOT NULL 
+			AND l.trigger IS NOT NULL 
 			AND l.trigger != ''
 			AND l.device_id IS NOT NULL 
 			AND l.user_id IS NOT NULL
 			AND position(ss.trigger in l.trigger) > 0
 			AND NOT EXISTS (
-				SELECT 1 from broadcast_messages bm
+				SELECT 1 FROM broadcast_messages bm
 				WHERE bm.sequence_id = s.id 
 				AND bm.recipient_phone = l.phone
 				AND bm.status IN ('pending', 'sent')
 			)
-		`limit` ?
+		LIMIT ?
 	`
 
 	rows, err := p.db.Query(query, p.batchSize)
@@ -90,7 +90,7 @@ func (p *DirectBroadcastProcessor) ProcessDirectEnrollments() (int, error) {
 }
 
 // enrollDirectBroadcast creates all messages directly in broadcast_messages
-func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead models.Lead, `trigger` string) error {
+func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead models.Lead, trigger string) error {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -120,7 +120,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 		var minDelay, maxDelay int
 		err := p.db.QueryRow(`
 			SELECT name, COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15)
-			`from` sequences WHERE id = ?
+			FROM sequences WHERE id = ?
 		`, currentSequenceID).Scan(&sequenceName, &minDelay, &maxDelay)
 		
 		if err != nil {
@@ -130,10 +130,10 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 
 		// Get all steps for this sequence
 		stepsQuery := `
-			SELECT id, day_number, ``trigger``, next_trigger, trigger_delay_hours,
+			SELECT id, day_number, trigger, next_trigger, trigger_delay_hours,
 				   message_type, content, media_url, 
-				   COALESCE(min_delay_seconds, ?) as min_delay,
-				   COALESCE(max_delay_seconds, ?) as max_delay
+				   COALESCE(min_delay_seconds, ?) AS min_delay,
+				   COALESCE(max_delay_seconds, ?) AS max_delay
 			FROM sequence_steps
 			WHERE sequence_id = ?
 			ORDER BY day_number ASC
@@ -243,15 +243,15 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 		if lastStepNextTrigger != "" && !strings.Contains(lastStepNextTrigger, "_day") {
 			var nextSequenceID string
 			err := p.db.QueryRow(`
-				SELECT s.id from sequences s
+				SELECT s.id FROM sequences s
 				INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
-				WHERE ss.is_entry_point = true AND ss.``trigger`` = ?
+				WHERE ss.is_entry_point = true AND ss.trigger = ?
 				LIMIT 1
 			`, lastStepNextTrigger).Scan(&nextSequenceID)
 			
 			if err == nil {
 				currentSequenceID = nextSequenceID
-				logrus.Debugf("Found linked sequence with `trigger` '%s'", lastStepNextTrigger)
+				logrus.Debugf("Found linked sequence with trigger '%s'", lastStepNextTrigger)
 			}
 		}
 	}
@@ -281,8 +281,8 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 }
 
 // removeCompletedTrigger removes trigger from lead after enrollment
-func (p *DirectBroadcastProcessor) removeCompletedTrigger(phone, `trigger` string) {
-	_, err := p.db.Exec("UPDATE leads SET `trigger` = NULL WHERE phone = ?", phone)
+func (p *DirectBroadcastProcessor) removeCompletedTrigger(phone, trigger string) {
+	_, err := p.db.Exec("UPDATE leads SET trigger = NULL WHERE phone = ?", phone)
 	if err != nil {
 		logrus.Errorf("Failed to remove trigger for %s: %v", phone, err)
 	}

@@ -39,8 +39,8 @@ func (bs *BroadcastScheduler) GetScheduleConflicts(userID string, proposedTime t
 	// Get campaigns that might conflict
 	campaignRows, err := db.Query(`
 		SELECT c.id, c.title, c.scheduled_at, c.status,
-		       COUNT(DISTINCT l.id) as message_count
-		from campaigns c
+		       COUNT(DISTINCT l.id) AS message_count
+		FROM campaigns c
 		LEFT JOIN leads l ON l.user_id = c.user_id 
 		    AND (c.target_status = 'all' OR l.status = c.target_status)
 		    AND (c.niche = '' OR c.niche = 'all' OR l.niche = c.niche)
@@ -48,7 +48,7 @@ func (bs *BroadcastScheduler) GetScheduleConflicts(userID string, proposedTime t
 		AND c.status IN ('pending', 'triggered', 'processing')
 		AND c.scheduled_at BETWEEN ? AND ?
 		GROUP BY c.id, c.title, c.scheduled_at, c.status
-		order BY c.scheduled_at
+		ORDER BY c.scheduled_at
 	`, userID, 
 		proposedTime.Add(-2*time.Hour), // Check 2 hours before
 		proposedTime.Add(2*time.Hour))  // Check 2 hours after
@@ -105,12 +105,12 @@ func (bs *BroadcastScheduler) AutoRescheduleCampaigns(userID string) error {
 		SELECT id, title, scheduled_at, 
 		       (SELECT COUNT(*) FROM leads l 
 		        WHERE l.user_id = c.user_id 
-		        AND (c.target_status = 'all' OR l.status = c.target_status)) as lead_count
-		from campaigns c
+		        AND (c.target_status = 'all' OR l.status = c.target_status)) AS lead_count
+		FROM campaigns c
 		WHERE user_id = ? 
-		AND `status` = 'pending'
+		AND status = 'pending'
 		AND scheduled_at >= NOW()
-		`order` BY scheduled_at
+		ORDER BY scheduled_at
 	`, userID)
 	
 	if err != nil {
@@ -199,13 +199,13 @@ func (bs *BroadcastScheduler) GetBroadcastTimeline(userID string, startDate, end
 	// Get campaigns
 	campaignRows, err := db.Query(`
 		SELECT c.id, c.title, c.scheduled_at, c.status,
-		       COUNT(DISTINCT l.id) as message_count
-		from campaigns c
+		       COUNT(DISTINCT l.id) AS message_count
+		FROM campaigns c
 		LEFT JOIN leads l ON l.user_id = c.user_id 
 		WHERE c.user_id = ?
 		AND c.scheduled_at BETWEEN ? AND ?
 		GROUP BY c.id, c.title, c.scheduled_at, c.status
-		order BY c.scheduled_at
+		ORDER BY c.scheduled_at
 	`, userID, startDate, endDate)
 	
 	if err != nil {

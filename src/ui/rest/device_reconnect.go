@@ -105,9 +105,9 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 	var sessionData []byte
 	err = db.QueryRow(`
 		SELECT session 
-		from whatsmeow_sessions 
+		FROM whatsmeow_sessions 
 		WHERE our_jid = ?
-		`limit` 1
+		LIMIT 1
 	`, device.JID).Scan(&sessionData)
 	
 	if err != nil {
@@ -244,7 +244,7 @@ func ReconnectDeviceSession(c *fiber.Ctx) error {
 			connected = true
 			break
 		}
-		SELECT {
+		select {
 		case <-ctx2.Done():
 			break
 		case <-time.After(500 * time.Millisecond):

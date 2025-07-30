@@ -42,9 +42,9 @@ func AutoSaveChatsToLeads(deviceID string, userID string) error {
 		// Check if lead already exists with same device_id, user_id, and phone
 		var existingID string
 		checkQuery := `
-			SELECT id from leads 
+			SELECT id FROM leads 
 			WHERE device_id = ? AND user_id = ? AND phone = ?
-			`limit` 1
+			LIMIT 1
 		`
 		err := db.QueryRow(checkQuery, deviceID, userID, phone).Scan(&existingID)
 		
@@ -116,7 +116,7 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		FROM whatsapp_chats
 		WHERE device_id = ?
 		AND chat_jid NOT IN (
-			SELECT chat_jid from whatsapp_chats WHERE device_id = ?
+			SELECT chat_jid FROM whatsapp_chats WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, chat_jid) DO NOTHING
 	`
@@ -129,14 +129,14 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	copyMessagesQuery := `
 		INSERT INTO whatsapp_messages(
 			device_id, chat_jid, message_id, sender_jid, 
-			message_text, message_`type`, message_secrets, timestamp, created_at
+			message_text, message_type, message_secrets, timestamp, created_at
 		)
 		SELECT ?, chat_jid, message_id, sender_jid,
 			message_text, message_type, message_secrets, timestamp, NOW()
 		FROM whatsapp_messages
 		WHERE device_id = ?
 		AND message_id NOT IN (
-			SELECT message_id from whatsapp_messages WHERE device_id = ?
+			SELECT message_id FROM whatsapp_messages WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, message_id) DO NOTHING
 	`
@@ -149,16 +149,16 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	copyLeadsQuery := `
 		INSERT INTO leads(
 			id, user_id, device_id, name, phone, niche, 
-			status, target_`status`, ```trigger```, journey, created_at, updated_at
+			status, target_status, trigger, journey, created_at, updated_at
 		)
 		SELECT UUID(), user_id, ?, name, phone, niche,
-			`status`, target_status, `trigger`, 
-			COALESCE(journey, '') || E'\n[Copied from device: ' || ? || ']',
+			status, target_status, trigger, 
+			COALESCE(journey, '') || E'\n[Copied FROM device: ' || ? || ']',
 			NOW(), NOW()
 		FROM leads
 		WHERE device_id = ? AND user_id = ?
 		AND phone NOT IN (
-			SELECT phone from leads WHERE device_id = ? AND user_id = ?
+			SELECT phone FROM leads WHERE device_id = ? AND user_id = ?
 		)
 	`
 	_, err = tx.Exec(copyLeadsQuery, newDeviceID, oldDeviceID, userID)

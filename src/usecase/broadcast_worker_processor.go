@@ -21,7 +21,7 @@ func StartBroadcastWorkerProcessor() {
 	defer ticker.Stop()
 	
 	for {
-		SELECT {
+		select {
 		case <-ticker.C:
 			// Get all devices with pending messages
 			devices, err := broadcastRepo.GetDevicesWithPendingMessages()

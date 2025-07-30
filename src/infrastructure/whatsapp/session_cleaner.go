@@ -49,7 +49,7 @@ func ClearAllWhatsAppSessions(db *sql.DB) error {
 		var exists bool
 		err = tx.QueryRow(`
 			SELECT EXISTS (
-				SELECT from information_schema.tables 
+				SELECT FROM information_schema.tables 
 				WHERE table_schema = 'public' 
 				AND table_name = ?
 			)
@@ -88,7 +88,7 @@ func GetWhatsAppSessionInfo(db *sql.DB) (map[string]int, error) {
 	
 	// Check session count
 	var sessionCount int
-	err = db.QueryRow("SELECT COUNT(*) `from` whatsmeow_sessions").Scan(&sessionCount)
+	err = db.QueryRow("SELECT COUNT(*) FROM whatsmeow_sessions").Scan(&sessionCount)
 	if err != nil {
 		logrus.Warnf("Error counting sessions: %v", err)
 	} else {

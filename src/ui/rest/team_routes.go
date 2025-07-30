@@ -59,7 +59,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		var username string
 		var isActive bool
 		err := db.QueryRow(`
-			SELECT id, username, is_active from team_members 
+			SELECT id, username, is_active FROM team_members 
 			WHERE username = ? AND password = ?
 		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username, &isActive)
 
@@ -68,7 +68,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			if err == sql.ErrNoRows {
 				// Check if user exists
 				var count int
-				db.QueryRow("SELECT COUNT(*) `from` team_members WHERE username = ?", loginReq.Username).Scan(&count)
+				db.QueryRow("SELECT COUNT(*) from team_members WHERE username = ?", loginReq.Username).Scan(&count)
 				if count > 0 {
 					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 						"error": "Invalid credentials - password mismatch",
@@ -165,7 +165,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		username := c.Locals("team_username").(string)
 		
 		rows, err := db.Query(`
-			SELECT id, device_name, phone, `status`, jid, last_seen
+			SELECT id, device_name, phone, status, jid, last_seen
 			FROM user_devices
 			WHERE device_name = ?
 		`, username)
@@ -212,14 +212,14 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		// Base query filtered by device
 		query := `
-			SELECT COUNT(DISTINCT c.id) as total_campaigns,
-				COUNT(DISTINCT bm.id) as total_contacts_should_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as contacts_done_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as contacts_failed_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.id END) as contacts_remaining_send
+			SELECT COUNT(DISTINCT c.id) AS total_campaigns,
+				COUNT(DISTINCT bm.id) AS total_contacts_should_send,
+				COUNT(DISTINCT case WHEN bm.status = 'sent' THEN bm.id END) AS contacts_done_send,
+				COUNT(DISTINCT case WHEN bm.status = 'failed' THEN bm.id END) AS contacts_failed_send,
+				COUNT(DISTINCT case WHEN bm.status = 'pending' THEN bm.id END) AS contacts_remaining_send
 			FROM campaigns c
 			LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id
-			WHERE c.device_id IN (SELECT id from user_devices WHERE device_name = ?)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		args := []interface{}{username}
 		paramCount := 1
@@ -260,12 +260,12 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		// Get chart data
 		chartQuery := `
-			SELECT DATE(bm.sent_at) as date,
-				COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) as sent,
-				COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed
+			SELECT DATE(bm.sent_at) AS date,
+				COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) AS sent,
+				COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) AS failed
 			FROM broadcast_messages bm
 			JOIN campaigns c ON bm.campaign_id = c.id
-			WHERE c.device_id IN (SELECT id from user_devices WHERE device_name = ?)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		chartArgs := []interface{}{username}
 		chartParamCount := 1
@@ -319,16 +319,16 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		// Base query filtered by device
 		query := `
-			SELECT COUNT(DISTINCT s.id) as total_sequences,
-				COUNT(DISTINCT ss.id) as total_flows,
-				COUNT(DISTINCT sc.id) as total_contacts_should_send,
-				COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as contacts_done_send,
-				COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.id END) as contacts_failed_send,
-				COUNT(DISTINCT CASE WHEN sc.status = 'pending' THEN sc.id END) as contacts_remaining_send
+			SELECT COUNT(DISTINCT s.id) AS total_sequences,
+				COUNT(DISTINCT ss.id) AS total_flows,
+				COUNT(DISTINCT sc.id) AS total_contacts_should_send,
+				COUNT(DISTINCT case WHEN sc.status = 'completed' THEN sc.id END) AS contacts_done_send,
+				COUNT(DISTINCT case WHEN sc.status = 'failed' THEN sc.id END) AS contacts_failed_send,
+				COUNT(DISTINCT case WHEN sc.status = 'pending' THEN sc.id END) AS contacts_remaining_send
 			FROM sequences s
 			LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id from user_devices WHERE device_name = ?)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		args := []interface{}{username}
 		paramCount := 1
@@ -405,11 +405,11 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		
 		rows, err := db.Query(`
 			SELECT c.id, c.title, c.date, c.niche, c.status
-			from campaigns c
+			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
 			WHERE ud.device_name = ?
-			`order` BY c.date DESC
-			limit 50
+			ORDER BY c.date DESC
+			LIMIT 50
 		`, username)
 
 		if err != nil {
@@ -445,10 +445,10 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		
 		rows, err := db.Query(`
 			SELECT DISTINCT c.niche
-			from campaigns c
+			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
 			WHERE ud.device_name = ? AND c.niche IS NOT NULL AND c.niche != ''
-			`order` BY c.niche
+			ORDER BY c.niche
 		`, username)
 
 		if err != nil {
@@ -476,9 +476,9 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			WHERE EXISTS (
 				SELECT 1 FROM sequence_contacts sc
 				WHERE sc.sequence_id = s.id
-				AND sc.device_id IN (SELECT id from user_devices WHERE device_name = ?)
+				AND sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 			)
-			`order` BY s.created_at DESC
+			ORDER BY s.created_at DESC
 		`, username)
 
 		if err != nil {
@@ -521,15 +521,15 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			SELECT s.id, 
 				s.name, 
 				s.niche,
-				COUNT(DISTINCT sc.id) as total_contacts,
-				COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed,
-				COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.id END) as failed,
-				COUNT(DISTINCT CASE WHEN sc.status = 'pending' THEN sc.id END) as pending
+				COUNT(DISTINCT sc.id) AS total_contacts,
+				COUNT(DISTINCT case WHEN sc.status = 'completed' THEN sc.id END) AS completed,
+				COUNT(DISTINCT case WHEN sc.status = 'failed' THEN sc.id END) AS failed,
+				COUNT(DISTINCT case WHEN sc.status = 'pending' THEN sc.id END) AS pending
 			FROM sequences s
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id from user_devices WHERE device_name = ?)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 			GROUP BY s.id, s.name, s.niche
-			order BY s.created_at DESC
+			ORDER BY s.created_at DESC
 		`, username)
 
 		if err != nil {
@@ -577,7 +577,7 @@ func TeamAuthMiddleware(db *sql.DB) fiber.Handler {
 		var username string
 		err := db.QueryRow(`
 			SELECT tm.username
-			from team_sessions ts
+			FROM team_sessions ts
 			JOIN team_members tm ON ts.team_member_id = tm.id
 			WHERE ts.session_id = ? AND ts.expires_at > NOW()
 		`, sessionID).Scan(&username)

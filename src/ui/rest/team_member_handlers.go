@@ -637,7 +637,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
 	var totalSequences int
 	query := `
 		SELECT COUNT(DISTINCT s.id) 
-		`from` sequences s
+		FROM sequences s
 		JOIN sequence_contacts sc ON s.id = sc.sequence_id
 		WHERE sc.processing_device_id = ANY(?)
 	`
@@ -649,16 +649,16 @@ func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
 	// Count total flows
 	query = `
 		SELECT COUNT(DISTINCT sequence_stepid) 
-		`from` sequence_contacts 
+		FROM sequence_contacts 
 		WHERE processing_device_id = ANY(?)
 	`
 	db.QueryRow(query, pq.Array(deviceIDs)).Scan(&totalFlows)
 	
 	// Count contacts
 	query = `
-		SELECT COUNT(*) as total,
-			COUNT(CASE WHEN status = 'sent' THEN 1 END) as done,
-			COUNT(CASE WHEN `status` = 'failed' THEN 1 END) as failed
+		SELECT COUNT(*) AS total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS done,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
 		FROM sequence_contacts
 		WHERE processing_device_id = ANY(?)
 	`
@@ -672,7 +672,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
 	// Get recent sequences
 	recentSequences := []map[string]interface{}{}
 	query = `
-		SELECT DISTINCT s.id, s.name, s.`trigger`, s.niche, s.status
+		SELECT DISTINCT s.id, s.name, s.trigger, s.niche, s.status
 		FROM sequences s
 		JOIN sequence_contacts sc ON s.id = sc.sequence_id
 		WHERE sc.processing_device_id = ANY(?)
@@ -694,9 +694,9 @@ func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
 				// Get stats for this sequence
 				var seqShould, seqDone, seqFailed int
 				statsQuery := `
-					SELECT COUNT(*) as total,
-						COUNT(CASE WHEN status = 'sent' THEN 1 END) as done,
-						COUNT(CASE WHEN `status` = 'failed' THEN 1 END) as failed
+					SELECT COUNT(*) AS total,
+						COUNT(CASE WHEN status = 'sent' THEN 1 END) AS done,
+						COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
 					FROM sequence_contacts
 					WHERE sequence_id = ? AND processing_device_id = ANY(?)
 				`
@@ -705,7 +705,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesSummary(c *fiber.Ctx) error {
 				recentSequences = append(recentSequences, map[string]interface{}{
 					"id":              seq.ID,
 					"name":            seq.Name,
-					"`trigger`":         seq.Trigger,
+					"trigger":         seq.Trigger,
 					"niche":           seq.Niche,
 					"status":          seq.Status,
 					"should_send":     seqShould,
@@ -757,7 +757,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesAnalytics(c *fiber.Ctx) error {
 func campaignUsesDevice(campaignID int64, deviceID string) bool {
 	db := database.GetDB()
 	var count int
-	query := `SELECT COUNT(*) `from` broadcast_messages WHERE campaign_id = ? AND device_id = ?`
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ?`
 	db.QueryRow(query, campaignID, deviceID).Scan(&count)
 	return count > 0
 }
@@ -768,16 +768,16 @@ func getCampaignDeviceStats(campaignID int64, deviceID string) (shouldSend, done
 	
 	// Get total messages for this device
 	var total int
-	query := `SELECT COUNT(*) `from` broadcast_messages WHERE campaign_id = ? AND device_id = ?`
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ?`
 	db.QueryRow(query, campaignID, deviceID).Scan(&total)
 	shouldSend = total
 	
 	// Get sent messages
-	query = `SELECT COUNT(*) `from` broadcast_messages WHERE campaign_id = ? AND device_id = ? AND `status` = 'sent'`
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ? AND status = 'sent'`
 	db.QueryRow(query, campaignID, deviceID).Scan(&doneSend)
 	
 	// Get failed messages
-	query = `SELECT COUNT(*) `from` broadcast_messages WHERE campaign_id = ? AND device_id = ? AND `status` = 'failed'`
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ? AND status = 'failed'`
 	db.QueryRow(query, campaignID, deviceID).Scan(&failedSend)
 	
 	return
@@ -812,10 +812,10 @@ func (h *TeamMemberHandlers) GetTeamCampaigns(c *fiber.Ctx) error {
 	db := database.GetDB()
 	query := `
 		SELECT DISTINCT c.* 
-		`from` campaigns c
+		FROM campaigns c
 		INNER JOIN broadcast_messages bm ON c.id = bm.campaign_id
 		WHERE bm.device_id = ANY(?)
-		`order` BY c.created_at DESC
+		ORDER BY c.created_at DESC
 	`
 	
 	rows, err := db.Query(query, pq.Array(deviceIDs))
@@ -891,7 +891,7 @@ func (h *TeamMemberHandlers) GetTeamCampaignDetails(c *fiber.Ctx) error {
 	// Get campaign details with stats
 	db := database.GetDB()
 	var campaign models.Campaign
-	query := `SELECT * `from` campaigns WHERE id = ?`
+	query := `SELECT * FROM campaigns WHERE id = ?`
 	err = db.QueryRow(query, campaignID).Scan(
 		&campaign.ID,
 		&campaign.UserID,
@@ -922,9 +922,9 @@ func (h *TeamMemberHandlers) GetTeamCampaignDetails(c *fiber.Ctx) error {
 	// Get stats for member's devices only
 	var totalRecipients, messagesSent, messagesFailed int
 	statsQuery := `
-		SELECT COUNT(*) as total,
-			COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-			COUNT(CASE WHEN `status` = 'failed' THEN 1 END) as failed
+		SELECT COUNT(*) AS total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
 		FROM broadcast_messages 
 		WHERE campaign_id = ? AND device_id = ANY(?)
 	`
@@ -963,11 +963,11 @@ func (h *TeamMemberHandlers) GetTeamSequences(c *fiber.Ctx) error {
 	db := database.GetDB()
 	query := `
 		SELECT DISTINCT s.* 
-		`from` sequences s
+		FROM sequences s
 		INNER JOIN sequence_contacts sc ON s.id = sc.sequence_id
 		INNER JOIN user_devices ud ON sc.processing_device_id = ud.id
 		WHERE ud.device_name = ?
-		`order` BY s.created_at DESC
+		ORDER BY s.created_at DESC
 	`
 	
 	rows, err := db.Query(query, member.Username)
@@ -1020,7 +1020,7 @@ func (h *TeamMemberHandlers) GetTeamSequenceDetails(c *fiber.Ctx) error {
 	// Get sequence details with stats for member's devices
 	db := database.GetDB()
 	var sequence models.Sequence
-	query := `SELECT * `from` sequences WHERE id = ?`
+	query := `SELECT * FROM sequences WHERE id = ?`
 	err := db.QueryRow(query, sequenceID).Scan(
 		&sequence.ID,
 		&sequence.UserID,
@@ -1040,17 +1040,17 @@ func (h *TeamMemberHandlers) GetTeamSequenceDetails(c *fiber.Ctx) error {
 	
 	// Get total flows
 	var totalFlows int
-	db.QueryRow("SELECT COUNT(*) `from` sequence_steps WHERE sequence_id = ?", sequenceID).Scan(&totalFlows)
+	db.QueryRow("SELECT COUNT(*) from sequence_steps WHERE sequence_id = ?", sequenceID).Scan(&totalFlows)
 	
 	// Get stats for member's devices
 	statsQuery := `
-		SELECT COUNT(DISTINCT l.id) as should_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as done_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as failed_send
-		from leads l
+		SELECT COUNT(DISTINCT l.id) AS should_send,
+			COUNT(DISTINCT case WHEN sc.status = 'sent' THEN sc.contact_phone END) AS done_send,
+			COUNT(DISTINCT case WHEN sc.status = 'failed' THEN sc.contact_phone END) AS failed_send
+		FROM leads l
 		LEFT JOIN sequence_contacts sc ON sc.contact_phone = l.phone AND sc.sequence_id = ?
 		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
-		WHERE l.`trigger` LIKE CONCAT('%', ?, '%') 
+		WHERE l.trigger LIKE CONCAT('%', ?, '%') 
 		AND (ud.device_name = ? OR ud.device_name IS NULL)
 	`
 	
@@ -1060,12 +1060,12 @@ func (h *TeamMemberHandlers) GetTeamSequenceDetails(c *fiber.Ctx) error {
 	// Get flow details
 	flowQuery := `
 		SELECT ss.day_number,
-			COUNT(DISTINCT l.id) as should_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as done_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as failed_send
-		from sequence_steps ss
+			COUNT(DISTINCT l.id) AS should_send,
+			COUNT(DISTINCT case WHEN sc.status = 'sent' THEN sc.contact_phone END) AS done_send,
+			COUNT(DISTINCT case WHEN sc.status = 'failed' THEN sc.contact_phone END) AS failed_send
+		FROM sequence_steps ss
 		LEFT JOIN sequence_contacts sc ON sc.sequence_stepid = ss.id
-		LEFT JOIN leads l ON l.`trigger` LIKE CONCAT('%', ?, '%')
+		LEFT JOIN leads l ON l.trigger LIKE CONCAT('%', ?, '%')
 		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
 		WHERE ss.sequence_id = ? 
 		AND (ud.device_name = ? OR ud.device_name IS NULL)
@@ -1161,11 +1161,11 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 	
 	db := database.GetDB()
 	campaignQuery := `
-		SELECT COUNT(DISTINCT c.id) as total_campaigns,
-			COUNT(bm.id) as total_should_send,
-			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) as total_done_send,
-			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as total_failed_send
-		from campaigns c
+		SELECT COUNT(DISTINCT c.id) AS total_campaigns,
+			COUNT(bm.id) AS total_should_send,
+			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) AS total_done_send,
+			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) AS total_failed_send
+		FROM campaigns c
 		LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id
 		WHERE bm.device_id = ANY(?)
 	`
@@ -1197,14 +1197,14 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 	
 	// Sequence analytics (filtered by member's devices)
 	sequenceQuery := `
-		SELECT COUNT(DISTINCT s.id) as total_sequences,
-			COUNT(DISTINCT ss.id) as total_flows,
-			COUNT(DISTINCT l.id) as total_should_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'sent' THEN sc.contact_phone END) as total_done_send,
-			COUNT(DISTINCT CASE WHEN sc.status = 'failed' THEN sc.contact_phone END) as total_failed_send
-		from sequences s
+		SELECT COUNT(DISTINCT s.id) AS total_sequences,
+			COUNT(DISTINCT ss.id) AS total_flows,
+			COUNT(DISTINCT l.id) AS total_should_send,
+			COUNT(DISTINCT case WHEN sc.status = 'sent' THEN sc.contact_phone END) AS total_done_send,
+			COUNT(DISTINCT case WHEN sc.status = 'failed' THEN sc.contact_phone END) AS total_failed_send
+		FROM sequences s
 		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
-		LEFT JOIN leads l ON l.`trigger` LIKE '%' || s.trigger || '%'
+		LEFT JOIN leads l ON l.trigger LIKE '%' || s.trigger || '%'
 		LEFT JOIN sequence_contacts sc ON sc.sequence_id = s.id AND sc.contact_phone = l.phone
 		LEFT JOIN user_devices ud ON sc.processing_device_id = ud.id
 		WHERE ud.device_name = ?
@@ -1232,14 +1232,14 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 	
 	// Chart data - Campaign performance over time
 	chartQuery := `
-		SELECT DATE(bm.created_at) as date,
-			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) as sent,
-			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed
-		from broadcast_messages bm
+		SELECT DATE(bm.created_at) AS date,
+			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) AS sent,
+			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) AS failed
+		FROM broadcast_messages bm
 		WHERE bm.device_id = ANY(?)
 		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
 		GROUP BY DATE(bm.created_at)
-		`order` BY date
+		ORDER BY date
 	`
 	
 	chartRows, _ := db.Query(chartQuery, pq.Array(deviceIDs))
@@ -1267,13 +1267,13 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 	
 	// Time-based chart (hourly distribution)
 	timeChartQuery := `
-		SELECT EXTRACT(HOUR FROM bm.created_at) as hour,
-			COUNT(*) as count
+		SELECT EXTRACT(HOUR FROM bm.created_at) AS hour,
+			COUNT(*) AS COUNT
 		FROM broadcast_messages bm
 		WHERE bm.device_id = ANY(?)
 		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
-		GROUP BY EXTRACT(HOUR from bm.created_at)
-		`order` BY hour
+		GROUP BY EXTRACT(HOUR FROM bm.created_at)
+		ORDER BY hour
 	`
 	
 	timeRows, _ := db.Query(timeChartQuery, pq.Array(deviceIDs))
@@ -1318,11 +1318,11 @@ func (h *TeamMemberHandlers) GetTeamNiches(c *fiber.Ctx) error {
 	db := database.GetDB()
 	query := `
 		SELECT DISTINCT l.niche 
-		from leads l
+		FROM leads l
 		INNER JOIN broadcast_messages bm ON bm.phone = l.phone
 		INNER JOIN user_devices ud ON bm.device_id = ud.id::text
 		WHERE ud.device_name = ? AND l.niche IS NOT NULL AND l.niche != ''
-		`order` BY l.niche
+		ORDER BY l.niche
 	`
 	
 	rows, err := db.Query(query, member.Username)

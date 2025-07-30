@@ -148,7 +148,7 @@ func (rm *RedisOptimizedBroadcastManager) SendMessage(msg domainBroadcast.Broadc
 // processQueues continuously processes messages from Redis queues
 func (rm *RedisOptimizedBroadcastManager) processQueues() {
 	for {
-		SELECT {
+		select {
 		case <-rm.ctx.Done():
 			return
 		default:
@@ -288,7 +288,7 @@ func (rm *RedisOptimizedBroadcastManager) checkRateLimit(deviceID string) bool {
 	}
 	
 	// Check hour rate limit (500/hour)
-	hourKey := fmt.Sprintf("%s:hour:%d", `key`, time.Now().Unix()/3600)
+	hourKey := fmt.Sprintf("%s:hour:%d", key, time.Now().Unix()/3600)
 	count, _ = rm.redisClient.Incr(rm.ctx, hourKey).Result()
 	rm.redisClient.Expire(rm.ctx, hourKey, 2*time.Hour)
 	
@@ -296,7 +296,7 @@ func (rm *RedisOptimizedBroadcastManager) checkRateLimit(deviceID string) bool {
 		return false
 	}
 	
-	// Check day rate `limit` (5000/day)
+	// Check day rate LIMIT (5000/day)
 	dayKey := fmt.Sprintf("%s:day:%s", key, time.Now().Format("2006-01-02"))
 	count, _ = rm.redisClient.Incr(rm.ctx, dayKey).Result()
 	rm.redisClient.Expire(rm.ctx, dayKey, 25*time.Hour)
@@ -357,7 +357,7 @@ func (rm *RedisOptimizedBroadcastManager) monitorWorkers() {
 	defer ticker.Stop()
 	
 	for {
-		SELECT {
+		select {
 		case <-rm.ctx.Done():
 			return
 		case <-ticker.C:
@@ -426,7 +426,7 @@ func (rm *RedisOptimizedBroadcastManager) incrementMetric(metric string) {
 func (rm *RedisOptimizedBroadcastManager) updateProcessingTime(deviceID string, duration time.Duration) {
 	key := fmt.Sprintf("%s%s:processing_time", metricsPrefix, deviceID)
 	rm.redisClient.LPush(rm.ctx, key, duration.Milliseconds())
-	rm.redisClient.LTrim(rm.ctx, `key`, 0, 99) // Keep last 100 values
+	rm.redisClient.LTrim(rm.ctx, key, 0, 99) // Keep last 100 values
 }
 
 func (rm *RedisOptimizedBroadcastManager) updateWorkerStatus(deviceID, status string) {

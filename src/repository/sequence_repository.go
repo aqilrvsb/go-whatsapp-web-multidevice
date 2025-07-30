@@ -91,7 +91,8 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 }
 // GetSequenceByID gets sequence by ID
 func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequence, error) {
-	`
+	query := `
+
 		SELECT id, user_id, device_id, name, description, niche, status, 
 		       COALESCE(start_trigger, '') AS start_trigger,
 		       COALESCE(end_trigger, '') AS end_trigger,
@@ -127,7 +128,8 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	sequence.UpdatedAt = time.Now()
 	
-	`
+	query := `
+
 		UPDATE sequences 
 		SET name = ?, description = ?, niche = ?, status = ?, 
 		    start_trigger = ?, end_trigger = ?, total_days = ?, 
@@ -285,7 +287,8 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 	contact.CurrentStep = 0
 	contact.Status = "active"
 
-	`
+	query := `
+
 		INSERT INTO sequence_contacts(id, sequence_id, contact_phone, contact_name, current_step, status, completed_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
@@ -298,7 +301,8 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 }
 // GetSequenceContacts gets all contacts in a sequence
 func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.SequenceContact, error) {
-	`
+	query := `
+
 		SELECT id, sequence_id, contact_phone, contact_name, current_step, status, 
 			   completed_at
 		FROM sequence_contacts
@@ -329,7 +333,8 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 
 // GetActiveSequenceContacts gets contacts ready for next message
 func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([]models.SequenceContact, error) {
-	`
+	query := `
+
 		SELECT sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name, 
 			   sc.current_step, sc.status, sc.completed_at
 		FROM sequence_contacts sc
@@ -360,7 +365,8 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 }
 // UpdateContactProgress updates contact's progress in sequence
 func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep int, status string) error {
-	`
+	query := `
+
 		UPDATE sequence_contacts 
 		SET current_step = ?, status = ?
 		WHERE id = ?
@@ -373,7 +379,8 @@ func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep
 // MarkContactCompleted marks contact as completed
 func (r *sequenceRepository) MarkContactCompleted(contactID string) error {
 	now := time.Now()
-	`
+	query := `
+
 		UPDATE sequence_contacts SET status = 'completed', completed_at = ?
 		WHERE id = ?
 	`
@@ -387,7 +394,8 @@ func (r *sequenceRepository) CreateSequenceLog(log *models.SequenceLog) error {
 	log.ID = uuid.New().String()
 	log.SentAt = time.Now()
 
-	`
+	query := `
+
 		INSERT INTO sequence_logs(id, sequence_id, contact_id, step_id, day, status, message_id, error_message, sent_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
@@ -403,7 +411,8 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	stats := make(map[string]int)
 	
 	// Get contact counts by status
-	`
+	query := `
+
 		SELECT status, COUNT(*) AS count
 		FROM sequence_contacts
 		WHERE sequence_id = ?
@@ -439,7 +448,8 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 
 // GetActiveSequencesWithNiche gets all active sequences that have a niche
 func (r *sequenceRepository) GetActiveSequencesWithNiche() ([]models.Sequence, error) {
-	`
+	query := `
+
 		SELECT id, user_id, device_id, name, description, niche, total_days, is_active, created_at, updated_at
 		FROM sequences
 		WHERE is_active = true

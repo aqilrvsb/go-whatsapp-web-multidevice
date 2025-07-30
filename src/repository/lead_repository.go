@@ -192,7 +192,8 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 
 // GetNewLeadsForSequence gets new leads matching niche that aren't in sequence
 func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]models.Lead, error) {
-	`
+	query := `
+
 		SELECT l.id, l.user_id, l.name, l.phone, l.niche, 
 		       l.journey, l.status, l.created_at, l.updated_at
 		FROM leads l

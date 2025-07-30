@@ -111,7 +111,7 @@ func (km *KeepaliveManager) runKeepalive(deviceID string, client *whatsmeow.Clie
 		// Calculate random interval
 		interval := minInterval + time.Duration(rand.Int63n(int64(maxInterval-minInterval)))
 		
-		SELECT {
+		select {
 		case <-stop:
 			return
 		case <-km.ctx.Done():

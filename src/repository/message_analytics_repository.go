@@ -199,7 +199,8 @@ func (r *MessageAnalyticsRepository) GetDeviceAnalytics(deviceID string, days in
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
 	
-	`
+	query := `
+
 		SELECT COUNT(CASE WHEN is_from_me = true THEN 1 END) AS messages_sent,
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) AS messages_received,
 			COUNT(DISTINCT jid) AS unique_contacts

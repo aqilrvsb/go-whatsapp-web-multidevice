@@ -216,7 +216,7 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 
 // GetUserBroadcastStats gets broadcast statistics for a user
 func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]interface{}, error) {
-	`
+	query := `
 		SELECT COUNT(*) AS total,
 			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
@@ -250,7 +250,7 @@ func max(a, b int) int {
 
 // GetAllPendingMessages gets all pending messages across all devices
 func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
-	`
+	query := `
 		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
 		       message_type, content, media_url, status, scheduled_at, created_at,
 		       group_id, group_order
@@ -309,7 +309,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 
 // GetDevicesWithPendingMessages gets all device IDs that have pending messages
 func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) {
-	`
+	query := `
 		SELECT DISTINCT device_id 
 		FROM broadcast_messages 
 		WHERE status = 'pending' 

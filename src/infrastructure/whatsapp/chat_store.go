@@ -99,7 +99,7 @@ func GetChatName(client *whatsmeow.Client, jid types.JID, chatJID string) string
 	return jid.User
 }
 
-// HandleMessageForChats processes messages and updates chat list
+// HandleMessageForChats processes messages AND updates chat list
 func HandleMessageForChats(deviceID string, client *whatsmeow.Client, evt *events.Message) {
 	// Skip non-personal chats for WhatsApp Web
 	if evt.Info.Chat.Server != types.DefaultUserServer {
@@ -126,7 +126,7 @@ func HandleMessageForChats(deviceID string, client *whatsmeow.Client, evt *event
 	NotifyChatUpdate(deviceID)
 }
 
-// HandleHistorySyncForChats processes history sync and updates chat list
+// HandleHistorySyncForChats processes history sync AND updates chat list
 func HandleHistorySyncForChats(deviceID string, client *whatsmeow.Client, evt *events.HistorySync) {
 	logrus.Infof("Processing history sync for chats - device %s", deviceID)
 	
@@ -204,7 +204,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 	CreateChatTable()
 	
 	// Query to get chats based on messages only (not relying on whatsapp_chats table)
-	// This ensures we only show chats where messages have been exchanged
+	// This ensures we only show chats WHERE messages have been exchanged
 	query := `
 		WITH recent_messages AS (
 			SELECT DISTINCT ON (chat_jid)
@@ -213,7 +213,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				message_text,
 				message_type,
 				timestamp
-			from whatsapp_messages
+			FROM whatsapp_messages
 			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'  -- Exclude groups
 				AND chat_jid NOT LIKE '%@broadcast'  -- Exclude broadcasts
@@ -225,7 +225,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 		),
 		chat_counts AS (
 			SELECT chat_jid,
-				COUNT(*) as message_count
+				COUNT(*) AS message_count
 			FROM whatsapp_messages
 			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'
@@ -233,18 +233,17 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				AND chat_jid != 'status@broadcast'
 			GROUP BY chat_jid
 		)
-		SELECT 
-			rm.chat_jid,
-			COALESCE(c.chat_name, SPLIT_PART(rm.chat_jid, '@', 1)) as chat_name,
+		SELECT rm.chat_jid,
+			COALESCE(c.chat_name, SPLIT_PART(rm.chat_jid, '@', 1)) AS chat_name,
 			rm.message_text,
 			rm.message_type,
 			rm.timestamp,
 			cc.message_count
-		from recent_messages rm
+		FROM recent_messages rm
 		LEFT JOIN whatsapp_chats c ON c.device_id = ? AND c.chat_jid = rm.chat_jid
 		LEFT JOIN chat_counts cc ON cc.chat_jid = rm.chat_jid
 		WHERE cc.message_count > 0  -- Only show chats with at least one message
-		order BY rm.timestamp DESC
+		ORDER BY rm.timestamp DESC
 	`
 	
 	rows, err := db.Query(query, deviceID)
@@ -322,21 +321,20 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 		WITH recent_messages AS (
 			SELECT DISTINCT
 				chat_jid,
-				FIRST_VALUE(message_text) OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) as last_message,
-				MAX(timestamp) OVER (PARTITION BY chat_jid) as last_timestamp
+				FIRST_VALUE(message_text) OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) AS last_message,
+				MAX(timestamp) OVER (PARTITION BY chat_jid) AS last_timestamp
 			FROM whatsapp_messages
 			WHERE device_id = ?
 				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '%d days')::BIGINT
 		)
-		SELECT 
-			c.chat_jid,
+		SELECT c.chat_jid,
 			c.chat_name,
 			rm.last_message,
 			rm.last_timestamp
-		from whatsapp_chats c
+		FROM whatsapp_chats c
 		INNER JOIN recent_messages rm ON c.chat_jid = rm.chat_jid
 		WHERE c.device_id = ?
-		`order` BY rm.last_timestamp DESC
+		ORDER BY rm.last_timestamp DESC
 	`
 	
 	formattedQuery := fmt.Sprintf(query, days)

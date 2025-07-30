@@ -29,7 +29,7 @@ func checkCampaignCompletions() {
 	// Get all campaigns that are marked as 'triggered' 
 	query := `
 		SELECT DISTINCT c.id, c.title
-		from campaigns c
+		FROM campaigns c
 		WHERE c.status = 'triggered'
 	`
 
@@ -51,8 +51,8 @@ func checkCampaignCompletions() {
 		var pendingCount int
 		checkQuery := `
 			SELECT COUNT(*) 
-			`from` broadcast_messages 
-			WHERE campaign_id = ? AND `status` = 'pending'
+			FROM broadcast_messages 
+			WHERE campaign_id = ? AND status = 'pending'
 		`
 		err := db.QueryRow(checkQuery, campaignID).Scan(&pendingCount)
 		if err != nil {
@@ -64,8 +64,8 @@ func checkCampaignCompletions() {
 			// Check total messages sent and failed
 			var sentCount, failedCount int
 			statsQuery := `
-				SELECT COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-					COUNT(CASE WHEN `status` = 'failed' THEN 1 END) as failed
+				SELECT COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
+					COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
 				FROM broadcast_messages 
 				WHERE campaign_id = ?
 			`

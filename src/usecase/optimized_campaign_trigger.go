@@ -33,10 +33,10 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 	// Query campaigns that are ready to send using TIMESTAMPTZ
 	query := `
 		SELECT c.id, c.user_id, c.title, c.message, c.niche, 
-			COALESCE(c.target_status, 'all') as target_status, 
-			COALESCE(c.image_url, '') as image_url, c.min_delay_seconds, c.max_delay_seconds,
+			COALESCE(c.target_status, 'all') AS target_status, 
+			COALESCE(c.image_url, '') AS image_url, c.min_delay_seconds, c.max_delay_seconds,
 			c.campaign_date, c.time_schedule
-		from campaigns c
+		FROM campaigns c
 		WHERE c.status = 'pending'
 		AND (
 			-- If scheduled_at exists, use it
@@ -46,7 +46,7 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 			(c.scheduled_at IS NULL AND 
 			 (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP)
 		)
-		`order` BY COALESCE(c.scheduled_at, (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')
+		ORDER BY COALESCE(c.scheduled_at, (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')
 	`
 	
 	rows, err := oct.db.Query(query)
@@ -175,7 +175,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	// Update campaign status to triggered after queueing
 	if successful > 0 {
 		// Only mark as triggered if we actually queued some messages
-		_, err = oct.db.Exec("UPDATE campaigns SET `status` = 'triggered', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
+		_, err = oct.db.Exec("UPDATE campaigns SET status = 'triggered', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update campaign status to triggered: %v", err)
 		}
@@ -183,7 +183,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 			campaign.Title, successful, failed)
 	} else {
 		// No messages queued, mark as finished
-		_, err = oct.db.Exec("UPDATE campaigns SET `status` = 'finished', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
+		_, err = oct.db.Exec("UPDATE campaigns SET status = 'finished', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update campaign status to finished: %v", err)
 		}

@@ -24,10 +24,10 @@ func MultiDeviceAutoReconnect() {
 	// Find all devices that have a JID (were previously connected)
 	rows, err := db.Query(`
 		SELECT id, device_name, phone, jid 
-		from user_devices 
+		FROM user_devices 
 		WHERE jid IS NOT NULL AND jid != ''
-		`order` BY last_seen DESC
-		limit 100  -- Process only 100 devices at a time to avoid overwhelming
+		ORDER BY last_seen DESC
+		LIMIT 100  -- Process only 100 devices at a time to avoid overwhelming
 	`)
 	if err != nil {
 		logrus.Errorf("Failed to query devices for auto-reconnect: %v", err)

@@ -96,7 +96,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		var exists bool
 		err = db.QueryRow(`
 			SELECT EXISTS (
-				SELECT from information_schema.tables 
+				SELECT FROM information_schema.tables 
 				WHERE table_schema = 'public' 
 				AND table_name = ?
 			)
