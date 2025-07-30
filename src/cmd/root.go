@@ -95,12 +95,8 @@ func initEnvConfig() {
 	if envDBURI := viper.GetString("DB_URI"); envDBURI != "" {
 		config.DBURI = envDBURI
 	} else if envMySQLURI := viper.GetString("MYSQL_URI"); envMySQLURI != "" {
-		// If MYSQL_URI is set, we need to use PostgreSQL for WhatsApp
-		if postgresURL := os.Getenv("DATABASE_URL"); postgresURL != "" {
-			config.DBURI = postgresURL
-		} else {
-			config.DBURI = "file:storages/whatsapp.db?_foreign_keys=on"
-		}
+		// If MYSQL_URI is set, don't set DBURI here, handle it in application logic
+		config.DBURI = "" // Empty means use default PostgreSQL in Railway
 	}
 	
 	// IMPORTANT: Railway uses DATABASE_URL for PostgreSQL
@@ -108,12 +104,12 @@ func initEnvConfig() {
 	if strings.Contains(config.DBURI, "mysql") {
 		// Check for DATABASE_URL (Railway's PostgreSQL)
 		if postgresURL := os.Getenv("DATABASE_URL"); postgresURL != "" {
-			logrus.Infof("MySQL detected in DB_URI, using PostgreSQL for WhatsApp: %s", postgresURL)
+			logrus.Infof("MySQL detected in DB_URI, using PostgreSQL for WhatsApp")
 			config.DBURI = postgresURL
 		} else {
-			// If no PostgreSQL available, default to file-based SQLite
-			logrus.Warn("MySQL detected but no PostgreSQL DATABASE_URL found, using SQLite")
-			config.DBURI = "file:storages/whatsapp.db?_foreign_keys=on"
+			// No PostgreSQL available, clear DBURI to use Railway's default
+			logrus.Warn("MySQL detected but no PostgreSQL DATABASE_URL found, clearing DB_URI")
+			config.DBURI = ""
 		}
 	}
 
