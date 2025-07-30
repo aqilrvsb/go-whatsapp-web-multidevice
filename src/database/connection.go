@@ -5,9 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"sync"
 	"time"
 	
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 )
@@ -22,8 +25,34 @@ func GetDB() *sql.DB {
 	once.Do(func() {
 		var err error
 		
-		// Parse PostgreSQL connection string
-		db, err = sql.Open("postgres", config.DBURI)
+		// Check for MySQL configuration first
+		mysqlURI := os.Getenv("MYSQL_URI")
+		if mysqlURI == "" {
+			mysqlURI = os.Getenv("DB_URI")
+		}
+		
+		if mysqlURI != "" && strings.Contains(mysqlURI, "mysql") {
+			// Use MySQL for application data
+			log.Println("Using MySQL for application data")
+			
+			// Convert mysql:// URL to DSN format if needed
+			if strings.HasPrefix(mysqlURI, "mysql://") {
+				mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+				parts := strings.Split(mysqlURI, "@")
+				if len(parts) == 2 {
+					userPass := parts[0]
+					hostDb := parts[1]
+					mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+				}
+			}
+			
+			db, err = sql.Open("mysql", mysqlURI)
+		} else {
+			// Fallback to PostgreSQL
+			log.Println("Using PostgreSQL for application data")
+			db, err = sql.Open("postgres", config.DBURI)
+		}
+		
 		if err != nil {
 			log.Fatalf("Failed to connect to database: %v", err)
 		}
