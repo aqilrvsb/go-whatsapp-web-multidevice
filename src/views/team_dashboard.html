@@ -1267,9 +1267,12 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Image (Optional)</label>
-                            <input type="file" class="form-control" id="campaignImageFile" accept="image/*" onchange="validateImageUrl('imageUrl', 'imagePreview')">
-                            <small class="text-muted">Max 5MB. Will be compressed automatically.</small>
-                            <input type="hidden" id="campaignImageUrl">
+                            <input <input type="url" class="form-control" id="imageUrl" 
+                               placeholder="https://example.com/image.jpg"
+                               onchange="validateImageUrl('imageUrl', 'imagePreview')">">
+                            <small class="text-muted">Enter the full URL of your campaign image</small>
+                            <div id="aiImagePreview" class="mt-2"></div>
+                            
                             <div id="imagePreview" class="mt-2"></div>
                         </div>
                         
@@ -1711,8 +1714,11 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Image (Optional)</label>
-                            <input type="file" class="form-control" id="aiCampaignImage" accept="image/*">
-                            <small class="text-muted">Max 350KB. Will be compressed automatically.</small>
+                            <input <input type="url" class="form-control" id="aiImageUrl" 
+                               placeholder="https://example.com/image.jpg"
+                               onchange="validateImageUrl('aiImageUrl', 'aiImagePreview')">">
+                            <small class="text-muted">Enter the full URL of your campaign image</small>
+                            <div id="aiImagePreview" class="mt-2"></div>
                         </div>
                         
                         <div class="row">
@@ -7225,18 +7231,12 @@
         }
         
         function saveAICampaign() {
-            const imageFile = document.getElementById('aiCampaignImage').files[0];
+            const imageUrl = document.getElementById('aiImageUrl').value;
             
             // First, handle image upload if provided
             const processImage = new Promise((resolve) => {
-                if (imageFile) {
-                    compressImageFile(imageFile, function(compressedBlob) {
-                        const reader = new FileReader();
-                        reader.onloadend = function() {
-                            resolve(reader.result); // base64 string
-                        };
-                        reader.readAsDataURL(compressedBlob);
-                    });
+                if (imageUrl) {
+                    resolve(imageUrl);
                 } else {
                     resolve(''); // No image
                 }
