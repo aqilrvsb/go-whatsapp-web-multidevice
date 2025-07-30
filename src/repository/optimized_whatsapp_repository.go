@@ -24,7 +24,7 @@ func NewOptimizedWhatsAppRepository(db *sql.DB) (*OptimizedWhatsAppRepository, e
 		INSERT INTO whatsapp_messages 
 		(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
 		 message_type, media_url, is_sent, is_read, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, message_id) DO NOTHING
 	`)
 	if err != nil {
@@ -64,7 +64,7 @@ func (r *OptimizedWhatsAppRepository) BatchSaveChats(chats []WhatsAppChat) error
 		INSERT INTO whatsapp_chats 
 		(device_id, chat_jid, chat_name, is_group, is_muted, last_message_text, 
 		 last_message_time, unread_count, avatar_url, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, chat_jid) 
 		DO UPDATE SET 
 			chat_name = EXCLUDED.chat_name,
@@ -230,7 +230,7 @@ func (r *OptimizedWhatsAppRepository) GetChats(deviceID string) ([]WhatsAppChat,
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
 		FROM whatsapp_chats
-		WHERE device_id = $1
+		WHERE device_id = ?
 		ORDER BY last_message_time DESC`
 	
 	rows, err := r.db.Query(query, deviceID)
@@ -261,9 +261,9 @@ func (r *OptimizedWhatsAppRepository) GetMessages(deviceID, chatJID string, limi
 		       message_text, message_type, media_url, is_sent, is_read, 
 		       timestamp, created_at
 		FROM whatsapp_messages
-		WHERE device_id = $1 AND chat_jid = $2
+		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
-		LIMIT $3`
+		LIMIT ?`
 	
 	rows, err := r.db.Query(query, deviceID, chatJID, limit)
 	if err != nil {

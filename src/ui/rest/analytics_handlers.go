@@ -73,11 +73,11 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	failedData := []int{}
 
 	// Get total campaigns count with error handling
-	campaignQuery := `SELECT COUNT(DISTINCT c.id) FROM campaigns c WHERE c.created_at BETWEEN $1 AND $2`
+	campaignQuery := `SELECT COUNT(DISTINCT c.id) FROM campaigns c WHERE c.created_at BETWEEN ? AND ?`
 	args := []interface{}{start, end}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		campaignQuery += " AND c.niche = $3"
+		campaignQuery += " AND c.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -95,7 +95,7 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
 		INNER JOIN campaigns c ON bm.campaign_id = c.id
-		WHERE bm.created_at BETWEEN $1 AND $2`
+		WHERE bm.created_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
 	argCount := 3
@@ -129,7 +129,7 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
 		INNER JOIN campaigns c ON bm.campaign_id = c.id
-		WHERE bm.created_at BETWEEN $1 AND $2`
+		WHERE bm.created_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
 	argCount = 3
@@ -259,11 +259,11 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	pendingData := []int{}
 
 	// Get total sequences with error handling (only active sequences)
-	sequenceQuery := `SELECT COUNT(DISTINCT s.id) FROM sequences s WHERE s.status = 'active' AND s.created_at BETWEEN $1 AND $2`
+	sequenceQuery := `SELECT COUNT(DISTINCT s.id) FROM sequences s WHERE s.status = 'active' AND s.created_at BETWEEN ? AND ?`
 	args := []interface{}{start, end}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		sequenceQuery += " AND s.niche = $3"
+		sequenceQuery += " AND s.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -273,11 +273,11 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	}
 
 	// Get total flows (only from active sequences)
-	flowQuery := `SELECT COUNT(*) FROM sequence_steps ss INNER JOIN sequences s ON ss.sequence_id = s.id WHERE s.status = 'active' AND s.created_at BETWEEN $1 AND $2`
+	flowQuery := `SELECT COUNT(*) FROM sequence_steps ss INNER JOIN sequences s ON ss.sequence_id = s.id WHERE s.status = 'active' AND s.created_at BETWEEN ? AND ?`
 	args = []interface{}{start, end}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		flowQuery += " AND s.niche = $3"
+		flowQuery += " AND s.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -294,7 +294,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE s.status = 'active' AND sc.completed_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.completed_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
 	argCount := 3
@@ -329,7 +329,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 			COALESCE(COUNT(CASE WHEN sc.status IN ('pending', 'active') THEN 1 END), 0) as pending
 		FROM sequence_contacts sc
 		INNER JOIN sequences s ON sc.sequence_id = s.id
-		WHERE s.status = 'active' AND sc.completed_at BETWEEN $1 AND $2`
+		WHERE s.status = 'active' AND sc.completed_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
 	argCount = 3

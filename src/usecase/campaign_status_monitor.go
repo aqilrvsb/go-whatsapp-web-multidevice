@@ -68,7 +68,7 @@ func updateCampaignStatuses() {
 				COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped,
 				EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(CASE WHEN status = 'queued' THEN updated_at END)))/60 as oldest_queued
 			FROM broadcast_messages
-			WHERE campaign_id = $1
+			WHERE campaign_id = ?
 		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped, &oldestQueuedMinutes)
 		
 		if err != nil {
@@ -87,7 +87,7 @@ func updateCampaignStatuses() {
 		err = db.QueryRow(`
 			SELECT COUNT(DISTINCT device_id) 
 			FROM broadcast_messages 
-			WHERE campaign_id = $1
+			WHERE campaign_id = ?
 		`, campaignID).Scan(&deviceCount)
 		
 		if err != nil {
@@ -100,7 +100,7 @@ func updateCampaignStatuses() {
 		if total == 0 && currentStatus == "pending" {
 			// No messages created yet but should have been triggered
 			var scheduledAt time.Time
-			err = db.QueryRow(`SELECT scheduled_at FROM campaigns WHERE id = $1`, campaignID).Scan(&scheduledAt)
+			err = db.QueryRow(`SELECT scheduled_at FROM campaigns WHERE id = ?`, campaignID).Scan(&scheduledAt)
 			if err == nil && scheduledAt.Before(time.Now()) {
 				// Campaign should have been triggered but wasn't - mark as failed
 				newStatus = "failed"
@@ -132,8 +132,8 @@ func updateCampaignStatuses() {
 		if newStatus != "" && newStatus != currentStatus {
 			_, err = db.Exec(`
 				UPDATE campaigns 
-				SET status = $1, updated_at = CURRENT_TIMESTAMP 
-				WHERE id = $2
+				SET status = ?, updated_at = CURRENT_TIMESTAMP 
+				WHERE id = ?
 			`, newStatus, campaignID)
 			
 			if err != nil {
@@ -154,7 +154,7 @@ func updateCampaignStatuses() {
 				if newStatus == "finished" || newStatus == "failed" {
 					coordinator := NewBroadcastCoordinator()
 					var userID string
-					err = db.QueryRow(`SELECT user_id FROM campaigns WHERE id = $1`, campaignID).Scan(&userID)
+					err = db.QueryRow(`SELECT user_id FROM campaigns WHERE id = ?`, campaignID).Scan(&userID)
 					if err == nil {
 						coordinator.UnlockBroadcast(userID)
 						logrus.Infof("Broadcast lock released for user %s after campaign %d %s", userID, campaignID, newStatus)

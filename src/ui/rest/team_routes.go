@@ -60,7 +60,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		var isActive bool
 		err := db.QueryRow(`
 			SELECT id, username, is_active FROM team_members 
-			WHERE username = $1 AND password = $2
+			WHERE username = ? AND password = ?
 		`, loginReq.Username, loginReq.Password).Scan(&memberID, &username, &isActive)
 
 		if err != nil {
@@ -68,7 +68,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			if err == sql.ErrNoRows {
 				// Check if user exists
 				var count int
-				db.QueryRow("SELECT COUNT(*) FROM team_members WHERE username = $1", loginReq.Username).Scan(&count)
+				db.QueryRow("SELECT COUNT(*) FROM team_members WHERE username = ?", loginReq.Username).Scan(&count)
 				if count > 0 {
 					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 						"error": "Invalid credentials - password mismatch",
@@ -100,7 +100,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 
 		_, err = db.Exec(`
 			INSERT INTO team_sessions (team_member_id, session_id, expires_at, created_at)
-			VALUES ($1, $2, $3, NOW())
+			VALUES (?, ?, ?, NOW())
 		`, memberID, sessionID, expiresAt)
 
 		if err != nil {
@@ -146,7 +146,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 	teamAPI.Post("/logout", func(c *fiber.Ctx) error {
 		sessionID := c.Cookies("team_session")
 		if sessionID != "" {
-			db.Exec("DELETE FROM team_sessions WHERE session_id = $1", sessionID)
+			db.Exec("DELETE FROM team_sessions WHERE session_id = ?", sessionID)
 		}
 		
 		c.Cookie(&fiber.Cookie{
@@ -167,7 +167,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 		rows, err := db.Query(`
 			SELECT id, device_name, phone, status, jid, last_seen
 			FROM user_devices
-			WHERE device_name = $1
+			WHERE device_name = ?
 		`, username)
 		
 		if err != nil {
@@ -220,7 +220,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.id END) as contacts_remaining_send
 			FROM campaigns c
 			LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id
-			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		args := []interface{}{username}
 		paramCount := 1
@@ -267,7 +267,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed
 			FROM broadcast_messages bm
 			JOIN campaigns c ON bm.campaign_id = c.id
-			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
+			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		chartArgs := []interface{}{username}
 		chartParamCount := 1
@@ -331,7 +331,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			FROM sequences s
 			LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
 		args := []interface{}{username}
 		paramCount := 1
@@ -410,7 +410,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			SELECT c.id, c.title, c.date, c.niche, c.status
 			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
-			WHERE ud.device_name = $1
+			WHERE ud.device_name = ?
 			ORDER BY c.date DESC
 			LIMIT 50
 		`, username)
@@ -450,7 +450,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			SELECT DISTINCT c.niche
 			FROM campaigns c
 			JOIN user_devices ud ON c.device_id = ud.id
-			WHERE ud.device_name = $1 AND c.niche IS NOT NULL AND c.niche != ''
+			WHERE ud.device_name = ? AND c.niche IS NOT NULL AND c.niche != ''
 			ORDER BY c.niche
 		`, username)
 
@@ -479,7 +479,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			WHERE EXISTS (
 				SELECT 1 FROM sequence_contacts sc
 				WHERE sc.sequence_id = s.id
-				AND sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
+				AND sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 			)
 			ORDER BY s.created_at DESC
 		`, username)
@@ -531,7 +531,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 				COUNT(DISTINCT CASE WHEN sc.status = 'pending' THEN sc.id END) as pending
 			FROM sequences s
 			LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = $1)
+			WHERE sc.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 			GROUP BY s.id, s.name, s.niche
 			ORDER BY s.created_at DESC
 		`, username)
@@ -583,7 +583,7 @@ func TeamAuthMiddleware(db *sql.DB) fiber.Handler {
 			SELECT tm.username
 			FROM team_sessions ts
 			JOIN team_members tm ON ts.team_member_id = tm.id
-			WHERE ts.session_id = $1 AND ts.expires_at > NOW()
+			WHERE ts.session_id = ? AND ts.expires_at > NOW()
 		`, sessionID).Scan(&username)
 
 		if err != nil {

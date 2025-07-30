@@ -56,7 +56,7 @@ func (r *WhatsAppRepository) SaveOrUpdateChat(chat *WhatsAppChat) error {
 		INSERT INTO whatsapp_chats 
 		(device_id, chat_jid, chat_name, is_group, is_muted, last_message_text, 
 		 last_message_time, unread_count, avatar_url, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, chat_jid) 
 		DO UPDATE SET 
 			chat_name = EXCLUDED.chat_name,
@@ -66,8 +66,7 @@ func (r *WhatsAppRepository) SaveOrUpdateChat(chat *WhatsAppChat) error {
 			last_message_time = EXCLUDED.last_message_time,
 			unread_count = EXCLUDED.unread_count,
 			avatar_url = EXCLUDED.avatar_url,
-			updated_at = EXCLUDED.updated_at
-		RETURNING id`
+			updated_at = EXCLUDED.updated_at`
 	
 	err := r.db.QueryRow(query, 
 		chat.DeviceID, chat.ChatJID, chat.ChatName, chat.IsGroup, chat.IsMuted,
@@ -84,7 +83,7 @@ func (r *WhatsAppRepository) GetChats(deviceID string) ([]WhatsAppChat, error) {
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
 		FROM whatsapp_chats
-		WHERE device_id = $1
+		WHERE device_id = ?
 		ORDER BY last_message_time DESC`
 	
 	rows, err := r.db.Query(query, deviceID)
@@ -114,9 +113,8 @@ func (r *WhatsAppRepository) SaveMessage(msg *WhatsAppMessage) error {
 		INSERT INTO whatsapp_messages 
 		(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
 		 message_type, media_url, is_sent, is_read, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		ON CONFLICT (device_id, message_id) DO NOTHING
-		RETURNING id`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (device_id, message_id) DO NOTHING`
 	
 	err := r.db.QueryRow(query,
 		msg.DeviceID, msg.ChatJID, msg.MessageID, msg.SenderJID, msg.SenderName,
@@ -138,9 +136,9 @@ func (r *WhatsAppRepository) GetMessages(deviceID, chatJID string, limit int) ([
 		       message_text, message_type, media_url, is_sent, is_read, 
 		       timestamp, created_at
 		FROM whatsapp_messages
-		WHERE device_id = $1 AND chat_jid = $2
+		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
-		LIMIT $3`
+		LIMIT ?`
 	
 	rows, err := r.db.Query(query, deviceID, chatJID, limit)
 	if err != nil {
@@ -175,7 +173,7 @@ func (r *WhatsAppRepository) GetChatByJID(deviceID, chatJID string) (*WhatsAppCh
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
 		FROM whatsapp_chats
-		WHERE device_id = $1 AND chat_jid = $2`
+		WHERE device_id = ? AND chat_jid = ?`
 	
 	var chat WhatsAppChat
 	err := r.db.QueryRow(query, deviceID, chatJID).Scan(
@@ -192,7 +190,7 @@ func (r *WhatsAppRepository) GetChatByJID(deviceID, chatJID string) (*WhatsAppCh
 
 // ClearDeviceMessages clears all messages for a device
 func (r *WhatsAppRepository) ClearDeviceMessages(deviceID string) error {
-	query := `DELETE FROM whatsapp_messages WHERE device_id = $1`
+	query := `DELETE FROM whatsapp_messages WHERE device_id = ?`
 	_, err := r.db.Exec(query, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to clear device messages: %w", err)
@@ -202,7 +200,7 @@ func (r *WhatsAppRepository) ClearDeviceMessages(deviceID string) error {
 
 // ClearDeviceChats clears all chats for a device
 func (r *WhatsAppRepository) ClearDeviceChats(deviceID string) error {
-	query := `DELETE FROM whatsapp_chats WHERE device_id = $1`
+	query := `DELETE FROM whatsapp_chats WHERE device_id = ?`
 	_, err := r.db.Exec(query, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to clear device chats: %w", err)

@@ -54,7 +54,7 @@ func StoreChat(deviceID, chatJID, name string, lastMessageTime time.Time) error 
 	
 	query := `
 		INSERT INTO whatsapp_chats (device_id, chat_jid, chat_name, last_message_time)
-		VALUES ($1, $2, $3, $4)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT (device_id, chat_jid) 
 		DO UPDATE SET 
 			chat_name = EXCLUDED.chat_name,
@@ -214,7 +214,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				message_type,
 				timestamp
 			FROM whatsapp_messages
-			WHERE device_id = $1
+			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'  -- Exclude groups
 				AND chat_jid NOT LIKE '%@broadcast'  -- Exclude broadcasts
 				AND chat_jid != 'status@broadcast'  -- Exclude status
@@ -228,7 +228,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				chat_jid,
 				COUNT(*) as message_count
 			FROM whatsapp_messages
-			WHERE device_id = $1
+			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'
 				AND chat_jid NOT LIKE '%@broadcast'
 				AND chat_jid != 'status@broadcast'
@@ -242,7 +242,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 			rm.timestamp,
 			cc.message_count
 		FROM recent_messages rm
-		LEFT JOIN whatsapp_chats c ON c.device_id = $1 AND c.chat_jid = rm.chat_jid
+		LEFT JOIN whatsapp_chats c ON c.device_id = ? AND c.chat_jid = rm.chat_jid
 		LEFT JOIN chat_counts cc ON cc.chat_jid = rm.chat_jid
 		WHERE cc.message_count > 0  -- Only show chats with at least one message
 		ORDER BY rm.timestamp DESC
@@ -326,7 +326,7 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 				FIRST_VALUE(message_text) OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) as last_message,
 				MAX(timestamp) OVER (PARTITION BY chat_jid) as last_timestamp
 			FROM whatsapp_messages
-			WHERE device_id = $1
+			WHERE device_id = ?
 				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '%d days')::BIGINT
 		)
 		SELECT 
@@ -336,7 +336,7 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 			rm.last_timestamp
 		FROM whatsapp_chats c
 		INNER JOIN recent_messages rm ON c.chat_jid = rm.chat_jid
-		WHERE c.device_id = $1
+		WHERE c.device_id = ?
 		ORDER BY rm.last_timestamp DESC
 	`
 	

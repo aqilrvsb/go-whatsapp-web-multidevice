@@ -179,7 +179,7 @@ func (pm *ProxyManager) fetchFromTrials() []Proxy {
 	// Many services offer free trials:
 	// - Bright Data: 7-day trial
 	// - Smartproxy: 3-day trial  
-	// - GeoNode: 7-day trial with $7 credit
+	// - GeoNode: 7-day trial with ? credit
 	// - ProxyRack: 7-day trial
 	
 	// This would require manual setup of trial accounts

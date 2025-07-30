@@ -69,8 +69,7 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 		INSERT INTO campaigns 
 		(user_id, campaign_date, title, niche, target_status, message, image_url, 
 		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, "limit", created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-		RETURNING id
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	// Default target_status to 'all' if not set
@@ -95,7 +94,7 @@ func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche stri
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
-		WHERE campaign_date = $1 AND niche = $2
+		WHERE campaign_date = ? AND niche = ?
 	`
 	
 	rows, err := r.db.Query(query, scheduledDate, niche)
@@ -131,7 +130,7 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
 		FROM campaigns
-		WHERE user_id = $1
+		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
 	`
 	
@@ -168,7 +167,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
 		FROM campaigns
-		WHERE id = $1
+		WHERE id = ?
 	`
 	
 	var c models.Campaign
@@ -186,7 +185,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 
 // UpdateCampaignStatus updates campaign status
 func (r *campaignRepository) UpdateCampaignStatus(id int, status string) error {
-	query := `UPDATE campaigns SET status = $1, updated_at = $2 WHERE id = $3`
+	query := `UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?`
 	_, err := r.db.Exec(query, status, time.Now(), id)
 	return err
 }
@@ -256,9 +255,9 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 			status, created_at, updated_at
 		FROM campaigns
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND status = 'pending'
-		AND (target_status = $2 OR target_status = 'all')
+		AND (target_status = ? OR target_status = 'all')
 		AND (
 			time_schedule IS NULL 
 			OR time_schedule = ''
@@ -302,11 +301,11 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
 	query := `
 		UPDATE campaigns 
-		SET title = $1, niche = $2, target_status = $3, message = $4, 
-		    image_url = $5, campaign_date = $6, time_schedule = $7,
-		    min_delay_seconds = $8, max_delay_seconds = $9, 
-		    status = $10, ai = $11, "limit" = $12, updated_at = $13
-		WHERE id = $14 AND user_id = $15
+		SET title = ?, niche = ?, target_status = ?, message = ?, 
+		    image_url = ?, campaign_date = ?, time_schedule = ?,
+		    min_delay_seconds = ?, max_delay_seconds = ?, 
+		    status = ?, ai = ?, "limit" = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
 	`
 	
 	campaign.UpdatedAt = time.Now()
@@ -343,7 +342,7 @@ func (r *campaignRepository) DeleteCampaign(id int) error {
 	defer tx.Rollback()
 	
 	// First, delete all broadcast messages for this campaign
-	deleteMessagesQuery := `DELETE FROM broadcast_messages WHERE campaign_id = $1`
+	deleteMessagesQuery := `DELETE FROM broadcast_messages WHERE campaign_id = ?`
 	_, err = tx.Exec(deleteMessagesQuery, id)
 	if err != nil {
 		log.Printf("Error deleting broadcast messages for campaign %d: %v", id, err)
@@ -351,7 +350,7 @@ func (r *campaignRepository) DeleteCampaign(id int) error {
 	}
 	
 	// Then delete the campaign itself
-	deleteCampaignQuery := `DELETE FROM campaigns WHERE id = $1`
+	deleteCampaignQuery := `DELETE FROM campaigns WHERE id = ?`
 	result, err := tx.Exec(deleteCampaignQuery, id)
 	if err != nil {
 		return err
@@ -387,18 +386,18 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	shouldSendQuery := `
 		SELECT COUNT(l.phone) 
 		FROM leads l
-		WHERE l.user_id = $1 
-		AND l.niche LIKE '%' || $2 || '%'
-		AND ($3 = 'all' OR l.target_status = $3)
+		WHERE l.user_id = ? 
+		AND l.niche LIKE '%' || ? || '%'
+		AND (? = 'all' OR l.target_status = ?)
 	`
 	
 	// Debug: Let's also get the actual leads to see what's being counted
 	debugQuery := `
 		SELECT l.phone, l.device_id, l.niche, l.target_status 
 		FROM leads l
-		WHERE l.user_id = $1 
-		AND l.niche LIKE '%' || $2 || '%'
-		AND ($3 = 'all' OR l.target_status = $3)
+		WHERE l.user_id = ? 
+		AND l.niche LIKE '%' || ? || '%'
+		AND (? = 'all' OR l.target_status = ?)
 	`
 	
 	rows, _ := r.db.Query(debugQuery, campaign.UserID, campaign.Niche, campaign.TargetStatus)
@@ -427,7 +426,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 			COUNT(CASE WHEN status = 'sent' THEN 1 END) as done_send,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_send
 		FROM broadcast_messages
-		WHERE campaign_id = $1
+		WHERE campaign_id = ?
 	`
 	
 	err = r.db.QueryRow(statsQuery, campaignID).Scan(&doneSend, &failedSend)
@@ -487,7 +486,7 @@ func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, start
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
 		FROM campaigns
-		WHERE user_id = $1
+		WHERE user_id = ?
 	`
 	
 	args := []interface{}{userID}

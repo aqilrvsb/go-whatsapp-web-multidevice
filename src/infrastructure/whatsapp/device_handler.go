@@ -213,7 +213,7 @@ func handleDeviceLoggedOut(ctx context.Context, deviceID string) {
 	if phoneNumber == "" || jidStr == "" {
 		userRepo := repository.GetUserRepository()
 		var dbPhone, dbJID sql.NullString
-		err = userRepo.DB().QueryRow("SELECT phone, jid FROM user_devices WHERE id = $1", deviceID).Scan(&dbPhone, &dbJID)
+		err = userRepo.DB().QueryRow("SELECT phone, jid FROM user_devices WHERE id = ?", deviceID).Scan(&dbPhone, &dbJID)
 		if err == nil {
 			if phoneNumber == "" && dbPhone.Valid {
 				phoneNumber = dbPhone.String
@@ -269,7 +269,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	// First, get the JID and phone from user_devices
 	var jid sql.NullString
 	var phone sql.NullString
-	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = $1", deviceID).Scan(&jid, &phone)
+	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = ?", deviceID).Scan(&jid, &phone)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logrus.Warnf("Device %s not found in database", deviceID)
@@ -302,29 +302,29 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		name  string
 		query string
 	}{
-		{"app_state_mutation_macs", "DELETE FROM whatsmeow_app_state_mutation_macs WHERE jid = ANY($1)"},
-		{"app_state_sync_keys", "DELETE FROM whatsmeow_app_state_sync_keys WHERE jid = ANY($1)"},
-		{"app_state_version", "DELETE FROM whatsmeow_app_state_version WHERE jid = ANY($1)"},
-		{"chat_settings", "DELETE FROM whatsmeow_chat_settings WHERE jid = ANY($1)"},
-		{"contacts", "DELETE FROM whatsmeow_contacts WHERE jid = ANY($1)"},
-		{"disappearing_timers", "DELETE FROM whatsmeow_disappearing_timers WHERE jid = ANY($1)"},
-		{"group_participants", "DELETE FROM whatsmeow_group_participants WHERE group_jid IN (SELECT jid FROM whatsmeow_groups WHERE jid = ANY($1))"},
-		{"groups", "DELETE FROM whatsmeow_groups WHERE jid = ANY($1)"},
-		{"history_syncs", "DELETE FROM whatsmeow_history_syncs WHERE device_jid = ANY($1)"},
-		{"media_backfill_requests", "DELETE FROM whatsmeow_media_backfill_requests WHERE user_jid = ANY($1) OR portal_jid = ANY($1)"},
-		{"message_secrets", "DELETE FROM whatsmeow_message_secrets WHERE chat_jid = ANY($1)"},
-		{"portal_data", "DELETE FROM whatsmeow_portal_message_part WHERE message_id IN (SELECT id FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1)))"},
-		{"portal_messages", "DELETE FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
-		{"portal_reactions", "DELETE FROM whatsmeow_portal_reaction WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
-		{"portal_backfill", "DELETE FROM whatsmeow_portal_backfill WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
-		{"portal_backfill_queue", "DELETE FROM whatsmeow_portal_backfill_queue WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY($1))"},
-		{"portals", "DELETE FROM whatsmeow_portal WHERE receiver = ANY($1)"},
-		{"privacy_settings", "DELETE FROM whatsmeow_privacy_settings WHERE jid = ANY($1)"},
-		{"sender_keys", "DELETE FROM whatsmeow_sender_keys WHERE our_jid = ANY($1)"},
-		{"sessions", "DELETE FROM whatsmeow_sessions WHERE our_jid = ANY($1)"},
-		{"pre_keys", "DELETE FROM whatsmeow_pre_keys WHERE jid = ANY($1)"},
-		{"identity_keys", "DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY($1)"},
-		{"device", "DELETE FROM whatsmeow_device WHERE jid = ANY($1)"},
+		{"app_state_mutation_macs", "DELETE FROM whatsmeow_app_state_mutation_macs WHERE jid = ANY(?)"},
+		{"app_state_sync_keys", "DELETE FROM whatsmeow_app_state_sync_keys WHERE jid = ANY(?)"},
+		{"app_state_version", "DELETE FROM whatsmeow_app_state_version WHERE jid = ANY(?)"},
+		{"chat_settings", "DELETE FROM whatsmeow_chat_settings WHERE jid = ANY(?)"},
+		{"contacts", "DELETE FROM whatsmeow_contacts WHERE jid = ANY(?)"},
+		{"disappearing_timers", "DELETE FROM whatsmeow_disappearing_timers WHERE jid = ANY(?)"},
+		{"group_participants", "DELETE FROM whatsmeow_group_participants WHERE group_jid IN (SELECT jid FROM whatsmeow_groups WHERE jid = ANY(?))"},
+		{"groups", "DELETE FROM whatsmeow_groups WHERE jid = ANY(?)"},
+		{"history_syncs", "DELETE FROM whatsmeow_history_syncs WHERE device_jid = ANY(?)"},
+		{"media_backfill_requests", "DELETE FROM whatsmeow_media_backfill_requests WHERE user_jid = ANY(?) OR portal_jid = ANY(?)"},
+		{"message_secrets", "DELETE FROM whatsmeow_message_secrets WHERE chat_jid = ANY(?)"},
+		{"portal_data", "DELETE FROM whatsmeow_portal_message_part WHERE message_id IN (SELECT id FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY(?)))"},
+		{"portal_messages", "DELETE FROM whatsmeow_portal_message WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY(?))"},
+		{"portal_reactions", "DELETE FROM whatsmeow_portal_reaction WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY(?))"},
+		{"portal_backfill", "DELETE FROM whatsmeow_portal_backfill WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY(?))"},
+		{"portal_backfill_queue", "DELETE FROM whatsmeow_portal_backfill_queue WHERE portal_jid IN (SELECT jid FROM whatsmeow_portal WHERE receiver = ANY(?))"},
+		{"portals", "DELETE FROM whatsmeow_portal WHERE receiver = ANY(?)"},
+		{"privacy_settings", "DELETE FROM whatsmeow_privacy_settings WHERE jid = ANY(?)"},
+		{"sender_keys", "DELETE FROM whatsmeow_sender_keys WHERE our_jid = ANY(?)"},
+		{"sessions", "DELETE FROM whatsmeow_sessions WHERE our_jid = ANY(?)"},
+		{"pre_keys", "DELETE FROM whatsmeow_pre_keys WHERE jid = ANY(?)"},
+		{"identity_keys", "DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY(?)"},
+		{"device", "DELETE FROM whatsmeow_device WHERE jid = ANY(?)"},
 	}
 	
 	// Execute each operation in its own transaction

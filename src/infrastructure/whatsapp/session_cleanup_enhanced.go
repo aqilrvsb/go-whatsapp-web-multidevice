@@ -24,7 +24,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	// First, get the JID and phone from user_devices
 	var jid sql.NullString
 	var phone sql.NullString
-	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = $1", deviceID).Scan(&jid, &phone)
+	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = ?", deviceID).Scan(&jid, &phone)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logrus.Warnf("Device %s not found in database", deviceID)
@@ -98,7 +98,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 			SELECT EXISTS (
 				SELECT FROM information_schema.tables 
 				WHERE table_schema = 'public' 
-				AND table_name = $1
+				AND table_name = ?
 			)
 		`, cleanup.table).Scan(&exists)
 		

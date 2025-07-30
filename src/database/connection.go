@@ -90,7 +90,7 @@ func InitializeSchema() error {
 
 	-- Create users table
 	CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		email VARCHAR(255) UNIQUE NOT NULL,
 		full_name VARCHAR(255) NOT NULL,
 		password_hash VARCHAR(255) NOT NULL,
@@ -102,7 +102,7 @@ func InitializeSchema() error {
 
 	-- Create user_devices table
 	CREATE TABLE IF NOT EXISTS user_devices (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		device_name VARCHAR(255) NOT NULL,
 		phone VARCHAR(50),
@@ -116,7 +116,7 @@ func InitializeSchema() error {
 
 	-- Create user_sessions table
 	CREATE TABLE IF NOT EXISTS user_sessions (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		token VARCHAR(255) UNIQUE NOT NULL,
 		expires_at TIMESTAMP NOT NULL,
@@ -125,7 +125,7 @@ func InitializeSchema() error {
 
 	-- Create message_analytics table
 	CREATE TABLE IF NOT EXISTS message_analytics (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		device_id UUID REFERENCES user_devices(id) ON DELETE SET NULL,
 		message_id VARCHAR(255) NOT NULL,
@@ -193,8 +193,8 @@ func InitializeSchema() error {
 		device_id VARCHAR(255) NOT NULL,
 		chat_jid VARCHAR(255) NOT NULL,
 		chat_name VARCHAR(255) NOT NULL,
-		is_group BOOLEAN DEFAULT FALSE,
-		is_muted BOOLEAN DEFAULT FALSE,
+		is_group BOOLEAN DEFAULT 0,
+		is_muted BOOLEAN DEFAULT 0,
 		last_message_text TEXT,
 		last_message_time TIMESTAMP,
 		unread_count INTEGER DEFAULT 0,
@@ -215,8 +215,8 @@ func InitializeSchema() error {
 		message_text TEXT,
 		message_type VARCHAR(50),
 		media_url TEXT,
-		is_sent BOOLEAN DEFAULT FALSE,
-		is_read BOOLEAN DEFAULT FALSE,
+		is_sent BOOLEAN DEFAULT 0,
+		is_read BOOLEAN DEFAULT 0,
 		timestamp TIMESTAMP NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(device_id, message_id)
@@ -224,7 +224,7 @@ func InitializeSchema() error {
 	
 	-- Create sequences table
 	CREATE TABLE IF NOT EXISTS sequences (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		name VARCHAR(255) NOT NULL,
 		description TEXT,
@@ -239,7 +239,7 @@ func InitializeSchema() error {
 	
 	-- Create sequence_steps table
 	CREATE TABLE IF NOT EXISTS sequence_steps (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
 		day_number INTEGER NOT NULL,
 		content TEXT,
@@ -253,7 +253,7 @@ func InitializeSchema() error {
 	
 	-- Create sequence_contacts table
 	CREATE TABLE IF NOT EXISTS sequence_contacts (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
 		contact_phone VARCHAR(50) NOT NULL,
 		contact_name VARCHAR(255),
@@ -274,7 +274,7 @@ func InitializeSchema() error {
 	
 	-- Create broadcast_messages table for tracking
 	CREATE TABLE IF NOT EXISTS broadcast_messages (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
 		campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL,
@@ -397,7 +397,7 @@ func InitializeSchema() error {
 
 	-- Create sequence_logs table if not exists
 	CREATE TABLE IF NOT EXISTS sequence_logs (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		id UUID PRIMARY KEY DEFAULT UUID(),
 		sequence_id UUID NOT NULL REFERENCES sequences(id) ON DELETE CASCADE,
 		contact_id UUID NOT NULL,
 		step_id UUID NOT NULL,
@@ -441,7 +441,7 @@ func InitializeSchema() error {
 		
 		_, err = db.Exec(`
 			INSERT INTO users (email, full_name, password_hash, is_active) 
-			VALUES ($1, $2, $3, $4)`,
+			VALUES (?, ?, ?, ?)`,
 			"admin@whatsapp.com", "Administrator", encodedPassword, true)
 		if err != nil {
 			return fmt.Errorf("failed to create admin user: %w", err)
@@ -515,7 +515,7 @@ func runTeamMembersMigration(db *sql.DB) error {
 	migrationSQL := `
 		-- Create team members table
 		CREATE TABLE IF NOT EXISTS team_members (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT UUID(),
 			username VARCHAR(255) UNIQUE NOT NULL,
 			password VARCHAR(255) NOT NULL,
 			created_by UUID,
@@ -526,7 +526,7 @@ func runTeamMembersMigration(db *sql.DB) error {
 
 		-- Create team sessions table
 		CREATE TABLE IF NOT EXISTS team_sessions (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT UUID(),
 			team_member_id UUID REFERENCES team_members(id) ON DELETE CASCADE,
 			token VARCHAR(255) UNIQUE NOT NULL,
 			expires_at TIMESTAMP NOT NULL,

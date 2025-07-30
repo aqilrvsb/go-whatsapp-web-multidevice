@@ -28,7 +28,7 @@ func MigrateSequenceSteps(db *sql.DB) error {
 		logrus.Info("Creating sequence_steps table...")
 		createQuery := `
 		CREATE TABLE sequence_steps (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			id UUID PRIMARY KEY DEFAULT UUID(),
 			sequence_id UUID NOT NULL,
 			day_number INTEGER NOT NULL DEFAULT 1,
 			message_type VARCHAR(50) DEFAULT 'text',

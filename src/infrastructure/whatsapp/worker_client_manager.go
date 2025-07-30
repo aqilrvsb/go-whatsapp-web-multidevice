@@ -136,7 +136,7 @@ func (wcm *WorkerClientManager) performRefresh(deviceID string, device *models.U
 	err = db.QueryRow(`
 		SELECT session 
 		FROM whatsmeow_sessions 
-		WHERE our_jid = $1
+		WHERE our_jid = ?
 		LIMIT 1
 	`, device.JID).Scan(&sessionData)
 	

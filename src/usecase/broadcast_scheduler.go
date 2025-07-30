@@ -44,9 +44,9 @@ func (bs *BroadcastScheduler) GetScheduleConflicts(userID string, proposedTime t
 		LEFT JOIN leads l ON l.user_id = c.user_id 
 		    AND (c.target_status = 'all' OR l.status = c.target_status)
 		    AND (c.niche = '' OR c.niche = 'all' OR l.niche = c.niche)
-		WHERE c.user_id = $1
+		WHERE c.user_id = ?
 		AND c.status IN ('pending', 'triggered', 'processing')
-		AND c.scheduled_at BETWEEN $2 AND $3
+		AND c.scheduled_at BETWEEN ? AND ?
 		GROUP BY c.id, c.title, c.scheduled_at, c.status
 		ORDER BY c.scheduled_at
 	`, userID, 
@@ -107,7 +107,7 @@ func (bs *BroadcastScheduler) AutoRescheduleCampaigns(userID string) error {
 		        WHERE l.user_id = c.user_id 
 		        AND (c.target_status = 'all' OR l.status = c.target_status)) as lead_count
 		FROM campaigns c
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND status = 'pending'
 		AND scheduled_at >= NOW()
 		ORDER BY scheduled_at
@@ -174,10 +174,10 @@ func (bs *BroadcastScheduler) AutoRescheduleCampaigns(userID string) error {
 			// Update in database
 			_, err = db.Exec(`
 				UPDATE campaigns 
-				SET scheduled_at = $1,
-				    time_schedule = $2,
+				SET scheduled_at = ?,
+				    time_schedule = ?,
 				    updated_at = NOW()
-				WHERE id = $3
+				WHERE id = ?
 			`, earliestStartTime, 
 			   earliestStartTime.Format("15:04"),
 			   currCampaign.ID)
@@ -202,8 +202,8 @@ func (bs *BroadcastScheduler) GetBroadcastTimeline(userID string, startDate, end
 		       COUNT(DISTINCT l.id) as message_count
 		FROM campaigns c
 		LEFT JOIN leads l ON l.user_id = c.user_id 
-		WHERE c.user_id = $1
-		AND c.scheduled_at BETWEEN $2 AND $3
+		WHERE c.user_id = ?
+		AND c.scheduled_at BETWEEN ? AND ?
 		GROUP BY c.id, c.title, c.scheduled_at, c.status
 		ORDER BY c.scheduled_at
 	`, userID, startDate, endDate)

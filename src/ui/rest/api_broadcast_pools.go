@@ -40,7 +40,7 @@ func (handler *App) GetBroadcastPoolStatus(c *fiber.Ctx) error {
 		       (SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = c.id) as total_messages,
 		       (SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = c.id AND status = 'sent') as sent_messages
 		FROM campaigns c
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND status IN ('triggered', 'processing')
 		ORDER BY created_at DESC
 	`, session.UserID)

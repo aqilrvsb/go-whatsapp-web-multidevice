@@ -40,9 +40,9 @@ func (r *MessageAnalyticsRepository) RecordMessage(userID, deviceID, messageID, 
 	id := uuid.New().String()
 	query := `
 		INSERT INTO message_analytics (id, user_id, device_id, message_id, jid, content, is_from_me, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (message_id) 
-		DO UPDATE SET status = $8, updated_at = CURRENT_TIMESTAMP
+		DO UPDATE SET status = ?, updated_at = CURRENT_TIMESTAMP
 	`
 	_, err := r.db.Exec(query, id, userID, deviceID, messageID, jid, content, isFromMe, status)
 	if err != nil {
@@ -56,8 +56,8 @@ func (r *MessageAnalyticsRepository) RecordMessage(userID, deviceID, messageID, 
 func (r *MessageAnalyticsRepository) UpdateMessageStatus(messageID, status string) error {
 	query := `
 		UPDATE message_analytics 
-		SET status = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE message_id = $1
+		SET status = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE message_id = ?
 	`
 	_, err := r.db.Exec(query, messageID, status)
 	if err != nil {
@@ -78,12 +78,12 @@ func (r *MessageAnalyticsRepository) GetUserAnalytics(userID string, startDate, 
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) as leads_replied,
 			COUNT(DISTINCT CASE WHEN device_id IS NOT NULL THEN device_id END) as active_devices
 		FROM message_analytics
-		WHERE user_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE user_id = ? AND created_at BETWEEN ? AND ?
 	`
 	
 	args := []interface{}{userID, startDate, endDate}
 	if deviceID != "" && deviceID != "all" {
-		metricsQuery += " AND device_id = $4"
+		metricsQuery += " AND device_id = ?"
 		args = append(args, deviceID)
 	}
 	
@@ -101,7 +101,7 @@ func (r *MessageAnalyticsRepository) GetUserAnalytics(userID string, startDate, 
 	
 	// Get device count
 	var totalDevices int
-	deviceQuery := "SELECT COUNT(*) FROM user_devices WHERE user_id = $1"
+	deviceQuery := "SELECT COUNT(*) FROM user_devices WHERE user_id = ?"
 	r.db.QueryRow(deviceQuery, userID).Scan(&totalDevices)
 	inactiveDevices := totalDevices - activeDevices
 	
@@ -114,12 +114,12 @@ func (r *MessageAnalyticsRepository) GetUserAnalytics(userID string, startDate, 
 			COUNT(CASE WHEN is_from_me = true AND status = 'read' THEN 1 END) as read,
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) as replied
 		FROM message_analytics
-		WHERE user_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE user_id = ? AND created_at BETWEEN ? AND ?
 	`
 	
 	dailyArgs := []interface{}{userID, startDate, endDate}
 	if deviceID != "" && deviceID != "all" {
-		dailyQuery += " AND device_id = $4"
+		dailyQuery += " AND device_id = ?"
 		dailyArgs = append(dailyArgs, deviceID)
 	}
 	dailyQuery += " GROUP BY DATE(created_at) ORDER BY date"
@@ -208,7 +208,7 @@ func (r *MessageAnalyticsRepository) GetDeviceAnalytics(deviceID string, days in
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) as messages_received,
 			COUNT(DISTINCT jid) as unique_contacts
 		FROM message_analytics
-		WHERE device_id = $1 AND created_at BETWEEN $2 AND $3
+		WHERE device_id = ? AND created_at BETWEEN ? AND ?
 	`
 	
 	var sent, received, contacts int

@@ -176,7 +176,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	// Update campaign status to triggered after queueing
 	if successful > 0 {
 		// Only mark as triggered if we actually queued some messages
-		_, err = oct.db.Exec("UPDATE campaigns SET status = 'triggered', updated_at = CURRENT_TIMESTAMP WHERE id = $1", campaign.ID)
+		_, err = oct.db.Exec("UPDATE campaigns SET status = 'triggered', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update campaign status to triggered: %v", err)
 		}
@@ -184,7 +184,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 			campaign.Title, successful, failed)
 	} else {
 		// No messages queued, mark as finished
-		_, err = oct.db.Exec("UPDATE campaigns SET status = 'finished', updated_at = CURRENT_TIMESTAMP WHERE id = $1", campaign.ID)
+		_, err = oct.db.Exec("UPDATE campaigns SET status = 'finished', updated_at = CURRENT_TIMESTAMP WHERE id = ?", campaign.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update campaign status to finished: %v", err)
 		}

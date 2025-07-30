@@ -122,8 +122,8 @@ func CreateLeadWebhook(c *fiber.Ctx) error {
 		
 		updateQuery := `
 			UPDATE user_devices 
-			SET jid = $1, platform = $2, updated_at = $3, status = 'online'
-			WHERE id = $4
+			SET jid = ?, platform = ?, updated_at = ?, status = 'online'
+			WHERE id = ?
 		`
 		_, err = userRepo.GetDB().Exec(updateQuery, request.DeviceID, request.Platform, time.Now(), device.ID)
 		if err != nil {

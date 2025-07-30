@@ -57,8 +57,8 @@ func GetMigrations() []Migration {
 			SQL: `
 			-- First add missing columns that might not exist
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT FALSE;
-			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT 0;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT 0;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_text TEXT;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_time TIMESTAMP;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
@@ -104,8 +104,8 @@ func GetMigrations() []Migration {
 				message_text TEXT,
 				message_type VARCHAR(50) DEFAULT 'text',
 				media_url TEXT,
-				is_sent BOOLEAN DEFAULT FALSE,
-				is_read BOOLEAN DEFAULT FALSE,
+				is_sent BOOLEAN DEFAULT 0,
+				is_read BOOLEAN DEFAULT 0,
 				timestamp BIGINT NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				UNIQUE(device_id, message_id)
@@ -229,18 +229,18 @@ RETURNS BOOLEAN AS $$
 BEGIN
     -- Check basic format HH:MM
     IF time_str !~ '^[0-2][0-9]:[0-5][0-9]$' THEN
-        RETURN FALSE;
+        RETURN 0;
     END IF;
     
     -- Check hour is valid (00-23)
     IF CAST(SPLIT_PART(time_str, ':', 1) AS INTEGER) > 23 THEN
-        RETURN FALSE;
+        RETURN 0;
     END IF;
     
-    RETURN TRUE;
+    RETURN 1;
 EXCEPTION
     WHEN OTHERS THEN
-        RETURN FALSE;
+        RETURN 0;
 END;
 $$ LANGUAGE plpgsql;
 			`,
@@ -386,8 +386,8 @@ END $$;
 -- Step 3: Ensure all required columns exist
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255);
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS media_url TEXT;
-ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_sent BOOLEAN DEFAULT FALSE;
-ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_sent BOOLEAN DEFAULT 0;
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT 0;
 
 -- Step 4: Create indexes if they don't exist
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_device_chat ON whatsapp_messages(device_id, chat_jid);

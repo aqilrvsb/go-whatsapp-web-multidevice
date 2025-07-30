@@ -28,15 +28,15 @@ func (r *workerRepository) UpdateWorkerStatus(deviceID, status string, queueSize
 	query := `
 		INSERT INTO worker_status 
 		(device_id, worker_type, status, current_queue_size, messages_processed, messages_failed, last_activity, updated_at)
-		VALUES ($1, 'broadcast', $2, $3, $4, $5, $6, $7)
+		VALUES (?, 'broadcast', ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, worker_type) 
 		DO UPDATE SET 
-			status = $2,
-			current_queue_size = $3,
-			messages_processed = $4,
-			messages_failed = $5,
-			last_activity = $6,
-			updated_at = $7
+			status = ?,
+			current_queue_size = ?,
+			messages_processed = ?,
+			messages_failed = ?,
+			last_activity = ?,
+			updated_at = ?
 	`
 	
 	now := time.Now()
@@ -88,7 +88,7 @@ func (r *workerRepository) GetWorkerStatuses() ([]map[string]interface{}, error)
 
 // CleanupOldWorkers removes old worker records
 func (r *workerRepository) CleanupOldWorkers(olderThan time.Duration) error {
-	query := `DELETE FROM worker_status WHERE last_activity < $1`
+	query := `DELETE FROM worker_status WHERE last_activity < ?`
 	cutoff := time.Now().Add(-olderThan)
 	_, err := r.db.Exec(query, cutoff)
 	return err

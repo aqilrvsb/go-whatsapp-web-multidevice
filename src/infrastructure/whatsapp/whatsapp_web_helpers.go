@@ -53,7 +53,7 @@ func StoreWhatsAppMessageWithMedia(deviceID, chatJID, messageID, senderJID, mess
 	query := `
 		INSERT INTO whatsapp_messages 
 		(device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, message_id) DO UPDATE
 		SET message_text = EXCLUDED.message_text,
 		    message_secrets = EXCLUDED.message_secrets,
@@ -95,7 +95,7 @@ func StoreWhatsAppMessageWithMediaAndTimestamp(deviceID, chatJID, messageID, sen
 	// Insert message with media URL if provided
 	query := `
 		INSERT INTO whatsapp_messages (device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, message_id) DO UPDATE SET
 			message_text = EXCLUDED.message_text,
 			message_type = EXCLUDED.message_type,

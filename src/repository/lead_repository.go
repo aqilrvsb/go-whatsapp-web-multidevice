@@ -36,8 +36,7 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 
 	query := `
 		INSERT INTO leads (device_id, user_id, name, phone, niche, journey, status, target_status, trigger, platform, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	// Map Notes to journey column
@@ -77,10 +76,10 @@ func (r *leadRepository) GetLeadsByNiche(niche string) ([]models.Lead, error) {
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
 		       COALESCE(target_status, 'prospect') as target_status, trigger, created_at, updated_at
 		FROM leads
-		WHERE niche = $1 
-		   OR niche LIKE $2 
-		   OR niche LIKE $3 
-		   OR niche LIKE $4
+		WHERE niche = ? 
+		   OR niche LIKE ? 
+		   OR niche LIKE ? 
+		   OR niche LIKE ?
 		ORDER BY created_at DESC
 	`
 	
@@ -138,9 +137,9 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 	query := `
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
 		FROM leads
-		WHERE device_id = $1
-		AND ($2 = '' OR niche LIKE '%' || $2 || '%')
-		AND ($3 = '' OR target_status = $3)
+		WHERE device_id = ?
+		AND (? = '' OR niche LIKE '%' || ? || '%')
+		AND (? = '' OR target_status = ?)
 		ORDER BY created_at DESC
 	`
 	
@@ -197,10 +196,10 @@ func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]mod
 		SELECT l.id, l.user_id, l.name, l.phone, l.niche, 
 		       l.journey, l.status, l.created_at, l.updated_at
 		FROM leads l
-		WHERE l.niche LIKE '%' || $1 || '%'
+		WHERE l.niche LIKE '%' || ? || '%'
 		AND NOT EXISTS (
 			SELECT 1 FROM sequence_contacts sc 
-			WHERE sc.sequence_id = $2 
+			WHERE sc.sequence_id = ? 
 			AND sc.contact_phone = l.phone
 		)
 		ORDER BY l.created_at DESC
@@ -238,7 +237,7 @@ func (r *leadRepository) GetLeadsByDevice(userID, deviceID string) ([]models.Lea
 	query := `
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, trigger, created_at, updated_at
 		FROM leads
-		WHERE user_id = $1 AND device_id = $2
+		WHERE user_id = ? AND device_id = ?
 		ORDER BY created_at DESC
 	`
 	
@@ -289,9 +288,9 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 	
 	query := `
 		UPDATE leads 
-		SET device_id = $2, name = $3, phone = $4, niche = $5, 
-		    journey = $6, status = $7, target_status = $8, trigger = $9, updated_at = $10
-		WHERE id = $1
+		SET device_id = ?, name = ?, phone = ?, niche = ?, 
+		    journey = ?, status = ?, target_status = ?, trigger = ?, updated_at = ?
+		WHERE id = ?
 	`
 	
 	// Map Notes to journey column
@@ -324,7 +323,7 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 
 // DeleteLead deletes a lead
 func (r *leadRepository) DeleteLead(id string) error {
-	query := `DELETE FROM leads WHERE id = $1`
+	query := `DELETE FROM leads WHERE id = ?`
 	
 	result, err := r.db.Exec(query, id)
 	if err != nil {
@@ -348,7 +347,7 @@ func (r *leadRepository) GetLeadByDeviceUserPhone(deviceID, userID, phone string
 		       target_status, trigger, notes, created_at, updated_at,
 		       COALESCE(platform, '') as platform
 		FROM leads
-		WHERE device_id = $1 AND user_id = $2 AND phone = $3
+		WHERE device_id = ? AND user_id = ? AND phone = ?
 		LIMIT 1
 	`
 	
@@ -385,7 +384,7 @@ func (r *leadRepository) GetLeadByDeviceUserPhoneNiche(deviceID, userID, phone, 
 		       target_status, trigger, notes, created_at, updated_at,
 		       COALESCE(platform, '') as platform
 		FROM leads
-		WHERE device_id = $1 AND user_id = $2 AND phone = $3 AND niche = $4
+		WHERE device_id = ? AND user_id = ? AND phone = ? AND niche = ?
 		LIMIT 1
 	`
 	
@@ -420,7 +419,7 @@ func (r *leadRepository) GetLeadsByPhone(phone string) ([]models.Lead, error) {
 		SELECT id, device_id, user_id, name, phone, niche, journey, status, 
 		       COALESCE(target_status, 'prospect') as target_status, trigger, created_at, updated_at
 		FROM leads
-		WHERE phone = $1
+		WHERE phone = ?
 		ORDER BY created_at DESC
 	`
 	

@@ -84,7 +84,7 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 			SET status = 'offline', 
 			    jid = NULL,
 			    updated_at = CURRENT_TIMESTAMP
-			WHERE user_id = $1 AND status != 'deleted'
+			WHERE user_id = ? AND status != 'deleted'
 		`
 		_, err = tx.Exec(updateQuery, userIDStr)
 	} else {

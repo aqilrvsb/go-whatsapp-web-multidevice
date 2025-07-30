@@ -43,7 +43,7 @@ func AutoSaveChatsToLeads(deviceID string, userID string) error {
 		var existingID string
 		checkQuery := `
 			SELECT id FROM leads 
-			WHERE device_id = $1 AND user_id = $2 AND phone = $3
+			WHERE device_id = ? AND user_id = ? AND phone = ?
 			LIMIT 1
 		`
 		err := db.QueryRow(checkQuery, deviceID, userID, phone).Scan(&existingID)
@@ -112,11 +112,11 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	// 1. Copy chats that don't exist in new device
 	copyChatsQuery := `
 		INSERT INTO whatsapp_chats (device_id, chat_jid, chat_name, last_message_time, created_at)
-		SELECT $1, chat_jid, chat_name, last_message_time, NOW()
+		SELECT ?, chat_jid, chat_name, last_message_time, NOW()
 		FROM whatsapp_chats
-		WHERE device_id = $2
+		WHERE device_id = ?
 		AND chat_jid NOT IN (
-			SELECT chat_jid FROM whatsapp_chats WHERE device_id = $1
+			SELECT chat_jid FROM whatsapp_chats WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, chat_jid) DO NOTHING
 	`
@@ -132,12 +132,12 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 			message_text, message_type, message_secrets, timestamp, created_at
 		)
 		SELECT 
-			$1, chat_jid, message_id, sender_jid,
+			?, chat_jid, message_id, sender_jid,
 			message_text, message_type, message_secrets, timestamp, NOW()
 		FROM whatsapp_messages
-		WHERE device_id = $2
+		WHERE device_id = ?
 		AND message_id NOT IN (
-			SELECT message_id FROM whatsapp_messages WHERE device_id = $1
+			SELECT message_id FROM whatsapp_messages WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, message_id) DO NOTHING
 	`
@@ -153,14 +153,14 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 			status, target_status, trigger, journey, created_at, updated_at
 		)
 		SELECT 
-			gen_random_uuid(), user_id, $1, name, phone, niche,
+			UUID(), user_id, ?, name, phone, niche,
 			status, target_status, trigger, 
-			COALESCE(journey, '') || E'\n[Copied from device: ' || $2 || ']',
+			COALESCE(journey, '') || E'\n[Copied from device: ' || ? || ']',
 			NOW(), NOW()
 		FROM leads
-		WHERE device_id = $2 AND user_id = $3
+		WHERE device_id = ? AND user_id = ?
 		AND phone NOT IN (
-			SELECT phone FROM leads WHERE device_id = $1 AND user_id = $3
+			SELECT phone FROM leads WHERE device_id = ? AND user_id = ?
 		)
 	`
 	_, err = tx.Exec(copyLeadsQuery, newDeviceID, oldDeviceID, userID)

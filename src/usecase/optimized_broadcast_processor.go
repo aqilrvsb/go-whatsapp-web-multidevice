@@ -193,11 +193,11 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 			logrus.Errorf("Failed to queue message %s: %v", msg.ID, err)
 			// Direct update to failed
 			db := database.GetDB()
-			db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = $1, updated_at = NOW() WHERE id = $2`, err.Error(), msg.ID)
+			db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
 		} else {
 			// Mark as queued - direct update like skipped
 			db := database.GetDB()
-			_, err := db.Exec(`UPDATE broadcast_messages SET status = 'queued', updated_at = NOW() WHERE id = $1 AND status = 'pending'`, msg.ID)
+			_, err := db.Exec(`UPDATE broadcast_messages SET status = 'queued', updated_at = NOW() WHERE id = ? AND status = 'pending'`, msg.ID)
 			if err != nil {
 				logrus.Errorf("Failed to update message %s to queued status: %v", msg.ID, err)
 			} else {
@@ -321,8 +321,8 @@ func (p *OptimizedBroadcastProcessor) checkWorkerHealth() {
 func (p *OptimizedBroadcastProcessor) skipDeviceMessages(deviceID string, reason string) {
 	query := `
 		UPDATE broadcast_messages 
-		SET status = 'skipped', error_message = $1 
-		WHERE device_id = $2 AND status = 'pending'
+		SET status = 'skipped', error_message = ? 
+		WHERE device_id = ? AND status = 'pending'
 	`
 	
 	db := database.GetDB()

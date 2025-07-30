@@ -28,7 +28,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 	err := db.QueryRow(`
 		SELECT COUNT(*) 
 		FROM campaigns 
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND status IN ('triggered', 'processing')
 	`, userID).Scan(&activeCampaigns)
 	
@@ -46,7 +46,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 		SELECT COUNT(DISTINCT s.id) 
 		FROM sequences s
 		JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		WHERE s.user_id = $1 
+		WHERE s.user_id = ? 
 		AND s.status = 'active'
 		AND sc.status = 'active'
 		AND EXISTS (
@@ -66,7 +66,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 	err = db.QueryRow(`
 		SELECT COUNT(*) 
 		FROM user_devices 
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND status IN ('connected', 'online')
 	`, userID).Scan(&availableDevices)
 	
@@ -81,7 +81,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 			-- Last campaign activity
 			SELECT MAX(COALESCE(updated_at, created_at)) as last_activity
 			FROM campaigns 
-			WHERE user_id = $1 
+			WHERE user_id = ? 
 			AND status IN ('finished', 'failed')
 			
 			UNION ALL
@@ -90,7 +90,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 			SELECT MAX(bm.updated_at) as last_activity
 			FROM broadcast_messages bm
 			JOIN sequences s ON bm.sequence_id = s.id::text
-			WHERE s.user_id = $1
+			WHERE s.user_id = ?
 			AND bm.status IN ('sent', 'failed')
 		) recent_activity
 	`, userID).Scan(&lastBroadcastTime)
@@ -113,9 +113,9 @@ func (bc *BroadcastCoordinator) LockBroadcast(userID string, broadcastType strin
 	// Create a broadcast lock record
 	_, err := db.Exec(`
 		INSERT INTO broadcast_locks (user_id, broadcast_type, broadcast_id, locked_at)
-		VALUES ($1, $2, $3, NOW())
+		VALUES (?, ?, ?, NOW())
 		ON CONFLICT (user_id) DO UPDATE 
-		SET broadcast_type = $2, broadcast_id = $3, locked_at = NOW()
+		SET broadcast_type = ?, broadcast_id = ?, locked_at = NOW()
 	`, userID, broadcastType, broadcastID)
 	
 	if err != nil {
@@ -133,7 +133,7 @@ func (bc *BroadcastCoordinator) LockBroadcast(userID string, broadcastType strin
 		if err == nil {
 			_, err = db.Exec(`
 				INSERT INTO broadcast_locks (user_id, broadcast_type, broadcast_id, locked_at)
-				VALUES ($1, $2, $3, NOW())
+				VALUES (?, ?, ?, NOW())
 			`, userID, broadcastType, broadcastID)
 		}
 	}
@@ -147,7 +147,7 @@ func (bc *BroadcastCoordinator) UnlockBroadcast(userID string) error {
 	
 	_, err := db.Exec(`
 		DELETE FROM broadcast_locks 
-		WHERE user_id = $1
+		WHERE user_id = ?
 	`, userID)
 	
 	return err
@@ -160,7 +160,7 @@ func (bc *BroadcastCoordinator) GetCurrentBroadcast(userID string) (broadcastTyp
 	err = db.QueryRow(`
 		SELECT broadcast_type, broadcast_id 
 		FROM broadcast_locks 
-		WHERE user_id = $1 
+		WHERE user_id = ? 
 		AND locked_at > NOW() - INTERVAL '2 hours'
 	`, userID).Scan(&broadcastType, &broadcastID)
 	

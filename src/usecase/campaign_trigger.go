@@ -285,9 +285,9 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			db := database.GetDB()
 			err = db.QueryRow(`
 				SELECT COUNT(*) FROM broadcast_messages 
-				WHERE sequence_id = $1 
-				AND recipient_phone = $2 
-				AND group_order = $3
+				WHERE sequence_id = ? 
+				AND recipient_phone = ? 
+				AND group_order = ?
 			`, sequence.ID, contact.ContactPhone, nextDay).Scan(&existingCount)
 			
 			if err == nil && existingCount > 0 {

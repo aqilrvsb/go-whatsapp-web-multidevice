@@ -106,7 +106,7 @@ func LoadAllDevicesOnStartup() {
 			if err != nil {
 				logrus.Errorf("Failed to connect device %s: %v", deviceName.String, err)
 				// Update status to offline
-				db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = $1", deviceID.String)
+				db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = ?", deviceID.String)
 			} else {
 				// Wait a bit for connection
 				time.Sleep(3 * time.Second)
@@ -114,17 +114,17 @@ func LoadAllDevicesOnStartup() {
 				if client.IsConnected() {
 					logrus.Infof("✓ Device %s connected successfully", deviceName.String)
 					// Update status to online
-					db.Exec("UPDATE user_devices SET status = 'online' WHERE id = $1", deviceID.String)
+					db.Exec("UPDATE user_devices SET status = 'online' WHERE id = ?", deviceID.String)
 					loadedCount++
 				} else {
 					logrus.Warnf("Device %s failed to establish connection", deviceName.String)
-					db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = $1", deviceID.String)
+					db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = ?", deviceID.String)
 					failedCount++
 				}
 			}
 		} else {
 			logrus.Infof("Device %s needs QR code scan", deviceName.String)
-			db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = $1", deviceID.String)
+			db.Exec("UPDATE user_devices SET status = 'offline' WHERE id = ?", deviceID.String)
 			failedCount++
 		}
 	}

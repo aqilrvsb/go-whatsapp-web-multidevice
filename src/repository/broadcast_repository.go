@@ -36,14 +36,14 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		INSERT INTO broadcast_messages 
 		(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`	
 	// Get user_id - use from message if provided, otherwise get from device
 	var userID string
 	if msg.UserID != "" {
 		userID = msg.UserID
 	} else {
-		err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = $1", msg.DeviceID).Scan(&userID)
+		err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", msg.DeviceID).Scan(&userID)
 		if err != nil {
 			return err
 		}
@@ -103,10 +103,10 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
-		WHERE bm.device_id = $1 AND bm.status = 'pending'
-		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= $2)
-		ORDER BY bm.group_id NULLS LAST, bm.group_order NULLS LAST, bm.created_at ASC
-		LIMIT $3
+		WHERE bm.device_id = ? AND bm.status = 'pending'
+		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= ?)
+		ORDER BY bm.group_id, bm.group_order, bm.created_at ASC
+		LIMIT ?
 	`	
 	rows, err := r.db.Query(query, deviceID, time.Now(), limit)
 	if err != nil {
@@ -161,11 +161,11 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
 		UPDATE broadcast_messages 
-		SET status = $1, 
-		    error_message = $2, 
-		    sent_at = CASE WHEN $3 = 'sent' THEN NOW() ELSE sent_at END,
+		SET status = ?, 
+		    error_message = ?, 
+		    sent_at = CASE WHEN ? = 'sent' THEN NOW() ELSE sent_at END,
 		    updated_at = NOW()
-		WHERE id = $4
+		WHERE id = ?
 	`
 	
 	result, err := r.db.Exec(query, status, errorMsg, status, messageID)
@@ -192,7 +192,7 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 	query := `
 		SELECT status, COUNT(*) as count
 		FROM broadcast_messages
-		WHERE device_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+		WHERE device_id = ? AND created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
 		GROUP BY status
 	`
 	
@@ -226,7 +226,7 @@ func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]i
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 			COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
 		FROM broadcast_messages
-		WHERE user_id = $1
+		WHERE user_id = ?
 	`
 	
 	var total, sent, failed, pending int
@@ -262,7 +262,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 		WHERE status = 'pending' 
 		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
 		ORDER BY created_at ASC
-		LIMIT $1
+		LIMIT ?
 	`
 	
 	rows, err := r.db.Query(query, limit)

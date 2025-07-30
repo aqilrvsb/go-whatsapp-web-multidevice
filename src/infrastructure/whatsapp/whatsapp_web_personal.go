@@ -61,9 +61,9 @@ func GetStoredMessagesFromDB(deviceID, chatJID string, limit int) ([]map[string]
 			message_secrets,
 			timestamp
 		FROM whatsapp_messages
-		WHERE device_id = $1 AND chat_jid = $2
+		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
-		LIMIT $3
+		LIMIT ?
 	`
 	
 	rows, err := db.Query(query, deviceID, chatJID, limit)
@@ -80,7 +80,7 @@ func GetStoredMessagesFromDB(deviceID, chatJID string, limit int) ([]map[string]
 	
 	// First, try to get device JID from user_devices table
 	var deviceJID sql.NullString
-	deviceQuery := `SELECT jid FROM user_devices WHERE id = $1`
+	deviceQuery := `SELECT jid FROM user_devices WHERE id = ?`
 	db.QueryRow(deviceQuery, deviceID).Scan(&deviceJID)
 	if deviceJID.Valid && deviceJID.String != "" {
 		ourJID = deviceJID.String
@@ -193,9 +193,9 @@ func GetWhatsAppWebMessages(deviceID, chatJID string, limit int) ([]map[string]i
 			message_secrets,
 			timestamp
 		FROM whatsapp_messages
-		WHERE device_id = $1 AND chat_jid = $2
+		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
-		LIMIT $3
+		LIMIT ?
 	`
 	
 	rows, err := db.Query(query, deviceID, chatJID, limit)

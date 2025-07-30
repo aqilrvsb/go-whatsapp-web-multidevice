@@ -49,7 +49,7 @@ func (r *UserRepository) DB() *sql.DB {
 func (r *UserRepository) CreateUser(email, fullName, password string) (*models.User, error) {
 	// Check if user exists
 	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email).Scan(&exists)
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email).Scan(&exists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -74,8 +74,7 @@ func (r *UserRepository) CreateUser(email, fullName, password string) (*models.U
 	// Insert into database
 	query := `
 		INSERT INTO users (id, email, full_name, password_hash, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING created_at, updated_at
+		VALUES (?, ?, ?, ?, ?, ?, ?), updated_at
 	`
 	err = r.db.QueryRow(query, user.ID, user.Email, user.FullName, user.PasswordHash, 
 		user.IsActive, user.CreatedAt, user.UpdatedAt).Scan(&user.CreatedAt, &user.UpdatedAt)
@@ -93,7 +92,7 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	var lastLogin sql.NullTime
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
-		FROM users WHERE email = $1
+		FROM users WHERE email = ?
 	`
 	err := r.db.QueryRow(query, email).Scan(
 		&user.ID, &user.Email, &user.FullName, &user.PasswordHash,
@@ -121,7 +120,7 @@ func (r *UserRepository) GetUserByID(id string) (*models.User, error) {
 	user := &models.User{}
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
-		FROM users WHERE id = $1
+		FROM users WHERE id = ?
 	`
 	var lastLogin sql.NullTime
 	err := r.db.QueryRow(query, id).Scan(
@@ -174,7 +173,7 @@ func (r *UserRepository) ValidatePassword(email, password string) (*models.User,
 	fmt.Printf("Debug: Password validation successful\n")
 	
 	// Update last login
-	_, err = r.db.Exec("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1", user.ID)
+	_, err = r.db.Exec("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", user.ID)
 	if err != nil {
 		// Log error but don't fail login
 		fmt.Printf("Failed to update last login: %v\n", err)
@@ -195,7 +194,7 @@ func (r *UserRepository) CreateSession(userID string) (*models.UserSession, erro
 	
 	query := `
 		INSERT INTO user_sessions (id, user_id, token, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES (?, ?, ?, ?, ?)
 	`
 	_, err := r.db.Exec(query, session.ID, session.UserID, session.Token, session.ExpiresAt, session.CreatedAt)
 	if err != nil {
@@ -211,7 +210,7 @@ func (r *UserRepository) GetSession(token string) (*models.UserSession, error) {
 	query := `
 		SELECT id, user_id, token, expires_at, created_at
 		FROM user_sessions 
-		WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP
+		WHERE token = ? AND expires_at > CURRENT_TIMESTAMP
 	`
 	err := r.db.QueryRow(query, token).Scan(
 		&session.ID, &session.UserID, &session.Token, &session.ExpiresAt, &session.CreatedAt,
@@ -239,8 +238,7 @@ func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserD
 	
 	query := `
 		INSERT INTO user_devices (id, user_id, device_name, status, last_seen, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING created_at, last_seen
+		VALUES (?, ?, ?, ?, ?, ?), last_seen
 	`
 	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
 		device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
@@ -265,8 +263,7 @@ func (r *UserRepository) AddUserDeviceWithPhone(userID, deviceName, phone string
 	
 	query := `
 		INSERT INTO user_devices (id, user_id, device_name, phone, status, last_seen, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING created_at, last_seen
+		VALUES (?, ?, ?, ?, ?, ?, ?), last_seen
 	`
 	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
 		device.Phone, device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
@@ -283,7 +280,7 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at, 
 		       COALESCE(platform, '') as platform
 		FROM user_devices 
-		WHERE user_id = $1
+		WHERE user_id = ?
 		ORDER BY created_at DESC
 	`
 	rows, err := r.db.Query(query, userID)
@@ -321,7 +318,7 @@ func (r *UserRepository) GetUserDevice(userID, deviceID string) (*models.UserDev
 	query := `
 		SELECT id, user_id, device_name, phone, jid, status, last_seen, created_at
 		FROM user_devices 
-		WHERE user_id = $1 AND id = $2
+		WHERE user_id = ? AND id = ?
 	`
 	device := &models.UserDevice{}
 	var phone, jid sql.NullString
@@ -351,7 +348,7 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
 		       created_at, COALESCE(updated_at, created_at), last_seen, COALESCE(platform, '')
 		FROM user_devices
-		WHERE id = $1
+		WHERE id = ?
 	`
 	
 	err := r.db.QueryRow(query, deviceID).Scan(
@@ -375,8 +372,8 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
 	query := `
 		UPDATE user_devices 
-		SET status = $2, last_seen = CURRENT_TIMESTAMP, phone = $3, jid = $4
-		WHERE id = $1
+		SET status = ?, last_seen = CURRENT_TIMESTAMP, phone = ?, jid = ?
+		WHERE id = ?
 	`
 	_, err := r.db.Exec(query, deviceID, status, phone, jid)
 	if err != nil {
@@ -396,7 +393,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	defer tx.Rollback()
 	
 	// First, delete all WhatsApp messages for this device
-	result, err := tx.Exec("DELETE FROM whatsapp_messages WHERE device_id = $1", deviceID)
+	result, err := tx.Exec("DELETE FROM whatsapp_messages WHERE device_id = ?", deviceID)
 	if err != nil {
 		log.Printf("Warning: failed to delete WhatsApp messages: %v", err)
 		// Continue with deletion even if this fails (table might not exist)
@@ -408,7 +405,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	
 	// Delete all WhatsApp chats for this device
-	result, err = tx.Exec("DELETE FROM whatsapp_chats WHERE device_id = $1", deviceID)
+	result, err = tx.Exec("DELETE FROM whatsapp_chats WHERE device_id = ?", deviceID)
 	if err != nil {
 		log.Printf("Warning: failed to delete WhatsApp chats: %v", err)
 		// Continue with deletion even if this fails (table might not exist)
@@ -420,7 +417,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	
 	// Delete all leads associated with this device
-	result, err = tx.Exec("DELETE FROM leads WHERE device_id = $1", deviceID)
+	result, err = tx.Exec("DELETE FROM leads WHERE device_id = ?", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete leads for device: %w", err)
 	}
@@ -431,7 +428,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	
 	// Also delete any broadcast messages for this device
-	result, err = tx.Exec("DELETE FROM broadcast_messages WHERE device_id = $1", deviceID)
+	result, err = tx.Exec("DELETE FROM broadcast_messages WHERE device_id = ?", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete broadcast messages for device: %w", err)
 	}
@@ -442,7 +439,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	
 	// Finally, delete the device itself
-	_, err = tx.Exec("DELETE FROM user_devices WHERE id = $1", deviceID)
+	_, err = tx.Exec("DELETE FROM user_devices WHERE id = ?", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete device: %w", err)
 	}
@@ -461,7 +458,7 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 	query := `
 		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, created_at, last_seen
 		FROM user_devices
-		WHERE user_id = $1 AND id = $2
+		WHERE user_id = ? AND id = ?
 	`
 	
 	var device models.UserDevice
@@ -529,8 +526,8 @@ func (r *UserRepository) CleanupExpiredSessions() error {
 func (r *UserRepository) UpdateDevicePhone(userID, deviceID, phone string) error {
 	query := `
 		UPDATE user_devices 
-		SET phone = $1, last_seen = CURRENT_TIMESTAMP
-		WHERE user_id = $2 AND id = $3
+		SET phone = ?, last_seen = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND id = ?
 	`
 	result, err := r.db.Exec(query, phone, userID, deviceID)
 	if err != nil {
@@ -623,7 +620,7 @@ func (r *UserRepository) CreateDevice(device *models.UserDevice) error {
 			last_seen, created_at, updated_at, 
 			min_delay_seconds, max_delay_seconds, platform
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	_, err := r.db.Exec(query, 
@@ -658,7 +655,7 @@ func (r *UserRepository) GetDeviceByUserAndJID(userID, jid string) (*models.User
 		       COALESCE(max_delay_seconds, 15) as max_delay_seconds,
 		       COALESCE(platform, '') as platform
 		FROM user_devices
-		WHERE user_id = $1 AND jid = $2
+		WHERE user_id = ? AND jid = ?
 		LIMIT 1
 	`
 	
@@ -693,7 +690,7 @@ func (r *UserRepository) GetDeviceByUserAndName(userID, deviceName string) (*mod
 		       COALESCE(max_delay_seconds, 15) as max_delay_seconds,
 		       COALESCE(platform, '') as platform
 		FROM user_devices
-		WHERE user_id = $1 AND device_name = $2
+		WHERE user_id = ? AND device_name = ?
 		LIMIT 1
 	`
 	

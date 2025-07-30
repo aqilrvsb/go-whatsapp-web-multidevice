@@ -37,7 +37,7 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, 
 		                      trigger, start_trigger, end_trigger, total_days, is_active, time_schedule, 
 		                      min_delay_seconds, max_delay_seconds, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	_, err := r.db.Exec(query, sequence.ID, sequence.UserID, nil, // device_id is NULL - sequences use all user devices
@@ -61,7 +61,7 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 		       created_at, updated_at
 		FROM sequences
-		WHERE user_id = $1
+		WHERE user_id = ?
 		ORDER BY created_at DESC
 	`
 	
@@ -102,7 +102,7 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 		       created_at, updated_at
 		FROM sequences
-		WHERE id = $1
+		WHERE id = ?
 	`
 	
 	var seq models.Sequence
@@ -130,11 +130,11 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	
 	query := `
 		UPDATE sequences 
-		SET name = $1, description = $2, niche = $3, status = $4, 
-		    start_trigger = $5, end_trigger = $6, total_days = $7, 
-		    is_active = $8, schedule_time = $9, min_delay_seconds = $10, 
-		    max_delay_seconds = $11, updated_at = $12
-		WHERE id = $13
+		SET name = ?, description = ?, niche = ?, status = ?, 
+		    start_trigger = ?, end_trigger = ?, total_days = ?, 
+		    is_active = ?, schedule_time = ?, min_delay_seconds = ?, 
+		    max_delay_seconds = ?, updated_at = ?
+		WHERE id = ?
 	`
 	
 	_, err := r.db.Exec(query, sequence.Name, sequence.Description, sequence.Niche, 
@@ -147,13 +147,13 @@ func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 
 // DeleteSequence deletes a sequence
 func (r *sequenceRepository) DeleteSequence(sequenceID string) error {
-	_, err := r.db.Exec("DELETE FROM sequences WHERE id = $1", sequenceID)
+	_, err := r.db.Exec("DELETE FROM sequences WHERE id = ?", sequenceID)
 	return err
 }
 
 // DeleteSequenceSteps deletes all steps for a sequence
 func (r *sequenceRepository) DeleteSequenceSteps(sequenceID string) error {
-	_, err := r.db.Exec("DELETE FROM sequence_steps WHERE sequence_id = $1", sequenceID)
+	_, err := r.db.Exec("DELETE FROM sequence_steps WHERE sequence_id = ?", sequenceID)
 	return err
 }
 
@@ -168,7 +168,7 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 			next_trigger, trigger_delay_hours, is_entry_point,
 			min_delay_seconds, max_delay_seconds, delay_days
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	// Use DayNumber
@@ -208,7 +208,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	
 	// First, let's check if there are any steps at all
 	var count int
-	countQuery := `SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = $1`
+	countQuery := `SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = ?`
 	err := r.db.QueryRow(countQuery, sequenceID).Scan(&count)
 	if err != nil {
 		logrus.Errorf("Error counting sequence steps: %v", err)
@@ -240,7 +240,7 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
 			COALESCE(delay_days, 0) as delay_days
 		FROM sequence_steps
-		WHERE sequence_id = $1
+		WHERE sequence_id = ?
 		ORDER BY day_number ASC
 	`
 	
@@ -288,7 +288,7 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 
 	query := `
 		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, completed_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
 	
@@ -303,7 +303,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 		SELECT id, sequence_id, contact_phone, contact_name, current_step, status, 
 			   completed_at
 		FROM sequence_contacts
-		WHERE sequence_id = $1
+		WHERE sequence_id = ?
 		ORDER BY completed_at DESC
 	`
 	
@@ -363,8 +363,8 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep int, status string) error {
 	query := `
 		UPDATE sequence_contacts 
-		SET current_step = $1, status = $2
-		WHERE id = $3
+		SET current_step = ?, status = ?
+		WHERE id = ?
 	`
 	
 	_, err := r.db.Exec(query, currentStep, status, contactID)
@@ -376,8 +376,8 @@ func (r *sequenceRepository) MarkContactCompleted(contactID string) error {
 	now := time.Now()
 	query := `
 		UPDATE sequence_contacts 
-		SET status = 'completed', completed_at = $1
-		WHERE id = $2
+		SET status = 'completed', completed_at = ?
+		WHERE id = ?
 	`
 	
 	_, err := r.db.Exec(query, now, contactID)
@@ -391,7 +391,7 @@ func (r *sequenceRepository) CreateSequenceLog(log *models.SequenceLog) error {
 
 	query := `
 		INSERT INTO sequence_logs (id, sequence_id, contact_id, step_id, day, status, message_id, error_message, sent_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
 	_, err := r.db.Exec(query, log.ID, log.SequenceID, log.ContactID, log.StepID,
@@ -408,7 +408,7 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	query := `
 		SELECT status, COUNT(*) as count
 		FROM sequence_contacts
-		WHERE sequence_id = $1
+		WHERE sequence_id = ?
 		GROUP BY status
 	`
 	
@@ -429,7 +429,7 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	// Get total messages sent
 	var messageCount int
 	err = r.db.QueryRow(`
-		SELECT COUNT(*) FROM sequence_logs WHERE sequence_id = $1
+		SELECT COUNT(*) FROM sequence_logs WHERE sequence_id = ?
 	`, sequenceID).Scan(&messageCount)
 	
 	if err == nil {

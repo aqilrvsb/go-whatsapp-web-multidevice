@@ -22,8 +22,7 @@ func NewTeamMemberRepository(db *sql.DB) *TeamMemberRepository {
 func (r *TeamMemberRepository) Create(ctx context.Context, member *models.TeamMember) error {
 	query := `
 		INSERT INTO team_members (username, password, created_by, is_active)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at, updated_at
+		VALUES (?, ?, ?, ?), created_at, updated_at
 	`
 	
 	err := r.db.QueryRowContext(ctx, query,
@@ -45,7 +44,7 @@ func (r *TeamMemberRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 	query := `
 		SELECT id, username, password, created_by, created_at, updated_at, is_active
 		FROM team_members
-		WHERE id = $1
+		WHERE id = ?
 	`
 	
 	member := &models.TeamMember{}
@@ -74,7 +73,7 @@ func (r *TeamMemberRepository) GetByUsername(ctx context.Context, username strin
 	query := `
 		SELECT id, username, password, created_by, created_at, updated_at, is_active
 		FROM team_members
-		WHERE username = $1
+		WHERE username = ?
 	`
 	
 	member := &models.TeamMember{}
@@ -137,8 +136,8 @@ func (r *TeamMemberRepository) GetAll(ctx context.Context) ([]models.TeamMember,
 func (r *TeamMemberRepository) Update(ctx context.Context, member *models.TeamMember) error {
 	query := `
 		UPDATE team_members
-		SET username = $2, password = $3, is_active = $4, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
+		SET username = ?, password = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
 	`
 	
 	_, err := r.db.ExecContext(ctx, query,
@@ -157,7 +156,7 @@ func (r *TeamMemberRepository) Update(ctx context.Context, member *models.TeamMe
 
 // Delete deletes a team member
 func (r *TeamMemberRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `DELETE FROM team_members WHERE id = $1`
+	query := `DELETE FROM team_members WHERE id = ?`
 	
 	_, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -179,7 +178,7 @@ func (r *TeamMemberRepository) CreateSession(ctx context.Context, memberID uuid.
 	
 	query := `
 		INSERT INTO team_sessions (id, team_member_id, token, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES (?, ?, ?, ?, ?)
 	`
 	
 	_, err := r.db.ExecContext(ctx, query,
@@ -202,7 +201,7 @@ func (r *TeamMemberRepository) GetSessionByToken(ctx context.Context, token stri
 	query := `
 		SELECT id, team_member_id, token, expires_at, created_at
 		FROM team_sessions
-		WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP
+		WHERE token = ? AND expires_at > CURRENT_TIMESTAMP
 	`
 	
 	session := &models.TeamSession{}
@@ -226,7 +225,7 @@ func (r *TeamMemberRepository) GetSessionByToken(ctx context.Context, token stri
 
 // DeleteSession deletes a session
 func (r *TeamMemberRepository) DeleteSession(ctx context.Context, token string) error {
-	query := `DELETE FROM team_sessions WHERE token = $1`
+	query := `DELETE FROM team_sessions WHERE token = ?`
 	
 	_, err := r.db.ExecContext(ctx, query, token)
 	if err != nil {
@@ -289,7 +288,7 @@ func (r *TeamMemberRepository) GetAllWithDeviceCount(ctx context.Context) ([]mod
 // GetDeviceIDsForMember gets all device IDs for a team member based on username
 func (r *TeamMemberRepository) GetDeviceIDsForMember(ctx context.Context, username string) ([]string, error) {
 	query := `
-		SELECT id FROM user_devices WHERE device_name = $1
+		SELECT id FROM user_devices WHERE device_name = ?
 	`
 	
 	rows, err := r.db.QueryContext(ctx, query, username)
@@ -315,7 +314,7 @@ func (r *TeamMemberRepository) GetTeamMemberDevices(ctx context.Context, usernam
 	query := `
 		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at
 		FROM user_devices
-		WHERE LOWER(device_name) = LOWER($1)
+		WHERE LOWER(device_name) = LOWER(?)
 		ORDER BY created_at DESC
 	`
 	

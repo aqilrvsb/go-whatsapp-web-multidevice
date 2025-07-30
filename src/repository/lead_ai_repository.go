@@ -43,8 +43,7 @@ func GetLeadAIRepository() LeadAIRepository {
 func (r *leadAIRepository) CreateLeadAI(lead *models.LeadAI) error {
 	query := `
 		INSERT INTO leads_ai (user_id, name, phone, email, niche, source, target_status, notes)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, created_at, updated_at`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?), created_at, updated_at`
 	
 	err := r.db.QueryRow(
 		query,
@@ -67,7 +66,7 @@ func (r *leadAIRepository) GetLeadAIByID(id int) (*models.LeadAI, error) {
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE id = $1`
+		WHERE id = ?`
 	
 	err := r.db.QueryRow(query, id).Scan(
 		&lead.ID,
@@ -98,7 +97,7 @@ func (r *leadAIRepository) GetLeadAIByUser(userID string) ([]models.LeadAI, erro
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE user_id = $1
+		WHERE user_id = ?
 		ORDER BY created_at DESC`
 	
 	return r.getLeadAIList(query, userID)
@@ -109,7 +108,7 @@ func (r *leadAIRepository) GetPendingLeadAI(userID string) ([]models.LeadAI, err
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE user_id = $1 AND status = 'pending'
+		WHERE user_id = ? AND status = 'pending'
 		ORDER BY created_at ASC`
 	
 	return r.getLeadAIList(query, userID)
@@ -125,7 +124,7 @@ func (r *leadAIRepository) GetLeadAIByNiche(userID, niche string) ([]models.Lead
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE user_id = $1 AND niche LIKE '%' || $2 || '%'
+		WHERE user_id = ? AND niche LIKE '%' || ? || '%'
 		ORDER BY created_at DESC`
 	
 	return r.getLeadAIList(query, userID, niche)
@@ -145,7 +144,7 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = $1 AND niche LIKE '%' || $2 || '%' AND status = 'pending'
+			WHERE user_id = ? AND niche LIKE '%' || ? || '%' AND status = 'pending'
 			ORDER BY created_at ASC`
 		args = []interface{}{userID, niche}
 	} else {
@@ -153,7 +152,7 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = $1 AND niche LIKE '%' || $2 || '%' AND target_status = $3 AND status = 'pending'
+			WHERE user_id = ? AND niche LIKE '%' || ? || '%' AND target_status = ? AND status = 'pending'
 			ORDER BY created_at ASC`
 		args = []interface{}{userID, niche, targetStatus}
 	}
@@ -165,8 +164,8 @@ func (r *leadAIRepository) AssignDevice(leadID int, deviceID string) error {
 	now := time.Now()
 	query := `
 		UPDATE leads_ai 
-		SET device_id = $1, assigned_at = $2, status = 'assigned', updated_at = $3
-		WHERE id = $4`
+		SET device_id = ?, assigned_at = ?, status = 'assigned', updated_at = ?
+		WHERE id = ?`
 	
 	_, err := r.db.Exec(query, deviceID, now, now, leadID)
 	return err
@@ -175,15 +174,15 @@ func (r *leadAIRepository) UpdateStatus(leadID int, status string) error {
 	now := time.Now()
 	query := `
 		UPDATE leads_ai 
-		SET status = $1, updated_at = $2`
+		SET status = ?, updated_at = ?`
 	
 	args := []interface{}{status, now}
 	
 	if status == "sent" {
-		query += `, sent_at = $3 WHERE id = $4`
+		query += `, sent_at = ? WHERE id = ?`
 		args = append(args, now, leadID)
 	} else {
-		query += ` WHERE id = $3`
+		query += ` WHERE id = ?`
 		args = append(args, leadID)
 	}
 	
@@ -194,9 +193,9 @@ func (r *leadAIRepository) UpdateStatus(leadID int, status string) error {
 func (r *leadAIRepository) UpdateLeadAI(id int, lead *models.LeadAI) error {
 	query := `
 		UPDATE leads_ai 
-		SET name = $1, phone = $2, email = $3, niche = $4, 
-		    target_status = $5, notes = $6, updated_at = $7
-		WHERE id = $8`
+		SET name = ?, phone = ?, email = ?, niche = ?, 
+		    target_status = ?, notes = ?, updated_at = ?
+		WHERE id = ?`
 	
 	_, err := r.db.Exec(
 		query,
@@ -213,7 +212,7 @@ func (r *leadAIRepository) UpdateLeadAI(id int, lead *models.LeadAI) error {
 	return err
 }
 func (r *leadAIRepository) DeleteLeadAI(id int) error {
-	query := `DELETE FROM leads_ai WHERE id = $1`
+	query := `DELETE FROM leads_ai WHERE id = ?`
 	_, err := r.db.Exec(query, id)
 	return err
 }
@@ -223,7 +222,7 @@ func (r *leadAIRepository) GetLeadAICountByDevice(campaignID int, deviceID strin
 	query := `
 		SELECT COUNT(*) 
 		FROM ai_campaign_progress 
-		WHERE campaign_id = $1 AND device_id = $2`
+		WHERE campaign_id = ? AND device_id = ?`
 	
 	err := r.db.QueryRow(query, campaignID, deviceID).Scan(&count)
 	if err != nil {
@@ -238,7 +237,7 @@ func (r *leadAIRepository) GetCampaignProgress(campaignID int) ([]models.AICampa
 		SELECT id, campaign_id, device_id, leads_sent, leads_failed, 
 		       status, last_activity, created_at, updated_at
 		FROM ai_campaign_progress
-		WHERE campaign_id = $1
+		WHERE campaign_id = ?
 		ORDER BY device_id`
 	
 	rows, err := r.db.Query(query, campaignID)
@@ -272,12 +271,12 @@ func (r *leadAIRepository) GetCampaignProgress(campaignID int) ([]models.AICampa
 func (r *leadAIRepository) UpdateCampaignProgress(progress *models.AICampaignProgress) error {
 	query := `
 		INSERT INTO ai_campaign_progress (campaign_id, device_id, leads_sent, leads_failed, status)
-		VALUES ($1, $2, $3, $4, $5)
+		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (campaign_id, device_id) 
 		DO UPDATE SET 
-			leads_sent = $3,
-			leads_failed = $4,
-			status = $5,
+			leads_sent = ?,
+			leads_failed = ?,
+			status = ?,
 			last_activity = CURRENT_TIMESTAMP,
 			updated_at = CURRENT_TIMESTAMP`
 	

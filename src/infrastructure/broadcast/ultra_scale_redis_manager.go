@@ -778,8 +778,8 @@ func getPriority(msg domainBroadcast.BroadcastMessage) int {
 func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDeviceID string) {
 	query := `
 		UPDATE broadcast_messages 
-		SET device_id = $1 
-		WHERE device_id = $2 AND status = 'pending'
+		SET device_id = ? 
+		WHERE device_id = ? AND status = 'pending'
 	`
 	
 	db := database.GetDB()
@@ -798,7 +798,7 @@ func (um *UltraScaleRedisManager) skipOfflineDeviceMessages(deviceID string) {
 	query := `
 		UPDATE broadcast_messages 
 		SET status = 'skipped', error_message = 'Device offline' 
-		WHERE device_id = $1 AND status = 'pending'
+		WHERE device_id = ? AND status = 'pending'
 	`
 	
 	db := database.GetDB()

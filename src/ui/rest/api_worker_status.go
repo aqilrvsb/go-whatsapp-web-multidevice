@@ -75,8 +75,8 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 		SELECT DISTINCT c.id, c.title, c.status 
 		FROM broadcast_messages bm 
 		JOIN campaigns c ON bm.campaign_id = c.id 
-		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
-		AND c.user_id = $2
+		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
+		AND c.user_id = ?
 		ORDER BY bm.created_at DESC 
 		LIMIT 1
 	`, deviceID, userID).Scan(&campaignID, &campaignTitle, &campaignStatus)
@@ -95,8 +95,8 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 		SELECT DISTINCT s.id, s.name, s.status 
 		FROM broadcast_messages bm 
 		JOIN sequences s ON bm.sequence_id = s.id 
-		WHERE bm.device_id = $1 AND bm.status IN ('pending', 'processing') 
-		AND s.user_id = $2
+		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
+		AND s.user_id = ?
 		ORDER BY bm.created_at DESC 
 		LIMIT 1
 	`, deviceID, userID).Scan(&sequenceID, &sequenceName, &sequenceStatus)
