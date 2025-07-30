@@ -552,7 +552,7 @@ func (s *sequenceService) sendSequenceMessage(sequence *models.Sequence, contact
 		return fmt.Errorf("no connected devices found for user")
 	}
 	
-	// Select random device for load balancing
+	// SELECT random device for load balancing
 	deviceIndex := time.Now().Nanosecond() % len(connectedDevices)
 	selectedDevice := connectedDevices[deviceIndex]
 	

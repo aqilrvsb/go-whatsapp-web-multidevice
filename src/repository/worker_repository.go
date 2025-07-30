@@ -26,8 +26,7 @@ func GetWorkerRepository() *workerRepository {
 // UpdateWorkerStatus updates or inserts worker status
 func (r *workerRepository) UpdateWorkerStatus(deviceID, status string, queueSize int, processed, failed int64) error {
 	query := `
-		INSERT INTO worker_status 
-		(device_id, worker_type, status, current_queue_size, messages_processed, messages_failed, last_activity, updated_at)
+		INSERT INTO worker_status(device_id, worker_type, ` + "`status`" + `, current_queue_size, messages_processed, messages_failed, last_activity, updated_at)
 		VALUES (?, 'broadcast', ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, worker_type) 
 		DO UPDATE SET 
@@ -47,7 +46,7 @@ func (r *workerRepository) UpdateWorkerStatus(deviceID, status string, queueSize
 // GetWorkerStatuses gets all worker statuses
 func (r *workerRepository) GetWorkerStatuses() ([]map[string]interface{}, error) {
 	query := `
-		SELECT device_id, worker_type, status, current_queue_size, 
+		SELECT device_id, worker_type, ` + "`status`" + `, current_queue_size, 
 		       messages_processed, messages_failed, last_activity
 		FROM worker_status
 		ORDER BY last_activity DESC

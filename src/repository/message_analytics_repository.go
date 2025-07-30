@@ -39,7 +39,7 @@ func NewMessageAnalyticsRepository() *MessageAnalyticsRepository {
 func (r *MessageAnalyticsRepository) RecordMessage(userID, deviceID, messageID, jid, content string, isFromMe bool, status string) error {
 	id := uuid.New().String()
 	query := `
-		INSERT INTO message_analytics (id, user_id, device_id, message_id, jid, content, is_from_me, status)
+		INSERT INTO message_analytics(id, user_id, device_id, message_id, jid, content, is_from_me, ` + "`status`" + `)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (message_id) 
 		DO UPDATE SET status = ?, updated_at = CURRENT_TIMESTAMP
@@ -55,8 +55,7 @@ func (r *MessageAnalyticsRepository) RecordMessage(userID, deviceID, messageID, 
 // UpdateMessageStatus updates the status of a message
 func (r *MessageAnalyticsRepository) UpdateMessageStatus(messageID, status string) error {
 	query := `
-		UPDATE message_analytics 
-		SET status = ?, updated_at = CURRENT_TIMESTAMP
+		UPDATE message_analytics SET ` + "`status`" + ` = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE message_id = ?
 	`
 	_, err := r.db.Exec(query, messageID, status)
@@ -71,10 +70,9 @@ func (r *MessageAnalyticsRepository) UpdateMessageStatus(messageID, status strin
 func (r *MessageAnalyticsRepository) GetUserAnalytics(userID string, startDate, endDate time.Time, deviceID string) (map[string]interface{}, error) {
 	// Base query for metrics
 	metricsQuery := `
-		SELECT 
-			COUNT(CASE WHEN is_from_me = true THEN 1 END) as leads_sent,
+		SELECT COUNT(CASE WHEN is_from_me = true THEN 1 END) as leads_sent,
 			COUNT(CASE WHEN is_from_me = true AND status IN ('delivered', 'read') THEN 1 END) as leads_delivered,
-			COUNT(CASE WHEN is_from_me = true AND status = 'read' THEN 1 END) as leads_read,
+			COUNT(CASE WHEN is_from_me = true AND ` + "`status`" + ` = 'read' THEN 1 END) as leads_read,
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) as leads_replied,
 			COUNT(DISTINCT CASE WHEN device_id IS NOT NULL THEN device_id END) as active_devices
 		FROM message_analytics
@@ -101,17 +99,16 @@ func (r *MessageAnalyticsRepository) GetUserAnalytics(userID string, startDate, 
 	
 	// Get device count
 	var totalDevices int
-	deviceQuery := "SELECT COUNT(*) FROM user_devices WHERE user_id = ?"
+	deviceQuery := "SELECT COUNT(*) `from` user_devices WHERE user_id = ?"
 	r.db.QueryRow(deviceQuery, userID).Scan(&totalDevices)
 	inactiveDevices := totalDevices - activeDevices
 	
 	// Get daily stats
 	dailyQuery := `
-		SELECT 
-			DATE(created_at) as date,
+		SELECT DATE(created_at) as date,
 			COUNT(CASE WHEN is_from_me = true THEN 1 END) as sent,
 			COUNT(CASE WHEN is_from_me = true AND status IN ('delivered', 'read') THEN 1 END) as delivered,
-			COUNT(CASE WHEN is_from_me = true AND status = 'read' THEN 1 END) as read,
+			COUNT(CASE WHEN is_from_me = true AND ` + "`status`" + ` = 'read' THEN 1 END) as read,
 			COUNT(CASE WHEN is_from_me = false THEN 1 END) as replied
 		FROM message_analytics
 		WHERE user_id = ? AND created_at BETWEEN ? AND ?
@@ -202,11 +199,10 @@ func (r *MessageAnalyticsRepository) GetDeviceAnalytics(deviceID string, days in
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
 	
-	query := `
-		SELECT 
-			COUNT(CASE WHEN is_from_me = true THEN 1 END) as messages_sent,
-			COUNT(CASE WHEN is_from_me = false THEN 1 END) as messages_received,
-			COUNT(DISTINCT jid) as unique_contacts
+	`
+		SELECT COUNT(CASE WHEN is_from_me = true THEN 1 END) AS messages_sent,
+			COUNT(CASE WHEN is_from_me = false THEN 1 END) AS messages_received,
+			COUNT(DISTINCT jid) AS unique_contacts
 		FROM message_analytics
 		WHERE device_id = ? AND created_at BETWEEN ? AND ?
 	`

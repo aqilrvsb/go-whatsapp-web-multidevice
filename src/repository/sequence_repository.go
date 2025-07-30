@@ -34,8 +34,7 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 	sequence.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO sequences (id, user_id, device_id, name, description, niche, status, 
-		                      trigger, start_trigger, end_trigger, total_days, is_active, time_schedule, 
+		INSERT INTO sequences(id, user_id, device_id, name, description, niche, status, ` + "`trigger`" + `, start_trigger, end_trigger, total_days, is_active, time_schedule, 
 		                      min_delay_seconds, max_delay_seconds, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
@@ -53,12 +52,12 @@ func (r *sequenceRepository) CreateSequence(sequence *models.Sequence) error {
 func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, error) {
 	query := `
 		SELECT id, user_id, device_id, name, description, niche, status, 
-		       COALESCE(start_trigger, '') as start_trigger,
-		       COALESCE(end_trigger, '') as end_trigger,
+		       COALESCE(start_trigger, '') AS start_trigger,
+		       COALESCE(end_trigger, '') AS end_trigger,
 		       total_days, is_active, 
-		       COALESCE(schedule_time, '09:00') as schedule_time, 
-		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+		       COALESCE(schedule_time, '09:00') AS schedule_time, 
+		       COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+		       COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
 		       created_at, updated_at
 		FROM sequences
 		WHERE user_id = ?
@@ -92,14 +91,14 @@ func (r *sequenceRepository) GetSequences(userID string) ([]models.Sequence, err
 }
 // GetSequenceByID gets sequence by ID
 func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequence, error) {
-	query := `
+	`
 		SELECT id, user_id, device_id, name, description, niche, status, 
-		       COALESCE(start_trigger, '') as start_trigger,
-		       COALESCE(end_trigger, '') as end_trigger,
+		       COALESCE(start_trigger, '') AS start_trigger,
+		       COALESCE(end_trigger, '') AS end_trigger,
 		       total_days, is_active, 
-		       COALESCE(schedule_time, '09:00') as schedule_time,
-		       COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-		       COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+		       COALESCE(schedule_time, '09:00') AS schedule_time,
+		       COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+		       COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
 		       created_at, updated_at
 		FROM sequences
 		WHERE id = ?
@@ -128,7 +127,7 @@ func (r *sequenceRepository) GetSequenceByID(sequenceID string) (*models.Sequenc
 func (r *sequenceRepository) UpdateSequence(sequence *models.Sequence) error {
 	sequence.UpdatedAt = time.Now()
 	
-	query := `
+	`
 		UPDATE sequences 
 		SET name = ?, description = ?, niche = ?, status = ?, 
 		    start_trigger = ?, end_trigger = ?, total_days = ?, 
@@ -162,9 +161,9 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 	step.ID = uuid.New().String()
 
 	query := `
-		INSERT INTO sequence_steps (
+		INSERT INTO sequence_steps(
 			id, sequence_id, day_number, message_type, content, 
-			media_url, caption, trigger, time_schedule,
+			media_url, caption, ` + "`trigger`" + `, time_schedule,
 			next_trigger, trigger_delay_hours, is_entry_point,
 			min_delay_seconds, max_delay_seconds, delay_days
 		)
@@ -226,8 +225,8 @@ func (r *sequenceRepository) GetSequenceSteps(sequenceID string) ([]models.Seque
 	query := `
 		SELECT 
 			id, sequence_id, 
-			COALESCE(day_number, 1) as day_number,
-			COALESCE(trigger, '') as trigger, 
+			COALESCE(day_number, 1) AS day_number,
+			COALESCE(` + "`trigger`" + `, '') as ` + "`trigger`" + `, 
 			COALESCE(next_trigger, '') as next_trigger,
 			COALESCE(trigger_delay_hours, 24) as trigger_delay_hours,
 			COALESCE(is_entry_point, false) as is_entry_point,
@@ -286,8 +285,8 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 	contact.CurrentStep = 0
 	contact.Status = "active"
 
-	query := `
-		INSERT INTO sequence_contacts (id, sequence_id, contact_phone, contact_name, current_step, status, completed_at)
+	`
+		INSERT INTO sequence_contacts(id, sequence_id, contact_phone, contact_name, current_step, status, completed_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (sequence_id, contact_phone) DO NOTHING
 	`
@@ -299,7 +298,7 @@ func (r *sequenceRepository) AddContactToSequence(contact *models.SequenceContac
 }
 // GetSequenceContacts gets all contacts in a sequence
 func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.SequenceContact, error) {
-	query := `
+	`
 		SELECT id, sequence_id, contact_phone, contact_name, current_step, status, 
 			   completed_at
 		FROM sequence_contacts
@@ -330,7 +329,7 @@ func (r *sequenceRepository) GetSequenceContacts(sequenceID string) ([]models.Se
 
 // GetActiveSequenceContacts gets contacts ready for next message
 func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([]models.SequenceContact, error) {
-	query := `
+	`
 		SELECT sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name, 
 			   sc.current_step, sc.status, sc.completed_at
 		FROM sequence_contacts sc
@@ -361,7 +360,7 @@ func (r *sequenceRepository) GetActiveSequenceContacts(currentTime time.Time) ([
 }
 // UpdateContactProgress updates contact's progress in sequence
 func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep int, status string) error {
-	query := `
+	`
 		UPDATE sequence_contacts 
 		SET current_step = ?, status = ?
 		WHERE id = ?
@@ -374,9 +373,8 @@ func (r *sequenceRepository) UpdateContactProgress(contactID string, currentStep
 // MarkContactCompleted marks contact as completed
 func (r *sequenceRepository) MarkContactCompleted(contactID string) error {
 	now := time.Now()
-	query := `
-		UPDATE sequence_contacts 
-		SET status = 'completed', completed_at = ?
+	`
+		UPDATE sequence_contacts SET status = 'completed', completed_at = ?
 		WHERE id = ?
 	`
 	
@@ -389,8 +387,8 @@ func (r *sequenceRepository) CreateSequenceLog(log *models.SequenceLog) error {
 	log.ID = uuid.New().String()
 	log.SentAt = time.Now()
 
-	query := `
-		INSERT INTO sequence_logs (id, sequence_id, contact_id, step_id, day, status, message_id, error_message, sent_at)
+	`
+		INSERT INTO sequence_logs(id, sequence_id, contact_id, step_id, day, status, message_id, error_message, sent_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
@@ -405,8 +403,8 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 	stats := make(map[string]int)
 	
 	// Get contact counts by status
-	query := `
-		SELECT status, COUNT(*) as count
+	`
+		SELECT status, COUNT(*) AS count
 		FROM sequence_contacts
 		WHERE sequence_id = ?
 		GROUP BY status
@@ -441,7 +439,7 @@ func (r *sequenceRepository) GetSequenceStats(sequenceID string) (map[string]int
 
 // GetActiveSequencesWithNiche gets all active sequences that have a niche
 func (r *sequenceRepository) GetActiveSequencesWithNiche() ([]models.Sequence, error) {
-	query := `
+	`
 		SELECT id, user_id, device_id, name, description, niche, total_days, is_active, created_at, updated_at
 		FROM sequences
 		WHERE is_active = true

@@ -42,9 +42,9 @@ func AutoSaveChatsToLeads(deviceID string, userID string) error {
 		// Check if lead already exists with same device_id, user_id, and phone
 		var existingID string
 		checkQuery := `
-			SELECT id FROM leads 
+			SELECT id from leads 
 			WHERE device_id = ? AND user_id = ? AND phone = ?
-			LIMIT 1
+			`limit` 1
 		`
 		err := db.QueryRow(checkQuery, deviceID, userID, phone).Scan(&existingID)
 		
@@ -116,7 +116,7 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		FROM whatsapp_chats
 		WHERE device_id = ?
 		AND chat_jid NOT IN (
-			SELECT chat_jid FROM whatsapp_chats WHERE device_id = ?
+			SELECT chat_jid from whatsapp_chats WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, chat_jid) DO NOTHING
 	`
@@ -127,17 +127,16 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	
 	// 2. Copy messages that don't exist in new device
 	copyMessagesQuery := `
-		INSERT INTO whatsapp_messages (
+		INSERT INTO whatsapp_messages(
 			device_id, chat_jid, message_id, sender_jid, 
-			message_text, message_type, message_secrets, timestamp, created_at
+			message_text, message_`type`, message_secrets, timestamp, created_at
 		)
-		SELECT 
-			?, chat_jid, message_id, sender_jid,
+		SELECT ?, chat_jid, message_id, sender_jid,
 			message_text, message_type, message_secrets, timestamp, NOW()
 		FROM whatsapp_messages
 		WHERE device_id = ?
 		AND message_id NOT IN (
-			SELECT message_id FROM whatsapp_messages WHERE device_id = ?
+			SELECT message_id from whatsapp_messages WHERE device_id = ?
 		)
 		ON CONFLICT (device_id, message_id) DO NOTHING
 	`
@@ -148,19 +147,18 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	
 	// 3. Copy leads that don't exist for new device
 	copyLeadsQuery := `
-		INSERT INTO leads (
+		INSERT INTO leads(
 			id, user_id, device_id, name, phone, niche, 
-			status, target_status, trigger, journey, created_at, updated_at
+			status, target_`status`, ```trigger```, journey, created_at, updated_at
 		)
-		SELECT 
-			UUID(), user_id, ?, name, phone, niche,
-			status, target_status, trigger, 
+		SELECT UUID(), user_id, ?, name, phone, niche,
+			`status`, target_status, `trigger`, 
 			COALESCE(journey, '') || E'\n[Copied from device: ' || ? || ']',
 			NOW(), NOW()
 		FROM leads
 		WHERE device_id = ? AND user_id = ?
 		AND phone NOT IN (
-			SELECT phone FROM leads WHERE device_id = ? AND user_id = ?
+			SELECT phone from leads WHERE device_id = ? AND user_id = ?
 		)
 	`
 	_, err = tx.Exec(copyLeadsQuery, newDeviceID, oldDeviceID, userID)

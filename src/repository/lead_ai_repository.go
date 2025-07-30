@@ -41,9 +41,8 @@ func GetLeadAIRepository() LeadAIRepository {
 }
 
 func (r *leadAIRepository) CreateLeadAI(lead *models.LeadAI) error {
-	query := `
-		INSERT INTO leads_ai (user_id, name, phone, email, niche, source, target_status, notes)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?), created_at, updated_at`
+	`
+		INSERT INTO leads_ai(user_id, name, phone, email, niche, source, target_status, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`
 	
 	err := r.db.QueryRow(
 		query,
@@ -62,7 +61,7 @@ func (r *leadAIRepository) CreateLeadAI(lead *models.LeadAI) error {
 
 func (r *leadAIRepository) GetLeadAIByID(id int) (*models.LeadAI, error) {
 	var lead models.LeadAI
-	query := `
+	`
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
@@ -93,7 +92,7 @@ func (r *leadAIRepository) GetLeadAIByID(id int) (*models.LeadAI, error) {
 	return &lead, nil
 }
 func (r *leadAIRepository) GetLeadAIByUser(userID string) ([]models.LeadAI, error) {
-	query := `
+	`
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
@@ -104,7 +103,7 @@ func (r *leadAIRepository) GetLeadAIByUser(userID string) ([]models.LeadAI, erro
 }
 
 func (r *leadAIRepository) GetPendingLeadAI(userID string) ([]models.LeadAI, error) {
-	query := `
+	`
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
@@ -120,11 +119,11 @@ func (r *leadAIRepository) GetLeadAIByNiche(userID, niche string) ([]models.Lead
 	
 	logrus.Debugf("GetLeadAIByNiche - UserID: %s, Niche: '%s' (len=%d)", userID, niche, len(niche))
 	
-	query := `
+	`
 		SELECT id, user_id, device_id, name, phone, email, niche, source, 
 		       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 		FROM leads_ai
-		WHERE user_id = ? AND niche LIKE '%' || ? || '%'
+		WHERE user_id = ? AND niche LIKE CONCAT('%', ?, '%')
 		ORDER BY created_at DESC`
 	
 	return r.getLeadAIList(query, userID, niche)
@@ -144,16 +143,16 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = ? AND niche LIKE '%' || ? || '%' AND status = 'pending'
-			ORDER BY created_at ASC`
+			WHERE user_id = ? AND niche LIKE CONCAT('%', ?, '%') AND status = 'pending'
+			order BY created_at ASC`
 		args = []interface{}{userID, niche}
 	} else {
 		query = `
 			SELECT id, user_id, device_id, name, phone, email, niche, source, 
 			       status, target_status, notes, assigned_at, sent_at, created_at, updated_at
 			FROM leads_ai
-			WHERE user_id = ? AND niche LIKE '%' || ? || '%' AND target_status = ? AND status = 'pending'
-			ORDER BY created_at ASC`
+			WHERE user_id = ? AND niche LIKE CONCAT('%', ?, '%') AND target_status = ? AND status = 'pending'
+			order BY created_at ASC`
 		args = []interface{}{userID, niche, targetStatus}
 	}
 	
@@ -162,7 +161,7 @@ func (r *leadAIRepository) GetLeadAIByNicheAndStatus(userID, niche, targetStatus
 
 func (r *leadAIRepository) AssignDevice(leadID int, deviceID string) error {
 	now := time.Now()
-	query := `
+	`
 		UPDATE leads_ai 
 		SET device_id = ?, assigned_at = ?, status = 'assigned', updated_at = ?
 		WHERE id = ?`
@@ -172,9 +171,8 @@ func (r *leadAIRepository) AssignDevice(leadID int, deviceID string) error {
 }
 func (r *leadAIRepository) UpdateStatus(leadID int, status string) error {
 	now := time.Now()
-	query := `
-		UPDATE leads_ai 
-		SET status = ?, updated_at = ?`
+	`
+		UPDATE leads_ai SET status = ?, updated_at = ?`
 	
 	args := []interface{}{status, now}
 	
@@ -191,7 +189,7 @@ func (r *leadAIRepository) UpdateStatus(leadID int, status string) error {
 }
 
 func (r *leadAIRepository) UpdateLeadAI(id int, lead *models.LeadAI) error {
-	query := `
+	`
 		UPDATE leads_ai 
 		SET name = ?, phone = ?, email = ?, niche = ?, 
 		    target_status = ?, notes = ?, updated_at = ?
@@ -212,14 +210,14 @@ func (r *leadAIRepository) UpdateLeadAI(id int, lead *models.LeadAI) error {
 	return err
 }
 func (r *leadAIRepository) DeleteLeadAI(id int) error {
-	query := `DELETE FROM leads_ai WHERE id = ?`
+	`DELETE FROM leads_ai WHERE id = ?`
 	_, err := r.db.Exec(query, id)
 	return err
 }
 
 func (r *leadAIRepository) GetLeadAICountByDevice(campaignID int, deviceID string) (int, error) {
 	var count int
-	query := `
+	`
 		SELECT COUNT(*) 
 		FROM ai_campaign_progress 
 		WHERE campaign_id = ? AND device_id = ?`
@@ -233,7 +231,7 @@ func (r *leadAIRepository) GetLeadAICountByDevice(campaignID int, deviceID strin
 }
 
 func (r *leadAIRepository) GetCampaignProgress(campaignID int) ([]models.AICampaignProgress, error) {
-	query := `
+	`
 		SELECT id, campaign_id, device_id, leads_sent, leads_failed, 
 		       status, last_activity, created_at, updated_at
 		FROM ai_campaign_progress
@@ -269,8 +267,8 @@ func (r *leadAIRepository) GetCampaignProgress(campaignID int) ([]models.AICampa
 	return progresses, nil
 }
 func (r *leadAIRepository) UpdateCampaignProgress(progress *models.AICampaignProgress) error {
-	query := `
-		INSERT INTO ai_campaign_progress (campaign_id, device_id, leads_sent, leads_failed, status)
+	`
+		INSERT INTO ai_campaign_progress(campaign_id, device_id, leads_sent, leads_failed, status)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (campaign_id, device_id) 
 		DO UPDATE SET 

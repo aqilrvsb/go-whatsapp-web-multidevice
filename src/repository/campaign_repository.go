@@ -65,10 +65,9 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	campaign.CreatedAt = time.Now()
 	campaign.UpdatedAt = time.Now()
 	
-	query := `
-		INSERT INTO campaigns 
-		(user_id, campaign_date, title, niche, target_status, message, image_url, 
-		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, "limit", created_at, updated_at)
+	`
+		INSERT INTO campaigns(user_id, campaign_date, title, niche, target_status, message, image_url, 
+		 time_schedule, min_delay_seconds, max_delay_seconds, status, ai, "LIMIT", created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	
@@ -88,9 +87,9 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 
 // GetCampaignByDateAndNiche gets campaigns by date and niche
 func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche string) ([]models.Campaign, error) {
-	query := `
+	`
 		SELECT id, user_id, title, niche, message, image_url, 
-		       campaign_date, COALESCE(time_schedule, '09:00:00') as time_schedule, 
+		       campaign_date, COALESCE(time_schedule, '09:00:00') AS time_schedule, 
 		       min_delay_seconds, max_delay_seconds, 
 		       status, created_at, updated_at
 		FROM campaigns
@@ -120,15 +119,14 @@ func (r *campaignRepository) GetCampaignByDateAndNiche(scheduledDate, niche stri
 
 // GetAllCampaigns gets all campaigns for a user
 func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, error) {
-	query := `
-		SELECT 
-			id, user_id, title, niche, 
-			COALESCE(target_status, 'all') as target_status,
-			message, COALESCE(image_url, '') as image_url, campaign_date, 
-			COALESCE(time_schedule, '') as time_schedule,
-			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
-			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
+	`
+		SELECT id, user_id, title, niche, 
+			COALESCE(target_status, 'all') AS target_status,
+			message, COALESCE(image_url, '') AS image_url, campaign_date, 
+			COALESCE(time_schedule, '') AS time_schedule,
+			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
+			status, ai, COALESCE("LIMIT", 0) AS LIMIT, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
@@ -157,15 +155,14 @@ func (r *campaignRepository) GetAllCampaigns(userID string) ([]models.Campaign, 
 
 // GetCampaignByID gets a campaign by ID
 func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
-	query := `
-		SELECT 
-			id, user_id, title, niche, 
-			COALESCE(target_status, 'all') as target_status,
-			message, COALESCE(image_url, '') as image_url, campaign_date, 
-			COALESCE(time_schedule, '') as time_schedule,
-			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
-			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
+	`
+		SELECT id, user_id, title, niche, 
+			COALESCE(target_status, 'all') AS target_status,
+			message, COALESCE(image_url, '') AS image_url, campaign_date, 
+			COALESCE(time_schedule, '') AS time_schedule,
+			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
+			status, ai, COALESCE("LIMIT", 0) AS LIMIT, created_at, updated_at
 		FROM campaigns
 		WHERE id = ?
 	`
@@ -185,7 +182,7 @@ func (r *campaignRepository) GetCampaignByID(id int) (*models.Campaign, error) {
 
 // UpdateCampaignStatus updates campaign status
 func (r *campaignRepository) UpdateCampaignStatus(id int, status string) error {
-	query := `UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?`
+	`UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?`
 	_, err := r.db.Exec(query, status, time.Now(), id)
 	return err
 }
@@ -193,14 +190,13 @@ func (r *campaignRepository) UpdateCampaignStatus(id int, status string) error {
 // GetPendingCampaigns gets all campaigns with pending status
 func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 	// OPTIMIZED: Let PostgreSQL handle timezone conversions
-	query := `
-		SELECT 
-			id, user_id, title, niche, 
-			COALESCE(target_status, 'all') as target_status,
-			message, COALESCE(image_url, '') as image_url, campaign_date, 
-			COALESCE(time_schedule, '') as time_schedule,
-			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+	`
+		SELECT id, user_id, title, niche, 
+			COALESCE(target_status, 'all') AS target_status,
+			message, COALESCE(image_url, '') AS image_url, campaign_date, 
+			COALESCE(time_schedule, '') AS time_schedule,
+			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
 			status, created_at, updated_at
 		FROM campaigns
 		WHERE status = 'pending'
@@ -211,10 +207,10 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 			WHERE campaign_id IS NOT NULL
 		)
 		AND (
-			-- Immediate execution (no time set)
+			-- Immediate execution (no time SET)
 			time_schedule IS NULL 
 			OR time_schedule = ''
-			-- Or scheduled time has passed (PostgreSQL handles timezone)
+			-- OR scheduled time has passed (PostgreSQL handles timezone)
 			OR (campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
 		)
 		ORDER BY campaign_date, time_schedule
@@ -245,14 +241,13 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 
 // GetPendingCampaignsByStatus gets pending campaigns filtered by target status
 func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetStatus string) ([]models.Campaign, error) {
-	query := `
-		SELECT 
-			id, user_id, title, niche, 
-			COALESCE(target_status, 'all') as target_status,
-			message, COALESCE(image_url, '') as image_url, campaign_date, 
-			COALESCE(time_schedule, '') as time_schedule,
-			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
+	`
+		SELECT id, user_id, title, niche, 
+			COALESCE(target_status, 'all') AS target_status,
+			message, COALESCE(image_url, '') AS image_url, campaign_date, 
+			COALESCE(time_schedule, '') AS time_schedule,
+			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
 			status, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = ? 
@@ -299,12 +294,12 @@ func (r *campaignRepository) GetCampaignsByUser(userID string) ([]models.Campaig
 
 // UpdateCampaign updates an existing campaign
 func (r *campaignRepository) UpdateCampaign(campaign *models.Campaign) error {
-	query := `
+	`
 		UPDATE campaigns 
 		SET title = ?, niche = ?, target_status = ?, message = ?, 
 		    image_url = ?, campaign_date = ?, time_schedule = ?,
 		    min_delay_seconds = ?, max_delay_seconds = ?, 
-		    status = ?, ai = ?, "limit" = ?, updated_at = ?
+		    status = ?, ai = ?, "LIMIT" = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
 	
@@ -387,7 +382,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		SELECT COUNT(l.phone) 
 		FROM leads l
 		WHERE l.user_id = ? 
-		AND l.niche LIKE '%' || ? || '%'
+		AND l.niche LIKE CONCAT('%', ?, '%')
 		AND (? = 'all' OR l.target_status = ?)
 	`
 	
@@ -396,7 +391,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 		SELECT l.phone, l.device_id, l.niche, l.target_status 
 		FROM leads l
 		WHERE l.user_id = ? 
-		AND l.niche LIKE '%' || ? || '%'
+		AND l.niche LIKE CONCAT('%', ?, '%')
 		AND (? = 'all' OR l.target_status = ?)
 	`
 	
@@ -422,9 +417,8 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	
 	// Get done and failed counts from broadcast_messages
 	statsQuery := `
-		SELECT 
-			COUNT(CASE WHEN status = 'sent' THEN 1 END) as done_send,
-			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_send
+		SELECT COUNT(CASE WHEN status = 'sent' THEN 1 END) AS done_send,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed_send
 		FROM broadcast_messages
 		WHERE campaign_id = ?
 	`
@@ -476,15 +470,14 @@ func (r *campaignRepository) GetUserCampaignBroadcastStats(userID string) (shoul
 
 // GetCampaignsByUserAndDateRange gets campaigns within a specific date range
 func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, startDate string, endDate string) ([]models.Campaign, error) {
-	query := `
-		SELECT 
-			id, user_id, title, niche, 
-			COALESCE(target_status, 'all') as target_status,
-			message, COALESCE(image_url, '') as image_url, campaign_date, 
-			COALESCE(time_schedule, '') as time_schedule,
-			COALESCE(min_delay_seconds, 10) as min_delay_seconds,
-			COALESCE(max_delay_seconds, 30) as max_delay_seconds,
-			status, ai, COALESCE("limit", 0) as limit, created_at, updated_at
+	`
+		SELECT id, user_id, title, niche, 
+			COALESCE(target_status, 'all') AS target_status,
+			message, COALESCE(image_url, '') AS image_url, campaign_date, 
+			COALESCE(time_schedule, '') AS time_schedule,
+			COALESCE(min_delay_seconds, 10) AS min_delay_seconds,
+			COALESCE(max_delay_seconds, 30) AS max_delay_seconds,
+			status, ai, COALESCE("LIMIT", 0) AS LIMIT, created_at, updated_at
 		FROM campaigns
 		WHERE user_id = ?
 	`

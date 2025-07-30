@@ -21,8 +21,7 @@ type OptimizedWhatsAppRepository struct {
 func NewOptimizedWhatsAppRepository(db *sql.DB) (*OptimizedWhatsAppRepository, error) {
 	// Prepare batch insert statement
 	batchStmt, err := db.Prepare(`
-		INSERT INTO whatsapp_messages 
-		(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
+		INSERT INTO whatsapp_messages(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
 		 message_type, media_url, is_sent, is_read, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, message_id) DO NOTHING
@@ -229,7 +228,7 @@ func (r *OptimizedWhatsAppRepository) GetChats(deviceID string) ([]WhatsAppChat,
 		SELECT id, device_id, chat_jid, chat_name, is_group, is_muted, 
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
-		FROM whatsapp_chats
+		from whatsapp_chats
 		WHERE device_id = ?
 		ORDER BY last_message_time DESC`
 	
@@ -260,7 +259,7 @@ func (r *OptimizedWhatsAppRepository) GetMessages(deviceID, chatJID string, limi
 		SELECT id, device_id, chat_jid, message_id, sender_jid, sender_name,
 		       message_text, message_type, media_url, is_sent, is_read, 
 		       timestamp, created_at
-		FROM whatsapp_messages
+		from whatsapp_messages
 		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
 		LIMIT ?`

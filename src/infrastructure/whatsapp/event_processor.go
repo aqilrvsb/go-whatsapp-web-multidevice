@@ -96,7 +96,7 @@ func (ep *EventProcessor) processEvent(task EventTask) {
 
 // QueueEvent adds an event to the processing queue
 func (ep *EventProcessor) QueueEvent(deviceID string, event interface{}, handler func(interface{})) {
-	select {
+	SELECT {
 	case ep.eventQueue <- EventTask{
 		DeviceID: deviceID,
 		Event:    event,

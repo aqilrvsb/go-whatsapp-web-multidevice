@@ -80,8 +80,7 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	var updateQuery string
 	if userIDStr != "" {
 		updateQuery = `
-			UPDATE user_devices 
-			SET status = 'offline', 
+			UPDATE user_devices SET `status` = 'offline', 
 			    jid = NULL,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE user_id = ? AND status != 'deleted'
@@ -90,8 +89,7 @@ func (handler *App) ClearAllSessions(c *fiber.Ctx) error {
 	} else {
 		// If no user ID, update all devices (admin action)
 		updateQuery = `
-			UPDATE user_devices 
-			SET status = 'offline', 
+			UPDATE user_devices SET `status` = 'offline', 
 			    jid = NULL,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE status != 'deleted'

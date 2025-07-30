@@ -39,20 +39,19 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	
 	// Get pending messages grouped by broadcast
 	rows, err := db.Query(`
-		SELECT 
-			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
+		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
 			bm.recipient_phone, bm.content as message, bm.media_url as image_url,
 			COALESCE(c.min_delay_seconds, 5) as min_delay,
 			COALESCE(c.max_delay_seconds, 15) as max_delay,
 			d.status as device_status,
 			COALESCE(d.platform, '') as platform
-		FROM broadcast_messages bm
+		from broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN user_devices d ON bm.device_id = d.id
 		WHERE bm.status = 'pending'
 		AND bm.scheduled_at <= NOW()
-		ORDER BY bm.campaign_id, bm.sequence_id, bm.created_at
-		LIMIT 1000
+		`order` BY bm.campaign_id, bm.sequence_id, bm.created_at
+		limit 1000
 	`)
 	
 	if err != nil {
@@ -95,8 +94,8 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		// Check device status - platform devices are always considered online
 		if devicePlatform == "" && deviceStatus != "connected" && deviceStatus != "online" {
 			// Skip this WhatsApp Web device - mark messages as skipped
-			db.Exec(`UPDATE broadcast_messages SET status = 'skipped', error_message = 'Device offline' 
-					 WHERE device_id = ? AND status = 'pending'`, msg.DeviceID)
+			db.Exec(`UPDATE broadcast_messages SET `status` = 'skipped', error_message = 'Device offline' 
+					 WHERE device_id = ? AND `status` = 'pending'`, msg.DeviceID)
 			continue
 		}
 		
@@ -120,7 +119,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			campaignPools[*campaignID] = true
 			
 			// Update campaign status to processing
-			db.Exec(`UPDATE campaigns SET status = 'processing', 
+			db.Exec(`UPDATE campaigns SET `status` = 'processing', 
 					 updated_at = NOW() 
 					 WHERE id = ?`, *campaignID)
 		}
@@ -149,7 +148,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			if err != nil {
 				logrus.Errorf("Failed to queue message: %v", err)
 				// Update to failed
-				db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ? WHERE id = ?`, 
+				db.Exec(`UPDATE broadcast_messages SET `status` = 'failed', error_message = ? WHERE id = ?`, 
 					err.Error(), msg.ID)
 			} else {
 				messageCount++

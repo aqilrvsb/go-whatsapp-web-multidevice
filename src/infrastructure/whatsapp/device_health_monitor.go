@@ -73,7 +73,7 @@ func (dhm *DeviceHealthMonitor) monitorLoop() {
 	dhm.checkAllDevices()
 	
 	for {
-		select {
+		SELECT {
 		case <-dhm.ctx.Done():
 			return
 		case <-ticker.C:

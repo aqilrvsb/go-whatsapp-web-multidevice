@@ -43,7 +43,7 @@ func (r *TeamMemberRepository) Create(ctx context.Context, member *models.TeamMe
 func (r *TeamMemberRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.TeamMember, error) {
 	query := `
 		SELECT id, username, password, created_by, created_at, updated_at, is_active
-		FROM team_members
+		from team_members
 		WHERE id = ?
 	`
 	
@@ -72,7 +72,7 @@ func (r *TeamMemberRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 func (r *TeamMemberRepository) GetByUsername(ctx context.Context, username string) (*models.TeamMember, error) {
 	query := `
 		SELECT id, username, password, created_by, created_at, updated_at, is_active
-		FROM team_members
+		from team_members
 		WHERE username = ?
 	`
 	
@@ -101,8 +101,8 @@ func (r *TeamMemberRepository) GetByUsername(ctx context.Context, username strin
 func (r *TeamMemberRepository) GetAll(ctx context.Context) ([]models.TeamMember, error) {
 	query := `
 		SELECT id, username, password, created_by, created_at, updated_at, is_active
-		FROM team_members
-		ORDER BY username
+		from team_members
+		order BY username
 	`
 	
 	rows, err := r.db.QueryContext(ctx, query)
@@ -177,7 +177,7 @@ func (r *TeamMemberRepository) CreateSession(ctx context.Context, memberID uuid.
 	}
 	
 	query := `
-		INSERT INTO team_sessions (id, team_member_id, token, expires_at, created_at)
+		INSERT INTO team_sessions(id, team_member_id, token, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?)
 	`
 	
@@ -200,7 +200,7 @@ func (r *TeamMemberRepository) CreateSession(ctx context.Context, memberID uuid.
 func (r *TeamMemberRepository) GetSessionByToken(ctx context.Context, token string) (*models.TeamSession, error) {
 	query := `
 		SELECT id, team_member_id, token, expires_at, created_at
-		FROM team_sessions
+		from team_sessions
 		WHERE token = ? AND expires_at > CURRENT_TIMESTAMP
 	`
 	
@@ -238,15 +238,14 @@ func (r *TeamMemberRepository) DeleteSession(ctx context.Context, token string) 
 // GetAllWithDeviceCount retrieves all team members with their device counts
 func (r *TeamMemberRepository) GetAllWithDeviceCount(ctx context.Context) ([]models.TeamMemberWithDevices, error) {
 	query := `
-		SELECT 
-			tm.id, tm.username, tm.password, tm.created_by, 
+		SELECT tm.id, tm.username, tm.password, tm.created_by, 
 			tm.created_at, tm.updated_at, tm.is_active,
 			COUNT(DISTINCT ud.id) as device_count
-		FROM team_members tm
+		from team_members tm
 		LEFT JOIN user_devices ud ON ud.device_name = tm.username
 		GROUP BY tm.id, tm.username, tm.password, tm.created_by, 
 				 tm.created_at, tm.updated_at, tm.is_active
-		ORDER BY tm.username
+		order BY tm.username
 	`
 	
 	rows, err := r.db.QueryContext(ctx, query)
@@ -288,7 +287,7 @@ func (r *TeamMemberRepository) GetAllWithDeviceCount(ctx context.Context) ([]mod
 // GetDeviceIDsForMember gets all device IDs for a team member based on username
 func (r *TeamMemberRepository) GetDeviceIDsForMember(ctx context.Context, username string) ([]string, error) {
 	query := `
-		SELECT id FROM user_devices WHERE device_name = ?
+		SELECT id from user_devices WHERE device_name = ?
 	`
 	
 	rows, err := r.db.QueryContext(ctx, query, username)
@@ -312,7 +311,7 @@ func (r *TeamMemberRepository) GetDeviceIDsForMember(ctx context.Context, userna
 // GetTeamMemberDevices returns devices accessible to a team member
 func (r *TeamMemberRepository) GetTeamMemberDevices(ctx context.Context, username string) ([]map[string]interface{}, error) {
 	query := `
-		SELECT id, user_id, device_name, phone, jid, status, created_at, updated_at
+		SELECT id, user_id, device_name, phone, jid, ` + "`status`" + `, created_at, updated_at
 		FROM user_devices
 		WHERE LOWER(device_name) = LOWER(?)
 		ORDER BY created_at DESC

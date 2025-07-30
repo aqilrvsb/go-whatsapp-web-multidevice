@@ -51,7 +51,7 @@ func (swm *SequenceWorkerManager) processLoop() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-swm.ctx.Done():
 			return
 		case <-ticker.C:
@@ -67,14 +67,13 @@ func (swm *SequenceWorkerManager) processSequenceContacts() {
 	// Query to get contacts grouped by assigned device
 	query := `
 		WITH ready_contacts AS (
-			SELECT 
-				sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
+			SELECT sc.id, sc.sequence_id, sc.contact_phone, sc.contact_name,
 				sc.current_trigger, sc.next_trigger_time,
 				COALESCE(sc.assigned_worker_id, l.device_id) as device_id,
 				ss.content, ss.message_type, ss.media_url, ss.caption,
 				ss.next_trigger, ss.trigger_delay_hours,
 				s.min_delay_seconds, s.max_delay_seconds
-			FROM sequence_contacts sc
+			from sequence_contacts sc
 			JOIN sequences s ON s.id = sc.sequence_id
 			JOIN sequence_steps ss ON ss.sequence_id = sc.sequence_id 
 				AND ss.trigger = sc.current_trigger
@@ -83,10 +82,10 @@ func (swm *SequenceWorkerManager) processSequenceContacts() {
 				AND s.status = 'active'
 				AND sc.next_trigger_time <= NOW()
 				AND sc.processing_device_id IS NULL
-			ORDER BY sc.next_trigger_time ASC
-			LIMIT 1000
+			order BY sc.next_trigger_time ASC
+			limit 1000
 		)
-		SELECT * FROM ready_contacts
+		SELECT * `from` ready_contacts
 	`
 	
 	rows, err := swm.db.Query(query)

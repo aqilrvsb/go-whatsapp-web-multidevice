@@ -14,7 +14,7 @@ func MigrateSequenceSteps(db *sql.DB) error {
 	var tableExists bool
 	err := db.QueryRow(`
 		SELECT EXISTS (
-			SELECT FROM information_schema.tables 
+			SELECT 1 FROM information_schema.tables 
 			WHERE table_name = 'sequence_steps'
 		)
 	`).Scan(&tableExists)

@@ -84,7 +84,7 @@ func (p *OptimizedBroadcastProcessor) run() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-ticker.C:
 			p.processNewMessages()
 		}
@@ -113,7 +113,7 @@ func (p *OptimizedBroadcastProcessor) processNewMessages() {
 		}
 		
 		// Get a slot from the worker pool
-		select {
+		SELECT {
 		case <-p.workerPool:
 			wg.Add(1)
 			go func(devID string) {
@@ -193,11 +193,11 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 			logrus.Errorf("Failed to queue message %s: %v", msg.ID, err)
 			// Direct update to failed
 			db := database.GetDB()
-			db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
+			db.Exec(`UPDATE broadcast_messages SET `status` = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
 		} else {
 			// Mark as queued - direct update like skipped
 			db := database.GetDB()
-			_, err := db.Exec(`UPDATE broadcast_messages SET status = 'queued', updated_at = NOW() WHERE id = ? AND status = 'pending'`, msg.ID)
+			_, err := db.Exec(`UPDATE broadcast_messages SET `status` = 'queued', updated_at = NOW() WHERE id = ? AND `status` = 'pending'`, msg.ID)
 			if err != nil {
 				logrus.Errorf("Failed to update message %s to queued status: %v", msg.ID, err)
 			} else {
@@ -246,7 +246,7 @@ func (p *OptimizedBroadcastProcessor) monitorQueues() {
 	ctx := context.Background()
 	
 	for {
-		select {
+		SELECT {
 		case <-ticker.C:
 			// Get all queue keys
 			keys, err := p.redisClient.Keys(ctx, "broadcast:queue:*").Result()
@@ -306,7 +306,7 @@ func (p *OptimizedBroadcastProcessor) checkWorkerHealth() {
 								Score:  float64(time.Now().Unix()),
 								Member: member,
 							})
-							p.redisClient.SRem(ctx, key, member)
+							p.redisClient.SRem(ctx, `key`, member)
 						}
 						logrus.Warnf("Recovered %d stuck messages for device %s", len(members), deviceID)
 					}
@@ -320,9 +320,8 @@ func (p *OptimizedBroadcastProcessor) checkWorkerHealth() {
 // skipDeviceMessages marks all pending messages for a device as skipped
 func (p *OptimizedBroadcastProcessor) skipDeviceMessages(deviceID string, reason string) {
 	query := `
-		UPDATE broadcast_messages 
-		SET status = 'skipped', error_message = ? 
-		WHERE device_id = ? AND status = 'pending'
+		UPDATE broadcast_messages SET `status` = 'skipped', error_message = ? 
+		WHERE device_id = ? AND `status` = 'pending'
 	`
 	
 	db := database.GetDB()

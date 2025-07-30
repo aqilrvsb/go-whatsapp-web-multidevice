@@ -49,7 +49,7 @@ func (r *UserRepository) DB() *sql.DB {
 func (r *UserRepository) CreateUser(email, fullName, password string) (*models.User, error) {
 	// Check if user exists
 	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email).Scan(&exists)
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 from users WHERE email = ?)", email).Scan(&exists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -92,7 +92,7 @@ func (r *UserRepository) GetUserByEmail(email string) (*models.User, error) {
 	var lastLogin sql.NullTime
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
-		FROM users WHERE email = ?
+		from users WHERE email = ?
 	`
 	err := r.db.QueryRow(query, email).Scan(
 		&user.ID, &user.Email, &user.FullName, &user.PasswordHash,
@@ -120,7 +120,7 @@ func (r *UserRepository) GetUserByID(id string) (*models.User, error) {
 	user := &models.User{}
 	query := `
 		SELECT id, email, full_name, password_hash, is_active, created_at, updated_at, last_login
-		FROM users WHERE id = ?
+		from users WHERE id = ?
 	`
 	var lastLogin sql.NullTime
 	err := r.db.QueryRow(query, id).Scan(
@@ -193,7 +193,7 @@ func (r *UserRepository) CreateSession(userID string) (*models.UserSession, erro
 	}
 	
 	query := `
-		INSERT INTO user_sessions (id, user_id, token, expires_at, created_at)
+		INSERT INTO user_sessions(id, user_id, token, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?)
 	`
 	_, err := r.db.Exec(query, session.ID, session.UserID, session.Token, session.ExpiresAt, session.CreatedAt)
@@ -209,7 +209,7 @@ func (r *UserRepository) GetSession(token string) (*models.UserSession, error) {
 	session := &models.UserSession{}
 	query := `
 		SELECT id, user_id, token, expires_at, created_at
-		FROM user_sessions 
+		from user_sessions 
 		WHERE token = ? AND expires_at > CURRENT_TIMESTAMP
 	`
 	err := r.db.QueryRow(query, token).Scan(
@@ -237,7 +237,7 @@ func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserD
 	}
 	
 	query := `
-		INSERT INTO user_devices (id, user_id, device_name, status, last_seen, created_at)
+		INSERT INTO user_devices(id, user_id, device_name, status, last_seen, created_at)
 		VALUES (?, ?, ?, ?, ?, ?), last_seen
 	`
 	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
@@ -262,7 +262,7 @@ func (r *UserRepository) AddUserDeviceWithPhone(userID, deviceName, phone string
 	}
 	
 	query := `
-		INSERT INTO user_devices (id, user_id, device_name, phone, status, last_seen, created_at)
+		INSERT INTO user_devices(id, user_id, device_name, phone, status, last_seen, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?), last_seen
 	`
 	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
@@ -281,7 +281,7 @@ func (r *UserRepository) GetUserDevices(userID string) ([]*models.UserDevice, er
 		       COALESCE(platform, '') as platform
 		FROM user_devices 
 		WHERE user_id = ?
-		ORDER BY created_at DESC
+		order BY created_at DESC
 	`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
@@ -371,8 +371,7 @@ func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, err
 // UpdateDeviceStatus updates device status
 func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid string) error {
 	query := `
-		UPDATE user_devices 
-		SET status = ?, last_seen = CURRENT_TIMESTAMP, phone = ?, jid = ?
+		UPDATE user_devices SET status = ?, last_seen = CURRENT_TIMESTAMP, phone = ?, jid = ?
 		WHERE id = ?
 	`
 	_, err := r.db.Exec(query, deviceID, status, phone, jid)
@@ -484,8 +483,8 @@ func (r *UserRepository) GetDevice(userID, deviceID string) (*models.UserDevice,
 func (r *UserRepository) GetAllUsers() ([]*models.User, error) {
 	query := `
 		SELECT id, email, full_name, is_active, created_at, updated_at, last_login
-		FROM users 
-		ORDER BY created_at DESC
+		from users 
+		order BY created_at DESC
 	`
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -552,7 +551,7 @@ func (r *UserRepository) GetAllDevices() ([]*models.UserDevice, error) {
 		SELECT id, user_id, device_name, phone, status, last_seen, created_at, updated_at,
 		       COALESCE(jid, '') as jid, COALESCE(platform, '') as platform
 		FROM user_devices 
-		ORDER BY created_at DESC
+		order BY created_at DESC
 	`
 	
 	rows, err := r.db.Query(query)
@@ -615,7 +614,7 @@ func (r *UserRepository) CreateDevice(device *models.UserDevice) error {
 	}
 	
 	query := `
-		INSERT INTO user_devices (
+		INSERT INTO user_devices(
 			id, user_id, device_name, phone, jid, status, 
 			last_seen, created_at, updated_at, 
 			min_delay_seconds, max_delay_seconds, platform
@@ -656,7 +655,7 @@ func (r *UserRepository) GetDeviceByUserAndJID(userID, jid string) (*models.User
 		       COALESCE(platform, '') as platform
 		FROM user_devices
 		WHERE user_id = ? AND jid = ?
-		LIMIT 1
+		limit 1
 	`
 	
 	err := r.db.QueryRow(query, userID, jid).Scan(
@@ -691,7 +690,7 @@ func (r *UserRepository) GetDeviceByUserAndName(userID, deviceName string) (*mod
 		       COALESCE(platform, '') as platform
 		FROM user_devices
 		WHERE user_id = ? AND device_name = ?
-		LIMIT 1
+		limit 1
 	`
 	
 	err := r.db.QueryRow(query, userID, deviceName).Scan(

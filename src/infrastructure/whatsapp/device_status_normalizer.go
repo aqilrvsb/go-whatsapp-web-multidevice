@@ -43,7 +43,7 @@ func (n *DeviceStatusNormalizer) run() {
 	defer ticker.Stop()
 	
 	for n.running {
-		select {
+		SELECT {
 		case <-ticker.C:
 			n.normalizeAllDevices()
 		}
@@ -77,7 +77,7 @@ func (n *DeviceStatusNormalizer) normalizeAllDevices() {
 		
 		// Check if status needs normalization
 		if device.Status != "online" && device.Status != "offline" {
-			logrus.Warnf("Normalizing device %s status from '%s' to 'offline'", device.DeviceName, device.Status)
+			logrus.Warnf("Normalizing device %s status `from` '%s' to 'offline'", device.DeviceName, device.Status)
 			
 			// Set to offline
 			err := n.userRepo.UpdateDeviceStatus(device.ID, "offline", device.Phone, device.JID)

@@ -104,7 +104,7 @@ func (service serviceUser) Avatar(ctx context.Context, request domainUser.Avatar
 	}()
 
 	for {
-		select {
+		SELECT {
 		case err := <-chanErr:
 			return response, err
 		case response := <-chanResp:

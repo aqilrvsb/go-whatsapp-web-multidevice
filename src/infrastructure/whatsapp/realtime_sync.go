@@ -63,7 +63,7 @@ func (rsm *RealtimeSyncManager) syncLoop() {
 	rsm.syncAllDevices()
 	
 	for {
-		select {
+		SELECT {
 		case <-ticker.C:
 			if config.WhatsappChatStorage {
 				rsm.syncAllDevices()
@@ -81,7 +81,7 @@ func (rsm *RealtimeSyncManager) syncAllDevices() {
 	
 	// Use goroutines for parallel processing (optimized for 3000 devices)
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 50) // Limit concurrent syncs to 50
+	semaphore := make(chan struct{}, 50) // `limit` concurrent syncs to 50
 	userRepo := repository.GetUserRepository()
 	
 	for deviceID, client := range allClients {
@@ -168,7 +168,7 @@ func (rsm *RealtimeSyncManager) HandleRealtimeMessage(deviceID string, evt *even
 	rsm.mu.RUnlock()
 	
 	if exists {
-		select {
+		SELECT {
 		case msgChan <- evt:
 			// Message queued for processing
 		default:

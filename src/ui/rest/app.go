@@ -1394,7 +1394,7 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 	
 	// Get current device info before updating
 	var phone, jid sql.NullString
-	err = userRepo.DB().QueryRow("SELECT phone, jid FROM user_devices WHERE id = ?", deviceId).Scan(&phone, &jid)
+	err = userRepo.DB().QueryRow("SELECT phone, jid from user_devices WHERE id = ?", deviceId).Scan(&phone, &jid)
 	if err != nil {
 		logrus.Warnf("Failed to get device info: %v", err)
 	}
@@ -1534,7 +1534,7 @@ func (handler *App) SyncDeviceChats(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Trigger chat sync
+	// `trigger` chat sync
 	go func() {
 		chats, err := whatsapp.GetChatsForDevice(device.ID)
 		if err != nil {
@@ -1866,7 +1866,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		var flowCount int
 		err = db.QueryRow(`
 			SELECT COUNT(*) 
-			FROM sequence_steps
+			`from` sequence_steps
 		`).Scan(&flowCount)
 		
 		if err != nil {
@@ -1877,7 +1877,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				SELECT COUNT(*) 
 				FROM sequence_steps ss
 				WHERE EXISTS (
-					SELECT 1 FROM sequences s 
+					SELECT 1 from sequences s 
 					WHERE s.id = ss.sequence_id 
 					AND s.user_id = ?
 				)
@@ -1890,7 +1890,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 					SELECT COUNT(*) 
 					FROM sequence_steps ss
 					WHERE sequence_id::text IN (
-						SELECT id::text FROM sequences WHERE user_id = ?
+						SELECT id::text from sequences WHERE user_id = ?
 					)
 				`, session.UserID).Scan(&flowCount)
 				
@@ -1929,7 +1929,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				"id":         sequence.ID,
 				"name":       sequence.Name,
 				"niche":      sequence.Niche,
-				"trigger":    sequence.Trigger,
+				"`trigger`":    sequence.Trigger,
 				"status":     sequence.Status,
 				"created_at": sequence.CreatedAt,
 			}
@@ -1938,7 +1938,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			var flowCount int
 			err := db.QueryRow(`
 				SELECT COUNT(*) 
-				FROM sequence_steps 
+				`from` sequence_steps 
 				WHERE sequence_id = ?
 			`, sequence.ID).Scan(&flowCount)
 			
@@ -1950,10 +1950,9 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			// Get contact statistics for this sequence
 			var shouldSend, doneSend, failedSend int
 			err = db.QueryRow(`
-				SELECT 
-					COALESCE(COUNT(*), 0) as total,
+				SELECT COALESCE(COUNT(*), 0) as total,
 					COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent,
-					COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed
+					COALESCE(COUNT(CASE WHEN `status` = 'failed' THEN 1 END), 0) as failed
 				FROM sequence_contacts
 				WHERE sequence_id = ?
 			`, sequence.ID).Scan(&shouldSend, &doneSend, &failedSend)
@@ -2541,10 +2540,10 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	// Get user devices - use direct query
 	db := database.GetDB()
 	query := `
-		SELECT id, device_name, phone, status, jid, created_at, last_seen
+		SELECT id, device_name, phone, `status`, jid, created_at, last_seen
 		FROM user_devices
 		WHERE user_id = ?
-		ORDER BY created_at DESC
+		`order` BY created_at DESC
 	`
 	rows, err := db.Query(query, session.UserID)
 	if err != nil {
@@ -2581,9 +2580,9 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	// Get real broadcast message data for this campaign
 	messageQuery := `
 		SELECT device_id, status, COUNT(*) as count
-		FROM broadcast_messages
+		from broadcast_messages
 		WHERE campaign_id = ? AND user_id = ?
-		GROUP BY device_id, status
+		GROUP BY device_id, `status`
 	`
 	msgRows, err := db.Query(messageQuery, campaignId, session.UserID)
 	if err == nil {
@@ -2595,7 +2594,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		// First, let's check total messages per device
 		totalQuery := `
 			SELECT device_id, COUNT(*) as total_count
-			FROM broadcast_messages
+			from broadcast_messages
 			WHERE campaign_id = ? AND user_id = ?
 			GROUP BY device_id
 		`
@@ -2680,9 +2679,9 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		// Count leads for this device matching campaign criteria
 		deviceLeadQuery := `
 			SELECT COUNT(l.phone) 
-			FROM leads l
+			`from` leads l
 			WHERE l.device_id = ? 
-			AND l.niche LIKE '%' || ? || '%'
+			AND l.niche LIKE CONCAT('%', ?, '%')
 			AND (? = 'all' OR l.target_status = ?)
 		`
 		var deviceShouldSend int
@@ -2798,20 +2797,20 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	
 	// First check if this is an AI campaign by checking the 'ai' column
 	var aiType sql.NullString
-	err = db.QueryRow("SELECT ai FROM campaigns WHERE id = ?", campaignId).Scan(&aiType)
+	err = db.QueryRow("SELECT ai from campaigns WHERE id = ?", campaignId).Scan(&aiType)
 	if err != nil {
 		log.Printf("Error checking campaign ai type: %v", err)
 	}
 	
 	// Log the query parameters
 	log.Printf("GetCampaignDeviceLeads - Campaign: %d, Device: %s, User: %s, Status: %s, AI: %v", 
-		campaignId, deviceId, session.UserID, status, aiType.String)
+		campaignId, deviceId, session.UserID, `status`, aiType.String)
 	
 	// Debug: Check for duplicates in broadcast_messages
 	var duplicateCount int
 	dupQuery := `
 		SELECT COUNT(*) - COUNT(DISTINCT recipient_phone) as duplicates
-		FROM broadcast_messages
+		from broadcast_messages
 		WHERE campaign_id = ? AND device_id = ? AND user_id = ?
 	`
 	db.QueryRow(dupQuery, campaignId, deviceId, session.UserID).Scan(&duplicateCount)
@@ -2825,13 +2824,13 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		query = `
 			WITH latest_messages AS (
 				SELECT DISTINCT ON (recipient_phone) 
-					recipient_phone, status, sent_at
+					recipient_phone, `status`, sent_at
 				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
-				ORDER BY recipient_phone, created_at DESC
+				`order` BY recipient_phone, created_at DESC
 			)
 			SELECT lm.recipient_phone, lm.status, lm.sent_at, lai.name
-			FROM latest_messages lm
+			from latest_messages lm
 			LEFT JOIN leads_ai lai ON lai.phone = lm.recipient_phone AND lai.user_id = ?
 		`
 	} else {
@@ -2839,13 +2838,13 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		query = `
 			WITH latest_messages AS (
 				SELECT DISTINCT ON (recipient_phone) 
-					recipient_phone, status, sent_at
+					recipient_phone, `status`, sent_at
 				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
-				ORDER BY recipient_phone, created_at DESC
+				`order` BY recipient_phone, created_at DESC
 			)
 			SELECT lm.recipient_phone, lm.status, lm.sent_at, l.name
-			FROM latest_messages lm
+			from latest_messages lm
 			LEFT JOIN leads l ON l.phone = lm.recipient_phone AND l.device_id = ?
 		`
 	}
@@ -2969,7 +2968,7 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 	db := database.GetDB()
 	var deviceStatus string
 	var deviceName string
-	err = db.QueryRow("SELECT status, device_name FROM user_devices WHERE id = ? AND user_id = ?", 
+	err = db.QueryRow("SELECT status, device_name from user_devices WHERE id = ? AND user_id = ?", 
 		deviceId, session.UserID).Scan(&deviceStatus, &deviceName)
 	if err != nil {
 		return c.Status(404).JSON(utils.ResponseData{
@@ -2990,9 +2989,8 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 	
 	// Update failed messages to pending status for retry
 	query := `
-		UPDATE broadcast_messages
-		SET status = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
-		WHERE campaign_id = ? AND device_id = ? AND user_id = ? AND status = 'failed'
+		UPDATE broadcast_messages SET `status` = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE campaign_id = ? AND device_id = ? AND user_id = ? AND `status` = 'failed'
 	`
 	
 	result, err := db.Exec(query, campaignId, deviceId, session.UserID)
@@ -3010,7 +3008,7 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 		// Get campaign details to check if it's AI campaign
 		var aiType sql.NullString
 		var campaignStatus string
-		err = db.QueryRow("SELECT ai, status FROM campaigns WHERE id = ?", campaignId).Scan(&aiType, &campaignStatus)
+		err = db.QueryRow("SELECT ai, status from campaigns WHERE id = ?", campaignId).Scan(&aiType, &campaignStatus)
 		if err == nil {
 			// Only update campaign status if it's finished/completed
 			// Don't touch campaigns that are already processing
@@ -3021,8 +3019,7 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 				}
 				
 				updateCampaignQuery := `
-					UPDATE campaigns 
-					SET status = ?, updated_at = CURRENT_TIMESTAMP 
+					UPDATE campaigns SET `status` = ?, updated_at = CURRENT_TIMESTAMP 
 					WHERE id = ?
 				`
 				_, err = db.Exec(updateCampaignQuery, newStatus, campaignId)
@@ -3379,7 +3376,7 @@ func (handler *App) DeleteLeadAI(c *fiber.Ctx) error {
 		Message: "AI lead deleted successfully",
 	})
 }
-// TriggerAICampaign - Handler to manually trigger an AI campaign
+// TriggerAICampaign - Handler to manually `trigger` an AI campaign
 func (handler *App) TriggerAICampaign(c *fiber.Ctx) error {
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {
@@ -3423,7 +3420,7 @@ func (handler *App) TriggerAICampaign(c *fiber.Ctx) error {
 		return c.Status(403).JSON(utils.ResponseData{
 			Status:  403,
 			Code:    "FORBIDDEN",
-			Message: "You don't have permission to trigger this campaign",
+			Message: "You don't have permission to `trigger` this campaign",
 		})
 	}
 	

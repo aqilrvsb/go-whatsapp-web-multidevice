@@ -152,7 +152,7 @@ func (cm *ConnectionManager) monitorConnections() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-cm.ctx.Done():
 			return
 		case <-ticker.C:

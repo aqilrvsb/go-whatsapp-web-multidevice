@@ -221,7 +221,7 @@ func (ocm *OptimizedClientManager) startBackgroundWorkers() {
 		defer ticker.Stop()
 		
 		for {
-			select {
+			SELECT {
 			case <-ticker.C:
 				ocm.cleanupInactiveClients()
 			case <-ocm.shutdownChan:
@@ -308,7 +308,7 @@ func (ocm *OptimizedClientManager) flushAllBuffers() {
 // queueDeviceSync queues a device for background sync
 func (ocm *OptimizedClientManager) queueDeviceSync(deviceID string) {
 	// Rate limit new syncs
-	select {
+	SELECT {
 	case ocm.connectionSemaphore <- struct{}{}:
 		go func() {
 			defer func() { <-ocm.connectionSemaphore }()

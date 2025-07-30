@@ -213,7 +213,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 				message_text,
 				message_type,
 				timestamp
-			FROM whatsapp_messages
+			from whatsapp_messages
 			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'  -- Exclude groups
 				AND chat_jid NOT LIKE '%@broadcast'  -- Exclude broadcasts
@@ -224,8 +224,7 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 			ORDER BY chat_jid, timestamp DESC
 		),
 		chat_counts AS (
-			SELECT 
-				chat_jid,
+			SELECT chat_jid,
 				COUNT(*) as message_count
 			FROM whatsapp_messages
 			WHERE device_id = ?
@@ -241,11 +240,11 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 			rm.message_type,
 			rm.timestamp,
 			cc.message_count
-		FROM recent_messages rm
+		from recent_messages rm
 		LEFT JOIN whatsapp_chats c ON c.device_id = ? AND c.chat_jid = rm.chat_jid
 		LEFT JOIN chat_counts cc ON cc.chat_jid = rm.chat_jid
 		WHERE cc.message_count > 0  -- Only show chats with at least one message
-		ORDER BY rm.timestamp DESC
+		order BY rm.timestamp DESC
 	`
 	
 	rows, err := db.Query(query, deviceID)
@@ -334,10 +333,10 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 			c.chat_name,
 			rm.last_message,
 			rm.last_timestamp
-		FROM whatsapp_chats c
+		from whatsapp_chats c
 		INNER JOIN recent_messages rm ON c.chat_jid = rm.chat_jid
 		WHERE c.device_id = ?
-		ORDER BY rm.last_timestamp DESC
+		`order` BY rm.last_timestamp DESC
 	`
 	
 	formattedQuery := fmt.Sprintf(query, days)

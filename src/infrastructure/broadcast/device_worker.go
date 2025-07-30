@@ -83,7 +83,7 @@ func (dw *DeviceWorker) Stop() {
 
 // QueueMessage adds a message to the worker's queue
 func (dw *DeviceWorker) QueueMessage(msg domainBroadcast.BroadcastMessage) error {
-	select {
+	SELECT {
 	case dw.messageQueue <- msg:
 		return nil
 	case <-time.After(time.Second * 5):
@@ -109,7 +109,7 @@ func (dw *DeviceWorker) GetStatus() domainBroadcast.WorkerStatus {
 // processMessages processes messages from the queue
 func (dw *DeviceWorker) processMessages() {
 	for {
-		select {
+		SELECT {
 		case <-dw.ctx.Done():
 			return
 		case msg, ok := <-dw.messageQueue:
@@ -133,7 +133,7 @@ func (dw *DeviceWorker) processMessages() {
 				if msg.ID != "" {
 					// Direct update like skipped
 					db := database.GetDB()
-					_, updateErr := db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
+					_, updateErr := db.Exec(`UPDATE broadcast_messages SET `status` = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
 					if updateErr != nil {
 						logrus.Errorf("Failed to update message status to failed: %v", updateErr)
 					}
@@ -144,7 +144,7 @@ func (dw *DeviceWorker) processMessages() {
 				if msg.ID != "" {
 					// Direct update like skipped
 					db := database.GetDB()
-					_, updateErr := db.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('pending', 'queued')`, msg.ID)
+					_, updateErr := db.Exec(`UPDATE broadcast_messages SET `status` = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('pending', 'queued')`, msg.ID)
 					if updateErr != nil {
 						logrus.Errorf("Failed to update message status to sent: %v", updateErr)
 					}
@@ -307,7 +307,7 @@ func (dw *DeviceWorker) healthCheck() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-dw.ctx.Done():
 			return
 		case <-ticker.C:

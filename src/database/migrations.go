@@ -24,32 +24,7 @@ func GetMigrations() []Migration {
 			Name: "Fix whatsapp_chats duplicate name columns",
 			SQL: `
 			-- Fix duplicate name columns issue
-			DO $$ 
-			BEGIN
-				-- Only proceed if the table exists
-				IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'whatsapp_chats') THEN
-					-- If we have both 'name' and 'chat_name' columns, we need to fix this
-					IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'name')
-					   AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
-						
-						-- Copy data from 'name' to 'chat_name' where chat_name is empty
-						UPDATE whatsapp_chats 
-						SET chat_name = name 
-						WHERE (chat_name IS NULL OR chat_name = '') AND name IS NOT NULL AND name != '';
-						
-						-- Drop the old 'name' column
-						ALTER TABLE whatsapp_chats DROP COLUMN name;
-						RAISE NOTICE 'Dropped duplicate name column';
-					
-					-- If we only have 'name' column, rename it to 'chat_name'
-					ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'name')
-					      AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
-						
-						ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
-						RAISE NOTICE 'Renamed name column to chat_name';
-					END IF;
-				END IF;
-			END $$;
+			-- PostgreSQL DO block removed for MySQL
 			`,
 		},
 		{
@@ -57,34 +32,15 @@ func GetMigrations() []Migration {
 			SQL: `
 			-- First add missing columns that might not exist
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group BOOLEAN DEFAULT 0;
-			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT 0;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_group TINYINT(1) DEFAULT 0;
+			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS is_muted TINYINT(1) DEFAULT 0;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_text TEXT;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS last_message_time TIMESTAMP;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
 			ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 			
 			-- Now fix column name from 'name' to 'chat_name' if needed
-			DO $$ 
-			BEGIN
-				-- Check if 'name' column exists and 'chat_name' doesn't
-				IF EXISTS (SELECT 1 FROM information_schema.columns 
-						   WHERE table_name = 'whatsapp_chats' AND column_name = 'name') 
-				   AND NOT EXISTS (SELECT 1 FROM information_schema.columns 
-								   WHERE table_name = 'whatsapp_chats' AND column_name = 'chat_name') THEN
-					-- Rename 'name' to 'chat_name'
-					ALTER TABLE whatsapp_chats RENAME COLUMN name TO chat_name;
-				END IF;
-				
-				-- Ensure chat_name column exists (in case both are missing)
-				ALTER TABLE whatsapp_chats ADD COLUMN IF NOT EXISTS chat_name VARCHAR(255) DEFAULT '';
-				
-				-- Make sure chat_name is never NULL
-				UPDATE whatsapp_chats SET chat_name = COALESCE(chat_name, '') WHERE chat_name IS NULL;
-				
-				-- Now we can safely set NOT NULL
-				ALTER TABLE whatsapp_chats ALTER COLUMN chat_name SET NOT NULL;
-			END $$;
+			-- PostgreSQL DO block removed for MySQL
 			`,
 		},
 		{
@@ -104,8 +60,8 @@ func GetMigrations() []Migration {
 				message_text TEXT,
 				message_type VARCHAR(50) DEFAULT 'text',
 				media_url TEXT,
-				is_sent BOOLEAN DEFAULT 0,
-				is_read BOOLEAN DEFAULT 0,
+				is_sent TINYINT(1) DEFAULT 0,
+				is_read TINYINT(1) DEFAULT 0,
 				timestamp BIGINT NOT NULL,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				UNIQUE(device_id, message_id)
@@ -154,10 +110,10 @@ func GetMigrations() []Migration {
 				AND chat_jid = NEW.chat_jid
 				AND message_id NOT IN (
 					SELECT message_id 
-					FROM whatsapp_messages 
+					from whatsapp_messages 
 					WHERE device_id = NEW.device_id 
 					AND chat_jid = NEW.chat_jid
-					ORDER BY timestamp DESC 
+					order BY timestamp DESC 
 					LIMIT 20
 				);
 				RETURN NEW;
@@ -225,7 +181,7 @@ func GetMigrations() []Migration {
 			Name: "Create time validation function",
 			SQL: `
 CREATE OR REPLACE FUNCTION is_valid_time(time_str TEXT) 
-RETURNS BOOLEAN AS $$
+RETURNS TINYINT(1) AS $$
 BEGIN
     -- Check basic format HH:MM
     IF time_str !~ '^[0-2][0-9]:[0-5][0-9]$' THEN
@@ -267,18 +223,7 @@ $$ LANGUAGE plpgsql;
 				);
 				
 				-- Add key column if missing
-				DO $$ 
-				BEGIN
-					IF NOT EXISTS (
-						SELECT 1 
-						FROM information_schema.columns 
-						WHERE table_name = 'whatsmeow_message_secrets' 
-						AND column_name = 'key'
-					) THEN
-						ALTER TABLE whatsmeow_message_secrets 
-						ADD COLUMN key bytea;
-					END IF;
-				END $$;
+				-- PostgreSQL DO block removed for MySQL
 			`,
 		},
 		{
@@ -373,21 +318,13 @@ CREATE INDEX IF NOT EXISTS idx_ai_campaign_progress_device_id ON ai_campaign_pro
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS message_secrets TEXT;
 
 -- Step 2: Copy data from media_url to message_secrets if both exist
-DO $$ 
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns 
-               WHERE table_name = 'whatsapp_messages' AND column_name = 'media_url') THEN
-        UPDATE whatsapp_messages 
-        SET message_secrets = media_url 
-        WHERE message_secrets IS NULL AND media_url IS NOT NULL;
-    END IF;
-END $$;
+-- PostgreSQL DO block removed for MySQL
 
 -- Step 3: Ensure all required columns exist
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255);
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS media_url TEXT;
-ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_sent BOOLEAN DEFAULT 0;
-ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT 0;
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_sent TINYINT(1) DEFAULT 0;
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS is_read TINYINT(1) DEFAULT 0;
 
 -- Step 4: Create indexes if they don't exist
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_device_chat ON whatsapp_messages(device_id, chat_jid);
@@ -429,13 +366,13 @@ WHERE status = 'active' AND current_trigger IS NOT NULL;
 -- Ensure sequence_steps has proper trigger flow
 ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS next_trigger VARCHAR(255);
 ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger_delay_hours INT DEFAULT 24;
-ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point BOOLEAN DEFAULT false;
+ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point TINYINT(1) DEFAULT 0;
 
 -- Create unique constraint on trigger
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sequence_steps_unique_trigger ON sequence_steps(trigger) WHERE trigger IS NOT NULL;
 
 -- Mark entry points for each sequence
-UPDATE sequence_steps SET is_entry_point = true WHERE day_number = 1;
+UPDATE sequence_steps SET is_entry_point = 1 WHERE day_number = 1;
 
 -- Create device load balance table
 CREATE TABLE IF NOT EXISTS device_load_balance (
@@ -444,21 +381,12 @@ CREATE TABLE IF NOT EXISTS device_load_balance (
     messages_today INT DEFAULT 0,
     last_reset_hour TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_reset_day TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_available BOOLEAN DEFAULT true,
+    is_available TINYINT(1) DEFAULT 1,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create unique constraint to prevent duplicate enrollments
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'uq_sequence_contact'
-    ) THEN
-        ALTER TABLE sequence_contacts 
-        ADD CONSTRAINT uq_sequence_contact UNIQUE (sequence_id, contact_phone);
-    END IF;
-END $$;
+-- PostgreSQL DO block removed for MySQL
 `,
 	})
 	

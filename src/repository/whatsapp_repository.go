@@ -82,7 +82,7 @@ func (r *WhatsAppRepository) GetChats(deviceID string) ([]WhatsAppChat, error) {
 		SELECT id, device_id, chat_jid, chat_name, is_group, is_muted, 
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
-		FROM whatsapp_chats
+		from whatsapp_chats
 		WHERE device_id = ?
 		ORDER BY last_message_time DESC`
 	
@@ -110,8 +110,7 @@ func (r *WhatsAppRepository) GetChats(deviceID string) ([]WhatsAppChat, error) {
 // SaveMessage saves a new message
 func (r *WhatsAppRepository) SaveMessage(msg *WhatsAppMessage) error {
 	query := `
-		INSERT INTO whatsapp_messages 
-		(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
+		INSERT INTO whatsapp_messages(device_id, chat_jid, message_id, sender_jid, sender_name, message_text,
 		 message_type, media_url, is_sent, is_read, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (device_id, message_id) DO NOTHING`
@@ -135,7 +134,7 @@ func (r *WhatsAppRepository) GetMessages(deviceID, chatJID string, limit int) ([
 		SELECT id, device_id, chat_jid, message_id, sender_jid, sender_name,
 		       message_text, message_type, media_url, is_sent, is_read, 
 		       timestamp, created_at
-		FROM whatsapp_messages
+		from whatsapp_messages
 		WHERE device_id = ? AND chat_jid = ?
 		ORDER BY timestamp DESC
 		LIMIT ?`
@@ -172,7 +171,7 @@ func (r *WhatsAppRepository) GetChatByJID(deviceID, chatJID string) (*WhatsAppCh
 		SELECT id, device_id, chat_jid, chat_name, is_group, is_muted, 
 		       last_message_text, last_message_time, unread_count, avatar_url, 
 		       created_at, updated_at
-		FROM whatsapp_chats
+		from whatsapp_chats
 		WHERE device_id = ? AND chat_jid = ?`
 	
 	var chat WhatsAppChat

@@ -8,7 +8,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/gofiber/fiber/v2"
-	_ "github.com/lib/pq"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // GetCampaignAnalytics returns campaign analytics data
@@ -51,7 +51,7 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 	end = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 
 	// Get database connection
-	db, err := sql.Open("postgres", config.DBURI)
+	db, err := sql.Open("mysql", config.MysqlDSN)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -89,8 +89,7 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 
 	// Get broadcast statistics with proper error handling
 	broadcastQuery := `
-		SELECT 
-			COALESCE(COUNT(*), 0) as total,
+		SELECT COALESCE(COUNT(*), 0) as total,
 			COALESCE(COUNT(CASE WHEN bm.status = 'sent' THEN 1 END), 0) as sent,
 			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
@@ -98,16 +97,13 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 		WHERE bm.created_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
-	argCount := 3
-
-	if deviceFilter != "all" && deviceFilter != "" {
-		broadcastQuery += fmt.Sprintf(" AND bm.device_id = $%d", argCount)
+		if deviceFilter != "all" && deviceFilter != "" {
+		broadcastQuery += " AND bm.device_id = ?"
 		args = append(args, deviceFilter)
-		argCount++
-	}
+			}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		broadcastQuery += fmt.Sprintf(" AND c.niche = $%d", argCount)
+		broadcastQuery += " AND c.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -123,8 +119,7 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 
 	// Get chart data with error handling
 	chartQuery := `
-		SELECT 
-			DATE(bm.created_at) as date,
+		SELECT DATE(bm.created_at) as date,
 			COALESCE(COUNT(CASE WHEN bm.status = 'sent' THEN 1 END), 0) as sent,
 			COALESCE(COUNT(CASE WHEN bm.status = 'failed' THEN 1 END), 0) as failed
 		FROM broadcast_messages bm
@@ -132,16 +127,14 @@ func (handler *App) GetCampaignAnalytics(c *fiber.Ctx) error {
 		WHERE bm.created_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
-	argCount = 3
 
 	if deviceFilter != "all" && deviceFilter != "" {
-		chartQuery += fmt.Sprintf(" AND bm.device_id = $%d", argCount)
+		chartQuery += " AND bm.device_id = ?"
 		args = append(args, deviceFilter)
-		argCount++
-	}
+			}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		chartQuery += fmt.Sprintf(" AND c.niche = $%d", argCount)
+		chartQuery += " AND c.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -235,7 +228,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 	end = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 
 	// Get database connection
-	db, err := sql.Open("postgres", config.DBURI)
+	db, err := sql.Open("mysql", config.MysqlDSN)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -272,7 +265,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		fmt.Printf("Error counting sequences: %v\n", err)
 	}
 
-	// Get total flows (only from active sequences)
+	// Get total flows (only FROM active sequences)
 	flowQuery := `SELECT COUNT(*) FROM sequence_steps ss INNER JOIN sequences s ON ss.sequence_id = s.id WHERE s.status = 'active' AND s.created_at BETWEEN ? AND ?`
 	args = []interface{}{start, end}
 
@@ -286,10 +279,9 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		fmt.Printf("Error counting flows: %v\n", err)
 	}
 
-	// Get sequence contact statistics (only from active sequences)
+	// Get sequence contact statistics (only FROM active sequences)
 	contactQuery := `
-		SELECT 
-			COALESCE(COUNT(*), 0) as total,
+		SELECT COALESCE(COUNT(*), 0) as total,
 			COALESCE(COUNT(CASE WHEN sc.status = 'sent' THEN 1 END), 0) as sent,
 			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed
 		FROM sequence_contacts sc
@@ -297,16 +289,13 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		WHERE s.status = 'active' AND sc.completed_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
-	argCount := 3
-
-	if deviceFilter != "all" && deviceFilter != "" {
-		contactQuery += fmt.Sprintf(" AND sc.processing_device_id = $%d", argCount)
+		if deviceFilter != "all" && deviceFilter != "" {
+		contactQuery += " AND sc.processing_device_id = ?"
 		args = append(args, deviceFilter)
-		argCount++
-	}
+			}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		contactQuery += fmt.Sprintf(" AND s.niche = $%d", argCount)
+		contactQuery += " AND s.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -320,10 +309,9 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		contactsRemainingSend = 0
 	}
 
-	// Get chart data (only from active sequences)
+	// Get chart data (only FROM active sequences)
 	chartQuery := `
-		SELECT 
-			DATE(sc.completed_at) as date,
+		SELECT DATE(sc.completed_at) as date,
 			COALESCE(COUNT(CASE WHEN sc.status = 'sent' THEN 1 END), 0) as completed,
 			COALESCE(COUNT(CASE WHEN sc.status = 'failed' THEN 1 END), 0) as failed,
 			COALESCE(COUNT(CASE WHEN sc.status IN ('pending', 'active') THEN 1 END), 0) as pending
@@ -332,16 +320,14 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 		WHERE s.status = 'active' AND sc.completed_at BETWEEN ? AND ?`
 
 	args = []interface{}{start, end}
-	argCount = 3
 
 	if deviceFilter != "all" && deviceFilter != "" {
-		chartQuery += fmt.Sprintf(" AND sc.processing_device_id = $%d", argCount)
+		chartQuery += " AND sc.processing_device_id = ?"
 		args = append(args, deviceFilter)
-		argCount++
-	}
+			}
 
 	if nicheFilter != "all" && nicheFilter != "" {
-		chartQuery += fmt.Sprintf(" AND s.niche = $%d", argCount)
+		chartQuery += " AND s.niche = ?"
 		args = append(args, nicheFilter)
 	}
 
@@ -401,7 +387,7 @@ func (handler *App) GetSequenceAnalytics(c *fiber.Ctx) error {
 
 // GetNiches returns all unique niches
 func (handler *App) GetNiches(c *fiber.Ctx) error {
-	db, err := sql.Open("postgres", config.DBURI)
+	db, err := sql.Open("mysql", config.MysqlDSN)
 	if err != nil {
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
@@ -413,7 +399,7 @@ func (handler *App) GetNiches(c *fiber.Ctx) error {
 
 	niches := []string{}
 
-	// Get niches from campaigns and sequences
+	// Get niches FROM campaigns and sequences
 	query := `
 		SELECT DISTINCT niche FROM (
 			SELECT niche FROM campaigns WHERE niche IS NOT NULL AND niche != ''
@@ -443,7 +429,7 @@ func (handler *App) GetNiches(c *fiber.Ctx) error {
 
 // TestDatabaseConnection tests database tables and returns diagnostic info
 func (handler *App) TestDatabaseConnection(c *fiber.Ctx) error {
-	db, err := sql.Open("postgres", config.DBURI)
+	db, err := sql.Open("mysql", config.MysqlDSN)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"error": "Failed to connect to database: " + err.Error(),

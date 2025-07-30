@@ -317,8 +317,7 @@ func ExpireOldMessages(c *fiber.Ctx) error {
 	
 	// Expire messages in database
 	query := fmt.Sprintf(`
-		UPDATE broadcast_messages 
-		SET status = 'expired', 
+		UPDATE broadcast_messages SET `status` = 'expired', 
 		    error_message = 'Manually expired (older than %d hours)' 
 		WHERE status IN ('pending', 'queued') 
 		AND created_at < NOW() - INTERVAL '%d hours'

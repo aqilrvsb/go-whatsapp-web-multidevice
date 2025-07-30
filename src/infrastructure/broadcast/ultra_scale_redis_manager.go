@@ -351,7 +351,7 @@ func (um *UltraScaleRedisManager) runWorker(deviceID string, worker *DeviceWorke
 	maxIdle := 100 // Stop worker after 100 idle checks (10 seconds)
 	
 	for {
-		select {
+		SELECT {
 		case <-um.ctx.Done():
 			return
 		case <-worker.ctx.Done():
@@ -472,7 +472,7 @@ func (um *UltraScaleRedisManager) processQueues() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-um.ctx.Done():
 			return
 		case <-ticker.C:
@@ -547,7 +547,7 @@ func (um *UltraScaleRedisManager) monitorWorkers() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-um.ctx.Done():
 			return
 		case <-ticker.C:
@@ -611,7 +611,7 @@ func (um *UltraScaleRedisManager) flushMetricsBatch() {
 	pipe := um.redisClient.Pipeline()
 	for metric, count := range batch {
 		key := fmt.Sprintf("%s%s", ultraMetricsPrefix, metric)
-		pipe.IncrBy(um.ctx, key, count)
+		pipe.IncrBy(um.ctx, `key`, count)
 	}
 	pipe.Exec(um.ctx)
 }
@@ -631,7 +631,7 @@ func (um *UltraScaleRedisManager) cleanupDeadLetters() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-um.ctx.Done():
 			return
 		case <-ticker.C:
@@ -779,7 +779,7 @@ func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDevi
 	query := `
 		UPDATE broadcast_messages 
 		SET device_id = ? 
-		WHERE device_id = ? AND status = 'pending'
+		WHERE device_id = ? AND `status` = 'pending'
 	`
 	
 	db := database.GetDB()
@@ -796,9 +796,8 @@ func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDevi
 // skipOfflineDeviceMessages marks messages as skipped for offline devices
 func (um *UltraScaleRedisManager) skipOfflineDeviceMessages(deviceID string) {
 	query := `
-		UPDATE broadcast_messages 
-		SET status = 'skipped', error_message = 'Device offline' 
-		WHERE device_id = ? AND status = 'pending'
+		UPDATE broadcast_messages SET `status` = 'skipped', error_message = 'Device offline' 
+		WHERE device_id = ? AND `status` = 'pending'
 	`
 	
 	db := database.GetDB()
@@ -819,7 +818,7 @@ func (um *UltraScaleRedisManager) cleanupOldMessages() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-um.ctx.Done():
 			return
 		case <-ticker.C:
@@ -835,11 +834,10 @@ func (um *UltraScaleRedisManager) performMessageCleanup() {
 	
 	// Mark messages older than 24 hours as expired
 	query := `
-		UPDATE broadcast_messages 
-		SET status = 'expired', 
+		UPDATE broadcast_messages SET `status` = 'expired', 
 		    error_message = 'Message expired (older than 24 hours)' 
 		WHERE status IN ('pending', 'queued') 
-		AND created_at < NOW() - INTERVAL '24 hours'
+		AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)
 	`
 	
 	db := database.GetDB()

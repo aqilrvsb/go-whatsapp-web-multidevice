@@ -56,7 +56,7 @@ func GetDeviceQR(deviceID string) (string, error) {
 	}
 	
 	// Try to get QR with timeout
-	select {
+	SELECT {
 	case qrItem, ok := <-qrChan:
 		if !ok {
 			return "", fmt.Errorf("QR channel closed")
@@ -183,7 +183,7 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 		},
 	}
 	
-	// Trigger initial sync after connection
+	// `trigger` initial sync after connection
 	go func() {
 		time.Sleep(3 * time.Second)
 		chats, err := GetChatsForDevice(deviceID)
@@ -269,7 +269,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	// First, get the JID and phone from user_devices
 	var jid sql.NullString
 	var phone sql.NullString
-	err := db.QueryRow("SELECT jid, phone FROM user_devices WHERE id = ?", deviceID).Scan(&jid, &phone)
+	err := db.QueryRow("SELECT jid, phone from user_devices WHERE id = ?", deviceID).Scan(&jid, &phone)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logrus.Warnf("Device %s not found in database", deviceID)
@@ -297,7 +297,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		jidsToCheck = append(jidsToCheck, phoneJID)
 	}
 	
-	// Tables to clear in order (to avoid foreign key violations)
+	// Tables to clear in `order` (to avoid foreign key violations)
 	clearOperations := []struct {
 		name  string
 		query string
@@ -324,7 +324,7 @@ func ClearWhatsAppSessionData(deviceID string) error {
 		{"sessions", "DELETE FROM whatsmeow_sessions WHERE our_jid = ANY(?)"},
 		{"pre_keys", "DELETE FROM whatsmeow_pre_keys WHERE jid = ANY(?)"},
 		{"identity_keys", "DELETE FROM whatsmeow_identity_keys WHERE our_jid = ANY(?)"},
-		{"device", "DELETE FROM whatsmeow_device WHERE jid = ANY(?)"},
+		{"device", "DELETE from whatsmeow_device WHERE jid = ANY(?)"},
 	}
 	
 	// Execute each operation in its own transaction

@@ -1,5 +1,5 @@
 # WhatsApp Multi-Device System - Dual Database Edition
-**Last Updated: July 30, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
+**Last Updated: January 30, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
 **Status: ✅ Production-ready with Dual Database Support**
 
 ## 🎯 Database Architecture
@@ -20,14 +20,86 @@ This system uses a dual-database approach for optimal performance:
   - Sequences and automation
   - Broadcast messages and queues
 
+## 📚 Database Documentation
+
+### Schema Documentation
+- **MySQL Schema**: See [MYSQL_SCHEMA_DOCUMENTATION.md](MYSQL_SCHEMA_DOCUMENTATION.md) for complete table structure
+- **Database Design**: See [CURRENT_WORKING_SCHEMA.sql](CURRENT_WORKING_SCHEMA.sql) for PostgreSQL reference
+
+### Key Files to Understand Database Structure
+1. **`MYSQL_SCHEMA_DOCUMENTATION.md`** - Complete MySQL schema with all tables, columns, indexes
+2. **`src/models/`** - Go structs that map to database tables
+3. **`src/repository/`** - Database queries and operations
+4. **`src/database/migrations/`** - Database migration files
+
+## 🔧 Database Connection Guide
+
+### Connecting to PostgreSQL
+
+#### Option 1: Railway PostgreSQL (Recommended for Production)
+1. Go to your Railway project
+2. Click on the PostgreSQL service
+3. Go to the "Connect" tab
+4. Copy the `DATABASE_URL` (use the public URL, not internal)
+5. Add to `.env`:
+```env
+DB_URI=postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway
+```
+
+Current connection:
+```env
+# Railway PostgreSQL (WhatsApp Sessions)
+DB_URI=postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway
+```
+
+#### Option 2: Local PostgreSQL
+```env
+DB_URI=postgresql://localhost:5432/whatsapp_db?sslmode=disable
+```
+
+#### Option 3: SQLite (Development Only)
+```env
+DB_URI=file:storages/whatsapp.db?_foreign_keys=on
+```
+
+### Connecting to MySQL
+
+The MySQL connection is configured in `.env`:
+```env
+MYSQL_URI=mysql://username:password@host:port/database_name
+```
+
+Example:
+```env
+MYSQL_URI=mysql://admin_aqil:admin_aqil@159.89.198.71:3306/admin_railway
+```
+
+### Testing Database Connections
+
+Run the database operations script:
+```bash
+# Install dependencies and run operations
+run_database_operations.bat
+
+# Or manually:
+pip install psycopg2-binary pymysql
+python database_operations.py
+```
+
+This script will:
+1. Connect to both databases
+2. Export MySQL schema documentation
+3. Show PostgreSQL disk usage
+4. Clean specified tables (if confirmed)
+
 ## 🔧 Environment Configuration
 
 ### Railway Deployment
 Set these environment variables in Railway:
 
 ```env
-# PostgreSQL for WhatsApp Sessions (Railway provides this automatically)
-DB_URI=postgres://user:password@host:port/database?sslmode=require
+# PostgreSQL for WhatsApp Sessions
+DB_URI=postgresql://postgres:CNFPbgfjsIVirTuqLMoObNMvoYobDDTU@yamanote.proxy.rlwy.net:49914/railway
 
 # MySQL for Application Data
 MYSQL_URI=mysql://admin_aqil:admin_aqil@159.89.198.71:3306/admin_railway
@@ -109,6 +181,24 @@ whatsapp.exe rest
 
 ## 🛠️ Troubleshooting
 
+### PostgreSQL Disk Space Issues
+If PostgreSQL is hitting 100% disk usage, run:
+```bash
+python db_operations_fixed.py
+```
+This will clear the following tables:
+- leads (26,366 records cleared)
+- leads_ai (21 records cleared)
+- sequences (3 records cleared)
+- sequence_contacts
+- broadcast_messages
+- campaigns (3 records cleared)
+
+**Results from latest cleanup:**
+- Database size reduced from 167 MB to 121 MB
+- 46 MB of disk space reclaimed
+- VACUUM FULL executed to free disk space
+
 ### MySQL Connection Issues
 1. **Error 1130**: Add Railway's IP to MySQL remote access in cPanel
 2. **Error 1064**: SQL syntax has been updated for MySQL compatibility
@@ -131,7 +221,7 @@ whatsapp.exe rest
 
 If migrating from a PostgreSQL-only setup:
 1. Export your data from PostgreSQL
-2. Import into MySQL using the schema in `emergency_db_fix/mysql_migration/`
+2. Import into MySQL using the schema in `MYSQL_SCHEMA_DOCUMENTATION.md`
 3. Update environment variables
 4. Deploy the new version
 

@@ -284,7 +284,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 			var existingCount int
 			db := database.GetDB()
 			err = db.QueryRow(`
-				SELECT COUNT(*) FROM broadcast_messages 
+				SELECT COUNT(*) `from` broadcast_messages 
 				WHERE sequence_id = ? 
 				AND recipient_phone = ? 
 				AND group_order = ?

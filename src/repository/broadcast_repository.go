@@ -33,8 +33,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	}
 	
 	query := `
-		INSERT INTO broadcast_messages 
-		(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
+		INSERT INTO broadcast_messages(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`	
@@ -43,7 +42,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	if msg.UserID != "" {
 		userID = msg.UserID
 	} else {
-		err := r.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", msg.DeviceID).Scan(&userID)
+		err := r.db.QueryRow("SELECT user_id from user_devices WHERE id = ?", msg.DeviceID).Scan(&userID)
 		if err != nil {
 			return err
 		}
@@ -94,12 +93,11 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 // GetPendingMessages gets pending messages for a device with campaign/sequence delays
 func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
-		SELECT 
-			bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
-			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content as message, bm.media_url as image_url, 
+		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
+			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url AS image_url, 
 			bm.scheduled_at, bm.group_id, bm.group_order,
-			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) as min_delay,
-			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) as max_delay
+			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) AS min_delay,
+			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) AS max_delay
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
@@ -160,8 +158,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 // UpdateMessageStatus updates message status
 func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
-		UPDATE broadcast_messages 
-		SET status = ?, 
+		UPDATE broadcast_messages SET status = ?, 
 		    error_message = ?, 
 		    sent_at = CASE WHEN ? = 'sent' THEN NOW() ELSE sent_at END,
 		    updated_at = NOW()
@@ -190,9 +187,9 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 	
 	// Get counts by status
 	query := `
-		SELECT status, COUNT(*) as count
+		SELECT status, COUNT(*) AS count
 		FROM broadcast_messages
-		WHERE device_id = ? AND created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+		WHERE device_id = ? AND created_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
 		GROUP BY status
 	`
 	
@@ -219,12 +216,11 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 
 // GetUserBroadcastStats gets broadcast statistics for a user
 func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]interface{}, error) {
-	query := `
-		SELECT 
-			COUNT(*) as total,
-			COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-			COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+	`
+		SELECT COUNT(*) AS total,
+			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
+			COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending
 		FROM broadcast_messages
 		WHERE user_id = ?
 	`
@@ -254,7 +250,7 @@ func max(a, b int) int {
 
 // GetAllPendingMessages gets all pending messages across all devices
 func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
-	query := `
+	`
 		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
 		       message_type, content, media_url, status, scheduled_at, created_at,
 		       group_id, group_order
@@ -313,7 +309,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 
 // GetDevicesWithPendingMessages gets all device IDs that have pending messages
 func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) {
-	query := `
+	`
 		SELECT DISTINCT device_id 
 		FROM broadcast_messages 
 		WHERE status = 'pending' 

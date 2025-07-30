@@ -73,12 +73,12 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	var campaignID int
 	err = db.QueryRow(`
 		SELECT DISTINCT c.id, c.title, c.status 
-		FROM broadcast_messages bm 
+		from broadcast_messages bm 
 		JOIN campaigns c ON bm.campaign_id = c.id 
 		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
 		AND c.user_id = ?
-		ORDER BY bm.created_at DESC 
-		LIMIT 1
+		`order` BY bm.created_at DESC 
+		limit 1
 	`, deviceID, userID).Scan(&campaignID, &campaignTitle, &campaignStatus)
 	
 	if err == nil {
@@ -93,12 +93,12 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	var sequenceID, sequenceName, sequenceStatus string
 	err = db.QueryRow(`
 		SELECT DISTINCT s.id, s.name, s.status 
-		FROM broadcast_messages bm 
+		from broadcast_messages bm 
 		JOIN sequences s ON bm.sequence_id = s.id 
 		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
 		AND s.user_id = ?
-		ORDER BY bm.created_at DESC 
-		LIMIT 1
+		`order` BY bm.created_at DESC 
+		limit 1
 	`, deviceID, userID).Scan(&sequenceID, &sequenceName, &sequenceStatus)
 	
 	if err == nil {

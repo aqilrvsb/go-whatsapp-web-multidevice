@@ -38,13 +38,13 @@ func (ar *AutoReconnectService) TryReconnectOfflineDevices() {
 	// Query devices that are offline but have JID (meaning they have been connected before)
 	query := `
 		SELECT id, device_name, phone, jid, user_id, platform
-		FROM user_devices
-		WHERE status = 'offline' 
+		from user_devices
+		WHERE `status` = 'offline' 
 		AND jid IS NOT NULL 
 		AND jid != ''
 		AND (platform IS NULL OR platform = '')
-		ORDER BY created_at ASC
-		LIMIT 20
+		`order` BY created_at ASC
+		limit 20
 	`
 	
 	rows, err := ar.db.Query(query)

@@ -83,7 +83,7 @@ func (acm *AutoConnectionMonitor) monitorLoop() {
 	defer ticker.Stop()
 	
 	for {
-		select {
+		SELECT {
 		case <-acm.ctx.Done():
 			return
 		case <-ticker.C:

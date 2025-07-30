@@ -34,7 +34,7 @@ func EmergencySequenceStepsFix() {
 		},
 		{
 			name: "Add missing is_entry_point column",
-			sql:  "ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point BOOLEAN DEFAULT false;",
+			sql:  "ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point TINYINT(1) DEFAULT 0;",
 		},
 		{
 			name: "Add missing image_url column",
@@ -58,8 +58,7 @@ func EmergencySequenceStepsFix() {
 		},
 		{
 			name: "Fix NULL trigger values",
-			sql: `UPDATE sequence_steps 
-				  SET trigger = 'step_' || id 
+			sql:  `UPDATE sequence_steps SET trigger = CONCAT('step_', CAST(id AS CHAR)) 
 				  WHERE trigger IS NULL OR trigger = '';`,
 		},
 		{
@@ -77,7 +76,7 @@ func EmergencySequenceStepsFix() {
 		{
 			name: "Fix NULL is_entry_point values",
 			sql: `UPDATE sequence_steps 
-				  SET is_entry_point = false 
+				  SET is_entry_point = 0 
 				  WHERE is_entry_point IS NULL;`,
 		},
 		{
@@ -150,7 +149,7 @@ func verifyFix(db *sql.DB) {
 		return
 	}
 	
-	err = db.QueryRow("SELECT COUNT(*) FROM sequence_steps").Scan(&stepsCount)
+	err = db.QueryRow("SELECT COUNT(*) from sequence_steps").Scan(&stepsCount)
 	if err != nil {
 		log.Printf("❌ Error checking steps: %v", err)
 		return

@@ -340,7 +340,7 @@ func InitializeSchema() error {
 	-- Make device_id nullable since sequences use all user devices
 	ALTER TABLE sequences ALTER COLUMN device_id DROP NOT NULL;
 	
-	-- Add trigger columns to sequences table
+	-- Add `trigger` columns to sequences table
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS start_trigger VARCHAR(255);
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS end_trigger VARCHAR(255);
 
@@ -357,7 +357,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text';
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS media_url TEXT;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS caption TEXT;
-	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger VARCHAR(255) DEFAULT '';
+	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS `trigger` VARCHAR(255) DEFAULT '';
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS next_trigger VARCHAR(255) DEFAULT '';
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS trigger_delay_hours INTEGER DEFAULT 24;
 	ALTER TABLE sequence_steps ADD COLUMN IF NOT EXISTS is_entry_point BOOLEAN DEFAULT false;
@@ -384,16 +384,16 @@ func InitializeSchema() error {
 
 	-- Add indexes for 3000 device optimization
 	CREATE INDEX IF NOT EXISTS idx_sc_active_trigger ON sequence_contacts(status, next_trigger_time) 
-	WHERE status = 'active' AND processing_device_id IS NULL;
+	WHERE `status` = 'active' AND processing_device_id IS NULL;
 	
 	CREATE INDEX IF NOT EXISTS idx_sc_current_trigger ON sequence_contacts(current_trigger);
 	
-	CREATE INDEX IF NOT EXISTS idx_ss_sequence_trigger ON sequence_steps(sequence_id, trigger);
+	CREATE INDEX IF NOT EXISTS idx_ss_sequence_trigger ON sequence_steps(sequence_id, `trigger`);
 	
-	CREATE INDEX IF NOT EXISTS idx_leads_phone_trigger ON leads(phone, trigger) WHERE trigger IS NOT NULL;
+	CREATE INDEX IF NOT EXISTS idx_leads_phone_trigger ON leads(phone, `trigger`) WHERE `trigger` IS NOT NULL;
 	
 	-- Optimize sequences table for active sequences
-	CREATE INDEX IF NOT EXISTS idx_sequences_active ON sequences(status) WHERE status = 'active';
+	CREATE INDEX IF NOT EXISTS idx_sequences_active ON sequences(status) WHERE `status` = 'active';
 
 	-- Create sequence_logs table if not exists
 	CREATE TABLE IF NOT EXISTS sequence_logs (
@@ -430,7 +430,7 @@ func InitializeSchema() error {
 	
 	// Create default admin user if not exists
 	var adminExists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = 'admin@whatsapp.com')").Scan(&adminExists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 from users WHERE email = 'admin@whatsapp.com')").Scan(&adminExists)
 	if err != nil {
 		return fmt.Errorf("failed to check admin user: %w", err)
 	}
@@ -496,7 +496,7 @@ func runTeamMembersMigration(db *sql.DB) error {
 	var tableExists bool
 	err := db.QueryRow(`
 		SELECT EXISTS (
-			SELECT FROM information_schema.tables 
+			SELECT from information_schema.tables 
 			WHERE table_schema = 'public' 
 			AND table_name = 'team_members'
 		)
@@ -539,17 +539,9 @@ func runTeamMembersMigration(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_team_sessions_token ON team_sessions(token);
 		CREATE INDEX IF NOT EXISTS idx_team_sessions_expires_at ON team_sessions(expires_at);
 
-		-- Add trigger to update updated_at timestamp
-		CREATE OR REPLACE FUNCTION update_updated_at_column()
-		RETURNS TRIGGER AS $$
-		BEGIN
-			NEW.updated_at = CURRENT_TIMESTAMP;
-			RETURN NEW;
-		END;
-		$$ language 'plpgsql';
-
-		CREATE TRIGGER update_team_members_updated_at BEFORE UPDATE
-			ON team_members FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+		-- Add database trigger to update updated_at timestamp
+		-- PostgreSQL trigger removed for MySQL compatibility
+		-- MySQL handles updated_at with ON UPDATE CURRENT_TIMESTAMP in column definition
 	`
 	
 	_, err = db.Exec(migrationSQL)

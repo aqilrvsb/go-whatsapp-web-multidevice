@@ -94,7 +94,7 @@ func (g *GreetingProcessor) processSpintax(template string) string {
 	return spintaxRegex.ReplaceAllStringFunc(template, func(match string) string {
 		// Remove braces and split by |
 		options := strings.Split(strings.Trim(match, "{}"), "|")
-		// Randomly select one option
+		// Randomly SELECT one option
 		return options[rand.Intn(len(options))]
 	})
 }

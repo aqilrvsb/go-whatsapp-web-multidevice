@@ -135,9 +135,9 @@ func (wcm *WorkerClientManager) performRefresh(deviceID string, device *models.U
 	var sessionData []byte
 	err = db.QueryRow(`
 		SELECT session 
-		FROM whatsmeow_sessions 
+		from whatsmeow_sessions 
 		WHERE our_jid = ?
-		LIMIT 1
+		`limit` 1
 	`, device.JID).Scan(&sessionData)
 	
 	if err != nil {

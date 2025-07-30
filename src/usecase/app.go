@@ -84,7 +84,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				userRepo := repository.GetUserRepository()
 				
 				// Update any device with this phone number to online status
-				query := `UPDATE user_devices SET status = 'online', jid = ?, last_seen = CURRENT_TIMESTAMP WHERE phone = ?`
+				query := `UPDATE user_devices SET `status` = 'online', jid = ?, last_seen = CURRENT_TIMESTAMP WHERE phone = ?`
 				result, err := userRepo.DB().Exec(query, jid, phoneNumber)
 				if err != nil {
 					logrus.Errorf("Failed to update device by phone: %v", err)
@@ -95,7 +95,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				
 				// Find the device ID by phone for client manager registration
 				var deviceID string
-				err = userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+				err = userRepo.DB().QueryRow(`SELECT id from user_devices WHERE phone = ? `limit` 1`, phoneNumber).Scan(&deviceID)
 				if err == nil && deviceID != "" {
 					// Register with client manager
 					cm := whatsapp.GetClientManager()
@@ -129,7 +129,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				if newClient.Store.ID != nil {
 					phoneNumber := newClient.Store.ID.User
 					var deviceID string
-					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+					err := userRepo.DB().QueryRow(`SELECT id from user_devices WHERE phone = ? `limit` 1`, phoneNumber).Scan(&deviceID)
 					if err == nil && deviceID != "" {
 						// Store chat and message
 						whatsapp.HandleMessageForChats(deviceID, newClient, v)
@@ -145,7 +145,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				if newClient.Store.ID != nil {
 					phoneNumber := newClient.Store.ID.User
 					var deviceID string
-					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+					err := userRepo.DB().QueryRow(`SELECT id from user_devices WHERE phone = ? `limit` 1`, phoneNumber).Scan(&deviceID)
 					if err == nil && deviceID != "" {
 						// Process history sync
 						whatsapp.HandleHistorySyncForChats(deviceID, newClient, v)
@@ -169,7 +169,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				// Find device ID by phone
 				userRepo := repository.GetUserRepository()
 				var deviceID string
-				err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+				err := userRepo.DB().QueryRow(`SELECT id from user_devices WHERE phone = ? `limit` 1`, phoneNumber).Scan(&deviceID)
 				if err == nil && deviceID != "" {
 					// Update status to reconnecting (not offline)
 					userRepo.UpdateDeviceStatus(deviceID, "reconnecting", phoneNumber, jidStr)
@@ -227,7 +227,7 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	
 	go func() {
 		for {
-			select {
+			SELECT {
 			case evt := <-ch:
 				response.Code = evt.Code
 				response.Duration = evt.Timeout / time.Second / 2
