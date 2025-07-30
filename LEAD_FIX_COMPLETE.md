@@ -63,3 +63,35 @@ The `leads` table in MySQL has these columns:
 - Ready for deployment to Railway or any platform
 
 The lead creation functionality should now work perfectly with MySQL!
+
+
+## Update Lead Fix - July 30, 2025
+
+### Issue Fixed
+- **Error**: 500 Internal Server Error on PUT /api/leads/{id}
+- **Root Cause**: SQL parameter order mismatch in UpdateLead function
+
+### Solution Applied
+Fixed the parameter order in the UPDATE query:
+
+```go
+// Wrong order (ID was first):
+result, err := r.db.Exec(query, id, lead.DeviceID, lead.Name, ...)
+
+// Correct order (ID should be last for WHERE clause):
+result, err := r.db.Exec(query, lead.DeviceID, lead.Name, ..., id)
+```
+
+The SQL query expects parameters in this order:
+1. device_id, name, phone, niche
+2. journey, status, target_status, trigger, updated_at
+3. id (for WHERE clause)
+
+### Status
+- ✅ Create Lead - Working
+- ✅ Update Lead - Fixed parameter order issue
+- ✅ Delete Lead - Working
+- ✅ List/Read Leads - Working
+- ✅ Import/Export - Working
+
+All CRUD operations are now fully functional!

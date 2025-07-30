@@ -53,10 +53,16 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 		status = "new"  // Default status
 	}
 	
+	// Debug logging
+	log.Printf("CreateLead - DeviceID: %s, UserID: %s, Name: %s, Phone: %s", lead.DeviceID, lead.UserID, lead.Name, lead.Phone)
+	log.Printf("CreateLead - Niche: %s, Status: %s, TargetStatus: %s, Platform: %s", lead.Niche, status, lead.TargetStatus, lead.Platform)
+	log.Printf("CreateLead - Journey: %s, Trigger: %s", journey, lead.Trigger)
+	
 	result, err := r.db.Exec(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
 		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt)
 	
 	if err != nil {
+		log.Printf("CreateLead - Error executing query: %v", err)
 		return err
 	}
 	
