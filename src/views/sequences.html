@@ -590,6 +590,7 @@
                     content: stepEl.querySelector('.step-content').value,
                     image_url: stepEl.querySelector('.step-image-url').value || '',
                     media_url: stepEl.querySelector('.step-image-url').value || '',
+                    caption: stepEl.querySelector('.step-content').value || '', // Add caption for images
                     min_delay_seconds: parseInt(stepEl.querySelector('.step-min-delay').value) || 5,
                     max_delay_seconds: parseInt(stepEl.querySelector('.step-max-delay').value) || 15,
                     send_time: document.getElementById('sequenceTimeSchedule').value || '09:00',

@@ -57,6 +57,16 @@ func (s *sequenceService) CreateSequence(request domainSequence.CreateSequenceRe
 	
 	// Create steps
 	for i, stepReq := range request.Steps {
+		// Log incoming step request
+		logrus.Infof("Processing step %d - Type: %s, Content: %s, MediaURL: %s, ImageURL: %s",
+			i+1, stepReq.MessageType, stepReq.Content, stepReq.MediaURL, stepReq.ImageURL)
+		
+		// For image messages, ensure Caption is set
+		if stepReq.MessageType == "image" && stepReq.Caption == "" && stepReq.Content != "" {
+			stepReq.Caption = stepReq.Content
+			logrus.Infof("Setting Caption from Content for image message")
+		}
+		
 		step := &models.SequenceStep{
 			SequenceID:        sequence.ID,
 			DayNumber:         stepReq.DayNumber,

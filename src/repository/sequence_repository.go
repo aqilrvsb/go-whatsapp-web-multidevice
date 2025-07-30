@@ -165,9 +165,9 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 	query := `
 		INSERT INTO sequence_steps(
 			id, sequence_id, day_number, message_type, content, 
-			media_url, caption, ` + "`trigger`" + `, time_schedule,
+			media_url, caption, delay_days, time_schedule, ` + "`trigger`" + `,
 			next_trigger, trigger_delay_hours, is_entry_point,
-			min_delay_seconds, max_delay_seconds, delay_days
+			min_delay_seconds, max_delay_seconds
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
@@ -195,14 +195,24 @@ func (r *sequenceRepository) CreateSequenceStep(step *models.SequenceStep) error
 		step.MaxDelaySeconds = 30
 	}
 	
+	// Default DelayDays if not set
+	delayDays := step.DelayDays
+	if delayDays == 0 {
+		delayDays = 1
+	}
+	
 	_, err := r.db.Exec(query, 
 		step.ID, step.SequenceID, dayNumber, step.MessageType, step.Content,
-		step.MediaURL, step.Caption, step.Trigger, step.TimeSchedule,
+		step.MediaURL, step.Caption, delayDays, step.TimeSchedule, step.Trigger,
 		step.NextTrigger, step.TriggerDelayHours, step.IsEntryPoint,
-		step.MinDelaySeconds, step.MaxDelaySeconds, step.DelayDays)
+		step.MinDelaySeconds, step.MaxDelaySeconds)
 		
 	if err != nil {
 		logrus.Errorf("Failed to create sequence step: %v", err)
+		logrus.Errorf("Step details - ID: %s, SequenceID: %s, DayNumber: %d, MessageType: %s", 
+			step.ID, step.SequenceID, dayNumber, step.MessageType)
+		logrus.Errorf("Content length: %d, MediaURL: %s, Caption: %s", 
+			len(step.Content), step.MediaURL, step.Caption)
 	}
 	
 	return err
