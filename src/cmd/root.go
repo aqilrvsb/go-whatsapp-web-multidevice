@@ -95,6 +95,15 @@ func initEnvConfig() {
 	if envDBURI := viper.GetString("DB_URI"); envDBURI != "" {
 		config.DBURI = envDBURI
 	}
+	
+	// Override with PostgreSQL for WhatsApp if MySQL is detected
+	if strings.Contains(config.DBURI, "mysql") {
+		// Check for DATABASE_URL (Railway's PostgreSQL)
+		if postgresURL := os.Getenv("DATABASE_URL"); postgresURL != "" {
+			// For WhatsApp, always use PostgreSQL
+			config.DBURI = postgresURL
+		}
+	}
 
 	// WhatsApp settings
 	if envAutoReply := viper.GetString("WHATSAPP_AUTO_REPLY"); envAutoReply != "" {
