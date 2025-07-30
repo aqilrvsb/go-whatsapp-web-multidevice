@@ -694,8 +694,8 @@
                         <div>
                             <label class="form-label mb-1 small">Date Range</label>
                             <div class="d-flex gap-2">
-                                <input type="date" class="form-control form-control-sm" id="startDate" onchange="updateDashboard()">
-                                <input type="date" class="form-control form-control-sm" id="endDate" onchange="updateDashboard()">
+                                <input type="date" class="form-controlontrol form-control-sm" id="startDate" onchange="updateDashboard()">
+                                <input type="date" class="form-controlontrol form-control-sm" id="endDate" onchange="updateDashboard()">
                             </div>
                         </div>
                         
@@ -972,7 +972,7 @@
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         <!-- Single Date Filter -->
-                        <input type="date" id="campaignFilterDate" class="form-control form-control-sm" style="width: auto;" placeholder="Filter by date">
+                        <input type="date" id="campaignFilterDate" class="form-controlontrol form-control-sm" style="width: auto;" placeholder="Filter by date">
                         <button class="btn btn-outline-primary btn-sm" onclick="filterCampaigns()">
                             <i class="bi bi-funnel"></i> Filter
                         </button>
@@ -982,9 +982,9 @@
                         
                         <!-- Date Range Filter -->
                         <span class="text-muted small">Range:</span>
-                        <input type="date" id="campaignRangeStart" class="form-control form-control-sm" style="width: auto;">
+                        <input type="date" id="campaignRangeStart" class="form-controlontrol form-control-sm" style="width: auto;">
                         <span class="text-muted small">to</span>
-                        <input type="date" id="campaignRangeEnd" class="form-control form-control-sm" style="width: auto;">
+                        <input type="date" id="campaignRangeEnd" class="form-controlontrol form-control-sm" style="width: auto;">
                         <button class="btn btn-outline-info btn-sm" onclick="filterCampaignsByRange()">
                             <i class="bi bi-calendar-range"></i> Apply Range
                         </button>
@@ -1023,7 +1023,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <!-- Date Filter -->
-                        <input type="date" id="sequenceFilterDate" class="form-control form-control-sm" style="width: auto;">
+                        <input type="date" id="sequenceFilterDate" class="form-controlontrol form-control-sm" style="width: auto;">
                         <button class="btn btn-outline-primary btn-sm" onclick="filterSequences()">
                             <i class="bi bi-funnel"></i> Filter
                         </button>
@@ -1054,7 +1054,7 @@
                     </div>
                     <div>
                         <div class="form-check form-switch d-inline-block me-3">
-                            <input class="form-check-input" type="checkbox" id="workerAutoRefresh">
+                            <input class="form-controlheck-input" type="checkbox" id="workerAutoRefresh">
                             <label class="form-check-label" for="workerAutoRefresh">
                                 Auto-refresh (5s)
                             </label>
@@ -1266,12 +1266,12 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Campaign Title <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="campaignTitle" required>
+                            <input type="text" class="form-controlontrol" id="campaignTitle" required>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Niche/Category <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="campaignNiche" required  placeholder="e.g., EXSTART, ITADRESS">
+                            <input type="text" class="form-controlontrol" id="campaignNiche" required  placeholder="e.g., EXSTART, ITADRESS">
                         </div>
                         
                         <div class="mb-3">
@@ -1307,32 +1307,31 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Image (Optional)</label>
-                            <input <input type="url" class="form-control" id="imageUrl" >
-                               placeholder="https://example.com/image.jpg" onchange="validateImageUrl('imageUrl', 'imagePreview')"">">
-                            <small class="text-muted">Enter the full URL of your campaign image</small>
-                            <div id="aiImagePreview" class="mt-2"></div>
+                            <label class="form-label">Image URL (Optional)</label>
+                    <input type="url" class="form-controlontrol" id="imageUrl" placeholder="https://example.com/image.jpg">
+                    <small class="text-muted">Enter the full URL of your campaign image</small>
+                    <div id="imagePreview" class="mt-2"></div><div id="aiImagePreview" class="mt-2"></div>
                             
                             <div id="imagePreview" class="mt-2"></div>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Scheduled Time (Optional)</label>
-                            <input type="time" class="form-control" id="campaignTime">
+                            <input type="time" class="form-controlontrol" id="campaignTime">
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Min Delay (seconds)</label>
-                                    <input type="number" class="form-control" id="campaignMinDelay" min="1" value="10" placeholder="10">
+                                    <input type="number" class="form-controlontrol" id="campaignMinDelay" min="1" value="10" placeholder="10">
                                     <small class="text-muted">Minimum delay between messages</small>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Max Delay (seconds)</label>
-                                    <input type="number" class="form-control" id="campaignMaxDelay" min="1" value="30" placeholder="30">
+                                    <input type="number" class="form-controlontrol" id="campaignMaxDelay" min="1" value="30" placeholder="30">
                                     <small class="text-muted">Maximum delay between messages</small>
                                 </div>
                             </div>
@@ -1641,17 +1640,17 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="aiLeadName" placeholder="Enter name" required>
+                                <input type="text" class="form-controlontrol" id="aiLeadName" placeholder="Enter name" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="aiLeadPhone" placeholder="60123456789" required>
+                                <input type="text" class="form-controlontrol" id="aiLeadPhone" placeholder="60123456789" required>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Niche</label>
-                                <input type="text" class="form-control" id="aiLeadNiche" placeholder="EXSTART or EXSTART,ITADRESS">
+                                <input type="text" class="form-controlontrol" id="aiLeadNiche" placeholder="EXSTART or EXSTART,ITADRESS">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Status</label>
@@ -1689,27 +1688,27 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Campaign Date *</label>
-                                    <input type="date" class="form-control" id="aiCampaignDate" required>
+                                    <input type="date" class="form-controlontrol" id="aiCampaignDate" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Scheduled Time</label>
-                                    <input type="time" class="form-control" id="aiCampaignTime">
+                                    <input type="time" class="form-controlontrol" id="aiCampaignTime">
                                 </div>
                             </div>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Campaign Title *</label>
-                            <input type="text" class="form-control" id="aiCampaignTitle" required>
+                            <input type="text" class="form-controlontrol" id="aiCampaignTitle" required>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Niche *</label>
-                                    <input type="text" class="form-control" id="aiCampaignNiche" required>
+                                    <input type="text" class="form-controlontrol" id="aiCampaignNiche" required>
                                     <small class="text-muted">Must match AI lead niches</small>
                                 </div>
                             </div>
@@ -1726,7 +1725,7 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Device Limit per Device *</label>
-                            <input type="number" class="form-control" id="aiDeviceLimit" min="1" required>
+                            <input type="number" class="form-controlontrol" id="aiDeviceLimit" min="1" required>
                             <small class="text-muted">Maximum leads each device can send</small>
                         </div>
                         
@@ -1753,9 +1752,8 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Image (Optional)</label>
-                            <input <input type="url" class="form-control" id="aiImageUrl" >
-                               placeholder="https://example.com/image.jpg" onchange="validateImageUrl('aiImageUrl', 'aiImagePreview')"">">
+                            <label class="form-label">Image URL (Optional)</label>
+                            <input type="url" class="form-controlontrol" id="aiImageUrl" placeholder="https://example.com/image.jpg">
                             <small class="text-muted">Enter the full URL of your campaign image</small>
                             <div id="aiImagePreview" class="mt-2"></div>
                         </div>
@@ -1764,14 +1762,14 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Min Delay (seconds)</label>
-                                    <input type="number" class="form-control" id="aiMinDelay" min="5" value="10">
+                                    <input type="number" class="form-controlontrol" id="aiMinDelay" min="5" value="10">
                                     <small class="text-muted">Minimum delay between messages</small>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Max Delay (seconds)</label>
-                                    <input type="number" class="form-control" id="aiMaxDelay" min="5" value="30">
+                                    <input type="number" class="form-controlontrol" id="aiMaxDelay" min="5" value="30">
                                     <small class="text-muted">Maximum delay between messages</small>
                                 </div>
                             </div>
@@ -1802,13 +1800,13 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Sequence Name <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="sequenceName" required>
+                                        <input type="text" class="form-controlontrol" id="sequenceName" required>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Niche <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="sequenceNiche" placeholder="e.g., Sales, Onboarding" required>
+                                        <input type="text" class="form-controlontrol" id="sequenceNiche" placeholder="e.g., Sales, Onboarding" required>
                                     </div>
                                 </div>
                             </div>
@@ -1816,7 +1814,7 @@
                                 <div class="col-md-12">
                                     <div class="mb-3">
                                         <label class="form-label">Sequence Trigger</label>
-                                        <input type="text" class="form-control" id="sequenceTrigger" placeholder="e.g., fitness_start, onboarding_begin">
+                                        <input type="text" class="form-controlontrol" id="sequenceTrigger" placeholder="e.g., fitness_start, onboarding_begin">
                                         <small class="text-muted">This trigger will be used to identify and enroll leads into this sequence</small>
                                     </div>
                                 </div>
@@ -1829,19 +1827,19 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Min Delay (seconds)</label>
-                                        <input type="number" class="form-control" id="sequenceMinDelay" value="5" min="1">
+                                        <input type="number" class="form-controlontrol" id="sequenceMinDelay" value="5" min="1">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Max Delay (seconds)</label>
-                                        <input type="number" class="form-control" id="sequenceMaxDelay" value="15" min="1">
+                                        <input type="number" class="form-controlontrol" id="sequenceMaxDelay" value="15" min="1">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Schedule Time</label>
-                                        <input type="time" class="form-control" id="sequenceScheduleTime" value="09:00">
+                                        <input type="time" class="form-controlontrol" id="sequenceScheduleTime" value="09:00">
                                     </div>
                                 </div>
                             </div>
@@ -1876,19 +1874,19 @@
                     <input type="hidden" id="currentDayNumber">
                     <div class="mb-3">
                         <label class="form-label">Step Trigger <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="dayStartTrigger" placeholder="e.g., fitness_day1, welcome_message" required>
+                        <input type="text" class="form-controlontrol" id="dayStartTrigger" placeholder="e.g., fitness_day1, welcome_message" required>
                         <small class="text-muted">Unique identifier for this step</small>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Next Trigger</label>
-                                <input type="text" class="form-control" id="dayNextTrigger" placeholder="e.g., fitness_day2">
+                                <input type="text" class="form-controlontrol" id="dayNextTrigger" placeholder="e.g., fitness_day2">
                                 <small class="text-muted">Leave empty for last step</small>
                             </div>
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="isSequenceEnd" onchange="toggleSequenceChaining()">
+                                    <input class="form-controlheck-input" type="checkbox" id="isSequenceEnd" onchange="toggleSequenceChaining()">
                                     <label class="form-check-label" for="isSequenceEnd">
                                         This is the end of sequence
                                     </label>
@@ -1905,7 +1903,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Delay Hours</label>
-                                <input type="number" class="form-control" id="dayTriggerDelayHours" value="24" min="1">
+                                <input type="number" class="form-controlontrol" id="dayTriggerDelayHours" value="24" min="1">
                                 <small class="text-muted">Hours to wait before next step</small>
                             </div>
                         </div>
@@ -1928,7 +1926,7 @@
                     
                     <div class="mb-3">
                             <label class="form-label">Image URL (Optional)</label>
-                            <input type="url" class="form-control" id="dayMessageImageUrl" placeholder="https://example.com/image.jpg">
+                            <input type="url" class="form-controlontrol" id="dayMessageImageUrl" placeholder="https://example.com/image.jpg">
                             <small class="text-muted">Enter the full URL of your image</small>
                             <div id="dayImagePreview" class="mt-2"></div>
                     </div>
@@ -1955,13 +1953,13 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Username <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="teamMemberUsername" required>
+                            <input type="text" class="form-controlontrol" id="teamMemberUsername" required>
                             <small class="text-muted">Username should match device name for automatic access</small>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Password <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="teamMemberPassword" required>
+                            <input type="text" class="form-controlontrol" id="teamMemberPassword" required>
                             <small class="text-muted">Password will be visible to admin</small>
                         </div>
                     </form>
@@ -2737,11 +2735,11 @@
                     <div class="text-start">
                         <div class="mb-3">
                             <label for="deviceName" class="form-label">Device Name</label>
-                            <input type="text" id="deviceName" class="form-control" placeholder="e.g., My Phone, Office WhatsApp">
+                            <input type="text" id="deviceName" class="form-controlontrol" placeholder="e.g., My Phone, Office WhatsApp">
                         </div>
                         <div class="mb-3">
                             <label for="devicePhone" class="form-label">WhatsApp Phone Number</label>
-                            <input type="text" id="devicePhone" class="form-control" placeholder="60123456789" maxlength="15">
+                            <input type="text" id="devicePhone" class="form-controlontrol" placeholder="60123456789" maxlength="15">
                             <small class="text-muted">Enter number with country code (without + sign). Must start with 60 for Malaysia.</small>
                         </div>
                     </div>
@@ -3466,11 +3464,11 @@
                     <div class="text-start">
                         <div class="mb-3">
                             <label for="editDeviceName" class="form-label">Device Name</label>
-                            <input type="text" class="form-control" id="editDeviceName" value="${device.name || ''}" placeholder="Enter device name">
+                            <input type="text" class="form-controlontrol" id="editDeviceName" value="${device.name || ''}" placeholder="Enter device name">
                         </div>
                         <div class="mb-3">
                             <label for="editDevicePhone" class="form-label">Phone Number</label>
-                            <input type="text" class="form-control" id="editDevicePhone" value="${device.phone || ''}" placeholder="Enter phone number">
+                            <input type="text" class="form-controlontrol" id="editDevicePhone" value="${device.phone || ''}" placeholder="Enter phone number">
                             <small class="text-muted">Note: Changing phone number won't reconnect WhatsApp. Use logout and scan QR again.</small>
                         </div>
                     </div>
@@ -4896,7 +4894,7 @@
                                         <i class="bi bi-trash"></i> Delete
                                     </button>
                                     <div class="form-check form-switch d-inline-block ms-2">
-                                        <input class="form-check-input" type="checkbox" id="toggle-${seq.id}" >
+                                        <input class="form-controlheck-input" type="checkbox" id="toggle-${seq.id}" >
                                             ${seq.status === 'active' ? 'checked' : ''}  onchange="toggleSequence('${seq.id}', '${seq.status}')">
                                         <label class="form-check-label" for="toggle-${seq.id}">
                                             ${seq.status === 'active' ? 'Active' : 'Inactive'}
@@ -4950,7 +4948,7 @@
                                         <i class="bi bi-trash"></i> Delete
                                     </button>
                                     <div class="form-check form-switch d-inline-block ms-2">
-                                        <input class="form-check-input" type="checkbox" id="toggle2-${seq.id}" >
+                                        <input class="form-controlheck-input" type="checkbox" id="toggle2-${seq.id}" >
                                             ${seq.status === 'active' ? 'checked' : ''}  onchange="toggleSequence('${seq.id}', '${seq.status}')">
                                         <label class="form-check-label" for="toggle2-${seq.id}">
                                             ${seq.status === 'active' ? 'Active' : 'Inactive'}
@@ -7477,7 +7475,7 @@ function validateImageUrl(urlInputId, previewId) {
     preview.innerHTML = 
         `<img src="${url}" class="img-thumbnail" style="max-height: 150px;" 
               onload="this.nextElementSibling.textContent='✓ Image loaded successfully'" 
-              onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-danger\'>Failed to load image. Please check the URL.&lt;/div>'">
+              onerror="this.style.display='none'">
          <small class="d-block mt-1 text-muted"></small>`;
     
     return true;
