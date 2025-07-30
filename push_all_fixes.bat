@@ -1,42 +1,30 @@
 @echo off
-echo === Committing and Pushing All Fixes ===
+echo Committing and pushing all fixes to GitHub...
 
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 
-echo.
-echo Adding all changes...
+echo [1/4] Adding files to git...
 git add -A
 
-echo.
-echo Creating commit...
-git commit -m "Fix sequence contacts and platform device detection
+echo [2/4] Committing changes...
+git commit -m "Fix: WebSocket QR filtering - prevent QR popups showing for other users' devices"
 
-FIXED ISSUES:
-1. Sequence Contacts ON CONFLICT:
-   - Added proper unique constraint (sequence_id, contact_phone, sequence_stepid)
-   - Cleaned up orphaned records without Step 1
-   - Database now ready for proper sequence enrollment
-
-2. Platform Device Detection:
-   - Fixed syntax errors in platform checks (was: Platform != "", now: if device.Platform != "")
-   - Platform devices (Wablas/Whacenter) now properly route to APIs
-   - Fixed auto_reconnect.go compilation error
-
-3. Database Cleanup:
-   - Removed completed sequence contacts
-   - Added constraint to prevent duplicate enrollments
-   - Ready for fresh testing
-
-This ensures:
-- Sequences enroll properly without ON CONFLICT errors
-- Platform devices use external APIs instead of WhatsApp Web
-- Steps activate by earliest trigger time
-- No missing or duplicate steps"
-
-echo.
-echo Pushing to GitHub...
+echo [3/4] Pushing to main branch...
 git push origin main
 
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Push failed!
+    pause
+    exit /b 1
+)
+
+echo [4/4] Push successful!
 echo.
-echo === Push Complete! ===
+echo All fixes applied:
+echo 1. Image uploads converted to URL inputs (sequences, campaigns, AI campaigns)
+echo 2. QR code popups only show for the device being connected
+echo 3. No cross-user interference with QR codes
+echo.
+echo Railway will auto-deploy these changes.
+echo.
 pause

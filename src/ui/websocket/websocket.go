@@ -10,12 +10,19 @@ import (
 	"github.com/gofiber/websocket/v2"
 )
 
-type client struct{}
+type client struct{
+	UserID   string
+	DeviceID string
+}
 
 type BroadcastMessage struct {
+
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Result  any    `json:"result"`
+
+	TargetUserID   string `json:"targetUserId,omitempty"`
+	TargetDeviceID string `json:"targetDeviceId,omitempty"`
 }
 
 var (
@@ -42,7 +49,17 @@ func broadcastMessage(message BroadcastMessage) {
 		return
 	}
 
-	for conn := range Clients {
+	for conn, client := range Clients {
+		// Filter by target user if specified
+		if message.TargetUserID != "" && client.UserID != message.TargetUserID {
+			continue
+		}
+		
+		// Filter by target device if specified
+		if message.TargetDeviceID != "" && client.DeviceID != message.TargetDeviceID {
+			continue
+		}
+		
 		if err := conn.WriteMessage(websocket.TextMessage, marshalMessage); err != nil {
 			log.Println("write error:", err)
 			closeConnection(conn)
