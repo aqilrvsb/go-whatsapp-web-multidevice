@@ -53,15 +53,20 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 		status = "new"  // Default status
 	}
 	
-	var id int
-	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
+	result, err := r.db.Exec(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt)
 	
-	if err == nil {
-		lead.ID = fmt.Sprintf("%d", id)
+	if err != nil {
+		return err
 	}
-		
-	return err
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	
+	lead.ID = fmt.Sprintf("%d", id)
+	return nil
 }
 
 // GetLeadsByNiche gets all leads matching a niche (supports comma-separated niches)
