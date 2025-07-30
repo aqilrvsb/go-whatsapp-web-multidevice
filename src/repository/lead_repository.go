@@ -313,8 +313,8 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 		lead.TargetStatus = "prospect"
 	}
 	
-	result, err := r.db.Exec(query, id, lead.DeviceID, lead.Name, lead.Phone,
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt)
+	result, err := r.db.Exec(query, lead.DeviceID, lead.Name, lead.Phone,
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt, id)
 	if err != nil {
 		return err
 	}
