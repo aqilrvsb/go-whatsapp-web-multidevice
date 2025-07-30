@@ -94,7 +94,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
 		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
-			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url AS image_url, 
+			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url, 
 			bm.scheduled_at, bm.group_id, bm.group_order,
 			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) AS min_delay,
 			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) AS max_delay
@@ -149,7 +149,11 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 			msg.ScheduledAt = scheduledAt.Time
 		}
 		
-		messages = append(messages, msg)
+		// Set ImageURL for backward compatibility
+		msg.ImageURL = msg.MediaURL
+		msg.Message = msg.Content
+		
+		
 	}
 	
 	return messages, nil
@@ -301,7 +305,11 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 			msg.ScheduledAt = scheduledAt.Time
 		}
 		
-		messages = append(messages, msg)
+		// Set ImageURL for backward compatibility
+		msg.ImageURL = msg.MediaURL
+		msg.Message = msg.Content
+		
+		
 	}
 	
 	return messages, nil
