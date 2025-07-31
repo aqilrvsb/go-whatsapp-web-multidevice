@@ -2094,11 +2094,8 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	// Add flow counts to each sequence
 	sequencesWithFlows := []map[string]interface{}{}
 	if db != nil {
-		for i, sequence := range sequences {
-			if i >= 5 { // Only process first 5 sequences for recent_sequences
-				break
-			}
-			
+		// Process ALL sequences, not just first 5
+		for _, sequence := range sequences {
 			sequenceData := map[string]interface{}{
 				"id":         sequence.ID,
 				"name":       sequence.Name,
@@ -2177,15 +2174,23 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	// Get overall sequence broadcast statistics
 	if db != nil {
 		var totalSuccess, totalFailed, totalPending int
-		err := db.QueryRow(`
+		
+		query := `
 			SELECT 
 				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
 			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
-			AND user_id = ?
-		`, session.UserID).Scan(&totalSuccess, &totalFailed, &totalPending)
+			AND user_id = ?`
+		
+		args := []interface{}{session.UserID}
+		
+		if showTodayOnly {
+			query += ` AND DATE(scheduled_at) = CURDATE()`
+		}
+		
+		err := db.QueryRow(query, args...).Scan(&totalSuccess, &totalFailed, &totalPending)
 		
 		if err == nil {
 			summary["broadcast_stats"] = map[string]interface{}{
@@ -4212,7 +4217,11 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		ORDER BY step_order
 	`
 	
-	stepRows, err := db.Query(stepsQuery, sequenceId)
+	// Use string sequence ID for query
+	sequenceIdStr = strconv.Itoa(sequenceId)
+	log.Printf("Getting steps for sequence ID: %s", sequenceIdStr)
+	
+	stepRows, err := db.Query(stepsQuery, sequenceIdStr)
 	if err != nil {
 		log.Printf("Error getting sequence steps: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
@@ -4272,9 +4281,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		AND bm.user_id = ?
 	`
 	
-	deviceRows, err := db.Query(deviceQuery, sequenceId, session.UserID)
+	deviceRows, err := db.Query(deviceQuery, sequenceIdStr, session.UserID)
 	if err != nil {
-		log.Printf("Error getting devices: %v", err)
+		log.Printf("Error getting devices for sequence %s: %v", sequenceIdStr, err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "INTERNAL_ERROR",
@@ -4339,7 +4348,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			GROUP BY bm.sequence_stepid
 		`
 		
-		statsRows, err := db.Query(stepStatsQuery, sequenceId, deviceId, session.UserID)
+		statsRows, err := db.Query(stepStatsQuery, sequenceIdStr, deviceId, session.UserID)
 		if err != nil {
 			log.Printf("Error getting step stats for device %s: %v", deviceId, err)
 			continue
@@ -4406,7 +4415,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		AND user_id = ?
 	`
 	
-	err = db.QueryRow(overallQuery, sequenceId, session.UserID).Scan(
+	err = db.QueryRow(overallQuery, sequenceIdStr, session.UserID).Scan(
 		&totalLeadCount, &totalDoneSend, &totalFailedSend, &totalRemainingSend)
 	
 	if err != nil {
@@ -4502,7 +4511,8 @@ func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
 	
 	query += ` ORDER BY bm.sent_at DESC`
 	
-	rows, err := db.Query(query, sequenceId, deviceId, session.UserID)
+	// Convert sequence ID to string
+	rows, err := db.Query(query, strconv.Itoa(sequenceId), deviceId, session.UserID)
 	if err != nil {
 		log.Printf("Error executing sequence lead details query: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
@@ -4607,7 +4617,8 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 		AND bm.user_id = ?
 	`
 	
-	args := []interface{}{sequenceId, deviceId, stepId, session.UserID}
+	// Convert sequence ID to string
+	args := []interface{}{strconv.Itoa(sequenceId), deviceId, stepId, session.UserID}
 	
 	// Add status filter if not "all"
 	if status != "all" {
