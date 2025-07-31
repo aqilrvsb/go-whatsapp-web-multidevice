@@ -1710,8 +1710,10 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 	var campaigns []models.Campaign
 	if startDate != "" || endDate != "" {
 		campaigns, err = campaignRepo.GetCampaignsByUserAndDateRange(session.UserID, startDate, endDate)
+		log.Printf("GetCampaignSummary: Date filter - start=%s, end=%s, found %d campaigns", startDate, endDate, len(campaigns))
 	} else {
 		campaigns, err = campaignRepo.GetCampaignsByUser(session.UserID)
+		log.Printf("GetCampaignSummary: No date filter, found %d campaigns for user %s", len(campaigns), session.UserID)
 	}
 	
 	if err != nil {
@@ -1741,6 +1743,8 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		}
 	}
 	
+	log.Printf("Campaign Status Breakdown - Total: %d, Pending: %d, Triggered: %d, Processing: %d, Sent: %d, Failed: %d",
+		totalCampaigns, pendingCampaigns, triggeredCampaigns, processingCampaigns, sentCampaigns, failedCampaigns)
 	
 	// Initialize totals based on broadcast_messages data
 	totalShouldSend := 0

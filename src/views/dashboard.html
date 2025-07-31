@@ -5674,6 +5674,18 @@
         }
         
         function displayCampaignSummary(summary) {
+            console.log('Campaign Summary Data:', summary); // Debug log
+            
+            // Ensure campaigns exists
+            summary.campaigns = summary.campaigns || {
+                total: 0,
+                pending: 0,
+                triggered: 0,
+                processing: 0,
+                sent: 0,
+                failed: 0
+            };
+            
             // Ensure broadcast_stats exists
             summary.broadcast_stats = summary.broadcast_stats || {
                 total_should_send: 0,
@@ -5683,53 +5695,124 @@
             };
             
             const html = `
+                <div class="mb-3 text-end">
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadCampaignSummary(true)">
+                        <i class="fas fa-eye"></i> Show All Campaigns
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadCampaignSummary(false)">
+                        <i class="fas fa-calendar-day"></i> Show Today Only
+                    </button>
+                </div>
+                
                 <div class="row mb-4">
+                    <!-- Campaign Status Breakdown -->
+                    <div class="col-12 mb-3">
+                        <h6 class="text-muted">Campaign Status</h6>
+                    </div>
+                    
                     <!-- Total Campaigns -->
-                    <div class="col-6 col-md-4 col-lg-2 mb-3">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h3 class="text-primary">${summary.campaigns.total || 0}</h3>
-                                <p class="text-muted mb-0">Total Campaigns</p>
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-primary">
+                            <div class="card-body p-2">
+                                <h4 class="text-primary mb-1">${summary.campaigns.total || 0}</h4>
+                                <small class="text-muted">Total</small>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Total Contacts Should Send -->
-                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                    <!-- Pending -->
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-warning">
+                            <div class="card-body p-2">
+                                <h4 class="text-warning mb-1">${summary.campaigns.pending || 0}</h4>
+                                <small class="text-muted">Pending</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Triggered -->
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-info">
+                            <div class="card-body p-2">
+                                <h4 class="text-info mb-1">${summary.campaigns.triggered || 0}</h4>
+                                <small class="text-muted">Triggered</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Processing -->
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-primary">
+                            <div class="card-body p-2">
+                                <h4 class="text-primary mb-1">${summary.campaigns.processing || 0}</h4>
+                                <small class="text-muted">Processing</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sent -->
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-success">
+                            <div class="card-body p-2">
+                                <h4 class="text-success mb-1">${summary.campaigns.sent || 0}</h4>
+                                <small class="text-muted">Sent</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Failed -->
+                    <div class="col-6 col-md-3 col-lg-2 mb-3">
+                        <div class="card text-center border-danger">
+                            <div class="card-body p-2">
+                                <h4 class="text-danger mb-1">${summary.campaigns.failed || 0}</h4>
+                                <small class="text-muted">Failed</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <!-- Broadcast Statistics -->
+                    <div class="col-12 mb-3">
+                        <h6 class="text-muted">Broadcast Messages</h6>
+                    </div>
+                    
+                    <!-- Total Messages -->
+                    <div class="col-6 col-md-3 mb-3">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-primary">${summary.broadcast_stats.total_should_send || 0}</h3>
-                                <p class="text-muted mb-0">Total Contacts Should Send</p>
+                                <p class="text-muted mb-0">Total Messages</p>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Contacts Done Send Message -->
-                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                    <!-- Messages Sent -->
+                    <div class="col-6 col-md-3 mb-3">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-success">${summary.broadcast_stats.total_done_send || 0}</h3>
-                                <p class="text-muted mb-0">Contacts Done Send Message</p>
+                                <p class="text-muted mb-0">Messages Sent</p>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Contacts Failed Send Message -->
-                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                    <!-- Messages Failed -->
+                    <div class="col-6 col-md-3 mb-3">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-danger">${summary.broadcast_stats.total_failed_send || 0}</h3>
-                                <p class="text-muted mb-0">Contacts Failed Send Message</p>
+                                <p class="text-muted mb-0">Messages Failed</p>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Contacts Remaining Send Message -->
-                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                    <!-- Messages Pending -->
+                    <div class="col-6 col-md-3 mb-3">
                         <div class="card text-center">
                             <div class="card-body">
                                 <h3 class="text-warning">${summary.broadcast_stats.total_remaining_send || 0}</h3>
-                                <p class="text-muted mb-0">Contacts Remaining Send Message</p>
+                                <p class="text-muted mb-0">Messages Pending</p>
                             </div>
                         </div>
                     </div>
