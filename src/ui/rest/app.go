@@ -1954,8 +1954,11 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	sequenceRepo := repository.GetSequenceRepository()
 	sequences, err := sequenceRepo.GetSequences(session.UserID)
 	if err != nil {
+		log.Printf("Error getting sequences for user %s: %v", session.UserID, err)
 		sequences = []models.Sequence{}
 	}
+	
+	log.Printf("Found %d sequences for user %s", len(sequences), session.UserID)
 	
 	// Calculate statistics
 	totalSequences := len(sequences)
@@ -2150,6 +2153,10 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			
 			sequencesWithFlows = append(sequencesWithFlows, sequenceData)
 		}
+		
+		log.Printf("Processed %d sequences with flows", len(sequencesWithFlows))
+	} else {
+		log.Printf("Database connection is nil")
 	}
 	
 	summary := map[string]interface{}{
@@ -4166,15 +4173,7 @@ func (a App) GetTeamMemberInfo(c *fiber.Ctx) error {
 
 // GetSequenceDeviceReport gets device-wise report for a sequence broken down by steps
 func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
-	sequenceIdStr := c.Params("id")
-	sequenceId, err := strconv.Atoi(sequenceIdStr)
-	if err != nil {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "BAD_REQUEST",
-			Message: "Invalid sequence ID",
-		})
-	}
+	sequenceId := c.Params("id") // Sequence ID is already a string UUID
 	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
@@ -4198,8 +4197,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	// Get sequence details
 	sequenceRepo := repository.GetSequenceRepository()
-	sequence, err := sequenceRepo.GetSequenceByID(strconv.Itoa(sequenceId))
+	sequence, err := sequenceRepo.GetSequenceByID(sequenceId) // Already a string
 	if err != nil {
+		log.Printf("Error getting sequence %s: %v", sequenceId, err)
 		return c.Status(404).JSON(utils.ResponseData{
 			Status:  404,
 			Code:    "NOT_FOUND",
@@ -4218,10 +4218,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	`
 	
 	// Use string sequence ID for query
-	sequenceIdStr = strconv.Itoa(sequenceId)
-	log.Printf("Getting steps for sequence ID: %s", sequenceIdStr)
+	log.Printf("Getting steps for sequence ID: %s", sequenceId)
 	
-	stepRows, err := db.Query(stepsQuery, sequenceIdStr)
+	stepRows, err := db.Query(stepsQuery, sequenceId)
 	if err != nil {
 		log.Printf("Error getting sequence steps: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
@@ -4281,9 +4280,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		AND bm.user_id = ?
 	`
 	
-	deviceRows, err := db.Query(deviceQuery, sequenceIdStr, session.UserID)
+	deviceRows, err := db.Query(deviceQuery, sequenceId, session.UserID)
 	if err != nil {
-		log.Printf("Error getting devices for sequence %s: %v", sequenceIdStr, err)
+		log.Printf("Error getting devices for sequence %s: %v", sequenceId, err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "INTERNAL_ERROR",
@@ -4348,7 +4347,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			GROUP BY bm.sequence_stepid
 		`
 		
-		statsRows, err := db.Query(stepStatsQuery, sequenceIdStr, deviceId, session.UserID)
+		statsRows, err := db.Query(stepStatsQuery, sequenceId, deviceId, session.UserID)
 		if err != nil {
 			log.Printf("Error getting step stats for device %s: %v", deviceId, err)
 			continue
@@ -4415,7 +4414,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		AND user_id = ?
 	`
 	
-	err = db.QueryRow(overallQuery, sequenceIdStr, session.UserID).Scan(
+	err = db.QueryRow(overallQuery, sequenceId, session.UserID).Scan(
 		&totalLeadCount, &totalDoneSend, &totalFailedSend, &totalRemainingSend)
 	
 	if err != nil {
@@ -4455,15 +4454,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 
 // GetSequenceDeviceLeads gets lead details for a specific device in a sequence
 func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
-	sequenceIdStr := c.Params("id")
-	sequenceId, err := strconv.Atoi(sequenceIdStr)
-	if err != nil {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "BAD_REQUEST",
-			Message: "Invalid sequence ID",
-		})
-	}
+	sequenceId := c.Params("id") // Already a string UUID
 	
 	deviceId := c.Params("deviceId")
 	status := c.Query("status", "all")
@@ -4511,8 +4502,7 @@ func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
 	
 	query += ` ORDER BY bm.sent_at DESC`
 	
-	// Convert sequence ID to string
-	rows, err := db.Query(query, strconv.Itoa(sequenceId), deviceId, session.UserID)
+	rows, err := db.Query(query, sequenceId, deviceId, session.UserID)
 	if err != nil {
 		log.Printf("Error executing sequence lead details query: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
@@ -4570,15 +4560,7 @@ func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
 
 // GetSequenceStepLeads gets lead details for a specific step in a sequence on a device
 func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
-	sequenceIdStr := c.Params("id")
-	sequenceId, err := strconv.Atoi(sequenceIdStr)
-	if err != nil {
-		return c.Status(400).JSON(utils.ResponseData{
-			Status:  400,
-			Code:    "BAD_REQUEST",
-			Message: "Invalid sequence ID",
-		})
-	}
+	sequenceId := c.Params("id") // Already a string UUID
 	
 	deviceId := c.Params("deviceId")
 	stepId := c.Params("stepId")
@@ -4617,8 +4599,8 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 		AND bm.user_id = ?
 	`
 	
-	// Convert sequence ID to string
-	args := []interface{}{strconv.Itoa(sequenceId), deviceId, stepId, session.UserID}
+	// Use sequence ID directly as string
+	args := []interface{}{sequenceId, deviceId, stepId, session.UserID}
 	
 	// Add status filter if not "all"
 	if status != "all" {
