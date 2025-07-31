@@ -2,7 +2,6 @@ package repository
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -493,24 +492,16 @@ func (r *campaignRepository) GetCampaignsByUserAndDateRange(userID string, start
 	`
 	
 	args := []interface{}{userID}
-	argCount := 1
 	
 	// Add date filters
 	if startDate != "" && endDate != "" {
-		argCount++
-		query += fmt.Sprintf(" AND campaign_date >= $%d", argCount)
-		args = append(args, startDate)
-		
-		argCount++
-		query += fmt.Sprintf(" AND campaign_date <= $%d", argCount)
-		args = append(args, endDate)
+		query += " AND campaign_date >= ? AND campaign_date <= ?"
+		args = append(args, startDate, endDate)
 	} else if startDate != "" {
-		argCount++
-		query += fmt.Sprintf(" AND campaign_date >= $%d", argCount)
+		query += " AND campaign_date >= ?"
 		args = append(args, startDate)
 	} else if endDate != "" {
-		argCount++
-		query += fmt.Sprintf(" AND campaign_date <= $%d", argCount)
+		query += " AND campaign_date <= ?"
 		args = append(args, endDate)
 	}
 	
