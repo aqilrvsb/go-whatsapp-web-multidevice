@@ -1308,7 +1308,7 @@
                         
                         <div class="mb-3">
                             <label class="form-label">Image URL (Optional)</label>
-                    <input type="url" class="form-control" id="campaignImageUrl" placeholder="https://example.com/image.jpg">
+                    <input type="url" class="form-control" id="imageUrl" placeholder="https://example.com/image.jpg">
                     <small class="text-muted">Enter the full URL of your campaign image</small>
                     <div id="imagePreview" class="mt-2"></div><div id="aiImagePreview" class="mt-2"></div>
                             
@@ -4464,15 +4464,7 @@
         
         function saveCampaign() {
             const campaignId = document.getElementById('campaignId').value;
-            let campaignDate = document.getElementById('campaignDate').value;
-            
-            // If campaignDate is null or empty, use today's date
-            if (!campaignDate) {
-                const today = new Date();
-                campaignDate = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-                console.warn('Campaign date was empty, using today:', campaignDate);
-                document.getElementById('campaignDate').value = campaignDate;
-            }
+            const campaignDate = document.getElementById('campaignDate').value;
             
             // Auto-set current time if not provided
             let scheduledTime = document.getElementById('campaignTime').value;
@@ -7498,10 +7490,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Campaign image URL
-    const campaignImageUrl = document.getElementById('campaignImageUrl');
+    const campaignImageUrl = document.getElementById('imageUrl');
     if (campaignImageUrl) {
         campaignImageUrl.addEventListener('change', function() {
-            validateImageUrl('campaignImageUrl', 'imagePreview');
+            validateImageUrl('imageUrl', 'imagePreview');
         });
     }
     
@@ -7514,20 +7506,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-
-        // Ensure campaign date is always set when modal is shown
-        document.addEventListener('DOMContentLoaded', function() {
-            const campaignModal = document.getElementById('campaignModal');
-            if (campaignModal) {
-                campaignModal.addEventListener('show.bs.modal', function(event) {
-                    const campaignDateInput = document.getElementById('campaignDate');
-                    if (campaignDateInput && !campaignDateInput.value) {
-                        const today = new Date();
-                        campaignDateInput.value = today.toISOString().split('T')[0];
-                    }
-                });
-            }
-        });
-    </script>
+</script>
 </body>
 </html>
