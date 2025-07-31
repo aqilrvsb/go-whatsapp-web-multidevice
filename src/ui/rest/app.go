@@ -1742,20 +1742,66 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 	}
 	
 	
-	// Initialize totals
+	// Initialize totals based on broadcast_messages data
 	totalShouldSend := 0
 	totalDoneSend := 0
 	totalFailedSend := 0
+	totalPendingSend := 0
 	
-	// Get broadcast statistics only for filtered campaigns
-	for _, campaign := range campaigns {
-		shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaign.ID)
-		totalShouldSend += shouldSend
-		totalDoneSend += doneSend
-		totalFailedSend += failedSend
+	// Get statistics from broadcast_messages table for filtered campaigns
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
 	}
 	
-	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, _ := sql.Open("mysql", mysqlURI)
+	if db != nil {
+		defer db.Close()
+		
+		// Get aggregated stats for all user's campaigns
+		var campaignIds []int
+		for _, campaign := range campaigns {
+			campaignIds = append(campaignIds, campaign.ID)
+		}
+		
+		if len(campaignIds) > 0 {
+			// Build query with placeholders
+			placeholders := make([]string, len(campaignIds))
+			args := make([]interface{}, len(campaignIds))
+			for i, id := range campaignIds {
+				placeholders[i] = "?"
+				args[i] = id
+			}
+			
+			query := fmt.Sprintf(`
+				SELECT 
+					COUNT(*) as total,
+					COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+					COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+					COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+				FROM broadcast_messages
+				WHERE campaign_id IN (%s)
+			`, strings.Join(placeholders, ","))
+			
+			err := db.QueryRow(query, args...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalPendingSend)
+			if err != nil {
+				log.Printf("Error getting campaign broadcast stats: %v", err)
+			}
+		}
+	}
+	
+	totalRemainingSend := totalPendingSend
 	if totalRemainingSend < 0 {
 		totalRemainingSend = 0
 	}
@@ -1767,12 +1813,25 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		for i := 0; i < limit; i++ {
 			campaign := campaigns[i]
 			
-			// Get broadcast stats for this campaign
-			shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaign.ID)
-			remainingSend := shouldSend - doneSend - failedSend
-			if remainingSend < 0 {
-				remainingSend = 0
+			// Get stats from broadcast_messages for this campaign
+			var shouldSend, doneSend, failedSend, pendingSend int
+			if db != nil {
+				err := db.QueryRow(`
+					SELECT 
+						COUNT(*) as total,
+						COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+						COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+						COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+					FROM broadcast_messages
+					WHERE campaign_id = ?
+				`, campaign.ID).Scan(&shouldSend, &doneSend, &failedSend, &pendingSend)
+				
+				if err != nil {
+					shouldSend, doneSend, failedSend, pendingSend = 0, 0, 0, 0
+				}
 			}
+			
+			remainingSend := pendingSend
 			
 			campaignData := map[string]interface{}{
 				"id":               campaign.ID,
@@ -1858,7 +1917,23 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	totalFlows := 0
 	
 	// Get total flows from database
-	db, err := sql.Open("postgres", config.DBURI)
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
 	if err == nil {
 		defer db.Close()
 		
@@ -1899,7 +1974,21 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		case "draft":
 			draftSequences++
 		}
-		totalContacts += sequence.ContactsCount
+	}
+	
+	// Get total contacts from broadcast_messages for all sequences
+	if db != nil {
+		var totalSequenceMessages int
+		err := db.QueryRow(`
+			SELECT COUNT(DISTINCT recipient_phone) 
+			FROM broadcast_messages
+			WHERE sequence_id IS NOT NULL
+			AND user_id = ?
+		`, session.UserID).Scan(&totalSequenceMessages)
+		
+		if err == nil {
+			totalContacts = totalSequenceMessages
+		}
 	}
 	
 	// Add flow counts to each sequence
@@ -1932,24 +2021,26 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			}
 			sequenceData["total_flows"] = flowCount
 			
-			// Get contact statistics for this sequence
-			var shouldSend, doneSend, failedSend int
+			// Get contact statistics for this sequence from broadcast_messages table
+			var totalMessages, successMessages, failedMessages, pendingMessages int
 			err = db.QueryRow(`
-				SELECT COALESCE(COUNT(*), 0) AS total,
-					COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) AS sent,
-					COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) AS failed
-				FROM sequence_contacts
+				SELECT 
+					COUNT(*) AS total,
+					COUNT(CASE WHEN status = 'success' THEN 1 END) AS success,
+					COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
+					COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending
+				FROM broadcast_messages
 				WHERE sequence_id = ?
-			`, sequence.ID).Scan(&shouldSend, &doneSend, &failedSend)
+			`, sequence.ID).Scan(&totalMessages, &successMessages, &failedMessages, &pendingMessages)
 			
 			if err != nil {
-				shouldSend, doneSend, failedSend = 0, 0, 0
+				totalMessages, successMessages, failedMessages, pendingMessages = 0, 0, 0, 0
 			}
 			
-			sequenceData["should_send"] = shouldSend
-			sequenceData["done_send"] = doneSend
-			sequenceData["failed_send"] = failedSend
-			sequenceData["remaining_send"] = shouldSend - doneSend - failedSend
+			sequenceData["total_messages"] = totalMessages
+			sequenceData["success_messages"] = successMessages
+			sequenceData["failed_messages"] = failedMessages
+			sequenceData["pending_messages"] = pendingMessages
 			
 			sequencesWithFlows = append(sequencesWithFlows, sequenceData)
 		}
@@ -1968,6 +2059,29 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
 		},
 		"recent_sequences": sequencesWithFlows,
+	}
+	
+	// Get overall sequence broadcast statistics
+	if db != nil {
+		var totalSuccess, totalFailed, totalPending int
+		err := db.QueryRow(`
+			SELECT 
+				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+			FROM broadcast_messages
+			WHERE sequence_id IS NOT NULL
+			AND user_id = ?
+		`, session.UserID).Scan(&totalSuccess, &totalFailed, &totalPending)
+		
+		if err == nil {
+			summary["broadcast_stats"] = map[string]interface{}{
+				"total_success": totalSuccess,
+				"total_failed": totalFailed,
+				"total_pending": totalPending,
+				"total_messages": totalSuccess + totalFailed + totalPending,
+			}
+		}
 	}
 	
 	return c.JSON(utils.ResponseData{
