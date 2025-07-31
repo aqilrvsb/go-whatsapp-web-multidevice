@@ -1876,14 +1876,29 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			err = db.QueryRow(`
 				SELECT COUNT(*) 
 				FROM sequence_steps ss
-				INNER JOIN sequences s ON s.id = ss.sequence_id
-				WHERE s.user_id = ?
+				WHERE EXISTS (
+					SELECT 1 FROM sequences s 
+					WHERE s.id = ss.sequence_id 
+					AND s.user_id = ?
+				)
 			`, session.UserID).Scan(&flowCount)
 			
 			if err != nil {
 				fmt.Printf("Error counting user sequence flows: %v\n", err)
-				// UUID casting not needed for MySQL
-				totalFlows = 0 // Default to 0 if query fails
+				// Try with UUID casting
+				err = db.QueryRow(`
+					SELECT COUNT(*) 
+					FROM sequence_steps ss
+					WHERE sequence_id::text IN (
+						SELECT id::text FROM sequences WHERE user_id = ?
+					)
+				`, session.UserID).Scan(&flowCount)
+				
+				if err != nil {
+					fmt.Printf("Error with UUID cast query: %v\n", err)
+				} else {
+					totalFlows = flowCount
+				}
 			} else {
 				totalFlows = flowCount
 			}

@@ -427,7 +427,7 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	
 	// Get done and failed counts from broadcast_messages
 	statsQuery := `
-		SELECT COUNT(CASE WHEN status = 'sent' THEN 1 END) AS done_send,
+		SELECT COUNT(CASE WHEN status = 'success' THEN 1 END) AS done_send,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed_send
 		FROM broadcast_messages
 		WHERE campaign_id = ?

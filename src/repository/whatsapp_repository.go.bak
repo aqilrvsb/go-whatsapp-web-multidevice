@@ -57,16 +57,16 @@ func (r *WhatsAppRepository) SaveOrUpdateChat(chat *WhatsAppChat) error {
 		(device_id, chat_jid, chat_name, is_group, is_muted, last_message_text, 
 		 last_message_time, unread_count, avatar_url, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE 
+		ON CONFLICT (device_id, chat_jid) 
 		DO UPDATE SET 
-			chat_name = VALUES(chat_name),
-			is_group = VALUES(is_group),
+			chat_name = EXCLUDED.chat_name,
+			is_group = EXCLUDED.is_group,
 			is_muted = EXCLUDED.is_muted,
-			last_message_text = VALUES(last_message_text),
-			last_message_time = VALUES(last_message_time),
-			unread_count = VALUES(unread_count),
-			avatar_url = VALUES(avatar_url),
-			updated_at = VALUES(updated_at)`
+			last_message_text = EXCLUDED.last_message_text,
+			last_message_time = EXCLUDED.last_message_time,
+			unread_count = EXCLUDED.unread_count,
+			avatar_url = EXCLUDED.avatar_url,
+			updated_at = EXCLUDED.updated_at`
 	
 	err := r.db.QueryRow(query, 
 		chat.DeviceID, chat.ChatJID, chat.ChatName, chat.IsGroup, chat.IsMuted,

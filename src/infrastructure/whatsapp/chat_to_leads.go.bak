@@ -118,7 +118,7 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		AND chat_jid NOT IN (
 			SELECT chat_jid FROM whatsapp_chats WHERE device_id = ?
 		)
-		ON DUPLICATE KEY UPDATE DO NOTHING
+		ON CONFLICT (device_id, chat_jid) DO NOTHING
 	`
 	_, err = tx.Exec(copyChatsQuery, newDeviceID, oldDeviceID)
 	if err != nil {
