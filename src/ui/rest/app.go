@@ -3016,52 +3016,122 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		log.Printf("WARNING: Found %d duplicate phone numbers in broadcast_messages for this device", duplicateCount)
 	}
 	
+	// Get campaign details to know the criteria
+	campaignRepo := repository.GetCampaignRepository()
+	campaign, err := campaignRepo.GetCampaignByID(campaignId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Campaign not found",
+		})
+	}
+	
+	var leads []map[string]interface{}
+	
+	// If status is "pending" or "all" and no broadcast messages exist, show leads that match campaign criteria
+	if status == "pending" || status == "all" {
+		// First check if there are any broadcast messages for this campaign
+		var messageCount int
+		err = db.QueryRow(`
+			SELECT COUNT(*) FROM broadcast_messages 
+			WHERE campaign_id = ? AND device_id = ?
+		`, campaignId, deviceId).Scan(&messageCount)
+		
+		if err == nil && messageCount == 0 {
+			// No messages sent yet, show all matching leads for this device
+			query := `
+				SELECT l.phone, l.name, 'pending' as status, NULL as sent_at
+				FROM leads l
+				WHERE l.device_id = ? 
+				AND l.user_id = ?
+				AND l.niche LIKE CONCAT('%', ?, '%')
+				AND (? = 'all' OR l.target_status = ?)
+			`
+			
+			rows, err := db.Query(query, deviceId, session.UserID, campaign.Niche, campaign.TargetStatus, campaign.TargetStatus)
+			if err == nil {
+				defer rows.Close()
+				
+				for rows.Next() {
+					var phone, name, status string
+					var sentAt sql.NullTime
+					
+					if err := rows.Scan(&phone, &name, &status, &sentAt); err == nil {
+						lead := map[string]interface{}{
+							"phone":  phone,
+							"name":   name,
+							"status": status,
+						}
+						if sentAt.Valid {
+							lead["sent_at"] = sentAt.Time
+						}
+						leads = append(leads, lead)
+					}
+				}
+			}
+			
+			return c.JSON(utils.ResponseData{
+				Status:  200,
+				Code:    "SUCCESS",
+				Message: "Lead details",
+				Results: leads,
+			})
+		}
+	}
+	
+	// Otherwise, get leads from broadcast messages
 	var query string
 	if aiType.Valid && aiType.String == "ai" {
-		// For AI campaigns - group by phone to get latest status
+		// For AI campaigns - use MySQL-compatible query
 		query = `
-			WITH latest_messages AS (
-				SELECT DISTINCT ON (recipient_phone) 
-					recipient_phone, status, sent_at
+			SELECT bm.recipient_phone, bm.status, bm.sent_at, lai.name
+			FROM (
+				SELECT recipient_phone, status, sent_at, created_at
 				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
-				ORDER BY recipient_phone, created_at DESC
-			)
-			SELECT lm.recipient_phone, lm.status, lm.sent_at, lai.name
-			FROM latest_messages lm
-			LEFT JOIN leads_ai lai ON lai.phone = lm.recipient_phone AND lai.user_id = ?
+				ORDER BY created_at DESC
+			) bm
+			LEFT JOIN leads_ai lai ON lai.phone = bm.recipient_phone AND lai.user_id = ?
+			GROUP BY bm.recipient_phone, lai.name
 		`
 	} else {
-		// For regular campaigns - group by phone to get latest status
+		// For regular campaigns - use MySQL-compatible query
 		query = `
-			WITH latest_messages AS (
-				SELECT DISTINCT ON (recipient_phone) 
-					recipient_phone, status, sent_at
+			SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
+			FROM (
+				SELECT recipient_phone, status, sent_at, created_at
 				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
-				ORDER BY recipient_phone, created_at DESC
-			)
-			SELECT lm.recipient_phone, lm.status, lm.sent_at, l.name
-			FROM latest_messages lm
-			LEFT JOIN leads l ON l.phone = lm.recipient_phone AND l.device_id = ?
+				ORDER BY created_at DESC
+			) bm
+			LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = ?
+			GROUP BY bm.recipient_phone, l.name
 		`
 	}
 	
 	// Add status filter if not "all"
 	if status != "all" {
 		if status == "success" {
-			query += ` WHERE lm.status IN ('sent', 'delivered', 'success')`
+			query += ` HAVING bm.status IN ('sent', 'delivered', 'success')`
 		} else if status == "pending" {
-			query += ` WHERE lm.status IN ('pending', 'queued')`
+			query += ` HAVING bm.status IN ('pending', 'queued')`
 		} else if status == "failed" {
-			query += ` WHERE lm.status IN ('failed', 'error')`
+			query += ` HAVING bm.status IN ('failed', 'error')`
 		}
 	}
 	
-	query += ` ORDER BY lm.sent_at DESC`
+	query += ` ORDER BY bm.sent_at DESC`
 	
-	rows, err := db.Query(query, campaignId, deviceId, session.UserID)
+	// Execute query based on campaign type
+	var rows *sql.Rows
+	if aiType.Valid && aiType.String == "ai" {
+		rows, err = db.Query(query, campaignId, deviceId, session.UserID, session.UserID)
+	} else {
+		rows, err = db.Query(query, campaignId, deviceId, session.UserID, session.UserID)
+	}
 	if err != nil {
+		log.Printf("Error executing lead details query: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "INTERNAL_ERROR",
@@ -3070,8 +3140,10 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 	
-	leadDetails := []map[string]interface{}{}
-	leadCount := 0
+	if leads == nil {
+		leads = []map[string]interface{}{}
+	}
+	
 	for rows.Next() {
 		var phone, msgStatus string
 		var sentAt sql.NullTime
@@ -3079,6 +3151,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		
 		err := rows.Scan(&phone, &msgStatus, &sentAt, &name)
 		if err != nil {
+			log.Printf("Error scanning lead row: %v", err)
 			continue
 		}
 		
@@ -3087,28 +3160,29 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 			leadName = name.String
 		}
 		
-		sentTime := "-"
-		if sentAt.Valid {
-			sentTime = sentAt.Time.Format("2006-01-02 03:04 PM")
-		}
-		
-		leadDetails = append(leadDetails, map[string]interface{}{
+		lead := map[string]interface{}{
 			"name":   leadName,
 			"phone":  phone,
 			"status": msgStatus,
-			"sentAt": sentTime,
-		})
-		leadCount++
+		}
+		
+		if sentAt.Valid {
+			lead["sent_at"] = sentAt.Time.Format("2006-01-02 03:04 PM")
+		} else {
+			lead["sent_at"] = "-"
+		}
+		
+		leads = append(leads, lead)
 	}
 	
 	log.Printf("GetCampaignDeviceLeads - Found %d leads for campaign %d, device %s, status %s", 
-		leadCount, campaignId, deviceId, status)
+		len(leads), campaignId, deviceId, status)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Lead details retrieved successfully",
-		Results: leadDetails,
+		Results: leads,
 	})
 }
 
