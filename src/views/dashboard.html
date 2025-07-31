@@ -6512,9 +6512,10 @@
             console.log('Device Report received:', report);
             console.log('totalDevices from backend:', report.totalDevices);
             console.log('activeDevices:', report.activeDevices, 'disconnectedDevices:', report.disconnectedDevices);
+            console.log('devices array:', report.devices);
             
-            // Calculate total devices as sum of online + offline
-            const totalDevices = (report.activeDevices || 0) + (report.disconnectedDevices || 0);
+            // Use the totalDevices from backend or calculate from devices array
+            const totalDevices = report.totalDevices || (report.devices ? report.devices.length : 0);
             
             // Update overall statistics
             document.getElementById('totalDevices').textContent = totalDevices;
@@ -6540,10 +6541,10 @@
                     console.log('Device Report - Device:', device);
                     
                     // Calculate per-device statistics
-                    const deviceShouldSend = device.shouldSend || 0;
-                    const deviceDoneSend = device.doneSend || 0;
-                    const deviceFailedSend = device.failedSend || 0;
-                    const deviceRemainingSend = device.remainingSend || 0;
+                    const deviceShouldSend = device.shouldSend || device.ShouldSend || 0;
+                    const deviceDoneSend = device.doneSend || device.DoneSend || device.successLeads || device.SuccessLeads || 0;
+                    const deviceFailedSend = device.failedSend || device.FailedSend || device.failedLeads || device.FailedLeads || 0;
+                    const deviceRemainingSend = device.remainingSend || device.RemainingSend || device.pendingLeads || device.PendingLeads || 0;
                     
                     // Determine campaign status for this device
                     const campaignStatus = deviceRemainingSend === 0 && deviceShouldSend > 0 ? 'Completed' : 'In Progress';

@@ -2917,10 +2917,13 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 			offlineDevicesWithData++
 		}
 		
-		log.Printf("Device %s (%s): Should=%d, Total=%d, Success=%d, Failed=%d, Pending=%d", 
-			report.Name, report.ID, report.ShouldSend, report.TotalLeads, 
+		log.Printf("Device %s (%s): Status=%s, Should=%d, Total=%d, Success=%d, Failed=%d, Pending=%d", 
+			report.Name, report.ID, report.Status, report.ShouldSend, report.TotalLeads, 
 			report.SuccessLeads, report.FailedLeads, report.PendingLeads)
 	}
+	
+	log.Printf("Device Report Summary: Total=%d, Online=%d, Offline=%d", 
+		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
 	
 	result := map[string]interface{}{
 		"totalDevices":        totalDevicesWithData,
