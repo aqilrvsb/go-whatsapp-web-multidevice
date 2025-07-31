@@ -6578,6 +6578,12 @@
         }
         
         function displayDeviceReport(report) {
+            // Check if this is a sequence report (has steps data)
+            if (report.steps && currentSequenceForReport) {
+                displaySequenceDeviceReport(report);
+                return;
+            }
+            
             // Debug: Log what we receive from backend
             console.log('Device Report received:', report);
             console.log('totalDevices from backend:', report.totalDevices);
@@ -6674,6 +6680,135 @@
             } else {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No device data available</td></tr>';
             }
+        }
+        
+        function displaySequenceDeviceReport(report) {
+            console.log('Sequence Device Report:', report);
+            
+            // Update overall statistics
+            document.getElementById('totalDevices').textContent = report.totalDevices || 0;
+            document.getElementById('activeDevices').textContent = report.activeDevices || 0;
+            document.getElementById('disconnectedDevices').textContent = report.disconnectedDevices || 0;
+            document.getElementById('contactsShouldSend').textContent = report.shouldSend || 0;
+            document.getElementById('contactsDoneSend').textContent = report.doneSend || 0;
+            document.getElementById('contactsFailedSend').textContent = report.failedSend || 0;
+            document.getElementById('contactsRemainingSend').textContent = report.remainingSend || 0;
+            
+            // Update table header for sequence steps
+            const tableHead = document.querySelector('#deviceReportTableBody').closest('table').querySelector('thead');
+            tableHead.innerHTML = `
+                <tr>
+                    <th>Device Name</th>
+                    <th>Step</th>
+                    <th>Day</th>
+                    <th>Contacts Should Send</th>
+                    <th>Contacts Done Send</th>
+                    <th>Contacts Failed Send</th>
+                    <th>Contacts Remaining</th>
+                    <th>Success Rate</th>
+                </tr>
+            `;
+            
+            // Update device table with steps
+            const tbody = document.getElementById('deviceReportTableBody');
+            tbody.innerHTML = '';
+            
+            if (report.devices && report.devices.length > 0) {
+                report.devices.forEach(device => {
+                    console.log('Device with steps:', device);
+                    
+                    if (device.steps && device.steps.length > 0) {
+                        device.steps.forEach((step, index) => {
+                            const successRate = step.should_send > 0 
+                                ? ((step.done_send / step.should_send) * 100).toFixed(1) 
+                                : 0;
+                            
+                            const row = `
+                                <tr>
+                                    ${index === 0 ? `<td rowspan="${device.steps.length}" style="vertical-align: middle; font-weight: bold;">${device.name}</td>` : ''}
+                                    <td>${step.step_name}</td>
+                                    <td>Day ${step.day_number || step.step_order}</td>
+                                    <td>
+                                        <a href="#" onclick="showSequenceStepLeadDetails('${device.id}', '${step.step_id}', 'all'); return false;">
+                                            ${step.should_send || 0}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="#" onclick="showSequenceStepLeadDetails('${device.id}', '${step.step_id}', 'success'); return false;" class="text-success">
+                                            ${step.done_send || 0}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="#" onclick="showSequenceStepLeadDetails('${device.id}', '${step.step_id}', 'failed'); return false;" class="text-danger">
+                                            ${step.failed_send || 0}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <a href="#" onclick="showSequenceStepLeadDetails('${device.id}', '${step.step_id}', 'pending'); return false;" class="text-warning">
+                                            ${step.remaining_send || 0}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-success" style="width: ${successRate}%">
+                                                ${successRate}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                            tbody.innerHTML += row;
+                        });
+                    } else {
+                        // Device has no steps data
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${device.name}</td>
+                                <td colspan="7" class="text-center text-muted">No step data available</td>
+                            </tr>
+                        `;
+                    }
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No device data available</td></tr>';
+            }
+        }
+        
+        function showSequenceStepLeadDetails(deviceId, stepId, status) {
+            if (!currentSequenceForReport) {
+                showAlert('error', 'No sequence selected');
+                return;
+            }
+            
+            console.log('showSequenceStepLeadDetails:', { deviceId, stepId, status });
+            
+            // Update modal title
+            let statusText = status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1);
+            document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads - Step`;
+            
+            // Show loading state
+            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
+            
+            // Fetch lead details for specific step
+            fetch(`/api/sequences/${currentSequenceForReport.id}/device/${deviceId}/step/${stepId}/leads?status=${status}`, { 
+                credentials: 'include' 
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        displayLeadDetails(data.results);
+                    } else {
+                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading lead details:', error);
+                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading leads</td></tr>';
+                });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
+            modal.show();
         }
         
         function showLeadDetails(deviceId, status, entityId) {

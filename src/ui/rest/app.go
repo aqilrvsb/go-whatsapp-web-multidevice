@@ -124,6 +124,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Sequence endpoints
 	app.Get("/api/sequences/:id/device-report", rest.GetSequenceDeviceReport)
 	app.Get("/api/sequences/:id/device/:deviceId/leads", rest.GetSequenceDeviceLeads)
+	app.Get("/api/sequences/:id/device/:deviceId/step/:stepId/leads", rest.GetSequenceStepLeads)
 	
 	// Team Member Management endpoints
 	app.Get("/api/team-members", rest.GetAllTeamMembers)
@@ -4158,7 +4159,7 @@ func (a App) GetTeamMemberInfo(c *fiber.Ctx) error {
 }
 
 
-// GetSequenceDeviceReport gets device-wise report for a sequence
+// GetSequenceDeviceReport gets device-wise report for a sequence broken down by steps
 func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	sequenceIdStr := c.Params("id")
 	sequenceId, err := strconv.Atoi(sequenceIdStr)
@@ -4185,7 +4186,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
-			Code:    "UNAUTHORIZED",
+			Code:    "UNAUTHORIZED", 
 			Message: "Invalid session",
 		})
 	}
@@ -4201,188 +4202,218 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Count total leads that match sequence criteria
-	var totalLeadCount int
 	db := database.GetDB()
 	
-	// For sequences, count broadcast messages as the lead count
-	err = db.QueryRow(`
-		SELECT COUNT(DISTINCT recipient_phone) 
-		FROM broadcast_messages
-		WHERE sequence_id = ? 
-		AND user_id = ?
-	`, sequenceId, session.UserID).Scan(&totalLeadCount)
-	
-	if err != nil {
-		totalLeadCount = 0
-	}
-	
-	// Get broadcast message stats
-	var doneSend, failedSend, pendingSend int
-	err = db.QueryRow(`
-		SELECT 
-			COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
-			COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-			COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-		FROM broadcast_messages
-		WHERE sequence_id = ? AND user_id = ?
-	`, sequenceId, session.UserID).Scan(&doneSend, &failedSend, &pendingSend)
-	
-	if err != nil {
-		doneSend, failedSend, pendingSend = 0, 0, 0
-	}
-	
-	remainingSend := totalLeadCount - doneSend - failedSend
-	if remainingSend < 0 {
-		remainingSend = 0
-	}
-	
-	// Get user devices
-	query := `
-		SELECT id, device_name, phone, status, jid, created_at, last_seen
-		FROM user_devices
-		WHERE user_id = ?
-		ORDER BY created_at DESC
+	// Get sequence steps first
+	stepsQuery := `
+		SELECT id, step_order, message_type, content, day_number
+		FROM sequence_steps
+		WHERE sequence_id = ?
+		ORDER BY step_order
 	`
-	rows, err := db.Query(query, session.UserID)
+	
+	stepRows, err := db.Query(stepsQuery, sequenceId)
 	if err != nil {
+		log.Printf("Error getting sequence steps: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get sequence steps",
+		})
+	}
+	defer stepRows.Close()
+	
+	// Store steps info
+	type StepInfo struct {
+		ID          string
+		Order       int
+		MessageType string
+		Content     string
+		DayNumber   int
+	}
+	
+	steps := []StepInfo{}
+	stepMap := make(map[string]StepInfo)
+	
+	for stepRows.Next() {
+		var step StepInfo
+		var contentNull sql.NullString
+		var dayNumberNull sql.NullInt64
+		
+		err := stepRows.Scan(&step.ID, &step.Order, &step.MessageType, &contentNull, &dayNumberNull)
+		if err != nil {
+			continue
+		}
+		
+		if contentNull.Valid {
+			step.Content = contentNull.String
+			if len(step.Content) > 50 {
+				step.Content = step.Content[:50] + "..."
+			}
+		}
+		
+		if dayNumberNull.Valid {
+			step.DayNumber = int(dayNumberNull.Int64)
+		}
+		
+		steps = append(steps, step)
+		stepMap[step.ID] = step
+	}
+	
+	// Get devices that have messages for this sequence
+	deviceQuery := `
+		SELECT DISTINCT 
+			bm.device_id,
+			COALESCE(ud.device_name, 'Unknown Device') as device_name,
+			COALESCE(ud.status, 'unknown') as device_status
+		FROM broadcast_messages bm
+		LEFT JOIN user_devices ud ON ud.id = bm.device_id
+		WHERE bm.sequence_id = ? 
+		AND bm.user_id = ?
+	`
+	
+	deviceRows, err := db.Query(deviceQuery, sequenceId, session.UserID)
+	if err != nil {
+		log.Printf("Error getting devices: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "INTERNAL_ERROR",
 			Message: "Failed to get devices",
 		})
 	}
-	defer rows.Close()
+	defer deviceRows.Close()
 	
-	devices := []models.UserDevice{}
-	deviceMap := make(map[string]*DeviceReport)
-	
-	for rows.Next() {
-		var device models.UserDevice
-		err := rows.Scan(&device.ID, &device.DeviceName, &device.Phone, &device.Status, 
-			&device.JID, &device.CreatedAt, &device.LastSeen)
-		if err != nil {
-			continue
-		}
-		device.UserID = session.UserID
-		devices = append(devices, device)
-		
-		deviceMap[device.ID] = &DeviceReport{
-			ID:     device.ID,
-			Name:   device.DeviceName,
-			Status: device.Status,
-		}
+	// Device report structure with steps
+	type StepReport struct {
+		StepID        string `json:"step_id"`
+		StepOrder     int    `json:"step_order"`
+		StepName      string `json:"step_name"`
+		DayNumber     int    `json:"day_number"`
+		ShouldSend    int    `json:"should_send"`
+		DoneSend      int    `json:"done_send"`
+		FailedSend    int    `json:"failed_send"`
+		RemainingSend int    `json:"remaining_send"`
 	}
 	
-	// Get broadcast message statistics grouped by device for this sequence
-	messageQuery := `
-		SELECT 
-			bm.device_id,
-			ud.device_name,
-			ud.status as device_status,
-			COUNT(*) as total_messages,
-			COUNT(CASE WHEN bm.status = 'success' THEN 1 END) as success_count,
-			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed_count,
-			COUNT(CASE WHEN bm.status = 'pending' THEN 1 END) as pending_count
-		FROM broadcast_messages bm
-		LEFT JOIN user_devices ud ON ud.id = bm.device_id
-		WHERE bm.sequence_id = ? 
-		AND bm.user_id = ?
-		GROUP BY bm.device_id, ud.device_name, ud.status
-		ORDER BY total_messages DESC
-	`
-	
-	msgRows, err := db.Query(messageQuery, sequenceId, session.UserID)
-	if err == nil {
-		defer msgRows.Close()
-		
-		for msgRows.Next() {
-			var deviceId, deviceName, deviceStatus string
-			var totalMessages, successCount, failedCount, pendingCount int
-			
-			var deviceNameNull, deviceStatusNull sql.NullString
-			
-			if err := msgRows.Scan(&deviceId, &deviceNameNull, &deviceStatusNull, 
-				&totalMessages, &successCount, &failedCount, &pendingCount); err != nil {
-				log.Printf("Sequence Device Report - Error scanning row: %v", err)
-				continue
-			}
-			
-			if deviceNameNull.Valid {
-				deviceName = deviceNameNull.String
-			} else {
-				deviceName = "Unknown Device"
-			}
-			
-			if deviceStatusNull.Valid {
-				deviceStatus = deviceStatusNull.String
-			} else {
-				deviceStatus = "unknown"
-			}
-			
-			log.Printf("Sequence Device Report - Device: %s (%s), Total: %d, Success: %d, Failed: %d, Pending: %d", 
-				deviceName, deviceId, totalMessages, successCount, failedCount, pendingCount)
-			
-			if report, exists := deviceMap[deviceId]; exists {
-				report.TotalLeads = totalMessages
-				report.SuccessLeads = successCount
-				report.FailedLeads = failedCount
-				report.PendingLeads = pendingCount
-				report.ShouldSend = totalMessages
-			} else {
-				deviceMap[deviceId] = &DeviceReport{
-					ID:           deviceId,
-					Name:         deviceName,
-					Status:       deviceStatus,
-					TotalLeads:   totalMessages,
-					SuccessLeads: successCount,
-					FailedLeads:  failedCount,
-					PendingLeads: pendingCount,
-					ShouldSend:   totalMessages,
-				}
-			}
-		}
+	type DeviceStepReport struct {
+		ID            string       `json:"id"`
+		Name          string       `json:"name"`
+		Status        string       `json:"status"`
+		TotalMessages int          `json:"total_messages"`
+		Steps         []StepReport `json:"steps"`
 	}
 	
-	// Convert map to slice and calculate totals
-	deviceReports := make([]DeviceReport, 0, len(deviceMap))
-	totalMessages := 0
-	pendingMessages := 0
-	successMessages := 0
-	failedMessages := 0
+	deviceReports := []DeviceStepReport{}
 	totalDevicesWithData := 0
 	onlineDevicesWithData := 0
 	offlineDevicesWithData := 0
 	
-	for _, report := range deviceMap {
-		if report.TotalLeads == 0 && report.ShouldSend == 0 {
+	// Process each device
+	for deviceRows.Next() {
+		var deviceId, deviceName, deviceStatus string
+		err := deviceRows.Scan(&deviceId, &deviceName, &deviceStatus)
+		if err != nil {
 			continue
 		}
 		
-		report.DoneSend = report.SuccessLeads
-		report.FailedSend = report.FailedLeads
-		report.RemainingSend = report.PendingLeads
-		
-		deviceReports = append(deviceReports, *report)
-		
-		totalMessages += report.TotalLeads
-		pendingMessages += report.PendingLeads
-		successMessages += report.SuccessLeads
-		failedMessages += report.FailedLeads
-		
-		totalDevicesWithData++
-		if report.Status == "online" {
-			onlineDevicesWithData++
-		} else {
-			offlineDevicesWithData++
+		deviceReport := DeviceStepReport{
+			ID:     deviceId,
+			Name:   deviceName,
+			Status: deviceStatus,
+			Steps:  []StepReport{},
 		}
 		
-		log.Printf("Sequence Device %s (%s): Status=%s, Should=%d, Total=%d, Success=%d, Failed=%d, Pending=%d", 
-			report.Name, report.ID, report.Status, report.ShouldSend, report.TotalLeads, 
-			report.SuccessLeads, report.FailedLeads, report.PendingLeads)
+		// Get stats for each step for this device
+		stepStatsQuery := `
+			SELECT 
+				bm.sequence_stepid,
+				COUNT(DISTINCT bm.recipient_phone) as total,
+				COUNT(DISTINCT CASE WHEN bm.status = 'success' THEN bm.recipient_phone END) as success,
+				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed,
+				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.recipient_phone END) as pending
+			FROM broadcast_messages bm
+			WHERE bm.sequence_id = ? 
+			AND bm.device_id = ?
+			AND bm.user_id = ?
+			AND bm.sequence_stepid IS NOT NULL
+			GROUP BY bm.sequence_stepid
+		`
+		
+		statsRows, err := db.Query(stepStatsQuery, sequenceId, deviceId, session.UserID)
+		if err != nil {
+			log.Printf("Error getting step stats for device %s: %v", deviceId, err)
+			continue
+		}
+		
+		totalDeviceMessages := 0
+		
+		for statsRows.Next() {
+			var stepId string
+			var total, success, failed, pending int
+			
+			err := statsRows.Scan(&stepId, &total, &success, &failed, &pending)
+			if err != nil {
+				continue
+			}
+			
+			// Get step info
+			stepInfo, exists := stepMap[stepId]
+			if !exists {
+				continue
+			}
+			
+			stepReport := StepReport{
+				StepID:        stepId,
+				StepOrder:     stepInfo.Order,
+				StepName:      fmt.Sprintf("Step %d: %s", stepInfo.Order, stepInfo.MessageType),
+				DayNumber:     stepInfo.DayNumber,
+				ShouldSend:    total,
+				DoneSend:      success,
+				FailedSend:    failed,
+				RemainingSend: pending,
+			}
+			
+			deviceReport.Steps = append(deviceReport.Steps, stepReport)
+			totalDeviceMessages += total
+		}
+		statsRows.Close()
+		
+		// Only include devices with messages
+		if totalDeviceMessages > 0 {
+			deviceReport.TotalMessages = totalDeviceMessages
+			deviceReports = append(deviceReports, deviceReport)
+			
+			totalDevicesWithData++
+			if deviceStatus == "online" || deviceStatus == "connected" {
+				onlineDevicesWithData++
+			} else {
+				offlineDevicesWithData++
+			}
+		}
 	}
 	
-	log.Printf("Sequence Device Report Summary: Total=%d, Online=%d, Offline=%d", 
+	// Calculate overall totals
+	var totalLeadCount, totalDoneSend, totalFailedSend, totalRemainingSend int
+	
+	overallQuery := `
+		SELECT 
+			COUNT(DISTINCT recipient_phone) as total,
+			COUNT(DISTINCT CASE WHEN status = 'success' THEN recipient_phone END) as success,
+			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed,
+			COUNT(DISTINCT CASE WHEN status = 'pending' THEN recipient_phone END) as pending
+		FROM broadcast_messages
+		WHERE sequence_id = ? 
+		AND user_id = ?
+	`
+	
+	err = db.QueryRow(overallQuery, sequenceId, session.UserID).Scan(
+		&totalLeadCount, &totalDoneSend, &totalFailedSend, &totalRemainingSend)
+	
+	if err != nil {
+		totalLeadCount, totalDoneSend, totalFailedSend, totalRemainingSend = 0, 0, 0, 0
+	}
+	
+	log.Printf("Sequence Device Report - Total devices: %d, Online: %d, Offline: %d", 
 		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
 	
 	result := map[string]interface{}{
@@ -4391,13 +4422,11 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		"disconnectedDevices": offlineDevicesWithData,
 		"totalLeads":          totalLeadCount,
 		"shouldSend":          totalLeadCount,
-		"doneSend":            successMessages,
-		"failedSend":          failedMessages,
-		"remainingSend":       remainingSend,
-		"pendingLeads":        pendingMessages,
-		"successLeads":        successMessages,
-		"failedLeads":         failedMessages,
+		"doneSend":            totalDoneSend,
+		"failedSend":          totalFailedSend,
+		"remainingSend":       totalRemainingSend,
 		"devices":             deviceReports,
+		"steps":               steps,
 		"sequence": map[string]interface{}{
 			"id":      sequence.ID,
 			"name":    sequence.Name,
@@ -4519,6 +4548,126 @@ func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
 	
 	log.Printf("GetSequenceDeviceLeads - Found %d leads for sequence %d, device %s, status %s", 
 		len(leads), sequenceId, deviceId, status)
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Lead details retrieved successfully",
+		Results: leads,
+	})
+}
+
+
+// GetSequenceStepLeads gets lead details for a specific step in a sequence on a device
+func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
+	sequenceIdStr := c.Params("id")
+	sequenceId, err := strconv.Atoi(sequenceIdStr)
+	if err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid sequence ID",
+		})
+	}
+	
+	deviceId := c.Params("deviceId")
+	stepId := c.Params("stepId")
+	status := c.Query("status", "all")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get leads from broadcast messages for this specific step
+	db := database.GetDB()
+	
+	query := `
+		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
+		FROM broadcast_messages bm
+		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
+		WHERE bm.sequence_id = ? 
+		AND bm.device_id = ? 
+		AND bm.sequence_stepid = ?
+		AND bm.user_id = ?
+	`
+	
+	args := []interface{}{sequenceId, deviceId, stepId, session.UserID}
+	
+	// Add status filter if not "all"
+	if status != "all" {
+		if status == "success" {
+			query += ` AND bm.status IN ('sent', 'delivered', 'success')`
+		} else if status == "pending" {
+			query += ` AND bm.status IN ('pending', 'queued')`
+		} else if status == "failed" {
+			query += ` AND bm.status IN ('failed', 'error')`
+		}
+	}
+	
+	query += ` ORDER BY bm.sent_at DESC`
+	
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		log.Printf("Error executing sequence step lead details query: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get lead details",
+		})
+	}
+	defer rows.Close()
+	
+	leads := []map[string]interface{}{}
+	
+	for rows.Next() {
+		var phone, msgStatus string
+		var sentAt sql.NullTime
+		var name sql.NullString
+		
+		err := rows.Scan(&phone, &msgStatus, &sentAt, &name)
+		if err != nil {
+			log.Printf("Error scanning lead row: %v", err)
+			continue
+		}
+		
+		leadName := "Unknown"
+		if name.Valid && name.String != "" {
+			leadName = name.String
+		}
+		
+		lead := map[string]interface{}{
+			"name":   leadName,
+			"phone":  phone,
+			"status": msgStatus,
+		}
+		
+		if sentAt.Valid {
+			lead["sent_at"] = sentAt.Time.Format("2006-01-02 03:04 PM")
+		} else {
+			lead["sent_at"] = "-"
+		}
+		
+		leads = append(leads, lead)
+	}
+	
+	log.Printf("GetSequenceStepLeads - Found %d leads for sequence %d, device %s, step %s, status %s", 
+		len(leads), sequenceId, deviceId, stepId, status)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
