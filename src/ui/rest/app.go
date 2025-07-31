@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -2670,16 +2669,40 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Get campaign broadcast statistics
+	// Get campaign details first
 	campaignRepo := repository.GetCampaignRepository()
-	shouldSend, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaignId)
-	remainingSend := shouldSend - doneSend - failedSend
+	campaign, err := campaignRepo.GetCampaignByID(campaignId)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Campaign not found",
+		})
+	}
+	
+	// Count total leads that match campaign criteria
+	var totalLeadCount int
+	db := database.GetDB()
+	err = db.QueryRow(`
+		SELECT COUNT(DISTINCT l.phone) 
+		FROM leads l
+		WHERE l.user_id = ? 
+		AND l.niche LIKE CONCAT('%', ?, '%')
+		AND (? = 'all' OR l.target_status = ?)
+	`, session.UserID, campaign.Niche, campaign.TargetStatus, campaign.TargetStatus).Scan(&totalLeadCount)
+	
+	if err != nil {
+		totalLeadCount = 0
+	}
+	
+	// Get broadcast message stats from GetCampaignBroadcastStats
+	_, doneSend, failedSend, _ := campaignRepo.GetCampaignBroadcastStats(campaignId)
+	remainingSend := totalLeadCount - doneSend - failedSend
 	if remainingSend < 0 {
 		remainingSend = 0
 	}
 	
 	// Get user devices - use direct query
-	db := database.GetDB()
 	query := `
 		SELECT id, device_name, phone, status, jid, created_at, last_seen
 		FROM user_devices
@@ -2718,176 +2741,207 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Get real broadcast message data for this campaign
+	// Get broadcast message statistics grouped by device for this campaign
 	messageQuery := `
-		SELECT device_id, status, COUNT(*) AS COUNT
-		FROM broadcast_messages
-		WHERE campaign_id = ? AND user_id = ?
-		GROUP BY device_id, status
+		SELECT 
+			bm.device_id,
+			ud.device_name,
+			ud.status as device_status,
+			COUNT(*) as total_messages,
+			COUNT(CASE WHEN bm.status = 'success' THEN 1 END) as success_count,
+			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed_count,
+			COUNT(CASE WHEN bm.status = 'pending' THEN 1 END) as pending_count
+		FROM broadcast_messages bm
+		LEFT JOIN user_devices ud ON ud.id = bm.device_id
+		WHERE bm.campaign_id = ? 
+		AND bm.user_id = ?
+		GROUP BY bm.device_id, ud.device_name, ud.status
+		ORDER BY total_messages DESC
 	`
+	
 	msgRows, err := db.Query(messageQuery, campaignId, session.UserID)
 	if err == nil {
 		defer msgRows.Close()
 		
-		// Debug: log the query results
-		log.Printf("Device Report - Campaign ID: %d, User ID: %s", campaignId, session.UserID)
-		
-		// First, let's check total messages per device
-		totalQuery := `
-			SELECT device_id, COUNT(*) AS total_count
-			FROM broadcast_messages
-			WHERE campaign_id = ? AND user_id = ?
-			GROUP BY device_id
-		`
-		totalRows, _ := db.Query(totalQuery, campaignId, session.UserID)
-		if totalRows != nil {
-			defer totalRows.Close()
-			for totalRows.Next() {
-				var deviceId string
-				var totalCount int
-				if err := totalRows.Scan(&deviceId, &totalCount); err == nil {
-					log.Printf("Device Report - Device %s has TOTAL %d messages", deviceId, totalCount)
-				}
-			}
-		}
-		
 		for msgRows.Next() {
-			var deviceId, status string
-			var count int
-			if err := msgRows.Scan(&deviceId, &status, &count); err != nil {
+			var deviceId, deviceName, deviceStatus string
+			var totalMessages, successCount, failedCount, pendingCount int
+			
+			// Handle null device_name and device_status
+			var deviceNameNull, deviceStatusNull sql.NullString
+			
+			if err := msgRows.Scan(&deviceId, &deviceNameNull, &deviceStatusNull, 
+				&totalMessages, &successCount, &failedCount, &pendingCount); err != nil {
+				log.Printf("Device Report - Error scanning row: %v", err)
 				continue
 			}
 			
-			log.Printf("Device Report - Device: %s, Status: %s, Count: %d", deviceId, status, count)
+			// Set device name and status with defaults
+			if deviceNameNull.Valid {
+				deviceName = deviceNameNull.String
+			} else {
+				deviceName = "Unknown Device"
+			}
 			
+			if deviceStatusNull.Valid {
+				deviceStatus = deviceStatusNull.String
+			} else {
+				deviceStatus = "unknown"
+			}
+			
+			log.Printf("Device Report - Device: %s (%s), Total: %d, Success: %d, Failed: %d, Pending: %d", 
+				deviceName, deviceId, totalMessages, successCount, failedCount, pendingCount)
+			
+			// Update or create device report
 			if report, exists := deviceMap[deviceId]; exists {
-				report.TotalLeads += count
-				
-				switch status {
-				case "pending", "queued":
-					report.PendingLeads += count
-				case "sent", "delivered", "success":
-					report.SuccessLeads += count
-				case "failed", "error":
-					report.FailedLeads += count
-				default:
-					// Log unknown status
-					log.Printf("Device Report - Unknown status: %s, count: %d", status, count)
-					// Add to pending for now
-					report.PendingLeads += count
+				report.TotalLeads = totalMessages
+				report.SuccessLeads = successCount
+				report.FailedLeads = failedCount
+				report.PendingLeads = pendingCount
+				report.ShouldSend = totalMessages // For broadcast messages, should send = total messages
+			} else {
+				// Device not in user's device list but has messages
+				deviceMap[deviceId] = &DeviceReport{
+					ID:           deviceId,
+					Name:         deviceName,
+					Status:       deviceStatus,
+					TotalLeads:   totalMessages,
+					SuccessLeads: successCount,
+					FailedLeads:  failedCount,
+					PendingLeads: pendingCount,
+					ShouldSend:   totalMessages,
 				}
-				
-				// Log what we're adding
-				log.Printf("Device Report - Added to %s: status=%s, count=%d", deviceId, status, count)
 			}
 		}
+	} else {
+		log.Printf("Device Report - Error querying broadcast messages: %v", err)
 	}
 	
-	// Calculate per-device should send (distribute evenly among devices)
-	perDeviceShouldSend := 0
-	if len(devices) > 0 && shouldSend > 0 {
-		// For single device, assign full count; for multiple devices, distribute evenly
-		if len(devices) == 1 {
-			perDeviceShouldSend = shouldSend
-		} else {
-			perDeviceShouldSend = int(math.Ceil(float64(shouldSend) / float64(len(devices))))
+	// If no broadcast messages exist, show lead distribution instead
+	if len(deviceMap) == 0 || totalLeadCount > 0 {
+		log.Printf("Device Report - No broadcast messages found, showing lead distribution")
+		
+		// Get lead distribution by device
+		leadQuery := `
+			SELECT 
+				l.device_id,
+				ud.device_name,
+				ud.status as device_status,
+				COUNT(*) as lead_count
+			FROM leads l
+			LEFT JOIN user_devices ud ON ud.id = l.device_id
+			WHERE l.user_id = ? 
+			AND l.niche LIKE CONCAT('%', ?, '%')
+			AND (? = 'all' OR l.target_status = ?)
+			GROUP BY l.device_id, ud.device_name, ud.status
+			ORDER BY lead_count DESC
+		`
+		
+		leadRows, err := db.Query(leadQuery, session.UserID, campaign.Niche, campaign.TargetStatus, campaign.TargetStatus)
+		if err == nil {
+			defer leadRows.Close()
+			
+			for leadRows.Next() {
+				var deviceId string
+				var deviceNameNull, deviceStatusNull sql.NullString
+				var leadCount int
+				
+				if err := leadRows.Scan(&deviceId, &deviceNameNull, &deviceStatusNull, &leadCount); err != nil {
+					continue
+				}
+				
+				deviceName := "Unknown Device"
+				deviceStatus := "unknown"
+				
+				if deviceNameNull.Valid {
+					deviceName = deviceNameNull.String
+				}
+				if deviceStatusNull.Valid {
+					deviceStatus = deviceStatusNull.String
+				}
+				
+				// Only update devices that don't have broadcast data
+				if report, exists := deviceMap[deviceId]; exists && report.TotalLeads == 0 {
+					report.ShouldSend = leadCount
+					report.PendingLeads = leadCount // All are pending since not sent
+				} else if !exists {
+					deviceMap[deviceId] = &DeviceReport{
+						ID:           deviceId,
+						Name:         deviceName,
+						Status:       deviceStatus,
+						ShouldSend:   leadCount,
+						PendingLeads: leadCount,
+						TotalLeads:   0,
+						SuccessLeads: 0,
+						FailedLeads:  0,
+					}
+				}
+			}
 		}
 	}
 	
 	// Convert map to slice and calculate totals
 	deviceReports := make([]DeviceReport, 0, len(deviceMap))
-	totalLeads := 0
-	pendingLeads := 0
-	successLeads := 0
-	failedLeads := 0
+	totalMessages := 0
+	pendingMessages := 0
+	successMessages := 0
+	failedMessages := 0
+	totalDevicesWithData := 0
+	onlineDevicesWithData := 0
+	offlineDevicesWithData := 0
 	
-	// Get campaign details to know target criteria
-	campaign, _ := campaignRepo.GetCampaignByID(campaignId)
-	
-	// Calculate per-device statistics based on actual leads
-	totalDevicesWithLeads := 0
-	onlineDevicesWithLeads := 0
-	offlineDevicesWithLeads := 0
-	
-	for deviceId, report := range deviceMap {
-		// Only include devices that have messages for this campaign
-		if report.TotalLeads == 0 {
-			// Skip devices with no messages
-			log.Printf("Device Report - Skipping device %s with 0 messages", deviceId)
+	for _, report := range deviceMap {
+		// Only include devices that have data (either messages or leads)
+		if report.TotalLeads == 0 && report.ShouldSend == 0 {
 			continue
 		}
 		
-		// Count leads for this device matching campaign criteria
-		deviceLeadQuery := `
-			SELECT COUNT(l.phone) 
-			FROM leads l
-			WHERE l.device_id = ? 
-			AND l.niche LIKE CONCAT('%', ?, '%')
-			AND (? = 'all' OR l.target_status = ?)
-		`
-		var deviceShouldSend int
-		err := db.QueryRow(deviceLeadQuery, deviceId, campaign.Niche, campaign.TargetStatus).Scan(&deviceShouldSend)
-		if err == nil {
-			report.ShouldSend = deviceShouldSend
-		} else {
-			// Fallback to even distribution
-			report.ShouldSend = perDeviceShouldSend
-		}
-		
-		// Set other statistics
+		// For display purposes
 		report.DoneSend = report.SuccessLeads
 		report.FailedSend = report.FailedLeads
-		report.RemainingSend = report.ShouldSend - report.DoneSend - report.FailedSend
-		if report.RemainingSend < 0 {
-			report.RemainingSend = 0
-		}
-		
-		log.Printf("Device %s (%s): Total=%d, Pending=%d, Success=%d, Failed=%d", 
-			deviceId, report.Name, report.TotalLeads, report.PendingLeads, 
-			report.SuccessLeads, report.FailedLeads)
+		report.RemainingSend = report.PendingLeads
 		
 		deviceReports = append(deviceReports, *report)
-		totalLeads += report.TotalLeads
-		pendingLeads += report.PendingLeads
-		successLeads += report.SuccessLeads
-		failedLeads += report.FailedLeads
 		
-		// Count devices with leads based on their status
-		totalDevicesWithLeads++
+		// Add to totals
+		totalMessages += report.TotalLeads
+		pendingMessages += report.PendingLeads
+		successMessages += report.SuccessLeads
+		failedMessages += report.FailedLeads
+		
+		// Count devices
+		totalDevicesWithData++
 		if report.Status == "online" {
-			onlineDevicesWithLeads++
+			onlineDevicesWithData++
 		} else {
-			offlineDevicesWithLeads++
+			offlineDevicesWithData++
 		}
-	}
-	
-	// Log final totals and device details
-	log.Printf("Device Report Final - Total Devices with Leads: %d (Online: %d, Offline: %d)", 
-		totalDevicesWithLeads, onlineDevicesWithLeads, offlineDevicesWithLeads)
-	log.Printf("Device Report Final - Total Leads: %d, Pending: %d, Success: %d, Failed: %d", 
-		totalLeads, pendingLeads, successLeads, failedLeads)
-	
-	// Log each device's counts
-	for _, report := range deviceReports {
-		log.Printf("Device %s: Total=%d (Pending=%d, Success=%d, Failed=%d) Should=%d, Done=%d, Failed=%d, Remaining=%d", 
-			report.Name, report.TotalLeads, report.PendingLeads, report.SuccessLeads, report.FailedLeads,
-			report.ShouldSend, report.DoneSend, report.FailedSend, report.RemainingSend)
+		
+		log.Printf("Device %s (%s): Should=%d, Total=%d, Success=%d, Failed=%d, Pending=%d", 
+			report.Name, report.ID, report.ShouldSend, report.TotalLeads, 
+			report.SuccessLeads, report.FailedLeads, report.PendingLeads)
 	}
 	
 	result := map[string]interface{}{
-		"totalDevices":        totalDevicesWithLeads,     // Only devices with matching leads
-		"activeDevices":       onlineDevicesWithLeads,    // Only online devices with matching leads
-		"disconnectedDevices": offlineDevicesWithLeads,   // Only offline devices with matching leads
-		"totalLeads":          totalLeads,
-		"pendingLeads":        pendingLeads,
-		"successLeads":        successLeads,
-		"failedLeads":         failedLeads,
+		"totalDevices":        totalDevicesWithData,
+		"activeDevices":       onlineDevicesWithData,
+		"disconnectedDevices": offlineDevicesWithData,
+		"totalLeads":          totalLeadCount,      // From campaign criteria
+		"shouldSend":          totalLeadCount,      // Same as totalLeads
+		"doneSend":            successMessages,     // From broadcast_messages
+		"failedSend":          failedMessages,      // From broadcast_messages
+		"remainingSend":       remainingSend,       // Calculated earlier
+		"pendingLeads":        pendingMessages,     // From broadcast_messages
+		"successLeads":        successMessages,     // From broadcast_messages
+		"failedLeads":         failedMessages,      // From broadcast_messages
 		"devices":             deviceReports,
-		// Add the new statistics
-		"shouldSend":          shouldSend,
-		"doneSend":            doneSend,
-		"failedSend":          failedSend,
-		"remainingSend":       remainingSend,
+		"campaign": map[string]interface{}{
+			"id":            campaign.ID,
+			"title":         campaign.Title,
+			"niche":         campaign.Niche,
+			"target_status": campaign.TargetStatus,
+			"status":        campaign.Status,
+		},
 	}
 	
 	return c.JSON(utils.ResponseData{
