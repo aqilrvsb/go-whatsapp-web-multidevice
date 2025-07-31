@@ -1773,12 +1773,31 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 	if db != nil {
 		defer db.Close()
 		
-		// Get aggregated stats for all user's campaigns
+		// Get campaign IDs for queries
 		var campaignIds []int
 		for _, campaign := range campaigns {
 			campaignIds = append(campaignIds, campaign.ID)
 		}
 		
+		// Count total leads that should receive messages from all campaigns
+		totalLeadsCount := 0
+		for _, campaign := range campaigns {
+			var leadCount int
+			err := db.QueryRow(`
+				SELECT COUNT(DISTINCT l.phone) 
+				FROM leads l
+				WHERE l.user_id = ? 
+				AND l.niche LIKE CONCAT('%', ?, '%')
+				AND (? = 'all' OR l.target_status = ?)
+			`, campaign.UserID, campaign.Niche, campaign.TargetStatus, campaign.TargetStatus).Scan(&leadCount)
+			
+			if err == nil {
+				totalLeadsCount += leadCount
+			}
+		}
+		totalShouldSend = totalLeadsCount
+		
+		// Get actual broadcast message stats
 		if len(campaignIds) > 0 {
 			// Build query with placeholders
 			placeholders := make([]string, len(campaignIds))
@@ -1790,7 +1809,6 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 			
 			query := fmt.Sprintf(`
 				SELECT 
-					COUNT(*) as total,
 					COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 					COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 					COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
@@ -1798,14 +1816,14 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 				WHERE campaign_id IN (%s)
 			`, strings.Join(placeholders, ","))
 			
-			err := db.QueryRow(query, args...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalPendingSend)
+			err := db.QueryRow(query, args...).Scan(&totalDoneSend, &totalFailedSend, &totalPendingSend)
 			if err != nil {
 				log.Printf("Error getting campaign broadcast stats: %v", err)
 			}
 		}
 	}
 	
-	totalRemainingSend := totalPendingSend
+	totalRemainingSend := totalShouldSend - totalDoneSend - totalFailedSend
 	if totalRemainingSend < 0 {
 		totalRemainingSend = 0
 	}
@@ -1817,25 +1835,45 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 		for i := 0; i < limit; i++ {
 			campaign := campaigns[i]
 			
-			// Get stats from broadcast_messages for this campaign
-			var shouldSend, doneSend, failedSend, pendingSend int
+			// Get lead count for "should send"
+			var leadCount int
+			if db != nil {
+				err := db.QueryRow(`
+					SELECT COUNT(DISTINCT l.phone) 
+					FROM leads l
+					WHERE l.user_id = ? 
+					AND l.niche LIKE CONCAT('%', ?, '%')
+					AND (? = 'all' OR l.target_status = ?)
+				`, campaign.UserID, campaign.Niche, campaign.TargetStatus, campaign.TargetStatus).Scan(&leadCount)
+				
+				if err != nil {
+					leadCount = 0
+					log.Printf("Error counting leads for campaign %d: %v", campaign.ID, err)
+				}
+			}
+			
+			// Get broadcast message stats
+			var doneSend, failedSend, pendingSend int
 			if db != nil {
 				err := db.QueryRow(`
 					SELECT 
-						COUNT(*) as total,
 						COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 						COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 						COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
 					FROM broadcast_messages
 					WHERE campaign_id = ?
-				`, campaign.ID).Scan(&shouldSend, &doneSend, &failedSend, &pendingSend)
+				`, campaign.ID).Scan(&doneSend, &failedSend, &pendingSend)
 				
 				if err != nil {
-					shouldSend, doneSend, failedSend, pendingSend = 0, 0, 0, 0
+					doneSend, failedSend, pendingSend = 0, 0, 0
 				}
 			}
 			
-			remainingSend := pendingSend
+			// Calculate remaining based on leads that haven't been sent to
+			remainingSend := leadCount - doneSend - failedSend
+			if remainingSend < 0 {
+				remainingSend = 0
+			}
 			
 			campaignData := map[string]interface{}{
 				"id":               campaign.ID,
@@ -1847,10 +1885,10 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 				"status":           campaign.Status,
 				"message":          campaign.Message,
 				"image_url":        campaign.ImageURL,
-				"should_send":      shouldSend,
-				"done_send":        doneSend,
-				"failed_send":      failedSend,
-				"remaining_send":   remainingSend,
+				"should_send":      leadCount,      // Actual lead count
+				"done_send":        doneSend,       // From broadcast_messages
+				"failed_send":      failedSend,     // From broadcast_messages
+				"remaining_send":   remainingSend,  // Calculated
 			}
 			
 			recentCampaigns = append(recentCampaigns, campaignData)
