@@ -5890,8 +5890,26 @@
         }
         
         // Sequence Summary Functions
+        let sequenceShowTodayOnly = false;
+        
+        function toggleSequenceFilter() {
+            sequenceShowTodayOnly = !sequenceShowTodayOnly;
+            const button = document.querySelector('#sequenceSummaryContent .btn-outline-secondary');
+            if (button) {
+                button.textContent = sequenceShowTodayOnly ? 'Show All' : 'Show Today Only';
+                button.classList.toggle('btn-secondary', sequenceShowTodayOnly);
+                button.classList.toggle('btn-outline-secondary', !sequenceShowTodayOnly);
+            }
+            loadSequenceSummary();
+        }
+        
         function loadSequenceSummary() {
-            fetch('/api/sequences/summary', {
+            let url = '/api/sequences/summary';
+            if (sequenceShowTodayOnly) {
+                url += '?today=true';
+            }
+            
+            fetch(url, {
                 credentials: 'include'
             })
                 .then(response => response.json())
@@ -5933,6 +5951,16 @@
             console.log('Summary sequences object:', summary.sequences); // Debug log
             
             const html = `
+                <!-- Filter Button -->
+                <div class="row mb-3">
+                    <div class="col-12 text-end">
+                        <button class="btn ${sequenceShowTodayOnly ? 'btn-secondary' : 'btn-outline-secondary'} btn-sm" 
+                                onclick="toggleSequenceFilter()">
+                            ${sequenceShowTodayOnly ? 'Show All' : 'Show Today Only'}
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="row mb-4">
                     <!-- Total Sequences -->
                     <div class="col-6 col-md-4 col-lg-2 mb-3">
@@ -6038,6 +6066,9 @@
                                                         <td>
                                                             <button class="btn btn-sm btn-outline-primary" onclick="window.open('/sequences/${sequence.id}', '_blank')" title="View Details">
                                                                 <i class="bi bi-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-success" onclick="showSequenceDeviceReport(${JSON.stringify(sequence).replace(/"/g, '&quot;')})" title="Device Report">
+                                                                <i class="bi bi-phone"></i> Report
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -6507,6 +6538,45 @@
             modal.show();
         }
         
+        // Sequence Device Report
+        let currentSequenceForReport = null;
+        
+        function showSequenceDeviceReport(sequence) {
+            // Store sequence for use in other functions
+            currentSequenceForReport = sequence;
+            
+            // Use the same modal as campaign report but populate with sequence data
+            document.getElementById('reportTitle').textContent = sequence.name || '-';
+            document.getElementById('reportNiche').textContent = sequence.niche || '-';
+            document.getElementById('reportTarget').innerHTML = `<span class="badge bg-info">Sequence</span>`;
+            document.getElementById('reportDate').textContent = sequence.created_at ? new Date(sequence.created_at).toLocaleDateString() : '-';
+            document.getElementById('reportTime').textContent = sequence.trigger || '-';
+            document.getElementById('reportStatus').innerHTML = `<span class="badge bg-${getStatusColor(sequence.status)}">${sequence.status}</span>`;
+            
+            // Show loading state
+            document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
+            
+            // Fetch device report data for sequence
+            fetch(`/api/sequences/${sequence.id}/device-report`, { credentials: 'include' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS' && data.results) {
+                        currentDeviceReport = data.results; // Store the report globally
+                        displayDeviceReport(data.results);
+                    } else {
+                        document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load device report</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading device report:', error);
+                    document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading device report</td></tr>';
+                });
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('campaignDeviceReportModal'));
+            modal.show();
+        }
+        
         function displayDeviceReport(report) {
             // Debug: Log what we receive from backend
             console.log('Device Report received:', report);
@@ -6606,9 +6676,15 @@
             }
         }
         
-        function showLeadDetails(deviceId, status, campaignId) {
+        function showLeadDetails(deviceId, status, entityId) {
             // Debug log
-            console.log('showLeadDetails called with:', { deviceId, status, campaignId });
+            console.log('showLeadDetails called with:', { deviceId, status, entityId });
+            
+            // Determine if this is a campaign or sequence
+            const isSequence = currentSequenceForReport && currentSequenceForReport.id === entityId;
+            const endpoint = isSequence 
+                ? `/api/sequences/${entityId}/device/${deviceId}/leads?status=${status}`
+                : `/api/campaigns/${entityId}/device/${deviceId}/leads?status=${status}`;
             
             // Update modal title
             let statusText = status.charAt(0).toUpperCase() + status.slice(1);
@@ -6618,7 +6694,7 @@
             document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
             
             // Fetch lead details
-            fetch(`/api/campaigns/${campaignId}/device/${deviceId}/leads?status=${status}`, { credentials: 'include' })
+            fetch(endpoint, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
