@@ -153,7 +153,7 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		)
 		SELECT UUID(), user_id, ?, name, phone, niche,
 			status, target_status, trigger, 
-			COALESCE(journey, '') || E'\n[Copied FROM device: ' || ? || ']',
+			CONCAT(COALESCE(journey, ''), '\n[Copied FROM device: ', ?, ']'),
 			NOW(), NOW()
 		FROM leads
 		WHERE device_id = ? AND user_id = ?

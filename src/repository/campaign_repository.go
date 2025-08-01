@@ -219,8 +219,8 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 			-- Immediate execution (no time SET)
 			time_schedule IS NULL 
 			OR time_schedule = ''
-			-- OR scheduled time has passed (PostgreSQL handles timezone)
-			OR (campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+			-- OR scheduled time has passed - MySQL version
+			OR STR_TO_DATE(CONCAT(campaign_date, ' ', time_schedule), '%Y-%m-%d %H:%i:%s') <= CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kuala_Lumpur')
 		)
 		ORDER BY campaign_date, time_schedule
 	`
@@ -265,7 +265,7 @@ func (r *campaignRepository) GetPendingCampaignsByStatus(userID string, targetSt
 		AND (
 			time_schedule IS NULL 
 			OR time_schedule = ''
-			OR (campaign_date || ' ' || time_schedule)::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP
+			OR STR_TO_DATE(CONCAT(campaign_date, ' ', time_schedule), '%Y-%m-%d %H:%i:%s') <= CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kuala_Lumpur')
 		)
 		ORDER BY campaign_date, time_schedule
 	`

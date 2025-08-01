@@ -30,7 +30,7 @@ func NewOptimizedCampaignTrigger(db *sql.DB) *OptimizedCampaignTrigger {
 func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 	logrus.Info("Processing campaigns with optimized timezone handling...")
 	
-	// Query campaigns that are ready to send using TIMESTAMPTZ
+	// Query campaigns that are ready to send - MySQL compatible
 	query := `
 		SELECT c.id, c.user_id, c.title, c.message, c.niche, 
 			COALESCE(c.target_status, 'all') AS target_status, 
@@ -42,11 +42,11 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 			-- If scheduled_at exists, use it
 			(c.scheduled_at IS NOT NULL AND c.scheduled_at <= CURRENT_TIMESTAMP)
 			OR
-			-- Fallback to old columns
+			-- Fallback to old columns - MySQL version
 			(c.scheduled_at IS NULL AND 
-			 (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur' <= CURRENT_TIMESTAMP)
+			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kuala_Lumpur'))
 		)
-		ORDER BY COALESCE(c.scheduled_at, (c.campaign_date || ' ' || COALESCE(c.time_schedule, '00:00:00'))::TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')
+		ORDER BY COALESCE(c.scheduled_at, STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s'))
 	`
 	
 	rows, err := oct.db.Query(query)
