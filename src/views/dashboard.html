@@ -1549,6 +1549,20 @@
                         </div>
                     </div>
                     
+                    <!-- Step-wise Statistics (for sequences) -->
+                    <div id="stepStatisticsSection" style="display: none;">
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Step-wise Statistics</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="stepStatisticsContainer" class="row">
+                                    <!-- Dynamic step statistics will be inserted here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Device-wise Report -->
                     <div class="card">
                         <div class="card-header bg-light">
@@ -6584,6 +6598,12 @@
                 return;
             }
             
+            // Hide step statistics section for campaigns
+            document.getElementById('stepStatisticsSection').style.display = 'none';
+            
+            // Hide step statistics section for campaigns
+            document.getElementById('stepStatisticsSection').style.display = 'none';
+            
             // Debug: Log what we receive from backend
             console.log('Device Report received:', report);
             console.log('totalDevices from backend:', report.totalDevices);
@@ -6693,6 +6713,101 @@
             document.getElementById('contactsDoneSend').textContent = report.doneSend || 0;
             document.getElementById('contactsFailedSend').textContent = report.failedSend || 0;
             document.getElementById('contactsRemainingSend').textContent = report.remainingSend || 0;
+            
+            // Show step statistics section
+            document.getElementById('stepStatisticsSection').style.display = 'block';
+            
+            // Generate step statistics
+            const stepStatsContainer = document.getElementById('stepStatisticsContainer');
+            stepStatsContainer.innerHTML = '';
+            
+            // Aggregate statistics by step
+            const stepStats = {};
+            
+            if (report.devices && report.devices.length > 0) {
+                report.devices.forEach(device => {
+                    if (device.steps && device.steps.length > 0) {
+                        device.steps.forEach(step => {
+                            if (!stepStats[step.step_id]) {
+                                stepStats[step.step_id] = {
+                                    name: step.step_name,
+                                    order: step.step_order,
+                                    day: step.day_number || step.step_order,
+                                    should_send: 0,
+                                    done_send: 0,
+                                    failed_send: 0,
+                                    remaining_send: 0
+                                };
+                            }
+                            stepStats[step.step_id].should_send += (step.should_send || 0);
+                            stepStats[step.step_id].done_send += (step.done_send || 0);
+                            stepStats[step.step_id].failed_send += (step.failed_send || 0);
+                            stepStats[step.step_id].remaining_send += (step.remaining_send || 0);
+                        });
+                    }
+                });
+            }
+            
+            // Sort steps by order
+            const sortedSteps = Object.entries(stepStats).sort((a, b) => a[1].order - b[1].order);
+            
+            // Display step statistics as cards
+            sortedSteps.forEach(([stepId, stats]) => {
+                const successRate = stats.should_send > 0 
+                    ? ((stats.done_send / stats.should_send) * 100).toFixed(1) 
+                    : 0;
+                    
+                const stepCard = `
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">${stats.name} (Day ${stats.day})</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 mb-2">
+                                        <div class="bg-primary text-white rounded p-2">
+                                            <h5 class="mb-0">${stats.should_send}</h5>
+                                            <small>Should Send</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <div class="bg-success text-white rounded p-2">
+                                            <h5 class="mb-0">${stats.done_send}</h5>
+                                            <small>Done Send</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="bg-danger text-white rounded p-2">
+                                            <h5 class="mb-0">${stats.failed_send}</h5>
+                                            <small>Failed Send</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="bg-warning text-white rounded p-2">
+                                            <h5 class="mb-0">${stats.remaining_send}</h5>
+                                            <small>Remaining</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-success" style="width: ${successRate}%">
+                                            ${successRate}% Success
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                stepStatsContainer.innerHTML += stepCard;
+            });
+            
+            // If no steps found
+            if (sortedSteps.length === 0) {
+                stepStatsContainer.innerHTML = '<div class="col-12"><p class="text-muted text-center">No step data available</p></div>';
+            }
             
             // Update table header for sequence steps
             const tableHead = document.querySelector('#deviceReportTableBody').closest('table').querySelector('thead');

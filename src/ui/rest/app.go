@@ -4174,6 +4174,7 @@ func (a App) GetTeamMemberInfo(c *fiber.Ctx) error {
 // GetSequenceDeviceReport gets device-wise report for a sequence broken down by steps
 func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	sequenceId := c.Params("id") // Sequence ID is already a string UUID
+	log.Printf("GetSequenceDeviceReport called for sequence: %s", sequenceId)
 	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
@@ -4188,6 +4189,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	session, err := userRepo.GetSession(sessionToken)
 	if err != nil {
+		log.Printf("Invalid session: %v", err)
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
 			Code:    "UNAUTHORIZED", 
@@ -4207,14 +4209,24 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		})
 	}
 	
+	log.Printf("Found sequence: %s - %s", sequence.ID, sequence.Name)
+	
 	db := database.GetDB()
+	if db == nil {
+		log.Printf("Database connection is nil")
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
 	
 	// Get sequence steps first
 	stepsQuery := `
-		SELECT id, step_order, message_type, content, day_number
+		SELECT id, COALESCE(day_number, day, 1) as step_order, message_type, content, COALESCE(day_number, day, 1) as day_num
 		FROM sequence_steps
 		WHERE sequence_id = ?
-		ORDER BY step_order
+		ORDER BY COALESCE(day_number, day, 1)
 	`
 	
 	// Use string sequence ID for query
@@ -4250,6 +4262,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		
 		err := stepRows.Scan(&step.ID, &step.Order, &step.MessageType, &contentNull, &dayNumberNull)
 		if err != nil {
+			log.Printf("Error scanning step row: %v", err)
 			continue
 		}
 		
