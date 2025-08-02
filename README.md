@@ -1,10 +1,15 @@
 # WhatsApp Multi-Device System - Dual Database Edition
-**Last Updated: August 02, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
+**Last Updated: August 03, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
 **Status: ✅ Production-ready with Critical Fixes Applied**
 
-## 🔧 Recent Updates (August 2, 2025)
+## 🔧 Recent Updates (August 3, 2025)
 
-### Fixed Critical Issues:
+### Critical Message Fix:
+1. **Fixed Missing Messages**: Fixed critical bug where `GetPendingMessages` wasn't appending messages to return array
+2. **Anti-Spam Flow**: Fixed double anti-spam application - now applied once in BroadcastWorker for all device types
+3. **Platform Device Support**: Platform devices (Wablas/Whacenter) now also receive anti-spam (greeting + randomization)
+
+### Previous Fixes (August 2, 2025):
 1. **Duplicate Prevention**: 
    - For Sequences: Checks `sequence_stepid`, `recipient_phone`, and `device_id`
    - For Campaigns: Checks `campaign_id`, `recipient_phone`, and `device_id`
