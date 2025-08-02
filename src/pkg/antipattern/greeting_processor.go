@@ -17,11 +17,11 @@ type GreetingProcessor struct {
 func NewGreetingProcessor() *GreetingProcessor {
 	return &GreetingProcessor{
 		templates: []string{
-			"{Hi|Hello|Hai} {name}",
-			"{name} {hi|hello}",
-			"{Salam|Hi|Hello} {name}",
+			"{Hi|Hello|Hai} {name},",
+			"{name}, {hi|hello}",
+			"{Salam|Hi|Hello} {name},",
 			"{name}, {apa khabar|hi}",
-			"{Selamat pagi|Hi} {name}", // Time-aware
+			"{Selamat pagi|Hi} {name},", // Time-aware
 		},
 	}
 }
@@ -66,8 +66,8 @@ func (g *GreetingProcessor) selectTimeAppropriateTemplate() string {
 	if hour >= 5 && hour < 12 {
 		// Prefer templates with "Selamat pagi"
 		morningTemplates := []string{
-			"{Selamat pagi|Pagi} {name}",
-			"{Hi|Hello|Hai} {name}",
+			"{Selamat pagi|Pagi} {name},",
+			"{Hi|Hello|Hai} {name},",
 			"{name}, {selamat pagi|hi}",
 		}
 		return morningTemplates[rand.Intn(len(morningTemplates))]
@@ -76,9 +76,9 @@ func (g *GreetingProcessor) selectTimeAppropriateTemplate() string {
 	// Evening/Night - avoid "pagi"
 	if hour >= 19 {
 		eveningTemplates := []string{
-			"{Hi|Hello|Hai} {name}",
-			"{name} {hi|hello}",
-			"{Salam|Hi} {name}",
+			"{Hi|Hello|Hai} {name},",
+			"{name}, {hi|hello}",
+			"{Salam|Hi} {name},",
 		}
 		return eveningTemplates[rand.Intn(len(eveningTemplates))]
 	}
@@ -99,55 +99,54 @@ func (g *GreetingProcessor) processSpintax(template string) string {
 	})
 }
 
-// applyMicroVariations adds subtle variations to prevent pattern detection
-func (g *GreetingProcessor) applyMicroVariations(text string) string {
-	// Punctuation variations (50% chance)
-	r := rand.Float32()
-	if r < 0.3 {
-		text = text + "."
-	} else if r < 0.5 {
-		text = text + ","
+// applyMicroVariations adds subtle variations to greeting
+func (g *GreetingProcessor) applyMicroVariations(greeting string) string {
+	// For greetings that already end with comma, don't add more punctuation
+	if strings.HasSuffix(greeting, ",") {
+		return greeting
 	}
 	
-	// Case variations (20% chance)
-	if rand.Float32() < 0.2 && len(text) > 0 {
-		// Lowercase first letter
-		text = strings.ToLower(text[:1]) + text[1:]
+	// Randomly (30% chance) add punctuation variations
+	if rand.Float32() < 0.3 {
+		variations := []string{
+			greeting + "!",
+			greeting + ".",
+			greeting + ",",
+			greeting + " 👋", // WhatsApp supports emojis
+		}
+		greeting = variations[rand.Intn(len(variations))]
 	}
 	
-	// Spacing variations (invisible but different)
-	if rand.Float32() < 0.4 {
-		text = text + " " // Extra space at end
+	// Randomly (20% chance) vary capitalization
+	if rand.Float32() < 0.2 {
+		// Lowercase first character for casual feel
+		if len(greeting) > 0 {
+			greeting = strings.ToLower(string(greeting[0])) + greeting[1:]
+		}
 	}
 	
-	return text
+	return greeting
 }
 
-// isPhoneNumber checks if the name looks like a phone number
-func isPhoneNumber(name string) bool {
-	// Check if name contains only numbers, +, -, and spaces
-	phoneRegex := regexp.MustCompile(`^[0-9\+\-\s]+$`)
-	return phoneRegex.MatchString(name)
-}
-
-// hash creates a simple hash from string
+// hash generates a deterministic hash from a string
 func hash(s string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return h.Sum32()
 }
 
-// GetMessageDelay calculates delay to prevent burst sending
-func GetMessageDelay(deviceID string, messageCount int) time.Duration {
-	baseDelay := 5 * time.Second
-	
-	// Add random jitter (0-10 seconds)
-	jitter := time.Duration(rand.Intn(10)) * time.Second
-	
-	// Increase delay after every 50 messages
-	batchDelay := time.Duration(messageCount/50) * 30 * time.Second
-	
-	return baseDelay + jitter + batchDelay
+// isPhoneNumber checks if the name looks like a phone number
+func isPhoneNumber(name string) bool {
+	// Remove all non-digits
+	digitsOnly := regexp.MustCompile(`\D`).ReplaceAllString(name, "")
+	// If more than 5 digits, probably a phone number
+	return len(digitsOnly) > 5
+}
+
+// isSingleName checks if name is a single word (no surname)
+func isSingleName(name string) bool {
+	parts := strings.Fields(name)
+	return len(parts) <= 1
 }
 
 // PrepareMessageWithGreeting adds greeting to original message
@@ -168,6 +167,6 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	processedMessage = strings.ReplaceAll(processedMessage, "<br />", "\n")
 	
 	// Combine with proper line breaks for WhatsApp
-	// Using \n\n for double line break - WhatsApp will handle the encoding
+	// Using \n\n for double line break to create a blank line
 	return greeting + "\n\n" + processedMessage
 }
