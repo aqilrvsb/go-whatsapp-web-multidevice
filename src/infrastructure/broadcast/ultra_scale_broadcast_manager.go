@@ -413,6 +413,18 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 		return fmt.Errorf("message sender not initialized")
 	}
 	
+	// Debug log the incoming message
+	logrus.Infof("[BROADCAST-WORKER] Processing message ID: %s", msg.ID)
+	logrus.Infof("[BROADCAST-WORKER] Original Content: '%s'", msg.Content)
+	logrus.Infof("[BROADCAST-WORKER] Original Message: '%s'", msg.Message)
+	logrus.Infof("[BROADCAST-WORKER] RecipientName: '%s'", msg.RecipientName)
+	
+	// Check if content is empty and use Message field as fallback
+	if msg.Content == "" && msg.Message != "" {
+		msg.Content = msg.Message
+		logrus.Infof("[BROADCAST-WORKER] Content was empty, using Message field: '%s'", msg.Content)
+	}
+	
 	// Apply anti-spam for ALL devices (both WhatsApp Web and Platform)
 	// Create message randomizer and greeting processor
 	messageRandomizer := antipattern.NewMessageRandomizer()
@@ -420,6 +432,7 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 	
 	// STEP 1: Apply randomization to CONTENT ONLY
 	randomizedContent := messageRandomizer.RandomizeMessage(msg.Content)
+	logrus.Infof("[BROADCAST-WORKER] After randomization: '%s'", randomizedContent)
 	
 	// STEP 2: Add greeting to the randomized content
 	finalContent := greetingProcessor.PrepareMessageWithGreeting(
@@ -433,6 +446,7 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 	msg.Content = finalContent
 	msg.Message = finalContent
 	
+	logrus.Infof("[BROADCAST-WORKER] Final content with greeting: '%s'", finalContent)
 	logrus.Debugf("Applied anti-spam for device %s: randomized and added greeting", bw.deviceID)
 	
 	// Use the self-healing message sender with modified content

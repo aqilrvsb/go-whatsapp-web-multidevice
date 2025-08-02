@@ -198,7 +198,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		msg.ImageURL = msg.MediaURL
 		msg.Message = msg.Content
 		
-		
+		messages = append(messages, msg)
 	}
 	
 	return messages, nil
