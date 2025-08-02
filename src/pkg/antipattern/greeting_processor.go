@@ -12,18 +12,10 @@ import (
 type GreetingProcessor struct {
 	// Malaysian greetings - NO SPINTAX, will randomly pick one
 	greetings []string
-	location  *time.Location
 }
 
 // NewGreetingProcessor creates a new greeting processor
 func NewGreetingProcessor() *GreetingProcessor {
-	// Always use Malaysia timezone
-	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
-	if err != nil {
-		logrus.Warnf("Failed to load Malaysia timezone, using local time: %v", err)
-		loc = time.Local
-	}
-	
 	return &GreetingProcessor{
 		greetings: []string{
 			"Salam {name}",
@@ -32,7 +24,6 @@ func NewGreetingProcessor() *GreetingProcessor {
 			"Maaf ganggu {name}",
 			"Pinjam masa {name}",
 		},
-		location: loc,
 	}
 }
 
@@ -55,10 +46,10 @@ func cleanName(name string) string {
 	return cleaned
 }
 
-// getSimpleGreeting returns a Malaysian greeting based on time or random
+// getSimpleGreeting returns a Malaysian greeting based on time
 func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 	// Debug log the original name
-	logrus.Debugf("[GREETING] Original name: '%s'", name)
+	logrus.Debugf("[GREETING] Original name from recipient_name: '%s'", name)
 	
 	// Clean the name by removing all numbers
 	cleanedName := cleanName(name)
@@ -72,11 +63,11 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 		name = cleanedName
 	}
 	
-	// Get current hour in Malaysia timezone
-	now := time.Now().In(g.location)
-	hour := now.Hour()
+	// Get current hour and add 5 hours for Malaysia time adjustment
+	hour := time.Now().Hour()
+	hour = (hour + 5) % 24
 	
-	logrus.Debugf("[GREETING] Malaysia time: %s (hour: %d)", now.Format("15:04:05"), hour)
+	logrus.Debugf("[GREETING] Server hour + 5: %d", hour)
 	
 	var greeting string
 	

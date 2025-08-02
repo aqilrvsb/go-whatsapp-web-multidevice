@@ -301,8 +301,8 @@ func max(a, b int) int {
 func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	query := `
 		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
-		       message_type, content, media_url, status, scheduled_at, created_at,
-		       group_id, group_order
+		       recipient_name, message_type, content, media_url, status, scheduled_at, 
+		       created_at, group_id, group_order
 		FROM broadcast_messages
 		WHERE status = 'pending' 
 		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
@@ -321,15 +321,21 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 		var msg domainBroadcast.BroadcastMessage
 		var campaignID sql.NullInt64
 		var sequenceID sql.NullString
+		var recipientName sql.NullString
 		var scheduledAt sql.NullTime
 		var groupID sql.NullString
 		var groupOrder sql.NullInt64
 		
 		err := rows.Scan(&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Type, &msg.Content, &msg.MediaURL, &msg.Status,
-			&scheduledAt, &msg.CreatedAt, &groupID, &groupOrder)
+			&msg.RecipientPhone, &recipientName, &msg.Type, &msg.Content, &msg.MediaURL, 
+			&msg.Status, &scheduledAt, &msg.CreatedAt, &groupID, &groupOrder)
 		if err != nil {
 			continue
+		}
+		
+		// Set recipient name
+		if recipientName.Valid {
+			msg.RecipientName = recipientName.String
 		}
 		
 		if campaignID.Valid {
@@ -354,7 +360,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 		msg.ImageURL = msg.MediaURL
 		msg.Message = msg.Content
 		
-		
+		messages = append(messages, msg)
 	}
 	
 	return messages, nil
