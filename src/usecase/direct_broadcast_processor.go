@@ -282,7 +282,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 
 // removeCompletedTrigger removes trigger from lead after enrollment
 func (p *DirectBroadcastProcessor) removeCompletedTrigger(phone, trigger string) {
-	_, err := p.db.Exec("UPDATE leads SET ` + "`trigger`" + ` = NULL WHERE phone = ?", phone)
+	_, err := p.db.Exec("UPDATE leads SET `trigger` = NULL WHERE phone = ?", phone)
 	if err != nil {
 		logrus.Errorf("Failed to remove trigger for %s: %v", phone, err)
 	}
