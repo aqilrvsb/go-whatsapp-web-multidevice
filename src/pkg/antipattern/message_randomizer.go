@@ -1,10 +1,12 @@
 package antipattern
 
+
 import (
 	"math/rand"
 	"strings"
 	"time"
 	"unicode"
+	"regexp"
 )
 
 // MessageRandomizer handles message anti-pattern techniques
@@ -33,11 +35,37 @@ func (mr *MessageRandomizer) RandomizeMessage(message string) string {
 	}
 	
 	// Apply techniques in order
-	message = mr.applyHomoglyphs(message, 0.10) // Changed from 15% to 10%
-	message = mr.insertZeroWidthSpaces(message, 2) // 2 zero-width spaces
+	// 1. First process any spintax in the message content
+	message = mr.processSpintax(message)
+	
+	// 2. Then apply homoglyphs (10% of characters)
+	message = mr.applyHomoglyphs(message, 0.10)
+	
+	// 3. Insert zero-width spaces
+	message = mr.insertZeroWidthSpaces(message, 2)
+	
+	// 4. Randomize punctuation
 	message = mr.randomizePunctuation(message)
 	
 	return message
+}
+
+// processSpintax processes spintax patterns {option1|option2|option3} in the message
+func (mr *MessageRandomizer) processSpintax(text string) string {
+	spintaxRegex := regexp.MustCompile(`\{([^}]+)\}`)
+	
+	result := spintaxRegex.ReplaceAllStringFunc(text, func(match string) string {
+		// Remove braces
+		content := match[1 : len(match)-1]
+		
+		// Split options
+		options := strings.Split(content, "|")
+		
+		// Randomly select one
+		return options[rand.Intn(len(options))]
+	})
+	
+	return result
 }
 
 // applyHomoglyphs replaces a percentage of characters with look-alikes

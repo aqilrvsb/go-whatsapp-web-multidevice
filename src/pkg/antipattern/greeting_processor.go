@@ -1,138 +1,55 @@
 package antipattern
 
 import (
-	"hash/fnv"
-	"math/rand"
-	"regexp"
 	"strings"
-	"time"
 	"github.com/sirupsen/logrus"
 )
 
-// GreetingProcessor handles Malaysian greeting variations for anti-spam
-type GreetingProcessor struct {
-	templates []string
-}
+// GreetingProcessor handles greeting for messages
+type GreetingProcessor struct{}
 
-// NewGreetingProcessor creates a new greeting processor with Malaysian templates
+// NewGreetingProcessor creates a new greeting processor
 func NewGreetingProcessor() *GreetingProcessor {
-	return &GreetingProcessor{
-		templates: []string{
-			"Hi {name},",
-			"Hello {name},",
-			"Hai {name},",
-			"Salam {name},",
-			"Selamat pagi {name},", // Morning greeting
-			"Selamat petang {name},", // Afternoon greeting
-			"Selamat malam {name},", // Evening greeting
-		},
-	}
+	return &GreetingProcessor{}
 }
 
-// GetAntiSpamGreeting generates a greeting WITHOUT spintax - just picks one based on time
+// GetAntiSpamGreeting - NOT USED ANYMORE, keeping for compatibility
 func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, recipientPhone string) string {
-	// Debug logging
-	logrus.Debugf("[GREETING] Processing greeting for name='%s', phone='%s'", name, recipientPhone)
-	
-	// Handle name - if phone number or empty, use "Cik"
-	originalName := name
-	if isPhoneNumber(name) || name == "" {
-		name = "Cik"
-		logrus.Debugf("[GREETING] Name '%s' detected as phone/empty, using 'Cik'", originalName)
-	} else {
-		logrus.Debugf("[GREETING] Using actual name: '%s'", name)
-	}
-	
-	// Select greeting based on time of day
-	greeting := g.selectTimeAppropriateGreeting(name)
-	
-	logrus.Infof("[GREETING] Final greeting: '%s' for recipient '%s'", greeting, recipientPhone)
-	return greeting
+	// Just return simple greeting
+	return g.getSimpleGreeting(name)
 }
 
-// selectTimeAppropriateGreeting chooses greeting based on current time - NO SPINTAX
-func (g *GreetingProcessor) selectTimeAppropriateGreeting(name string) string {
-	hour := time.Now().Hour()
-	
-	// Morning (5am - 12pm)
-	if hour >= 5 && hour < 12 {
-		return "Selamat pagi " + name + ","
+// getSimpleGreeting returns a simple greeting with the name
+func (g *GreetingProcessor) getSimpleGreeting(name string) string {
+	// Handle empty name or phone number as name
+	if name == "" || isPhoneNumber(name) {
+		name = "there" // Use "there" instead of "Cik" for more universal greeting
 	}
 	
-	// Afternoon (12pm - 6pm)
-	if hour >= 12 && hour < 18 {
-		return "Selamat petang " + name + ","
-	}
-	
-	// Evening/Night (6pm - 5am)
-	if hour >= 18 || hour < 5 {
-		return "Selamat malam " + name + ","
-	}
-	
-	// Default fallback
+	// Simple greeting - NO SPINTAX!
 	return "Hi " + name + ","
 }
 
-// processSpintax processes spintax patterns {option1|option2|option3}
-func (g *GreetingProcessor) processSpintax(text string) string {
-	spintaxRegex := regexp.MustCompile(`\{([^}]+)\}`)
-	
-	result := spintaxRegex.ReplaceAllStringFunc(text, func(match string) string {
-		// Remove braces
-		content := match[1 : len(match)-1]
-		
-		// Split options
-		options := strings.Split(content, "|")
-		
-		// Randomly select one
-		return options[rand.Intn(len(options))]
-	})
-	
-	return result
-}
-
-// isPhoneNumber checks if the name looks like a phone number
-func isPhoneNumber(name string) bool {
-	// Remove spaces and check if mostly digits
-	cleaned := strings.ReplaceAll(name, " ", "")
-	digitCount := 0
-	for _, r := range cleaned {
-		if r >= '0' && r <= '9' {
-			digitCount++
-		}
-	}
-	// If more than 50% digits, it's likely a phone number
-	return float64(digitCount) > float64(len(cleaned))*0.5
-}
-
-// hash generates a consistent hash for a string
-func hash(s string) uint32 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return h.Sum32()
-}
-
-// PrepareMessageWithGreeting adds greeting to original message
+// PrepareMessageWithGreeting adds greeting to message
 func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, name string, deviceID string, recipientPhone string) string {
-	logrus.Infof("[GREETING] PrepareMessageWithGreeting called with name='%s', phone='%s'", name, recipientPhone)
+	logrus.Infof("[GREETING] Processing message for name='%s', phone='%s'", name, recipientPhone)
 	
-	// STEP 1: Process spintax on the CONTENT FIRST (before adding greeting)
-	processedMessage := g.processSpintax(originalMessage)
-	logrus.Debugf("[GREETING] Content after spintax: %s", processedMessage)
+	// STEP 1: Get the simple greeting (NO SPINTAX!)
+	greeting := g.getSimpleGreeting(name)
+	logrus.Debugf("[GREETING] Simple greeting: %s", greeting)
 	
-	// STEP 2: Replace {name} placeholder in the processed content
+	// STEP 2: Process the message content
+	// First replace {name} in the message if exists
+	processedMessage := originalMessage
 	if strings.Contains(processedMessage, "{name}") {
-		// Ensure we use proper name (not phone number)
 		properName := name
-		if isPhoneNumber(name) || name == "" {
-			properName = "Cik"
+		if name == "" || isPhoneNumber(name) {
+			properName = "there"
 		}
 		processedMessage = strings.ReplaceAll(processedMessage, "{name}", properName)
-		logrus.Debugf("[GREETING] Content after name replacement: %s", processedMessage)
 	}
 	
-	// STEP 3: Fix line breaks for WhatsApp
-	// Replace common line break patterns with proper WhatsApp line breaks
+	// STEP 3: Fix line breaks in the message
 	processedMessage = strings.ReplaceAll(processedMessage, "\\n", "\n")
 	processedMessage = strings.ReplaceAll(processedMessage, "%0A", "\n")
 	processedMessage = strings.ReplaceAll(processedMessage, "%0a", "\n")
@@ -140,16 +57,39 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	processedMessage = strings.ReplaceAll(processedMessage, "<br/>", "\n")
 	processedMessage = strings.ReplaceAll(processedMessage, "<br />", "\n")
 	
-	// STEP 4: Get simple greeting (no spintax, just time-based)
-	greeting := g.GetAntiSpamGreeting(name, deviceID, recipientPhone)
-	
-	// STEP 5: Combine greeting + line breaks + content
-	// Using \n\n for double line break to create a blank line
+	// STEP 4: Combine greeting + double line break + message
+	// The spintax processing will happen LATER in the message randomizer
 	finalMessage := greeting + "\n\n" + processedMessage
 	
-	logrus.Infof("[GREETING] Final message preview: '%s...'", strings.ReplaceAll(finalMessage[:min(50, len(finalMessage))], "\n", "\\n"))
+	logrus.Infof("[GREETING] Final message with greeting added (before spintax): %s", 
+		strings.ReplaceAll(finalMessage[:min(100, len(finalMessage))], "\n", "\\n"))
+	
 	return finalMessage
 }
+
+// isPhoneNumber checks if the name looks like a phone number
+func isPhoneNumber(name string) bool {
+	// Remove spaces and check if mostly digits
+	cleaned := strings.ReplaceAll(name, " ", "")
+	cleaned = strings.ReplaceAll(cleaned, "+", "")
+	cleaned = strings.ReplaceAll(cleaned, "-", "")
+	
+	if len(cleaned) == 0 {
+		return false
+	}
+	
+	digitCount := 0
+	for _, r := range cleaned {
+		if r >= '0' && r <= '9' {
+			digitCount++
+		}
+	}
+	// If more than 70% digits, it's likely a phone number
+	return float64(digitCount) > float64(len(cleaned))*0.7
+}
+
+// processSpintax - REMOVED! This should NOT be in greeting processor
+// Spintax processing happens in message_randomizer.go AFTER greeting is added
 
 // min returns the minimum of two integers
 func min(a, b int) int {
@@ -157,9 +97,4 @@ func min(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// init initializes the random seed
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
