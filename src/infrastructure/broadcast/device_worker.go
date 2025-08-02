@@ -214,6 +214,24 @@ func (dw *DeviceWorker) sendMessage(msg domainBroadcast.BroadcastMessage) error 
 
 // sendTextMessage sends text message
 func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast.BroadcastMessage) error {
+	// Check if this is a platform device
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(dw.deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get device info: %v", err)
+	}
+	
+	// If platform device, just send raw content (platform sender will handle greeting/anti-spam)
+	if device != nil && device.Platform != "" {
+		logrus.Debugf("Platform device %s detected, skipping greeting/anti-spam", device.Platform)
+		message := &waProto.Message{
+			Conversation: proto.String(msg.Content),
+		}
+		_, err := dw.client.SendMessage(context.Background(), recipient, message)
+		return err
+	}
+	
+	// For regular WhatsApp Web devices, apply greeting and anti-spam
 	// STEP 1: Apply randomization to CONTENT ONLY
 	randomizedContent := dw.messageRandomizer.RandomizeMessage(msg.Content)
 	
@@ -230,7 +248,7 @@ func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast
 		Conversation: proto.String(finalContent),
 	}
 	
-	_, err := dw.client.SendMessage(context.Background(), recipient, message)
+	_, err = dw.client.SendMessage(context.Background(), recipient, message)
 	return err
 }
 
@@ -251,16 +269,25 @@ func (dw *DeviceWorker) sendImageMessage(recipient types.JID, msg domainBroadcas
 	// Process caption with spintax (same as text messages)
 	processedCaption := ""
 	if msg.Content != "" {
-		// STEP 1: Apply randomization to CAPTION ONLY
-		randomizedCaption := dw.messageRandomizer.RandomizeMessage(msg.Content)
-		
-		// STEP 2: Add greeting to the randomized caption
-		processedCaption = dw.greetingProcessor.PrepareMessageWithGreeting(
-			randomizedCaption,
-			msg.RecipientName,
-			dw.deviceID,
-			msg.RecipientPhone,
-		)
+		// Check if this is a platform device
+		userRepo := repository.GetUserRepository()
+		device, err := userRepo.GetDeviceByID(dw.deviceID)
+		if err == nil && device != nil && device.Platform != "" {
+			// Platform device - just use raw content
+			processedCaption = msg.Content
+		} else {
+			// Regular WhatsApp device - apply greeting and anti-spam
+			// STEP 1: Apply randomization to CAPTION ONLY
+			randomizedCaption := dw.messageRandomizer.RandomizeMessage(msg.Content)
+			
+			// STEP 2: Add greeting to the randomized caption
+			processedCaption = dw.greetingProcessor.PrepareMessageWithGreeting(
+				randomizedCaption,
+				msg.RecipientName,
+				dw.deviceID,
+				msg.RecipientPhone,
+			)
+		}
 	}
 	
 	// Create image message
