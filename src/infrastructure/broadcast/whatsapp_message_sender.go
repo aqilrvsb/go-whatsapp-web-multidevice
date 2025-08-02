@@ -7,11 +7,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/multidevice"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
@@ -23,14 +21,12 @@ import (
 
 // WhatsAppMessageSender handles message sending with self-healing capabilities
 type WhatsAppMessageSender struct {
-	platformSender     *PlatformSender
 	greetingProcessor  *antipattern.GreetingProcessor
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		platformSender:    NewPlatformSender(),
 		greetingProcessor: antipattern.NewGreetingProcessor(),
 	}
 }
@@ -52,38 +48,10 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	
 	// Check if it's a platform device
 	if device.Platform != "" {
-		// Send via external platform
-		logrus.Infof("[PLATFORM-SEND] 📤 Sending message via %s platform for device %s (%s)", 
-			device.Platform, device.DeviceName, deviceID)
-		logrus.Infof("[PLATFORM-SEND] Recipient: %s, Message type: %s", 
-			msg.RecipientPhone, msg.Type)
-		
-		// Get instance/token from device JID (or you can add a separate column)
-		instance := device.JID // Using JID as instance/token
-		
-		logrus.Debugf("[PLATFORM-SEND] Using instance/token: %s", instance)
-		
-		startTime := time.Now()
-		err = w.platformSender.SendMessage(
-			device.Platform,
-			instance,
-			msg.RecipientPhone,
-			msg.RecipientName,
-			msg.Message,
-			msg.ImageURL,
-			deviceID,
-		)
-		duration := time.Since(startTime)
-		
-		if err != nil {
-			logrus.Errorf("[PLATFORM-SEND] ❌ Failed to send via %s platform: %v (took %v)", 
-				device.Platform, err, duration)
-			return fmt.Errorf("platform send failed: %v", err)
-		}
-		
-		logrus.Infof("[PLATFORM-SEND] ✅ Successfully sent message via %s platform to %s (took %v)", 
-			device.Platform, msg.RecipientPhone, duration)
-		return nil
+		// For platform devices, we need to implement platform sending
+		// For now, log and return error
+		logrus.Warnf("Platform device %s (%s) not supported in this version", device.DeviceName, device.Platform)
+		return fmt.Errorf("platform devices not implemented")
 	}
 	
 	// Normal WhatsApp sending with self-healing
@@ -98,13 +66,13 @@ func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMe
 		content = msg.Message
 	}
 	
-	// Process greeting only if recipientName is provided
-	if msg.RecipientName != "" {
+	// Process greeting only if recipientName is provided and not empty
+	if msg.RecipientName != "" && msg.RecipientName != "None" {
 		// Use the greeting processor to add personalized greeting
-		content = w.greetingProcessor.ProcessMessageContent(content, msg.RecipientName, deviceID, msg.RecipientPhone)
+		content = w.greetingProcessor.PrepareMessageWithGreeting(content, msg.RecipientName, deviceID, msg.RecipientPhone)
 	}
 	
-	// Fix line breaks for WhatsApp
+	// Fix line breaks for WhatsApp (already done in PrepareMessageWithGreeting, but do it again just in case)
 	content = strings.ReplaceAll(content, "\\n", "\n")
 	content = strings.ReplaceAll(content, "%0A", "\n")
 	content = strings.ReplaceAll(content, "%0a", "\n")
