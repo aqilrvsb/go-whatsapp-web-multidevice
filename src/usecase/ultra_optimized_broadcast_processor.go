@@ -40,7 +40,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	// Get pending messages grouped by broadcast
 	rows, err := db.Query(`
 		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
-			bm.recipient_phone, bm.content AS message, bm.media_url AS image_url,
+			bm.recipient_phone, bm.recipient_name, bm.content AS message, bm.media_url AS image_url,
 			COALESCE(c.min_delay_seconds, 5) AS min_delay,
 			COALESCE(c.max_delay_seconds, 15) AS max_delay,
 			d.status AS device_status,
@@ -72,16 +72,24 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		var deviceStatus string
 		var devicePlatform string
 		var imageURL sql.NullString // Use sql.NullString for nullable fields
+		var recipientName sql.NullString // Add recipient name
 		
 		err := rows.Scan(
 			&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &msg.Message, &imageURL, // Scan into sql.NullString
+			&msg.RecipientPhone, &recipientName, &msg.Message, &imageURL, // Include recipient name
 			&minDelay, &maxDelay, &deviceStatus, &devicePlatform,
 		)
 		
 		if err != nil {
 			logrus.Errorf("Failed to scan message: %v", err)
 			continue
+		}
+		
+		// Set recipient name
+		if recipientName.Valid {
+			msg.RecipientName = recipientName.String
+		} else {
+			msg.RecipientName = ""
 		}
 		
 		// Convert NullString to string
