@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"github.com/sirupsen/logrus"
 )
 
 // GreetingProcessor handles Malaysian greeting variations for anti-spam
@@ -28,6 +29,9 @@ func NewGreetingProcessor() *GreetingProcessor {
 
 // GetAntiSpamGreeting generates a unique greeting for each recipient
 func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, recipientPhone string) string {
+	// Debug logging
+	logrus.Debugf("[GREETING] Processing greeting for name='%s', phone='%s'", name, recipientPhone)
+	
 	// 1. Device-specific seed (each device has different pattern)
 	deviceSeed := hash(deviceID + time.Now().Format("2006-01-02"))
 	
@@ -44,8 +48,12 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 	template := g.selectTimeAppropriateTemplate()
 	
 	// Handle name FIRST - if phone number or empty, use "Cik"
+	originalName := name
 	if isPhoneNumber(name) || name == "" {
 		name = "Cik"
+		logrus.Debugf("[GREETING] Name '%s' detected as phone/empty, using 'Cik'", originalName)
+	} else {
+		logrus.Debugf("[GREETING] Using actual name: '%s'", name)
 	}
 	
 	// Replace {name} placeholder BEFORE processing spintax
@@ -55,7 +63,10 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 	greeting := g.processSpintax(template)
 	
 	// Apply micro-variations
-	return g.applyMicroVariations(greeting)
+	finalGreeting := g.applyMicroVariations(greeting)
+	
+	logrus.Infof("[GREETING] Final greeting: '%s' for recipient '%s'", finalGreeting, recipientPhone)
+	return finalGreeting
 }
 
 // selectTimeAppropriateTemplate chooses template based on current time
@@ -140,7 +151,9 @@ func isPhoneNumber(name string) bool {
 	// Remove all non-digits
 	digitsOnly := regexp.MustCompile(`\D`).ReplaceAllString(name, "")
 	// If more than 5 digits, probably a phone number
-	return len(digitsOnly) > 5
+	isPhone := len(digitsOnly) > 5
+	logrus.Debugf("[GREETING] isPhoneNumber check: '%s' -> %d digits -> %v", name, len(digitsOnly), isPhone)
+	return isPhone
 }
 
 // isSingleName checks if name is a single word (no surname)
@@ -151,6 +164,8 @@ func isSingleName(name string) bool {
 
 // PrepareMessageWithGreeting adds greeting to original message
 func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, name string, deviceID string, recipientPhone string) string {
+	logrus.Infof("[GREETING] PrepareMessageWithGreeting called with name='%s', phone='%s'", name, recipientPhone)
+	
 	// Get unique greeting
 	greeting := g.GetAntiSpamGreeting(name, deviceID, recipientPhone)
 	
@@ -168,5 +183,16 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	
 	// Combine with proper line breaks for WhatsApp
 	// Using \n\n for double line break to create a blank line
-	return greeting + "\n\n" + processedMessage
+	finalMessage := greeting + "\n\n" + processedMessage
+	
+	logrus.Infof("[GREETING] Final message preview: '%s...'", strings.ReplaceAll(finalMessage[:min(50, len(finalMessage))], "\n", "\\n"))
+	return finalMessage
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
