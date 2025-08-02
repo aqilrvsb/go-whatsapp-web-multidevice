@@ -130,7 +130,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 
 		// Get all steps for this sequence
 		stepsQuery := `
-			SELECT id, day_number, trigger, next_trigger, trigger_delay_hours,
+			SELECT id, day_number, ` + "`trigger`" + `, next_trigger, trigger_delay_hours,
 				   message_type, content, media_url, 
 				   COALESCE(min_delay_seconds, ?) AS min_delay,
 				   COALESCE(max_delay_seconds, ?) AS max_delay
@@ -245,7 +245,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			err := p.db.QueryRow(`
 				SELECT s.id FROM sequences s
 				INNER JOIN sequence_steps ss ON ss.sequence_id = s.id
-				WHERE ss.is_entry_point = true AND ss.trigger = ?
+				WHERE ss.is_entry_point = true AND ss.` + "`trigger`" + ` = ?
 				LIMIT 1
 			`, lastStepNextTrigger).Scan(&nextSequenceID)
 			
@@ -282,7 +282,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 
 // removeCompletedTrigger removes trigger from lead after enrollment
 func (p *DirectBroadcastProcessor) removeCompletedTrigger(phone, trigger string) {
-	_, err := p.db.Exec("UPDATE leads SET trigger = NULL WHERE phone = ?", phone)
+	_, err := p.db.Exec("UPDATE leads SET ` + "`trigger`" + ` = NULL WHERE phone = ?", phone)
 	if err != nil {
 		logrus.Errorf("Failed to remove trigger for %s: %v", phone, err)
 	}
