@@ -49,6 +49,9 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	msg.Message = processedContent
 	msg.Content = processedContent
 	
+	// Debug log to see the processed content
+	logrus.Debugf("Processed message content for %s: %s", msg.RecipientPhone, strings.ReplaceAll(processedContent, "\n", "\\n"))
+	
 	// Check if it's a platform device
 	if device.Platform != "" {
 		logrus.Infof("Sending via platform %s for device %s", device.Platform, device.DeviceName)
@@ -75,19 +78,28 @@ func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMe
 		content = msg.Message
 	}
 	
+	// Debug log original content
+	logrus.Debugf("Original content: %s", strings.ReplaceAll(content, "\n", "\\n"))
+	
 	// Process greeting only if recipientName is provided and not empty
 	if msg.RecipientName != "" && msg.RecipientName != "None" {
 		// Use the greeting processor to add personalized greeting
 		content = w.greetingProcessor.PrepareMessageWithGreeting(content, msg.RecipientName, deviceID, msg.RecipientPhone)
 	}
 	
-	// Fix line breaks for WhatsApp (already done in PrepareMessageWithGreeting, but do it again just in case)
+	// Fix line breaks for WhatsApp - ensure we have actual newline characters
+	// Replace various line break representations with actual newlines
 	content = strings.ReplaceAll(content, "\\n", "\n")
 	content = strings.ReplaceAll(content, "%0A", "\n")
 	content = strings.ReplaceAll(content, "%0a", "\n")
 	content = strings.ReplaceAll(content, "<br>", "\n")
 	content = strings.ReplaceAll(content, "<br/>", "\n")
 	content = strings.ReplaceAll(content, "<br />", "\n")
+	content = strings.ReplaceAll(content, "\r\n", "\n") // Windows line breaks
+	content = strings.ReplaceAll(content, "\r", "\n")   // Old Mac line breaks
+	
+	// Debug log processed content
+	logrus.Debugf("Processed content with line breaks: %s", strings.ReplaceAll(content, "\n", "\\n"))
 	
 	return content
 }
@@ -144,9 +156,11 @@ func (w *WhatsAppMessageSender) sendViaWhatsApp(deviceID string, msg *broadcast.
 
 // sendTextMessage sends a text message
 func (w *WhatsAppMessageSender) sendTextMessage(waClient *whatsmeow.Client, recipient types.JID, msg *broadcast.BroadcastMessage) error {
-	// Create message
+	// Use ExtendedTextMessage for better formatting support
 	message := &waE2E.Message{
-		Conversation: proto.String(msg.Message),
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String(msg.Message),
+		},
 	}
 	
 	// Send message
