@@ -3,6 +3,7 @@ package broadcast
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -559,9 +560,13 @@ func calculateRandomDelay(minSeconds, maxSeconds int) time.Duration {
 		return time.Duration(minSeconds) * time.Second
 	}
 	
-	// Random delay between min and max
-	delaySeconds := minSeconds + (maxSeconds-minSeconds)/2
-	return time.Duration(delaySeconds) * time.Second
+	// Generate truly random delay between min and max
+	rand.Seed(time.Now().UnixNano())
+	delayRange := maxSeconds - minSeconds
+	randomDelay := minSeconds + rand.Intn(delayRange+1) // +1 to include maxSeconds
+	
+	logrus.Debugf("Random delay: %d seconds (between %d-%d)", randomDelay, minSeconds, maxSeconds)
+	return time.Duration(randomDelay) * time.Second
 }
 
 // acquireSendPermission ensures only one worker sends at a time with proper delay
