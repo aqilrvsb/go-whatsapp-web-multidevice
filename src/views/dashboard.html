@@ -6520,6 +6520,12 @@
             // Store campaign for use in other functions
             currentCampaignForReport = campaign;
             
+            // Reset modal title to "Campaign Device Report"
+            document.querySelector('#campaignDeviceReportModal .modal-title').textContent = 'Campaign Device Report';
+            
+            // Reset card header to "Campaign Details"
+            document.querySelector('#campaignDeviceReportModal .card-header h6').textContent = 'Campaign Details';
+            
             // Populate campaign details
             document.getElementById('reportTitle').textContent = campaign.title || '-';
             document.getElementById('reportNiche').textContent = campaign.niche || '-';
@@ -6558,6 +6564,12 @@
         function showSequenceDeviceReport(sequence) {
             // Store sequence for use in other functions
             currentSequenceForReport = sequence;
+            
+            // Update modal title to "Sequence Device Report"
+            document.querySelector('#campaignDeviceReportModal .modal-title').textContent = 'Sequence Device Report';
+            
+            // Update card header to "Sequence Details"
+            document.querySelector('#campaignDeviceReportModal .card-header h6').textContent = 'Sequence Details';
             
             // Use the same modal as campaign report but populate with sequence data
             document.getElementById('reportTitle').textContent = sequence.name || '-';

@@ -4349,9 +4349,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			SELECT 
 				bm.sequence_stepid,
 				COUNT(DISTINCT bm.recipient_phone) as total,
-				COUNT(DISTINCT CASE WHEN bm.status = 'success' THEN bm.recipient_phone END) as success,
-				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed,
-				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.recipient_phone END) as pending
+				COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN bm.recipient_phone END) as done_send,
+				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send,
+				COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued') THEN bm.recipient_phone END) as remaining_send
 			FROM broadcast_messages bm
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
@@ -4370,9 +4370,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		
 		for statsRows.Next() {
 			var stepId string
-			var total, success, failed, pending int
+			var total, doneSend, failedSend, remainingSend int
 			
-			err := statsRows.Scan(&stepId, &total, &success, &failed, &pending)
+			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend)
 			if err != nil {
 				continue
 			}
@@ -4389,9 +4389,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				StepName:      fmt.Sprintf("Step %d: %s", stepInfo.Order, stepInfo.MessageType),
 				DayNumber:     stepInfo.DayNumber,
 				ShouldSend:    total,
-				DoneSend:      success,
-				FailedSend:    failed,
-				RemainingSend: pending,
+				DoneSend:      doneSend,
+				FailedSend:    failedSend,
+				RemainingSend: remainingSend,
 			}
 			
 			deviceReport.Steps = append(deviceReport.Steps, stepReport)
@@ -4419,9 +4419,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	overallQuery := `
 		SELECT 
 			COUNT(DISTINCT recipient_phone) as total,
-			COUNT(DISTINCT CASE WHEN status = 'success' THEN recipient_phone END) as success,
-			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed,
-			COUNT(DISTINCT CASE WHEN status = 'pending' THEN recipient_phone END) as pending
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining_send
 		FROM broadcast_messages
 		WHERE sequence_id = ? 
 		AND user_id = ?
