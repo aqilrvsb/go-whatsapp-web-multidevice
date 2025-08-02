@@ -46,7 +46,7 @@ func (p *DirectBroadcastProcessor) ProcessDirectEnrollments() (int, error) {
 			AND l.user_id IS NOT NULL
 			AND position(ss.trigger in l.trigger) > 0
 			AND NOT EXISTS (
-				SELECT 1 FROM broadcast_messages1 bm
+				SELECT 1 FROM broadcast_messages bm
 				WHERE bm.sequence_id = s.id 
 				AND bm.recipient_phone = l.phone
 				AND bm.status IN ('pending', 'sent')

@@ -32,7 +32,7 @@ func cleanStuckMessages() {
 	
 	// Clean messages that have been queued for more than 12 hours
 	result, err := db.Exec(`
-		UPDATE broadcast_messages1 SET ` + "status" + ` = 'failed', 
+		UPDATE broadcast_messages SET ` + "status" + ` = 'failed', 
 		    updated_at = CURRENT_TIMESTAMP,
 		    error_message = 'Message timeout - could not be delivered within 12 hours'
 		WHERE ` + "status" + ` = 'queued' 
@@ -52,7 +52,7 @@ func cleanStuckMessages() {
 	// Log current queue status
 	var queuedCount int
 	err = db.QueryRow(`
-		SELECT COUNT(*) FROM broadcast_messages1 
+		SELECT COUNT(*) FROM broadcast_messages 
 		WHERE ` + "status" + ` = 'queued'
 	`).Scan(&queuedCount)
 	

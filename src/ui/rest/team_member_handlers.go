@@ -757,7 +757,7 @@ func (h *TeamMemberHandlers) GetTeamSequencesAnalytics(c *fiber.Ctx) error {
 func campaignUsesDevice(campaignID int64, deviceID string) bool {
 	db := database.GetDB()
 	var count int
-	query := `SELECT COUNT(*) FROM broadcast_messages1 WHERE campaign_id = ? AND device_id = ?`
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ?`
 	db.QueryRow(query, campaignID, deviceID).Scan(&count)
 	return count > 0
 }
@@ -768,16 +768,16 @@ func getCampaignDeviceStats(campaignID int64, deviceID string) (shouldSend, done
 	
 	// Get total messages for this device
 	var total int
-	query := `SELECT COUNT(*) FROM broadcast_messages1 WHERE campaign_id = ? AND device_id = ?`
+	query := `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ?`
 	db.QueryRow(query, campaignID, deviceID).Scan(&total)
 	shouldSend = total
 	
 	// Get sent messages
-	query = `SELECT COUNT(*) FROM broadcast_messages1 WHERE campaign_id = ? AND device_id = ? AND status = 'sent'`
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ? AND status = 'sent'`
 	db.QueryRow(query, campaignID, deviceID).Scan(&doneSend)
 	
 	// Get failed messages
-	query = `SELECT COUNT(*) FROM broadcast_messages1 WHERE campaign_id = ? AND device_id = ? AND status = 'failed'`
+	query = `SELECT COUNT(*) FROM broadcast_messages WHERE campaign_id = ? AND device_id = ? AND status = 'failed'`
 	db.QueryRow(query, campaignID, deviceID).Scan(&failedSend)
 	
 	return
@@ -925,7 +925,7 @@ func (h *TeamMemberHandlers) GetTeamCampaignDetails(c *fiber.Ctx) error {
 		SELECT COUNT(*) AS total,
 			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
-		FROM broadcast_messages1 
+		FROM broadcast_messages 
 		WHERE campaign_id = ? AND device_id = ANY(?)
 	`
 	db.QueryRow(statsQuery, campaignID, pq.Array(deviceIDs)).Scan(&totalRecipients, &messagesSent, &messagesFailed)
@@ -1235,7 +1235,7 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 		SELECT DATE(bm.created_at) AS date,
 			COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) AS sent,
 			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) AS failed
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		WHERE bm.device_id = ANY(?)
 		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
 		GROUP BY DATE(bm.created_at)
@@ -1269,7 +1269,7 @@ func (h *TeamMemberHandlers) GetTeamDashboardAnalytics(c *fiber.Ctx) error {
 	timeChartQuery := `
 		SELECT EXTRACT(HOUR FROM bm.created_at) AS hour,
 			COUNT(*) AS COUNT
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		WHERE bm.device_id = ANY(?)
 		AND bm.created_at >= CURRENT_DATE - INTERVAL '7 days'
 		GROUP BY EXTRACT(HOUR FROM bm.created_at)

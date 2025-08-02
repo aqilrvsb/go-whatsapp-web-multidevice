@@ -45,7 +45,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			COALESCE(c.max_delay_seconds, 15) AS max_delay,
 			d.status AS device_status,
 			COALESCE(d.platform, '') AS platform
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN user_devices d ON bm.device_id = d.id
 		WHERE bm.status = 'pending'
@@ -94,7 +94,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		// Check device status - platform devices are always considered online
 		if devicePlatform == "" && deviceStatus != "connected" && deviceStatus != "online" {
 			// Skip this WhatsApp Web device - mark messages as skipped
-			db.Exec(`UPDATE broadcast_messages1 SET status = 'skipped', error_message = 'Device offline' 
+			db.Exec(`UPDATE broadcast_messages SET status = 'skipped', error_message = 'Device offline' 
 					 WHERE device_id = ? AND status = 'pending'`, msg.DeviceID)
 			continue
 		}
@@ -148,7 +148,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			if err != nil {
 				logrus.Errorf("Failed to queue message: %v", err)
 				// Update to failed
-				db.Exec(`UPDATE broadcast_messages1 SET status = 'failed', error_message = ? WHERE id = ?`, 
+				db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ? WHERE id = ?`, 
 					err.Error(), msg.ID)
 			} else {
 				messageCount++

@@ -51,7 +51,7 @@ func checkCampaignCompletions() {
 		var pendingCount int
 		checkQuery := `
 			SELECT COUNT(*) 
-			FROM broadcast_messages1 
+			FROM broadcast_messages 
 			WHERE campaign_id = ? AND status = 'pending'
 		`
 		err := db.QueryRow(checkQuery, campaignID).Scan(&pendingCount)
@@ -66,7 +66,7 @@ func checkCampaignCompletions() {
 			statsQuery := `
 				SELECT COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
 					COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed
-				FROM broadcast_messages1 
+				FROM broadcast_messages 
 				WHERE campaign_id = ?
 			`
 			err := db.QueryRow(statsQuery, campaignID).Scan(&sentCount, &failedCount)

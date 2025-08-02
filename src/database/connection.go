@@ -273,7 +273,7 @@ func InitializeSchema() error {
 	);
 	
 	-- Create broadcast_messages table for tracking
-	CREATE TABLE IF NOT EXISTS broadcast_messages1 (
+	CREATE TABLE IF NOT EXISTS broadcast_messages (
 		id UUID PRIMARY KEY DEFAULT UUID(),
 		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		device_id UUID NOT NULL REFERENCES user_devices(id) ON DELETE CASCADE,
@@ -312,8 +312,8 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_sequence_steps_sequence_id ON sequence_steps(sequence_id);
 	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_sequence_id ON sequence_contacts(sequence_id);
 	CREATE INDEX IF NOT EXISTS idx_sequence_contacts_next_send ON sequence_contacts(next_trigger_time);
-	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_status ON broadcast_messages1(status);
-	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_scheduled ON broadcast_messages1(scheduled_at);
+	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_status ON broadcast_messages(status);
+	CREATE INDEX IF NOT EXISTS idx_broadcast_messages_scheduled ON broadcast_messages(scheduled_at);
 	`
 	
 	_, err := db.Exec(schema)
@@ -333,7 +333,7 @@ func InitializeSchema() error {
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS time_schedule TEXT;
 	
 	-- Add missing columns to broadcast_messages if they don't exist
-	ALTER TABLE broadcast_messages1 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS min_delay_seconds INTEGER DEFAULT 10;
 	ALTER TABLE sequences ADD COLUMN IF NOT EXISTS max_delay_seconds INTEGER DEFAULT 30;
 	
@@ -415,8 +415,8 @@ func InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_sequence_logs_sent_at ON sequence_logs(sent_at);
 	
 	-- Add group columns to broadcast_messages
-	ALTER TABLE broadcast_messages1 ADD COLUMN IF NOT EXISTS group_id VARCHAR(255);
-	ALTER TABLE broadcast_messages1 ADD COLUMN IF NOT EXISTS group_order INTEGER;
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS group_id VARCHAR(255);
+	ALTER TABLE broadcast_messages ADD COLUMN IF NOT EXISTS group_order INTEGER;
 	`
 	
 	_, err = db.Exec(alterSchema)

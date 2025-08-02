@@ -1756,7 +1756,7 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 	totalFailedSend := 0
 	totalPendingSend := 0
 	
-	// Get statistics FROM broadcast_messages1 table for filtered campaigns
+	// Get statistics FROM broadcast_messages table for filtered campaigns
 	mysqlURI := os.Getenv("MYSQL_URI")
 	if mysqlURI == "" {
 		mysqlURI = os.Getenv("DB_URI")
@@ -1816,7 +1816,7 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 					COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 					COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 					COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-				FROM broadcast_messages1
+				FROM broadcast_messages
 				WHERE campaign_id IN (%s)
 			`, strings.Join(placeholders, ","))
 			
@@ -1864,7 +1864,7 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 						COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 						COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 						COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-					FROM broadcast_messages1
+					FROM broadcast_messages
 					WHERE campaign_id = ?
 				`, campaign.ID).Scan(&doneSend, &failedSend, &pendingSend)
 				
@@ -1890,8 +1890,8 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 				"message":          campaign.Message,
 				"image_url":        campaign.ImageURL,
 				"should_send":      leadCount,      // Actual lead count
-				"done_send":        doneSend,       // FROM broadcast_messages1
-				"failed_send":      failedSend,     // FROM broadcast_messages1
+				"done_send":        doneSend,       // FROM broadcast_messages
+				"failed_send":      failedSend,     // FROM broadcast_messages
 				"remaining_send":   remainingSend,  // Calculated
 			}
 			
@@ -2028,14 +2028,14 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Get total contacts FROM broadcast_messages1 for all sequences
+	// Get total contacts FROM broadcast_messages for all sequences
 	if db != nil {
 		var totalSequenceMessages int
 		
 		// Build query with optional date filter
 		query := `
 			SELECT COUNT(DISTINCT recipient_phone) 
-			FROM broadcast_messages1
+			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
@@ -2059,7 +2059,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		// First get total should send (distinct contacts)
 		query := `
 			SELECT COUNT(DISTINCT recipient_phone)
-			FROM broadcast_messages1
+			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
@@ -2080,7 +2080,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-			FROM broadcast_messages1
+			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
@@ -2121,7 +2121,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			}
 			sequenceData["total_flows"] = flowCount
 			
-			// Get contact statistics for this sequence FROM broadcast_messages1 table
+			// Get contact statistics for this sequence FROM broadcast_messages table
 			var shouldSend, doneSend, failedSend, remainingSend int
 			
 			// Build query with date filter
@@ -2131,7 +2131,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 					COUNT(DISTINCT CASE WHEN status = 'success' THEN recipient_phone END) AS success,
 					COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) AS failed,
 					COUNT(DISTINCT CASE WHEN status = 'pending' THEN recipient_phone END) AS pending
-				FROM broadcast_messages1
+				FROM broadcast_messages
 				WHERE sequence_id = ?`
 			
 			args := []interface{}{sequence.ID}
@@ -2187,7 +2187,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
 				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-			FROM broadcast_messages1
+			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
@@ -2835,7 +2835,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 			COUNT(CASE WHEN bm.status = 'success' THEN 1 END) as success_count,
 			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed_count,
 			COUNT(CASE WHEN bm.status = 'pending' THEN 1 END) as pending_count
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.campaign_id = ? 
 		AND bm.user_id = ?
@@ -3015,12 +3015,12 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		"disconnectedDevices": offlineDevicesWithData,
 		"totalLeads":          totalLeadCount,      // From campaign criteria
 		"shouldSend":          totalLeadCount,      // Same as totalLeads
-		"doneSend":            successMessages,     // FROM broadcast_messages1
-		"failedSend":          failedMessages,      // FROM broadcast_messages1
+		"doneSend":            successMessages,     // FROM broadcast_messages
+		"failedSend":          failedMessages,      // FROM broadcast_messages
 		"remainingSend":       remainingSend,       // Calculated earlier
-		"pendingLeads":        pendingMessages,     // FROM broadcast_messages1
-		"successLeads":        successMessages,     // FROM broadcast_messages1
-		"failedLeads":         failedMessages,      // FROM broadcast_messages1
+		"pendingLeads":        pendingMessages,     // FROM broadcast_messages
+		"successLeads":        successMessages,     // FROM broadcast_messages
+		"failedLeads":         failedMessages,      // FROM broadcast_messages
 		"devices":             deviceReports,
 		"campaign": map[string]interface{}{
 			"id":            campaign.ID,
@@ -3092,7 +3092,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 	var duplicateCount int
 	dupQuery := `
 		SELECT COUNT(*) - COUNT(DISTINCT recipient_phone) AS duplicates
-		FROM broadcast_messages1
+		FROM broadcast_messages
 		WHERE campaign_id = ? AND device_id = ? AND user_id = ?
 	`
 	db.QueryRow(dupQuery, campaignId, deviceId, session.UserID).Scan(&duplicateCount)
@@ -3118,7 +3118,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 		// First check if there are any broadcast messages for this campaign
 		var messageCount int
 		err = db.QueryRow(`
-			SELECT COUNT(*) FROM broadcast_messages1 
+			SELECT COUNT(*) FROM broadcast_messages 
 			WHERE campaign_id = ? AND device_id = ?
 		`, campaignId, deviceId).Scan(&messageCount)
 		
@@ -3172,7 +3172,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 			SELECT bm.recipient_phone, bm.status, bm.sent_at, lai.name
 			FROM (
 				SELECT recipient_phone, status, sent_at, created_at
-				FROM broadcast_messages1
+				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
 				ORDER BY created_at DESC
 			) bm
@@ -3185,7 +3185,7 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 			SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
 			FROM (
 				SELECT recipient_phone, status, sent_at, created_at
-				FROM broadcast_messages1
+				FROM broadcast_messages
 				WHERE campaign_id = ? AND device_id = ? AND user_id = ?
 				ORDER BY created_at DESC
 			) bm
@@ -3345,7 +3345,7 @@ func (handler *App) RetryCampaignFailedMessages(c *fiber.Ctx) error {
 	
 	// Update failed messages to pending status for retry
 	query := `
-		UPDATE broadcast_messages1 SET status = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
+		UPDATE broadcast_messages SET status = 'pending', error_message = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE campaign_id = ? AND device_id = ? AND user_id = ? AND status = 'failed'
 	`
 	
@@ -4287,7 +4287,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			bm.device_id,
 			COALESCE(ud.device_name, 'Unknown Device') as device_name,
 			COALESCE(ud.status, 'unknown') as device_status
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ? 
 		AND bm.user_id = ?
@@ -4352,7 +4352,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				COUNT(DISTINCT CASE WHEN bm.status = 'success' THEN bm.recipient_phone END) as success,
 				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed,
 				COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.recipient_phone END) as pending
-			FROM broadcast_messages1 bm
+			FROM broadcast_messages bm
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
 			AND bm.user_id = ?
@@ -4422,7 +4422,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			COUNT(DISTINCT CASE WHEN status = 'success' THEN recipient_phone END) as success,
 			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed,
 			COUNT(DISTINCT CASE WHEN status = 'pending' THEN recipient_phone END) as pending
-		FROM broadcast_messages1
+		FROM broadcast_messages
 		WHERE sequence_id = ? 
 		AND user_id = ?
 	`
@@ -4497,7 +4497,7 @@ func (handler *App) GetSequenceDeviceLeads(c *fiber.Ctx) error {
 	
 	query := `
 		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
 		WHERE bm.sequence_id = ? AND bm.device_id = ? AND bm.user_id = ?
 	`
@@ -4604,7 +4604,7 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 	
 	query := `
 		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
-		FROM broadcast_messages1 bm
+		FROM broadcast_messages bm
 		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
 		WHERE bm.sequence_id = ? 
 		AND bm.device_id = ? 
