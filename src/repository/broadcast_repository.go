@@ -32,6 +32,51 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		msg.ID = uuid.New().String()
 	}
 	
+	// ISSUE 3 FIX: Check for duplicates before inserting
+	// For SEQUENCES: Check based on sequence_stepid, recipient_phone, and device_id
+	if msg.SequenceStepID != nil && *msg.SequenceStepID != "" {
+		duplicateCheck := `
+			SELECT COUNT(*) 
+			FROM broadcast_messages 
+			WHERE sequence_stepid = ? 
+			AND recipient_phone = ? 
+			AND device_id = ?
+			AND status IN ('pending', 'sent', 'queued')
+		`
+		
+		var count int
+		err := r.db.QueryRow(duplicateCheck, *msg.SequenceStepID, msg.RecipientPhone, msg.DeviceID).Scan(&count)
+		if err != nil {
+			logrus.Warnf("Error checking sequence duplicates: %v", err)
+		} else if count > 0 {
+			logrus.Infof("Skipping duplicate sequence message for %s - sequence_step %s already exists", 
+				msg.RecipientPhone, *msg.SequenceStepID)
+			return nil // Skip duplicate
+		}
+	}
+	
+	// For CAMPAIGNS: Check based on campaign_id, recipient_phone, and device_id
+	if msg.CampaignID != nil && *msg.CampaignID > 0 {
+		duplicateCheck := `
+			SELECT COUNT(*) 
+			FROM broadcast_messages 
+			WHERE campaign_id = ? 
+			AND recipient_phone = ? 
+			AND device_id = ?
+			AND status IN ('pending', 'sent', 'queued')
+		`
+		
+		var count int
+		err := r.db.QueryRow(duplicateCheck, *msg.CampaignID, msg.RecipientPhone, msg.DeviceID).Scan(&count)
+		if err != nil {
+			logrus.Warnf("Error checking campaign duplicates: %v", err)
+		} else if count > 0 {
+			logrus.Infof("Skipping duplicate campaign message for %s - campaign %d already exists", 
+				msg.RecipientPhone, *msg.CampaignID)
+			return nil // Skip duplicate
+		}
+	}
+	
 	query := `
 		INSERT INTO broadcast_messages(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
@@ -103,7 +148,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
 		WHERE bm.device_id = ? AND bm.status = 'pending'
 		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= ?)
-		ORDER BY bm.group_id, bm.group_order, bm.created_at ASC
+		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
 		LIMIT ?
 	`	
 	rows, err := r.db.Query(query, deviceID, time.Now(), limit)

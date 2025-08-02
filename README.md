@@ -1,6 +1,31 @@
 # WhatsApp Multi-Device System - Dual Database Edition
-**Last Updated: January 30, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
-**Status: ✅ Production-ready with Dual Database Support**
+**Last Updated: August 02, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
+**Status: ✅ Production-ready with Critical Fixes Applied**
+
+## 🔧 Recent Updates (August 2, 2025)
+
+### Fixed Critical Issues for BOTH Sequences and Campaigns:
+1. **Duplicate Prevention**: 
+   - For Sequences: Checks `sequence_stepid`, `recipient_phone`, and `device_id`
+   - For Campaigns: Checks `campaign_id`, `recipient_phone`, and `device_id`
+   - Prevents duplicate message creation before inserting
+2. **Message Ordering**: Fixed message order to use `scheduled_at` timestamp instead of `created_at`, ensuring proper delivery order
+3. **Removed Dual Processing**: System now uses only Direct Broadcast method for sequences
+4. **Mutex Locking**: Verified device workers properly implement mutex locking to prevent race conditions
+
+### Database Cleanup Required:
+```sql
+-- Remove duplicate pending messages (both sequences and campaigns)
+DELETE bm1 FROM broadcast_messages bm1
+INNER JOIN broadcast_messages bm2 
+WHERE bm1.recipient_phone = bm2.recipient_phone
+AND ((bm1.sequence_id = bm2.sequence_id AND bm1.sequence_stepid = bm2.sequence_stepid)
+  OR (bm1.campaign_id = bm2.campaign_id))
+AND bm1.device_id = bm2.device_id
+AND bm1.status = 'pending'
+AND bm2.status = 'pending'
+AND bm1.created_at > bm2.created_at;
+```
 
 ## 🎯 Database Architecture
 

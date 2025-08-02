@@ -1,42 +1,31 @@
 @echo off
 echo ========================================
-echo Pushing to GitHub main branch
+echo Pushing Sequence Fixes to GitHub
 echo ========================================
+echo.
 
-cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+cd /d "C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main"
 
-echo Current directory:
-cd
+echo Adding changes...
+git add .
 
 echo.
-echo Adding all changes...
-git add -A
+echo Committing changes...
+git commit -m "Fix critical issues for both sequences and campaigns: duplicate prevention and message ordering
+
+- Added duplicate checking for BOTH sequences and campaigns in QueueMessage()
+  - Sequences: Check sequence_stepid, recipient_phone, and device_id
+  - Campaigns: Check campaign_id, recipient_phone, and device_id
+- Fixed message ordering to use scheduled_at instead of created_at
+- Verified mutex locking in device workers prevents race conditions
+- Updated README and documentation with complete fixes"
 
 echo.
-echo Creating commit...
-git commit -m "Fix: Worker health check and auto-reconnect system - All control buttons functional
-
-- Fixed syntax errors in rest.go (backtick issues)
-- Added GetAllDevices method to UserRepository
-- Fixed duplicate method declarations in device_worker.go
-- Implemented device health monitor with auto-reconnect
-- Enhanced client manager with better registration
-- Improved worker health checks
-- All worker control buttons now functional
-- Fixed compilation errors and unused imports
-- Better error handling and recovery mechanisms
-- Updated README with comprehensive documentation"
-
-echo.
-echo Pushing to GitHub...
+echo Pushing to main branch...
 git push origin main
 
 echo.
 echo ========================================
-echo Push Complete!
+echo Push complete!
 echo ========================================
-echo.
-echo Changes have been pushed to GitHub main branch.
-echo Railway should auto-deploy these changes.
-echo.
 pause
