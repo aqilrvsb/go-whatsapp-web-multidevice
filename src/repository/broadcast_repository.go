@@ -141,11 +141,22 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
 			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url, 
 			bm.scheduled_at, bm.group_id, bm.group_order,
-			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) AS min_delay,
-			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) AS max_delay
+			COALESCE(
+				c.min_delay_seconds, 
+				ss.min_delay_seconds, 
+				s.min_delay_seconds, 
+				10
+			) AS min_delay,
+			COALESCE(
+				c.max_delay_seconds, 
+				ss.max_delay_seconds, 
+				s.max_delay_seconds, 
+				30
+			) AS max_delay
 		FROM broadcast_messages bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
+		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		WHERE bm.device_id = ? AND bm.status = 'pending'
 		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= ?)
 		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
