@@ -11,6 +11,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -22,12 +23,14 @@ import (
 // WhatsAppMessageSender handles message sending with self-healing capabilities
 type WhatsAppMessageSender struct {
 	greetingProcessor  *antipattern.GreetingProcessor
+	platformSender     *external.PlatformSender
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
 		greetingProcessor: antipattern.NewGreetingProcessor(),
+		platformSender:    external.NewPlatformSender(),
 	}
 }
 
@@ -46,8 +49,21 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	msg.Message = processedContent
 	msg.Content = processedContent
 	
-	// Check if it's a platform device - if yes, we need platform sender implementation
-	// For now, just treat all devices the same way (use WhatsApp Web)
+	// Check if it's a platform device
+	if device.Platform != "" {
+		logrus.Infof("Sending via platform %s for device %s", device.Platform, device.DeviceName)
+		return w.platformSender.SendMessage(
+			device.Platform,
+			device.JID,  // JID contains the instance/token for platform devices
+			msg.RecipientPhone,
+			msg.RecipientName,
+			msg.Message,
+			msg.ImageURL,
+			deviceID,
+		)
+	}
+	
+	// Normal WhatsApp Web sending
 	return w.sendViaWhatsApp(deviceID, msg)
 }
 
