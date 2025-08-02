@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/multidevice"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
@@ -20,33 +21,36 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// WhatsAppMessageSender handles actual WhatsApp message sending with self-healing
+// WhatsAppMessageSender handles message sending with self-healing capabilities
 type WhatsAppMessageSender struct {
-	platformSender    *external.PlatformSender
-	userRepo         *repository.UserRepository
-	messageRandomizer *antipattern.MessageRandomizer
-	greetingProcessor *antipattern.GreetingProcessor
+	platformSender     *PlatformSender
+	greetingProcessor  *antipattern.GreetingProcessor
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
-		platformSender:    external.NewPlatformSender(),
-		userRepo:         repository.GetUserRepository(),
-		messageRandomizer: antipattern.NewMessageRandomizer(),
+		platformSender:    NewPlatformSender(),
 		greetingProcessor: antipattern.NewGreetingProcessor(),
 	}
 }
 
-// SendMessage sends a message via WhatsApp or external platform
+// SendMessage sends a message via WhatsApp with self-healing capabilities
 func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.BroadcastMessage) error {
-	// Get device details to check platform
-	device, err := w.userRepo.GetDeviceByID(deviceID)
+	// Check if this is a platform device (Wablas/Whacenter)
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
-		return fmt.Errorf("failed to get device: %v", err)
+		logrus.Errorf("Failed to get device %s: %v", deviceID, err)
+		return fmt.Errorf("device not found: %v", err)
 	}
 	
-	// Check if device has platform
+	// Process message content with greeting and line breaks
+	processedContent := w.processMessageContent(msg, device.ID)
+	msg.Message = processedContent
+	msg.Content = processedContent
+	
+	// Check if it's a platform device
 	if device.Platform != "" {
 		// Send via external platform
 		logrus.Infof("[PLATFORM-SEND] 📤 Sending message via %s platform for device %s (%s)", 
@@ -84,6 +88,31 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	
 	// Normal WhatsApp sending with self-healing
 	return w.sendViaWhatsApp(deviceID, msg)
+}
+
+// processMessageContent adds greeting and processes line breaks
+func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMessage, deviceID string) string {
+	// Get the original content
+	content := msg.Content
+	if content == "" {
+		content = msg.Message
+	}
+	
+	// Process greeting only if recipientName is provided
+	if msg.RecipientName != "" {
+		// Use the greeting processor to add personalized greeting
+		content = w.greetingProcessor.ProcessMessageContent(content, msg.RecipientName, deviceID, msg.RecipientPhone)
+	}
+	
+	// Fix line breaks for WhatsApp
+	content = strings.ReplaceAll(content, "\\n", "\n")
+	content = strings.ReplaceAll(content, "%0A", "\n")
+	content = strings.ReplaceAll(content, "%0a", "\n")
+	content = strings.ReplaceAll(content, "<br>", "\n")
+	content = strings.ReplaceAll(content, "<br/>", "\n")
+	content = strings.ReplaceAll(content, "<br />", "\n")
+	
+	return content
 }
 
 // sendViaWhatsApp sends message via normal WhatsApp with self-healing client refresh
@@ -179,6 +208,10 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		}
 		defer resp.Body.Close()
 		
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to download image: %s", resp.Status)
+		}
+		
 		imageData, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read image data: %v", err)
@@ -191,7 +224,7 @@ func (w *WhatsAppMessageSender) sendImageMessage(waClient *whatsmeow.Client, rec
 		return fmt.Errorf("failed to upload image: %v", err)
 	}
 	
-	// Create image message
+	// Create image message with processed caption
 	caption := msg.Message
 	message := &waE2E.Message{
 		ImageMessage: &waE2E.ImageMessage{
