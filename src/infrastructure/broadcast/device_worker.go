@@ -123,6 +123,8 @@ func (dw *DeviceWorker) processMessages() {
 			dw.mu.Unlock()
 			
 			// Process the message
+			logrus.Infof("[DEVICE-WORKER] Processing message ID: %s, RecipientName: '%s', RecipientPhone: %s", 
+				msg.ID, msg.RecipientName, msg.RecipientPhone)
 			err := dw.sendMessage(msg)
 			
 			dw.mu.Lock()
@@ -212,16 +214,16 @@ func (dw *DeviceWorker) sendMessage(msg domainBroadcast.BroadcastMessage) error 
 
 // sendTextMessage sends text message
 func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast.BroadcastMessage) error {
-	// Process greeting with spintax
-	processedContent := dw.greetingProcessor.PrepareMessageWithGreeting(
-		msg.Content,
+	// STEP 1: Apply randomization to CONTENT ONLY
+	randomizedContent := dw.messageRandomizer.RandomizeMessage(msg.Content)
+	
+	// STEP 2: Add greeting to the randomized content
+	finalContent := dw.greetingProcessor.PrepareMessageWithGreeting(
+		randomizedContent,
 		msg.RecipientName,
 		dw.deviceID,
 		msg.RecipientPhone,
 	)
-	
-	// Apply randomization techniques
-	finalContent := dw.messageRandomizer.RandomizeMessage(processedContent)
 	
 	// Use simple Conversation message instead of ExtendedTextMessage for better compatibility
 	message := &waProto.Message{
@@ -249,14 +251,16 @@ func (dw *DeviceWorker) sendImageMessage(recipient types.JID, msg domainBroadcas
 	// Process caption with spintax (same as text messages)
 	processedCaption := ""
 	if msg.Content != "" {
+		// STEP 1: Apply randomization to CAPTION ONLY
+		randomizedCaption := dw.messageRandomizer.RandomizeMessage(msg.Content)
+		
+		// STEP 2: Add greeting to the randomized caption
 		processedCaption = dw.greetingProcessor.PrepareMessageWithGreeting(
-			msg.Content,
+			randomizedCaption,
 			msg.RecipientName,
 			dw.deviceID,
 			msg.RecipientPhone,
 		)
-		// Apply randomization techniques
-		processedCaption = dw.messageRandomizer.RandomizeMessage(processedCaption)
 	}
 	
 	// Create image message
