@@ -223,10 +223,9 @@ func (dw *DeviceWorker) sendTextMessage(recipient types.JID, msg domainBroadcast
 	// Apply randomization techniques
 	finalContent := dw.messageRandomizer.RandomizeMessage(processedContent)
 	
+	// Use simple Conversation message instead of ExtendedTextMessage for better compatibility
 	message := &waProto.Message{
-		ExtendedTextMessage: &waProto.ExtendedTextMessage{
-			Text: &finalContent,
-		},
+		Conversation: proto.String(finalContent),
 	}
 	
 	_, err := dw.client.SendMessage(context.Background(), recipient, message)

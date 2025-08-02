@@ -148,11 +148,29 @@ func hash(s string) uint32 {
 
 // isPhoneNumber checks if the name looks like a phone number
 func isPhoneNumber(name string) bool {
-	// Remove all non-digits
-	digitsOnly := regexp.MustCompile(`\D`).ReplaceAllString(name, "")
-	// If more than 5 digits, probably a phone number
-	isPhone := len(digitsOnly) > 5
-	logrus.Debugf("[GREETING] isPhoneNumber check: '%s' -> %d digits -> %v", name, len(digitsOnly), isPhone)
+	// First check if it's mostly digits (more than 70% digits)
+	digitCount := 0
+	totalCount := 0
+	for _, char := range name {
+		if char != ' ' { // Don't count spaces
+			totalCount++
+			if char >= '0' && char <= '9' {
+				digitCount++
+			}
+		}
+	}
+	
+	// If empty or very short, not a phone number
+	if totalCount < 3 {
+		return false
+	}
+	
+	// If more than 70% digits OR starts with 60/+60 (Malaysia), it's likely a phone number
+	digitRatio := float64(digitCount) / float64(totalCount)
+	isPhone := digitRatio > 0.7 || strings.HasPrefix(name, "60") || strings.HasPrefix(name, "+60")
+	
+	logrus.Debugf("[GREETING] isPhoneNumber check: '%s' -> %d/%d digits (%.2f%%) -> %v", 
+		name, digitCount, totalCount, digitRatio*100, isPhone)
 	return isPhone
 }
 

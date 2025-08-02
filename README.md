@@ -4,14 +4,15 @@
 
 ## 🔧 Recent Updates (August 2, 2025)
 
-### Fixed Critical Issues for BOTH Sequences and Campaigns:
+### Fixed Critical Issues:
 1. **Duplicate Prevention**: 
    - For Sequences: Checks `sequence_stepid`, `recipient_phone`, and `device_id`
    - For Campaigns: Checks `campaign_id`, `recipient_phone`, and `device_id`
    - Prevents duplicate message creation before inserting
-2. **Message Ordering**: Fixed message order to use `scheduled_at` timestamp instead of `created_at`, ensuring proper delivery order
-3. **Removed Dual Processing**: System now uses only Direct Broadcast method for sequences
-4. **Mutex Locking**: Verified device workers properly implement mutex locking to prevent race conditions
+2. **Message Ordering**: Fixed message order to use `scheduled_at` timestamp instead of `created_at`
+3. **Recipient Name Display**: Fixed name detection algorithm to properly show recipient names instead of defaulting to "Cik"
+4. **Line Break Support**: Fixed message formatting to properly display line breaks in WhatsApp
+5. **Message Type Fix**: Changed from ExtendedTextMessage to Conversation for better compatibility
 
 ### Database Cleanup Required:
 ```sql
