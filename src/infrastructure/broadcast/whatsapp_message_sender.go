@@ -46,15 +46,8 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	msg.Message = processedContent
 	msg.Content = processedContent
 	
-	// Check if it's a platform device
-	if device.Platform != "" {
-		// For platform devices, we need to implement platform sending
-		// For now, log and return error
-		logrus.Warnf("Platform device %s (%s) not supported in this version", device.DeviceName, device.Platform)
-		return fmt.Errorf("platform devices not implemented")
-	}
-	
-	// Normal WhatsApp sending with self-healing
+	// Check if it's a platform device - if yes, we need platform sender implementation
+	// For now, just treat all devices the same way (use WhatsApp Web)
 	return w.sendViaWhatsApp(deviceID, msg)
 }
 
