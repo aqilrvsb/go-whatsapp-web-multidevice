@@ -427,7 +427,7 @@ func (r *UserRepository) DeleteDevice(deviceID string) error {
 	}
 	
 	// Also delete any broadcast messages for this device
-	result, err = tx.Exec("DELETE FROM broadcast_messages WHERE device_id = ?", deviceID)
+	result, err = tx.Exec("DELETE FROM broadcast_messages1 WHERE device_id = ?", deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete broadcast messages for device: %w", err)
 	}

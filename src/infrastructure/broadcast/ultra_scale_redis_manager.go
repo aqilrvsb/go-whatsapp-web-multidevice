@@ -777,7 +777,7 @@ func getPriority(msg domainBroadcast.BroadcastMessage) int {
 // updateMessagesToNewDevice updates pending messages to use a new device ID
 func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDeviceID string) {
 	query := `
-		UPDATE broadcast_messages 
+		UPDATE broadcast_messages1 
 		SET device_id = ? 
 		WHERE device_id = ? AND STATUS = 'pending'
 	`
@@ -796,7 +796,7 @@ func (um *UltraScaleRedisManager) updateMessagesToNewDevice(oldDeviceID, newDevi
 // skipOfflineDeviceMessages marks messages as skipped for offline devices
 func (um *UltraScaleRedisManager) skipOfflineDeviceMessages(deviceID string) {
 	query := `
-		UPDATE broadcast_messages SET STATUS = 'skipped', error_message = 'Device offline' 
+		UPDATE broadcast_messages1 SET STATUS = 'skipped', error_message = 'Device offline' 
 		WHERE device_id = ? AND STATUS = 'pending'
 	`
 	
@@ -834,7 +834,7 @@ func (um *UltraScaleRedisManager) performMessageCleanup() {
 	
 	// Mark messages older than 24 hours as expired
 	query := `
-		UPDATE broadcast_messages SET STATUS = 'expired', 
+		UPDATE broadcast_messages1 SET STATUS = 'expired', 
 		    error_message = 'Message expired (older than 24 hours)' 
 		WHERE status IN ('pending', 'queued') 
 		AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)

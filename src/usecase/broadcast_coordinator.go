@@ -50,7 +50,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 		AND s.status = 'active'
 		AND sc.status = 'active'
 		AND EXISTS (
-			SELECT 1 FROM broadcast_messages bm 
+			SELECT 1 FROM broadcast_messages1 bm 
 			WHERE bm.sequence_id = s.id::text 
 			AND bm.status IN ('pending', 'queued')
 			AND bm.created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
@@ -88,7 +88,7 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 			
 			-- Last sequence message activity  
 			SELECT MAX(bm.updated_at) AS last_activity
-			FROM broadcast_messages bm
+			FROM broadcast_messages1 bm
 			JOIN sequences s ON bm.sequence_id = s.id::text
 			WHERE s.user_id = ?
 			AND bm.status IN ('sent', 'failed')

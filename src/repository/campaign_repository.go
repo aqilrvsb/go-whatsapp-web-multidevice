@@ -212,7 +212,7 @@ func (r *campaignRepository) GetPendingCampaigns() ([]models.Campaign, error) {
 		AND id NOT IN (
 			-- Exclude campaigns that already have broadcast messages
 			SELECT DISTINCT campaign_id 
-			FROM broadcast_messages 
+			FROM broadcast_messages1 
 			WHERE campaign_id IS NOT NULL
 		)
 		AND (
@@ -346,7 +346,7 @@ func (r *campaignRepository) DeleteCampaign(id int) error {
 	defer tx.Rollback()
 	
 	// First, delete all broadcast messages for this campaign
-	deleteMessagesQuery := `DELETE FROM broadcast_messages WHERE campaign_id = ?`
+	deleteMessagesQuery := `DELETE FROM broadcast_messages1 WHERE campaign_id = ?`
 	_, err = tx.Exec(deleteMessagesQuery, id)
 	if err != nil {
 		log.Printf("Error deleting broadcast messages for campaign %d: %v", id, err)
@@ -424,11 +424,11 @@ func (r *campaignRepository) GetCampaignBroadcastStats(campaignID int) (shouldSe
 	log.Printf("Campaign %d - UserID: %s, Niche: %s, TargetStatus: %s, ShouldSend: %d", 
 		campaignID, campaign.UserID, campaign.Niche, campaign.TargetStatus, shouldSend)
 	
-	// Get done and failed counts from broadcast_messages
+	// Get done and failed counts FROM broadcast_messages1
 	statsQuery := `
 		SELECT COUNT(CASE WHEN status = 'success' THEN 1 END) AS done_send,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed_send
-		FROM broadcast_messages
+		FROM broadcast_messages1
 		WHERE campaign_id = ?
 	`
 	

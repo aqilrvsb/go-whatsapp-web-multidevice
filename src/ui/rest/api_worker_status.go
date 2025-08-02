@@ -73,7 +73,7 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	var campaignID int
 	err = db.QueryRow(`
 		SELECT DISTINCT c.id, c.title, c.status 
-		FROM broadcast_messages bm 
+		FROM broadcast_messages1 bm 
 		JOIN campaigns c ON bm.campaign_id = c.id 
 		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
 		AND c.user_id = ?
@@ -93,7 +93,7 @@ func (rest *App) CheckDeviceWorkerStatus(c *fiber.Ctx) error {
 	var sequenceID, sequenceName, sequenceStatus string
 	err = db.QueryRow(`
 		SELECT DISTINCT s.id, s.name, s.status 
-		FROM broadcast_messages bm 
+		FROM broadcast_messages1 bm 
 		JOIN sequences s ON bm.sequence_id = s.id 
 		WHERE bm.device_id = ? AND bm.status IN ('pending', 'processing') 
 		AND s.user_id = ?

@@ -133,7 +133,7 @@ func (dw *DeviceWorker) processMessages() {
 				if msg.ID != "" {
 					// Direct update like skipped
 					db := database.GetDB()
-					_, updateErr := db.Exec(`UPDATE broadcast_messages SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
+					_, updateErr := db.Exec(`UPDATE broadcast_messages1 SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, err.Error(), msg.ID)
 					if updateErr != nil {
 						logrus.Errorf("Failed to update message status to failed: %v", updateErr)
 					}
@@ -144,7 +144,7 @@ func (dw *DeviceWorker) processMessages() {
 				if msg.ID != "" {
 					// Direct update like skipped
 					db := database.GetDB()
-					_, updateErr := db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('pending', 'queued')`, msg.ID)
+					_, updateErr := db.Exec(`UPDATE broadcast_messages1 SET STATUS = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('pending', 'queued')`, msg.ID)
 					if updateErr != nil {
 						logrus.Errorf("Failed to update message status to sent: %v", updateErr)
 					}

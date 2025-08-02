@@ -33,7 +33,7 @@ func updateCampaignStatuses() {
 		AND (
 			-- Has messages
 			EXISTS (
-				SELECT 1 FROM broadcast_messages bm 
+				SELECT 1 FROM broadcast_messages1 bm 
 				WHERE bm.campaign_id = c.id
 			)
 			OR 
@@ -66,7 +66,7 @@ func updateCampaignStatuses() {
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
 				COUNT(CASE WHEN status = 'skipped' THEN 1 END) AS skipped,
 				EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(CASE WHEN status = 'queued' THEN updated_at END)))/60 AS oldest_queued
-			FROM broadcast_messages
+			FROM broadcast_messages1
 			WHERE campaign_id = ?
 		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped, &oldestQueuedMinutes)
 		
@@ -85,7 +85,7 @@ func updateCampaignStatuses() {
 		var deviceCount int
 		err = db.QueryRow(`
 			SELECT COUNT(DISTINCT device_id) 
-			FROM broadcast_messages 
+			FROM broadcast_messages1 
 			WHERE campaign_id = ?
 		`, campaignID).Scan(&deviceCount)
 		

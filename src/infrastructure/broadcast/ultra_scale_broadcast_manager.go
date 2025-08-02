@@ -226,7 +226,7 @@ func (bwp *BroadcastWorkerPool) QueueMessage(msg *domainBroadcast.BroadcastMessa
 	case group.messageQueue <- msg:
 		// Update message status to queued
 		db := database.GetDB()
-		_, err := db.Exec(`UPDATE broadcast_messages SET STATUS = 'queued' WHERE id = ?`, msg.ID)
+		_, err := db.Exec(`UPDATE broadcast_messages1 SET STATUS = 'queued' WHERE id = ?`, msg.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update message status: %v", err)
 		}
@@ -377,7 +377,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.failedCount, 1)
 		}
 		// Update status to failed
-		db.Exec(`UPDATE broadcast_messages SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
+		db.Exec(`UPDATE broadcast_messages1 SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
 			err.Error(), msg.ID)
 		logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
 	} else {
@@ -387,7 +387,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.processedCount, 1)
 		}
 		// Update status to sent
-		db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ?`, msg.ID)
+		db.Exec(`UPDATE broadcast_messages1 SET STATUS = 'sent', sent_at = NOW() WHERE id = ?`, msg.ID)
 		
 		// Update sequence progress if this is a sequence message
 		if msg.SequenceID != nil {

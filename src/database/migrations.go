@@ -156,11 +156,11 @@ func GetMigrations() []Migration {
 			Name: "Add scheduled_at for timezone support",
 			SQL: `
 				-- Add TIMESTAMPTZ column for proper timezone support
-				ALTER TABLE broadcast_messages 
+				ALTER TABLE broadcast_messages1 
 				ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
 				
 				-- Update scheduled_at from created_at for existing records
-				UPDATE broadcast_messages 
+				UPDATE broadcast_messages1 
 				SET scheduled_at = created_at 
 				WHERE scheduled_at IS NULL;
 			`,
@@ -168,11 +168,11 @@ func GetMigrations() []Migration {
 		{
 			Name: "Add updated_at to broadcast_messages",
 			SQL: `
-				ALTER TABLE broadcast_messages 
+				ALTER TABLE broadcast_messages1 
 				ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 				
 				-- Update existing records
-				UPDATE broadcast_messages 
+				UPDATE broadcast_messages1 
 				SET updated_at = CURRENT_TIMESTAMP 
 				WHERE updated_at IS NULL;
 			`,

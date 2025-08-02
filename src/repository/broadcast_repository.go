@@ -37,7 +37,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	if msg.SequenceStepID != nil && *msg.SequenceStepID != "" {
 		duplicateCheck := `
 			SELECT COUNT(*) 
-			FROM broadcast_messages 
+			FROM broadcast_messages1 
 			WHERE sequence_stepid = ? 
 			AND recipient_phone = ? 
 			AND device_id = ?
@@ -59,7 +59,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	if msg.CampaignID != nil && *msg.CampaignID > 0 {
 		duplicateCheck := `
 			SELECT COUNT(*) 
-			FROM broadcast_messages 
+			FROM broadcast_messages1 
 			WHERE campaign_id = ? 
 			AND recipient_phone = ? 
 			AND device_id = ?
@@ -78,7 +78,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 	}
 	
 	query := `
-		INSERT INTO broadcast_messages(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
+		INSERT INTO broadcast_messages1(id, user_id, device_id, campaign_id, sequence_id, sequence_stepid, recipient_phone, recipient_name,
 		 message_type, content, media_url, status, scheduled_at, created_at, group_id, group_order)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`	
@@ -143,7 +143,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 			bm.scheduled_at, bm.group_id, bm.group_order,
 			COALESCE(c.min_delay_seconds, s.min_delay_seconds, 10) AS min_delay,
 			COALESCE(c.max_delay_seconds, s.max_delay_seconds, 30) AS max_delay
-		FROM broadcast_messages bm
+		FROM broadcast_messages1 bm
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
 		WHERE bm.device_id = ? AND bm.status = 'pending'
@@ -207,7 +207,7 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 // UpdateMessageStatus updates message status
 func (r *BroadcastRepository) UpdateMessageStatus(messageID, status, errorMsg string) error {
 	query := `
-		UPDATE broadcast_messages SET status = ?, 
+		UPDATE broadcast_messages1 SET status = ?, 
 		    error_message = ?, 
 		    sent_at = CASE WHEN ? = 'sent' THEN NOW() ELSE sent_at END,
 		    updated_at = NOW()
@@ -237,7 +237,7 @@ func (r *BroadcastRepository) GetBroadcastStats(deviceID string) (map[string]int
 	// Get counts by status
 	query := `
 		SELECT status, COUNT(*) AS count
-		FROM broadcast_messages
+		FROM broadcast_messages1
 		WHERE device_id = ? AND created_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR)
 		GROUP BY status
 	`
@@ -270,7 +270,7 @@ func (r *BroadcastRepository) GetUserBroadcastStats(userID string) (map[string]i
 			COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
 			COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending
-		FROM broadcast_messages
+		FROM broadcast_messages1
 		WHERE user_id = ?
 	`
 	
@@ -303,7 +303,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 		SELECT id, user_id, device_id, campaign_id, sequence_id, recipient_phone, 
 		       message_type, content, media_url, status, scheduled_at, created_at,
 		       group_id, group_order
-		FROM broadcast_messages
+		FROM broadcast_messages1
 		WHERE status = 'pending' 
 		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
 		ORDER BY created_at ASC
@@ -364,7 +364,7 @@ func (r *BroadcastRepository) GetAllPendingMessages(limit int) ([]domainBroadcas
 func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) {
 	query := `
 		SELECT DISTINCT device_id 
-		FROM broadcast_messages 
+		FROM broadcast_messages1 
 		WHERE status = 'pending' 
 		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
 		ORDER BY device_id

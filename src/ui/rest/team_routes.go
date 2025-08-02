@@ -263,7 +263,7 @@ func InitTeamRoutes(app *fiber.App, db *sql.DB) {
 			SELECT DATE(bm.sent_at) AS date,
 				COUNT(CASE WHEN bm.status = 'sent' THEN 1 END) AS sent,
 				COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) AS failed
-			FROM broadcast_messages bm
+			FROM broadcast_messages1 bm
 			JOIN campaigns c ON bm.campaign_id = c.id
 			WHERE c.device_id IN (SELECT id FROM user_devices WHERE device_name = ?)
 		`
