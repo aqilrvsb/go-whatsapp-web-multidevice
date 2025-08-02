@@ -10,6 +10,8 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
@@ -412,7 +414,43 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 		return fmt.Errorf("message sender not initialized")
 	}
 	
-	// Use the self-healing message sender
+	// Check if this is a platform device
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(bw.deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get device info: %v", err)
+	}
+	
+	// If platform device, just send raw content (platform API handles its own anti-spam)
+	if device != nil && device.Platform != "" {
+		logrus.Debugf("Platform device %s detected, sending raw content", device.Platform)
+		// Use the self-healing message sender without modification
+		return bw.messageSender.SendMessage(bw.deviceID, msg)
+	}
+	
+	// For regular WhatsApp Web devices, apply anti-spam
+	// Create message randomizer and greeting processor
+	messageRandomizer := antipattern.NewMessageRandomizer()
+	greetingProcessor := antipattern.NewGreetingProcessor()
+	
+	// STEP 1: Apply randomization to CONTENT ONLY
+	randomizedContent := messageRandomizer.RandomizeMessage(msg.Content)
+	
+	// STEP 2: Add greeting to the randomized content
+	finalContent := greetingProcessor.PrepareMessageWithGreeting(
+		randomizedContent,
+		msg.RecipientName,
+		bw.deviceID,
+		msg.RecipientPhone,
+	)
+	
+	// Update the message content
+	msg.Content = finalContent
+	msg.Message = finalContent
+	
+	logrus.Debugf("Applied anti-spam for WhatsApp device %s: randomized and added greeting", bw.deviceID)
+	
+	// Use the self-healing message sender with modified content
 	return bw.messageSender.SendMessage(bw.deviceID, msg)
 }
 

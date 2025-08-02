@@ -32,15 +32,15 @@ func NewPlatformSender() *PlatformSender {
 	}
 }
 
-// SendMessage sends a message via external platform with anti-spam
+// SendMessage sends a message via external platform
+// NOTE: Anti-spam is already applied by BroadcastWorker - we just send raw content
 func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, message, imageURL, deviceID string) error {
 	// Log initial request
 	logrus.Infof("[PLATFORM] Starting send via %s - Phone: %s, Device: %s, Has Image: %v", 
 		platform, phone, deviceID, imageURL != "")
 	logrus.Debugf("[PLATFORM] Message preview (first 100 chars): %s", truncateString(message, 100))
 	
-	// Apply anti-spam to message first
-	message = ps.applyAntiSpam(message, recipientName, deviceID, phone)
+	// NO ANTI-SPAM HERE - Already handled by BroadcastWorker
 	
 	startTime := time.Now()
 	var err error
@@ -253,30 +253,6 @@ func (ps *PlatformSender) sendViaWhacenter(deviceID, phone, message, imageURL st
 	
 	logrus.Infof("[WHACENTER] ✅ Message sent successfully to %s", phone)
 	return nil
-}
-
-// applyAntiSpam applies greeting and randomization to message
-func (ps *PlatformSender) applyAntiSpam(message, recipientName, deviceID, phone string) string {
-	logrus.Debugf("[PLATFORM-ANTISPAM] Starting anti-spam for %s", phone)
-	logrus.Debugf("[PLATFORM-ANTISPAM] Original message: %s", truncateString(message, 100))
-	
-	// Add Malaysian greeting
-	messageWithGreeting := ps.greetingProcessor.PrepareMessageWithGreeting(
-		message,
-		recipientName,
-		deviceID,
-		phone,
-	)
-	
-	logrus.Debugf("[PLATFORM-ANTISPAM] After greeting: %s", truncateString(messageWithGreeting, 100))
-	
-	// Apply randomization (homoglyphs, zero-width chars, etc.)
-	randomizedMessage := ps.messageRandomizer.RandomizeMessage(messageWithGreeting)
-	
-	logrus.Infof("[PLATFORM-ANTISPAM] ✅ Anti-spam applied for %s: greeting added, message randomized", phone)
-	logrus.Debugf("[PLATFORM-ANTISPAM] Final message: %s", truncateString(randomizedMessage, 100))
-	
-	return randomizedMessage
 }
 
 // truncateString truncates a string to specified length for logging

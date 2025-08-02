@@ -35,6 +35,7 @@ func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 }
 
 // SendMessage sends a message via WhatsApp with self-healing capabilities
+// NOTE: Anti-spam is handled by BroadcastWorker, not here
 func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.BroadcastMessage) error {
 	// Check if this is a platform device (Wablas/Whacenter)
 	userRepo := repository.GetUserRepository()
@@ -44,8 +45,8 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 		return fmt.Errorf("device not found: %v", err)
 	}
 	
-	// Process message content with greeting and line breaks
-	processedContent := w.processMessageContent(msg, device.ID)
+	// Only process line breaks, NO anti-spam here
+	processedContent := w.processLineBreaks(msg.Content)
 	msg.Message = processedContent
 	msg.Content = processedContent
 	
@@ -70,22 +71,14 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	return w.sendViaWhatsApp(deviceID, msg)
 }
 
-// processMessageContent adds greeting and processes line breaks
-func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMessage, deviceID string) string {
-	// Get the original content
-	content := msg.Content
+// processLineBreaks only processes line breaks, no anti-spam
+func (w *WhatsAppMessageSender) processLineBreaks(content string) string {
 	if content == "" {
-		content = msg.Message
+		return content
 	}
 	
 	// Debug log original content
 	logrus.Debugf("Original content: %s", strings.ReplaceAll(content, "\n", "\\n"))
-	
-	// Process greeting only if recipientName is provided and not empty
-	if msg.RecipientName != "" && msg.RecipientName != "None" {
-		// Use the greeting processor to add personalized greeting
-		content = w.greetingProcessor.PrepareMessageWithGreeting(content, msg.RecipientName, deviceID, msg.RecipientPhone)
-	}
 	
 	// Fix line breaks for WhatsApp - ensure we have actual newline characters
 	// Replace various line break representations with actual newlines
@@ -102,6 +95,18 @@ func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMe
 	logrus.Debugf("Processed content with line breaks: %s", strings.ReplaceAll(content, "\n", "\\n"))
 	
 	return content
+}
+
+// processMessageContent is deprecated - kept for backward compatibility
+func (w *WhatsAppMessageSender) processMessageContent(msg *broadcast.BroadcastMessage, deviceID string) string {
+	// Get the original content
+	content := msg.Content
+	if content == "" {
+		content = msg.Message
+	}
+	
+	// Only process line breaks
+	return w.processLineBreaks(content)
 }
 
 // sendViaWhatsApp sends message via normal WhatsApp with self-healing client refresh
