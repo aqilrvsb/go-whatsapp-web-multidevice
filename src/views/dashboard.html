@@ -6520,24 +6520,6 @@
             // When clearing, still show today's data
             showSequencesToday();
         }
-                            active: filteredSequences.filter(s => s.status === 'active').length,
-                            inactive: filteredSequences.length - filteredSequences.filter(s => s.status === 'active').length
-                        };
-                        
-                        displaySequenceSummary(filteredResults);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error filtering sequences:', error);
-                    showAlert('danger', 'Error filtering sequences');
-                });
-        }
-        
-        // Clear Sequence Filter
-        function clearSequenceFilter() {
-            document.getElementById('sequenceFilterDate').value = '';
-            loadSequenceSummary();
-        }
         
         // Campaign Device Report Functions
         let currentCampaignForReport = null;
