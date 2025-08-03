@@ -125,6 +125,10 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/sequences/:id/device-report", rest.GetSequenceDeviceReport)
 	app.Get("/api/sequences/:id/device/:deviceId/leads", rest.GetSequenceDeviceLeads)
 	app.Get("/api/sequences/:id/device/:deviceId/step/:stepId/leads", rest.GetSequenceStepLeads)
+	app.Post("/api/sequences/:id/device/:deviceId/step/:stepId/resend-failed", rest.ResendFailedSequenceStep)
+	
+	// Device management endpoints
+	app.Put("/api/devices/:id/update-jid", rest.UpdateDeviceJID)
 	
 	// Team Member Management endpoints
 	app.Get("/api/team-members", rest.GetAllTeamMembers)
@@ -2801,12 +2805,13 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		devices = append(devices, device)
 		
 		// Initialize device report
-		log.Printf("Device Report - Initializing device: ID=%s, Name=%s, Platform=%s", device.ID, device.DeviceName, device.Platform)
+		log.Printf("Device Report - Initializing device: ID=%s, Name=%s, Platform=%s, JID=%s", device.ID, device.DeviceName, device.Platform, device.JID)
 		deviceMap[device.ID] = &DeviceReport{
 			ID:       device.ID,
 			Name:     device.DeviceName,
 			Status:   device.Status,
 			Platform: device.Platform,
+			JID:      device.JID,
 		}
 	}
 	
@@ -3261,6 +3266,7 @@ type DeviceReport struct {
 	Name         string `json:"name"`
 	Status       string `json:"status"`
 	Platform     string `json:"platform"`
+	JID          string `json:"jid"`
 	TotalLeads   int    `json:"totalLeads"`
 	PendingLeads int    `json:"pendingLeads"`
 	SuccessLeads int    `json:"successLeads"`
@@ -4279,7 +4285,8 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			bm.device_id,
 			COALESCE(ud.device_name, 'Unknown Device') as device_name,
 			COALESCE(ud.status, 'unknown') as device_status,
-			COALESCE(ud.platform, '') as platform
+			COALESCE(ud.platform, '') as platform,
+			COALESCE(ud.jid, '') as jid
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ? 
@@ -4327,6 +4334,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		Name          string       `json:"name"`
 		Status        string       `json:"status"`
 		Platform      string       `json:"platform"`
+		JID           string       `json:"jid"`
 		TotalMessages int          `json:"total_messages"`
 		Steps         []StepReport `json:"steps"`
 	}
@@ -4338,8 +4346,8 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	// Process each device
 	for deviceRows.Next() {
-		var deviceId, deviceName, deviceStatus, platform string
-		err := deviceRows.Scan(&deviceId, &deviceName, &deviceStatus, &platform)
+		var deviceId, deviceName, deviceStatus, platform, jid string
+		err := deviceRows.Scan(&deviceId, &deviceName, &deviceStatus, &platform, &jid)
 		if err != nil {
 			continue
 		}
@@ -4349,6 +4357,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			Name:     deviceName,
 			Status:   deviceStatus,
 			Platform: platform,
+			JID:      jid,
 			Steps:    []StepReport{},
 		}
 		
@@ -4723,5 +4732,143 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Lead details retrieved successfully",
 		Results: leads,
+	})
+}
+
+
+// ResendFailedSequenceStep resets failed messages to pending for a specific sequence step
+func (handler *App) ResendFailedSequenceStep(c *fiber.Ctx) error {
+	sequenceId := c.Params("id")
+	deviceId := c.Params("deviceId")
+	stepId := c.Params("stepId")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Update failed messages to pending and clear error_message
+	db := database.GetDB()
+	query := `
+		UPDATE broadcast_messages
+		SET status = 'pending', error_message = NULL
+		WHERE sequence_id = ? 
+		AND device_id = ? 
+		AND sequence_stepid = ?
+		AND user_id = ?
+		AND status = 'failed'
+	`
+	
+	result, err := db.Exec(query, sequenceId, deviceId, stepId, session.UserID)
+	if err != nil {
+		log.Printf("Error resending failed messages: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to resend messages",
+		})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	
+	log.Printf("Resend failed messages - Sequence: %s, Device: %s, Step: %s, Updated: %d", 
+		sequenceId, deviceId, stepId, rowsAffected)
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Failed messages reset to pending",
+		Results: map[string]interface{}{
+			"updated": rowsAffected,
+		},
+	})
+}
+
+// UpdateDeviceJID updates the JID for a device
+func (handler *App) UpdateDeviceJID(c *fiber.Ctx) error {
+	deviceId := c.Params("id")
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Parse request body
+	var request struct {
+		JID string `json:"jid"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	// Update device JID
+	db := database.GetDB()
+	query := `
+		UPDATE user_devices
+		SET jid = ?
+		WHERE id = ? AND user_id = ?
+	`
+	
+	result, err := db.Exec(query, request.JID, deviceId, session.UserID)
+	if err != nil {
+		log.Printf("Error updating device JID: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to update JID",
+		})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	
+	if rowsAffected == 0 {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	log.Printf("Updated device JID - Device: %s, New JID: %s", deviceId, request.JID)
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device JID updated successfully",
 	})
 }

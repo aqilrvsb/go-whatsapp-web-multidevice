@@ -1590,6 +1590,7 @@
                                             <th>Contacts Remaining Send Message</th>
                                             <th>Success Rate</th>
                                             <th>Actions</th>
+                                            <th>JID</th>
                                         </tr>
                                     </thead>
                                     <tbody id="deviceReportTableBody">
@@ -6733,12 +6734,20 @@
                                     </button>
                                 ` : ''}
                             </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted me-2" style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${device.jid || 'No JID'}">${device.jid || 'No JID'}</small>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editDeviceJID('${device.id}', '${device.jid || ''}'); return false;" title="Edit JID">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No device data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No device data available</td></tr>';
             }
         }
         
@@ -6862,6 +6871,8 @@
                     <th>Contacts Failed Send</th>
                     <th>Contacts Remaining</th>
                     <th>Success Rate</th>
+                    <th>Actions</th>
+                    <th>JID</th>
                 </tr>
             `;
             
@@ -6916,6 +6927,21 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <td>
+                                        ${step.failed_send > 0 ? `
+                                            <button class="btn btn-sm btn-outline-danger" onclick="resendFailedSequenceStep('${device.id}', '${step.step_id}'); return false;" title="Resend Failed Messages">
+                                                <i class="bi bi-arrow-repeat"></i> Resend
+                                            </button>
+                                        ` : '-'}
+                                    </td>
+                                    ${index === 0 ? `<td rowspan="${device.steps.length}" style="vertical-align: middle;">
+                                        <div class="d-flex align-items-center">
+                                            <small class="text-muted me-2" style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${device.jid || 'No JID'}">${device.jid || 'No JID'}</small>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="editDeviceJID('${device.id}', '${device.jid || ''}'); return false;" title="Edit JID">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                        </div>
+                                    </td>` : ''}
                                 </tr>
                             `;
                             tbody.innerHTML += row;
@@ -6931,12 +6957,21 @@
                                     </span>
                                 </td>
                                 <td colspan="7" class="text-center text-muted">No step data available</td>
+                                <td>-</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <small class="text-muted me-2" style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${device.jid || 'No JID'}">${device.jid || 'No JID'}</small>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editDeviceJID('${device.id}', '${device.jid || ''}'); return false;" title="Edit JID">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         `;
                     }
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No device data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No device data available</td></tr>';
             }
         }
         
@@ -7110,6 +7145,87 @@
         function exportDeviceReport() {
             // TODO: Implement export functionality
             showAlert('info', 'Export feature coming soon!');
+        }
+        
+        // Function to resend failed messages for a specific sequence step
+        function resendFailedSequenceStep(deviceId, stepId) {
+            if (!currentSequenceForReport) {
+                showAlert('error', 'No sequence selected');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to resend all failed messages for this step?')) {
+                return;
+            }
+            
+            showToast('Resending failed messages...', 'info');
+            
+            // Call API to resend failed messages for sequence step
+            fetch(`/api/sequences/${currentSequenceForReport.id}/device/${deviceId}/step/${stepId}/resend-failed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    showAlert('success', `Successfully reset ${data.results.updated || 0} failed messages to pending`);
+                    // Refresh the device report
+                    showSequenceDeviceReport(currentSequenceForReport);
+                } else {
+                    showAlert('error', data.message || 'Failed to resend messages');
+                }
+            })
+            .catch(error => {
+                console.error('Error resending failed messages:', error);
+                showAlert('error', 'Error resending messages');
+            });
+        }
+        
+        // Function to edit device JID
+        function editDeviceJID(deviceId, currentJID) {
+            const newJID = prompt('Enter new JID for this device:', currentJID || '');
+            
+            if (newJID === null) {
+                return; // User cancelled
+            }
+            
+            if (newJID.trim() === '') {
+                showAlert('error', 'JID cannot be empty');
+                return;
+            }
+            
+            showToast('Updating device JID...', 'info');
+            
+            // Call API to update device JID
+            fetch(`/api/devices/${deviceId}/update-jid`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ jid: newJID.trim() }),
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    showAlert('success', 'Device JID updated successfully');
+                    // Refresh the device report
+                    if (currentSequenceForReport) {
+                        showSequenceDeviceReport(currentSequenceForReport);
+                    } else if (currentCampaignForReport) {
+                        showCampaignDeviceReport(currentCampaignForReport);
+                    }
+                } else {
+                    showAlert('error', data.message || 'Failed to update JID');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating device JID:', error);
+                showAlert('error', 'Error updating JID');
+            });
         }
         
         // Note: Mock data generators removed - using real API data now
