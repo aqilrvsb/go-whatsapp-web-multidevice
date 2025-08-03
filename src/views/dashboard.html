@@ -1582,6 +1582,7 @@
                                     <thead>
                                         <tr>
                                             <th>Device Name</th>
+                                            <th>Platform</th>
                                             <th>Status Campaign</th>
                                             <th>Contacts Should Send</th>
                                             <th>Contacts Done Send Message</th>
@@ -6688,6 +6689,11 @@
                         <tr>
                             <td>${device.name || 'Unknown Device'}</td>
                             <td>
+                                <span class="badge bg-${device.platform ? 'info' : 'secondary'}">
+                                    ${device.platform || 'WhatsApp Web'}
+                                </span>
+                            </td>
+                            <td>
                                 <span class="badge bg-${statusColor}">
                                     ${campaignStatus}
                                 </span>
@@ -6732,7 +6738,7 @@
                     tbody.innerHTML += row;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No device data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No device data available</td></tr>';
             }
         }
         
@@ -6848,6 +6854,7 @@
             tableHead.innerHTML = `
                 <tr>
                     <th>Device Name</th>
+                    <th>Platform</th>
                     <th>Step</th>
                     <th>Day</th>
                     <th>Contacts Should Send</th>
@@ -6875,6 +6882,11 @@
                             const row = `
                                 <tr>
                                     ${index === 0 ? `<td rowspan="${device.steps.length}" style="vertical-align: middle; font-weight: bold;">${device.name}</td>` : ''}
+                                    ${index === 0 ? `<td rowspan="${device.steps.length}" style="vertical-align: middle;">
+                                        <span class="badge bg-${device.platform ? 'info' : 'secondary'}">
+                                            ${device.platform || 'WhatsApp Web'}
+                                        </span>
+                                    </td>` : ''}
                                     <td>${step.step_name}</td>
                                     <td>Day ${step.day_number || step.step_order}</td>
                                     <td>
@@ -6913,13 +6925,18 @@
                         tbody.innerHTML += `
                             <tr>
                                 <td>${device.name}</td>
+                                <td>
+                                    <span class="badge bg-${device.platform ? 'info' : 'secondary'}">
+                                        ${device.platform || 'WhatsApp Web'}
+                                    </span>
+                                </td>
                                 <td colspan="7" class="text-center text-muted">No step data available</td>
                             </tr>
                         `;
                     }
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No device data available</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No device data available</td></tr>';
             }
         }
         

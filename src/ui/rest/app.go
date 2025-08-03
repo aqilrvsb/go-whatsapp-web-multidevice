@@ -2772,7 +2772,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	
 	// Get user devices - use direct query
 	query := `
-		SELECT id, device_name, phone, status, jid, created_at, last_seen
+		SELECT id, device_name, phone, status, jid, created_at, last_seen, COALESCE(platform, '') as platform
 		FROM user_devices
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -2793,7 +2793,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	for rows.Next() {
 		var device models.UserDevice
 		err := rows.Scan(&device.ID, &device.DeviceName, &device.Phone, &device.Status, 
-			&device.JID, &device.CreatedAt, &device.LastSeen)
+			&device.JID, &device.CreatedAt, &device.LastSeen, &device.Platform)
 		if err != nil {
 			continue
 		}
@@ -2801,11 +2801,12 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		devices = append(devices, device)
 		
 		// Initialize device report
-		log.Printf("Device Report - Initializing device: ID=%s, Name=%s", device.ID, device.DeviceName)
+		log.Printf("Device Report - Initializing device: ID=%s, Name=%s, Platform=%s", device.ID, device.DeviceName, device.Platform)
 		deviceMap[device.ID] = &DeviceReport{
-			ID:     device.ID,
-			Name:   device.DeviceName,
-			Status: device.Status,
+			ID:       device.ID,
+			Name:     device.DeviceName,
+			Status:   device.Status,
+			Platform: device.Platform,
 		}
 	}
 	
@@ -3259,6 +3260,7 @@ type DeviceReport struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	Status       string `json:"status"`
+	Platform     string `json:"platform"`
 	TotalLeads   int    `json:"totalLeads"`
 	PendingLeads int    `json:"pendingLeads"`
 	SuccessLeads int    `json:"successLeads"`
@@ -4276,7 +4278,8 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		SELECT DISTINCT 
 			bm.device_id,
 			COALESCE(ud.device_name, 'Unknown Device') as device_name,
-			COALESCE(ud.status, 'unknown') as device_status
+			COALESCE(ud.status, 'unknown') as device_status,
+			COALESCE(ud.platform, '') as platform
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ? 
@@ -4323,6 +4326,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		ID            string       `json:"id"`
 		Name          string       `json:"name"`
 		Status        string       `json:"status"`
+		Platform      string       `json:"platform"`
 		TotalMessages int          `json:"total_messages"`
 		Steps         []StepReport `json:"steps"`
 	}
@@ -4334,17 +4338,18 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	// Process each device
 	for deviceRows.Next() {
-		var deviceId, deviceName, deviceStatus string
-		err := deviceRows.Scan(&deviceId, &deviceName, &deviceStatus)
+		var deviceId, deviceName, deviceStatus, platform string
+		err := deviceRows.Scan(&deviceId, &deviceName, &deviceStatus, &platform)
 		if err != nil {
 			continue
 		}
 		
 		deviceReport := DeviceStepReport{
-			ID:     deviceId,
-			Name:   deviceName,
-			Status: deviceStatus,
-			Steps:  []StepReport{},
+			ID:       deviceId,
+			Name:     deviceName,
+			Status:   deviceStatus,
+			Platform: platform,
+			Steps:    []StepReport{},
 		}
 		
 		// Get stats for each step for this device
