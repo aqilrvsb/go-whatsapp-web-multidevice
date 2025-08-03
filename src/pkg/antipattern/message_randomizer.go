@@ -38,8 +38,8 @@ func (mr *MessageRandomizer) RandomizeMessage(message string) string {
 	// 1. First process any spintax in the message content
 	message = mr.processSpintax(message)
 	
-	// 2. Then apply homoglyphs (10% of characters)
-	message = mr.applyHomoglyphs(message, 0.10)
+	// 2. Then apply homoglyphs (5% of characters)
+	message = mr.applyHomoglyphs(message, 0.05)
 	
 	// 3. Insert zero-width spaces
 	message = mr.insertZeroWidthSpaces(message, 2)
