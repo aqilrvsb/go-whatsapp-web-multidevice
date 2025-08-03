@@ -642,6 +642,7 @@
                 <span class="filter-chip active" data-trigger="all">All</span>
                 <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
                 <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+                <span class="filter-chip" data-trigger="history">History Triggers</span>
             `;
             
             // Add separator if there are triggers
@@ -658,8 +659,16 @@
                 chip.addEventListener('click', function() {
                     triggerFilters.querySelector('.filter-chip.active').classList.remove('active');
                     this.classList.add('active');
+                    const previousFilter = currentTriggerFilter;
                     currentTriggerFilter = this.dataset.trigger;
-                    filterLeads();
+                    
+                    // If switching to/from history, reload leads
+                    if ((previousFilter === 'history' && currentTriggerFilter !== 'history') ||
+                        (previousFilter !== 'history' && currentTriggerFilter === 'history')) {
+                        loadLeads();
+                    } else {
+                        filterLeads();
+                    }
                 });
             });
         }
