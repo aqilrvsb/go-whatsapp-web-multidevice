@@ -655,6 +655,7 @@ func (handler *App) DeviceLeadsView(c *fiber.Ctx) error {
 // GetDeviceLeads gets all leads for a specific device
 func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 	deviceId := c.Params("deviceId")
+	includeTriggerHistory := c.Query("include_history", "false") == "true"
 	
 	// Get session from cookie - same as campaigns
 	sessionToken := c.Cookies("session_token")
@@ -687,6 +688,62 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 			Message: "Leads retrieved successfully",
 			Results: []interface{}{},
 		})
+	}
+	
+	// If include_history is true, add historical triggers from broadcast_messages
+	if includeTriggerHistory {
+		db := database.GetDB()
+		for i := range leads {
+			// Get historical triggers from broadcast_messages
+			var historicalTriggers []string
+			query := `
+				SELECT DISTINCT ss.trigger_name
+				FROM broadcast_messages bm
+				JOIN sequence_steps ss ON ss.id = bm.sequence_stepid
+				WHERE bm.recipient_phone = ? 
+				AND bm.device_id = ?
+				AND bm.user_id = ?
+				AND ss.trigger_name IS NOT NULL
+				AND ss.trigger_name != ''
+			`
+			rows, err := db.Query(query, leads[i].Phone, deviceId, session.UserID)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var trigger string
+					if err := rows.Scan(&trigger); err == nil {
+						historicalTriggers = append(historicalTriggers, trigger)
+					}
+				}
+			}
+			
+			// Combine current triggers with historical triggers
+			currentTriggers := []string{}
+			if leads[i].Trigger != "" {
+				currentTriggers = strings.Split(leads[i].Trigger, ",")
+				for j := range currentTriggers {
+					currentTriggers[j] = strings.TrimSpace(currentTriggers[j])
+				}
+			}
+			
+			// Merge and deduplicate
+			allTriggers := append(currentTriggers, historicalTriggers...)
+			uniqueTriggers := make(map[string]bool)
+			for _, t := range allTriggers {
+				uniqueTriggers[t] = true
+			}
+			
+			// Convert back to slice
+			triggerList := make([]string, 0, len(uniqueTriggers))
+			for t := range uniqueTriggers {
+				triggerList = append(triggerList, t)
+			}
+			
+			// Update the lead with all triggers
+			if len(triggerList) > 0 {
+				leads[i].Trigger = strings.Join(triggerList, ",")
+			}
+		}
 	}
 	
 	return c.JSON(utils.ResponseData{
@@ -831,6 +888,25 @@ func (handler *App) UpdateLead(c *fiber.Ctx) error {
 			Code:    "INTERNAL_ERROR",
 			Message: fmt.Sprintf("Failed to update lead: %v", err),
 		})
+	}
+	
+	// Also update recipient_name in broadcast_messages table
+	if request.Name != "" {
+		db := database.GetDB()
+		updateQuery := `
+			UPDATE broadcast_messages 
+			SET recipient_name = ?
+			WHERE recipient_phone = ? 
+			AND device_id = ?
+			AND user_id = ?
+		`
+		result, err := db.Exec(updateQuery, request.Name, request.Phone, request.DeviceID, session.UserID)
+		if err != nil {
+			log.Printf("Error updating broadcast_messages recipient_name: %v", err)
+		} else {
+			rowsAffected, _ := result.RowsAffected()
+			log.Printf("Updated recipient_name in broadcast_messages for %d rows", rowsAffected)
+		}
 	}
 	
 	return c.JSON(utils.ResponseData{

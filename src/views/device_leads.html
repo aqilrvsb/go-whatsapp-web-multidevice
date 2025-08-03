@@ -294,6 +294,7 @@
                             <span class="filter-chip active" data-trigger="all">All</span>
                             <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
                             <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+                            <span class="filter-chip" data-trigger="history">History Triggers</span>
                             <!-- Dynamic trigger filters will be added here -->
                         </div>
                     </div>
@@ -438,6 +439,11 @@
                     <p class="text-muted">Update <span id="bulkUpdateCount">0</span> selected leads. Leave fields empty to keep existing values.</p>
                     <form id="bulkUpdateForm">
                         <div class="mb-3">
+                            <label class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" id="bulkName" placeholder="Customer name">
+                            <small class="text-muted">Leave empty to keep existing values</small>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Niche</label>
                             <input type="text" class="form-control" id="bulkNiche" placeholder="EXSTART or EXSTART,ITADRESS">
                             <small class="text-muted">Leave empty to keep existing values</small>
@@ -509,8 +515,16 @@
                 chip.addEventListener('click', function() {
                     document.querySelector('#triggerFilters .filter-chip.active').classList.remove('active');
                     this.classList.add('active');
+                    const previousFilter = currentTriggerFilter;
                     currentTriggerFilter = this.dataset.trigger;
-                    filterLeads();
+                    
+                    // If switching to/from history, reload leads
+                    if ((previousFilter === 'history' && currentTriggerFilter !== 'history') ||
+                        (previousFilter !== 'history' && currentTriggerFilter === 'history')) {
+                        loadLeads();
+                    } else {
+                        filterLeads();
+                    }
                 });
             });
             
@@ -531,7 +545,13 @@
         
         // Load leads
         function loadLeads() {
-            fetch(`/api/devices/${deviceId}/leads`, { credentials: 'include' })
+            // Check if we need to include history triggers
+            const includeHistory = currentTriggerFilter === 'history';
+            const url = includeHistory 
+                ? `/api/devices/${deviceId}/leads?include_history=true`
+                : `/api/devices/${deviceId}/leads`;
+                
+            fetch(url, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && Array.isArray(data.results)) {
@@ -719,6 +739,10 @@
                 filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
             } else if (currentTriggerFilter === 'no-trigger') {
                 filtered = filtered.filter(lead => !lead.trigger || lead.trigger.trim() === '');
+            } else if (currentTriggerFilter === 'history') {
+                // For history triggers, we already loaded them from server
+                // Just show all leads that have triggers
+                filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
             } else if (currentTriggerFilter !== 'all') {
                 filtered = filtered.filter(lead => {
                     if (!lead.trigger) return false;
@@ -1212,12 +1236,13 @@
         
         // Process bulk update
         function processBulkUpdate() {
+            const name = document.getElementById('bulkName').value.trim();
             const niche = document.getElementById('bulkNiche').value.trim();
             const status = document.getElementById('bulkStatus').value;
             const trigger = document.getElementById('bulkTrigger').value.trim();
             
             // Check if any field has value
-            if (!niche && !status && !trigger) {
+            if (!name && !niche && !status && !trigger) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'No Changes',
@@ -1241,6 +1266,7 @@
             });
             
             const updateData = {};
+            if (name) updateData.name = name;
             if (niche) updateData.niche = niche;
             if (status) updateData.target_status = status; // Only set if not empty
             if (trigger !== '') updateData.trigger = trigger; // Allow empty string to clear trigger
@@ -1251,11 +1277,11 @@
                 if (!lead) return Promise.resolve();
                 
                 // Debug logging
-                console.log('Updating lead:', leadId, 'with target_status:', updateData.target_status);
+                console.log('Updating lead:', leadId, 'with name:', updateData.name, 'target_status:', updateData.target_status);
                 
                 const payload = {
                     device_id: lead.device_id,
-                    name: lead.name,
+                    name: updateData.name !== undefined ? updateData.name : lead.name,
                     phone: lead.phone,
                     niche: updateData.niche !== undefined ? updateData.niche : lead.niche,
                     target_status: updateData.target_status !== undefined ? updateData.target_status : (lead.target_status || 'prospect'),
