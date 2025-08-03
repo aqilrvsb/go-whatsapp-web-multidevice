@@ -1813,9 +1813,9 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 			
 			query := fmt.Sprintf(`
 				SELECT 
-					COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+					COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
 					COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-					COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+					COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
 				FROM broadcast_messages
 				WHERE campaign_id IN (%s)
 			`, strings.Join(placeholders, ","))
@@ -1861,9 +1861,9 @@ func (handler *App) GetCampaignSummary(c *fiber.Ctx) error {
 			if db != nil {
 				err := db.QueryRow(`
 					SELECT 
-						COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+						COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
 						COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-						COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+						COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
 					FROM broadcast_messages
 					WHERE campaign_id = ?
 				`, campaign.ID).Scan(&doneSend, &failedSend, &pendingSend)
@@ -1947,8 +1947,25 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Check if today filter is applied
-	showTodayOnly := c.Query("today") == "true"
+	// Get date filter from query parameters
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	showToday := c.Query("today", "")
+	
+	// If no date filter provided and not explicitly showing today, default to today
+	if startDate == "" && endDate == "" && showToday == "" {
+		showToday = "true" // Default to showing today's data
+	}
+	
+	// If showToday is true, override date filters
+	if showToday == "true" {
+		today := time.Now().Format("2006-01-02")
+		startDate = today
+		endDate = today
+		log.Printf("Sequence Summary: Filtering by today: %s", today)
+	} else if startDate != "" || endDate != "" {
+		log.Printf("Sequence Summary: Date range filter - start=%s, end=%s", startDate, endDate)
+	}
 	
 	// Get sequence statistics
 	sequenceRepo := repository.GetSequenceRepository()
@@ -2041,8 +2058,15 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		
 		args := []interface{}{session.UserID}
 		
-		if showTodayOnly {
-			query += ` AND DATE(scheduled_at) = CURDATE()`
+		if startDate != "" && endDate != "" {
+			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+			args = append(args, startDate, endDate)
+		} else if startDate != "" {
+			query += ` AND DATE(scheduled_at) >= ?`
+			args = append(args, startDate)
+		} else if endDate != "" {
+			query += ` AND DATE(scheduled_at) <= ?`
+			args = append(args, endDate)
 		}
 		
 		err := db.QueryRow(query, args...).Scan(&totalSequenceMessages)
@@ -2065,8 +2089,15 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		
 		args := []interface{}{session.UserID}
 		
-		if showTodayOnly {
-			query += ` AND DATE(scheduled_at) = CURDATE()`
+		if startDate != "" && endDate != "" {
+			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+			args = append(args, startDate, endDate)
+		} else if startDate != "" {
+			query += ` AND DATE(scheduled_at) >= ?`
+			args = append(args, startDate)
+		} else if endDate != "" {
+			query += ` AND DATE(scheduled_at) <= ?`
+			args = append(args, endDate)
 		}
 		
 		err := db.QueryRow(query, args...).Scan(&totalShouldSend)
@@ -2077,15 +2108,22 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		// Get status counts
 		query = `
 			SELECT 
-				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+				COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+				COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
 			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
-		if showTodayOnly {
-			query += ` AND DATE(scheduled_at) = CURDATE()`
+		if startDate != "" && endDate != "" {
+			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+			args = append(args, startDate, endDate)
+		} else if startDate != "" {
+			query += ` AND DATE(scheduled_at) >= ?`
+			args = append(args, startDate)
+		} else if endDate != "" {
+			query += ` AND DATE(scheduled_at) <= ?`
+			args = append(args, endDate)
 		}
 		
 		err = db.QueryRow(query, args...).Scan(&totalDoneSend, &totalFailedSend, &totalRemainingSend)
@@ -2128,17 +2166,24 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			query := `
 				SELECT 
 					COUNT(DISTINCT recipient_phone) AS total,
-					COUNT(DISTINCT CASE WHEN status = 'success' THEN recipient_phone END) AS success,
+					COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) AS done_send,
 					COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) AS failed,
-					COUNT(DISTINCT CASE WHEN status = 'pending' THEN recipient_phone END) AS pending
+					COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) AS remaining
 				FROM broadcast_messages
 				WHERE sequence_id = ?`
 			
 			args := []interface{}{sequence.ID}
 			
-			if showTodayOnly {
-				query += ` AND DATE(scheduled_at) = CURDATE()`
-			}
+			if startDate != "" && endDate != "" {
+			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+			args = append(args, startDate, endDate)
+		} else if startDate != "" {
+			query += ` AND DATE(scheduled_at) >= ?`
+			args = append(args, startDate)
+		} else if endDate != "" {
+			query += ` AND DATE(scheduled_at) <= ?`
+			args = append(args, endDate)
+		}
 			
 			err = db.QueryRow(query, args...).Scan(&shouldSend, &doneSend, &failedSend, &remainingSend)
 			
@@ -2184,17 +2229,24 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		
 		query := `
 			SELECT 
-				COUNT(CASE WHEN status = 'success' THEN 1 END) as success,
+				COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
+				COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
 			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
 		
 		args := []interface{}{session.UserID}
 		
-		if showTodayOnly {
-			query += ` AND DATE(scheduled_at) = CURDATE()`
+		if startDate != "" && endDate != "" {
+			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+			args = append(args, startDate, endDate)
+		} else if startDate != "" {
+			query += ` AND DATE(scheduled_at) >= ?`
+			args = append(args, startDate)
+		} else if endDate != "" {
+			query += ` AND DATE(scheduled_at) <= ?`
+			args = append(args, endDate)
 		}
 		
 		err := db.QueryRow(query, args...).Scan(&totalSuccess, &totalFailed, &totalPending)
@@ -2832,7 +2884,7 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 			ud.device_name,
 			ud.status as device_status,
 			COUNT(*) as total_messages,
-			COUNT(CASE WHEN bm.status = 'success' THEN 1 END) as success_count,
+			COUNT(CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN 1 END) as success_count,
 			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed_count,
 			COUNT(CASE WHEN bm.status = 'pending' THEN 1 END) as pending_count
 		FROM broadcast_messages bm
@@ -4176,6 +4228,12 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	sequenceId := c.Params("id") // Sequence ID is already a string UUID
 	log.Printf("GetSequenceDeviceReport called for sequence: %s", sequenceId)
 	
+	// Get date filters from query parameters
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	
+	log.Printf("Date filters - start: %s, end: %s", startDate, endDate)
+	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {
@@ -4290,10 +4348,23 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ? 
-		AND bm.user_id = ?
-	`
+		AND bm.user_id = ?`
 	
-	deviceRows, err := db.Query(deviceQuery, sequenceId, session.UserID)
+	args := []interface{}{sequenceId, session.UserID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		deviceQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
+		args = append(args, startDate, endDate)
+	} else if startDate != "" {
+		deviceQuery += ` AND DATE(bm.scheduled_at) >= ?`
+		args = append(args, startDate)
+	} else if endDate != "" {
+		deviceQuery += ` AND DATE(bm.scheduled_at) <= ?`
+		args = append(args, endDate)
+	}
+	
+	deviceRows, err := db.Query(deviceQuery, args...)
 	if err != nil {
 		log.Printf("Error getting devices for sequence %s: %v", sequenceId, err)
 		return c.Status(500).JSON(utils.ResponseData{
@@ -4356,11 +4427,25 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
 			AND bm.user_id = ?
-			AND bm.sequence_stepid IS NOT NULL
-			GROUP BY bm.sequence_stepid
-		`
+			AND bm.sequence_stepid IS NOT NULL`
 		
-		statsRows, err := db.Query(stepStatsQuery, sequenceId, deviceId, session.UserID)
+		statsArgs := []interface{}{sequenceId, deviceId, session.UserID}
+		
+		// Add date filters if provided
+		if startDate != "" && endDate != "" {
+			stepStatsQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
+			statsArgs = append(statsArgs, startDate, endDate)
+		} else if startDate != "" {
+			stepStatsQuery += ` AND DATE(bm.scheduled_at) >= ?`
+			statsArgs = append(statsArgs, startDate)
+		} else if endDate != "" {
+			stepStatsQuery += ` AND DATE(bm.scheduled_at) <= ?`
+			statsArgs = append(statsArgs, endDate)
+		}
+		
+		stepStatsQuery += ` GROUP BY bm.sequence_stepid`
+		
+		statsRows, err := db.Query(stepStatsQuery, statsArgs...)
 		if err != nil {
 			log.Printf("Error getting step stats for device %s: %v", deviceId, err)
 			continue
@@ -4424,10 +4509,23 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining_send
 		FROM broadcast_messages
 		WHERE sequence_id = ? 
-		AND user_id = ?
-	`
+		AND user_id = ?`
 	
-	err = db.QueryRow(overallQuery, sequenceId, session.UserID).Scan(
+	overallArgs := []interface{}{sequenceId, session.UserID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		overallQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+		overallArgs = append(overallArgs, startDate, endDate)
+	} else if startDate != "" {
+		overallQuery += ` AND DATE(scheduled_at) >= ?`
+		overallArgs = append(overallArgs, startDate)
+	} else if endDate != "" {
+		overallQuery += ` AND DATE(scheduled_at) <= ?`
+		overallArgs = append(overallArgs, endDate)
+	}
+	
+	err = db.QueryRow(overallQuery, overallArgs...).Scan(
 		&totalLeadCount, &totalDoneSend, &totalFailedSend, &totalRemainingSend)
 	
 	if err != nil {
@@ -4603,7 +4701,7 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 	db := database.GetDB()
 	
 	query := `
-		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name
+		SELECT bm.recipient_phone, bm.status, bm.sent_at, l.name, bm.error_message
 		FROM broadcast_messages bm
 		LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.user_id = bm.user_id
 		WHERE bm.sequence_id = ? 
@@ -4645,8 +4743,9 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 		var phone, msgStatus string
 		var sentAt sql.NullTime
 		var name sql.NullString
+		var errorMessage sql.NullString
 		
-		err := rows.Scan(&phone, &msgStatus, &sentAt, &name)
+		err := rows.Scan(&phone, &msgStatus, &sentAt, &name, &errorMessage)
 		if err != nil {
 			log.Printf("Error scanning lead row: %v", err)
 			continue
@@ -4661,6 +4760,13 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 			"name":   leadName,
 			"phone":  phone,
 			"status": msgStatus,
+		}
+		
+		// Add error message if exists
+		if errorMessage.Valid && errorMessage.String != "" {
+			lead["error_message"] = errorMessage.String
+		} else {
+			lead["error_message"] = "-"
 		}
 		
 		if sentAt.Valid {

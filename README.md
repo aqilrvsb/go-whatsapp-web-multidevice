@@ -8,6 +8,16 @@
 1. **Fixed Missing Messages**: Fixed critical bug where `GetPendingMessages` wasn't appending messages to return array
 2. **Anti-Spam Flow**: Fixed double anti-spam application - now applied once in BroadcastWorker for all device types
 3. **Platform Device Support**: Platform devices (Wablas/Whacenter) now also receive anti-spam (greeting + randomization)
+4. **True Random Delays**: Fixed delays to be truly random instead of always using middle value
+5. **Sequence Step Delays**: Each sequence step can now have its own min/max delay settings
+6. **Fixed Status Queries**: Changed all `status = 'success'` to `status = 'sent'` throughout the system
+7. **Sequence Summary Fixes**:
+   - Changed "Campaign Device Report" to "Sequence Device Report" for sequences
+   - Fixed statistics to use correct status values (sent, failed, pending/queued)
+   - Added date range filter (like campaigns)
+   - Auto-filters to today's date on page load
+   - Date filters are passed to device reports
+8. **Error Message Display**: Added error_message column to failed leads popup (for debugging failures)
 
 ### Previous Fixes (August 2, 2025):
 1. **Duplicate Prevention**: 

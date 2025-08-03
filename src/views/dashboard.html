@@ -1022,10 +1022,18 @@
                         <p class="text-muted mb-0">Overview of all your sequence activities</p>
                     </div>
                     <div class="d-flex gap-2">
-                        <!-- Date Filter -->
-                        <input type="date" id="sequenceFilterDate" class="form-control form-control-sm" style="width: auto;">
+                        <!-- Date Range Filter -->
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-muted">From:</small>
+                            <input type="date" id="sequenceStartDate" class="form-control form-control-sm" style="width: auto;">
+                            <small class="text-muted">To:</small>
+                            <input type="date" id="sequenceEndDate" class="form-control form-control-sm" style="width: auto;">
+                        </div>
                         <button class="btn btn-outline-primary btn-sm" onclick="filterSequences()">
                             <i class="bi bi-funnel"></i> Filter
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="showSequencesToday()">
+                            <i class="bi bi-calendar-day"></i> Today
                         </button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="clearSequenceFilter()">
                             <i class="bi bi-x-circle"></i> Clear
@@ -5917,10 +5925,33 @@
             loadSequenceSummary();
         }
         
+        // Global variables for sequence date filters
+        let sequenceStartDate = '';
+        let sequenceEndDate = '';
+        
         function loadSequenceSummary() {
             let url = '/api/sequences/summary';
-            if (sequenceShowTodayOnly) {
-                url += '?today=true';
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            
+            // If we have date filters, use them
+            if (sequenceStartDate || sequenceEndDate) {
+                if (sequenceStartDate) params.append('start_date', sequenceStartDate);
+                if (sequenceEndDate) params.append('end_date', sequenceEndDate);
+            } else {
+                // Default to today on first load
+                const today = new Date().toISOString().split('T')[0];
+                params.append('start_date', today);
+                params.append('end_date', today);
+                
+                // Set the date inputs to today
+                document.getElementById('sequenceStartDate').value = today;
+                document.getElementById('sequenceEndDate').value = today;
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
             }
             
             fetch(url, {
@@ -6465,34 +6496,30 @@
             modal.show();
         }
         
-        // Sequence Filter Function
+        // Sequence Filter Functions
         function filterSequences() {
-            const filterDate = document.getElementById('sequenceFilterDate').value;
-            
-            if (!filterDate) {
-                loadSequenceSummary();
-                return;
-            }
-            
-            // Filter the existing sequences data client-side
-            fetch('/api/sequences/summary')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.code === 'SUCCESS' && data.results) {
-                        // Filter sequences by created date
-                        const filteredResults = {
-                            ...data.results,
-                            recent_sequences: data.results.recent_sequences.filter(sequence => {
-                                if (!sequence.created_at) return false;
-                                const sequenceDate = sequence.created_at.split('T')[0];
-                                return sequenceDate === filterDate;
-                            })
-                        };
-                        
-                        // Update counts
-                        const filteredSequences = filteredResults.recent_sequences;
-                        filteredResults.sequences = {
-                            total: filteredSequences.length,
+            sequenceStartDate = document.getElementById('sequenceStartDate').value;
+            sequenceEndDate = document.getElementById('sequenceEndDate').value;
+            loadSequenceSummary();
+        }
+        
+        function showSequencesToday() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sequenceStartDate').value = today;
+            document.getElementById('sequenceEndDate').value = today;
+            sequenceStartDate = today;
+            sequenceEndDate = today;
+            loadSequenceSummary();
+        }
+        
+        function clearSequenceFilter() {
+            document.getElementById('sequenceStartDate').value = '';
+            document.getElementById('sequenceEndDate').value = '';
+            sequenceStartDate = '';
+            sequenceEndDate = '';
+            // When clearing, still show today's data
+            showSequencesToday();
+        }
                             active: filteredSequences.filter(s => s.status === 'active').length,
                             inactive: filteredSequences.length - filteredSequences.filter(s => s.status === 'active').length
                         };
@@ -6582,8 +6609,20 @@
             // Show loading state
             document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
             
+            // Build URL with date filters
+            let url = `/api/sequences/${sequence.id}/device-report`;
+            const params = new URLSearchParams();
+            
+            // Pass the same date filters from the summary
+            if (sequenceStartDate) params.append('start_date', sequenceStartDate);
+            if (sequenceEndDate) params.append('end_date', sequenceEndDate);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
             // Fetch device report data for sequence
-            fetch(`/api/sequences/${sequence.id}/device-report`, { credentials: 'include' })
+            fetch(url, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
