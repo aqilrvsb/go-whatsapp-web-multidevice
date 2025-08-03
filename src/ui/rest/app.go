@@ -690,58 +690,102 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 		})
 	}
 	
-	// If include_history is true, add historical triggers from broadcast_messages
+	// If include_history is true, we need to get ALL leads that have historical triggers
 	if includeTriggerHistory {
 		db := database.GetDB()
-		for i := range leads {
-			// Get historical triggers from broadcast_messages
-			var historicalTriggers []string
-			query := `
-				SELECT DISTINCT ss.trigger_name
-				FROM broadcast_messages bm
-				JOIN sequence_steps ss ON ss.id = bm.sequence_stepid
-				WHERE bm.recipient_phone = ? 
-				AND bm.device_id = ?
-				AND bm.user_id = ?
-				AND ss.trigger_name IS NOT NULL
-				AND ss.trigger_name != ''
-			`
-			rows, err := db.Query(query, leads[i].Phone, deviceId, session.UserID)
-			if err == nil {
-				defer rows.Close()
-				for rows.Next() {
-					var trigger string
-					if err := rows.Scan(&trigger); err == nil {
-						historicalTriggers = append(historicalTriggers, trigger)
+		
+		// First, get all phone numbers that have triggers in broadcast_messages
+		historicalQuery := `
+			SELECT DISTINCT 
+				bm.recipient_phone,
+				COALESCE(bm.recipient_name, l.name, 'Unknown') as name,
+				GROUP_CONCAT(DISTINCT ss.trigger_name) as triggers
+			FROM broadcast_messages bm
+			JOIN sequence_steps ss ON ss.id = bm.sequence_stepid
+			LEFT JOIN leads l ON l.phone = bm.recipient_phone AND l.device_id = bm.device_id AND l.user_id = bm.user_id
+			WHERE bm.device_id = ?
+			AND bm.user_id = ?
+			AND ss.trigger_name IS NOT NULL
+			AND ss.trigger_name != ''
+			GROUP BY bm.recipient_phone, bm.recipient_name, l.name
+		`
+		
+		rows, err := db.Query(historicalQuery, deviceId, session.UserID)
+		if err != nil {
+			log.Printf("Error getting historical triggers: %v", err)
+		} else {
+			defer rows.Close()
+			
+			// Create a map of phone -> triggers for historical data
+			historicalTriggers := make(map[string]string)
+			historicalNames := make(map[string]string)
+			
+			for rows.Next() {
+				var phone, name, triggers string
+				if err := rows.Scan(&phone, &name, &triggers); err == nil {
+					historicalTriggers[phone] = triggers
+					historicalNames[phone] = name
+				}
+			}
+			
+			// Create a map of existing leads by phone
+			existingLeads := make(map[string]*models.Lead)
+			for i := range leads {
+				existingLeads[leads[i].Phone] = &leads[i]
+			}
+			
+			// Add historical leads that don't exist in leads table
+			for phone, triggers := range historicalTriggers {
+				if _, exists := existingLeads[phone]; !exists {
+					// Create a new lead entry for historical data
+					newLead := models.Lead{
+						UserID:   session.UserID,
+						DeviceID: deviceId,
+						Phone:    phone,
+						Name:     historicalNames[phone],
+						Trigger:  triggers,
+						Source:   "historical",
+						TargetStatus: "prospect", // Default status
+					}
+					leads = append(leads, newLead)
+				} else {
+					// Update existing lead with historical triggers
+					existingLead := existingLeads[phone]
+					
+					// Merge triggers
+					currentTriggers := []string{}
+					if existingLead.Trigger != "" {
+						currentTriggers = strings.Split(existingLead.Trigger, ",")
+						for j := range currentTriggers {
+							currentTriggers[j] = strings.TrimSpace(currentTriggers[j])
+						}
+					}
+					
+					histTriggers := strings.Split(triggers, ",")
+					for j := range histTriggers {
+						histTriggers[j] = strings.TrimSpace(histTriggers[j])
+					}
+					
+					// Merge and deduplicate
+					allTriggers := append(currentTriggers, histTriggers...)
+					uniqueTriggers := make(map[string]bool)
+					for _, t := range allTriggers {
+						if t != "" {
+							uniqueTriggers[t] = true
+						}
+					}
+					
+					// Convert back to slice
+					triggerList := make([]string, 0, len(uniqueTriggers))
+					for t := range uniqueTriggers {
+						triggerList = append(triggerList, t)
+					}
+					
+					// Update the lead with all triggers
+					if len(triggerList) > 0 {
+						existingLead.Trigger = strings.Join(triggerList, ",")
 					}
 				}
-			}
-			
-			// Combine current triggers with historical triggers
-			currentTriggers := []string{}
-			if leads[i].Trigger != "" {
-				currentTriggers = strings.Split(leads[i].Trigger, ",")
-				for j := range currentTriggers {
-					currentTriggers[j] = strings.TrimSpace(currentTriggers[j])
-				}
-			}
-			
-			// Merge and deduplicate
-			allTriggers := append(currentTriggers, historicalTriggers...)
-			uniqueTriggers := make(map[string]bool)
-			for _, t := range allTriggers {
-				uniqueTriggers[t] = true
-			}
-			
-			// Convert back to slice
-			triggerList := make([]string, 0, len(uniqueTriggers))
-			for t := range uniqueTriggers {
-				triggerList = append(triggerList, t)
-			}
-			
-			// Update the lead with all triggers
-			if len(triggerList) > 0 {
-				leads[i].Trigger = strings.Join(triggerList, ",")
 			}
 		}
 	}
