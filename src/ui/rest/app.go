@@ -2108,9 +2108,9 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		// Get status counts
 		query = `
 			SELECT 
-				COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
-				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
+				COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
+				COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed,
+				COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining
 			FROM broadcast_messages
 			WHERE sequence_id IS NOT NULL
 			AND user_id = ?`
@@ -2127,9 +2127,17 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		}
 		
 		err = db.QueryRow(query, args...).Scan(&totalDoneSend, &totalFailedSend, &totalRemainingSend)
-		if err != nil {
-			totalDoneSend, totalFailedSend, totalRemainingSend = 0, 0, 0
+		// Ensure totalRemainingSend is not negative
+		if totalRemainingSend < 0 {
+			totalRemainingSend = 0
 		}
+		
+		// Calculate totalShouldSend as the sum of all statuses
+		// This ensures consistency: Should Send = Done + Failed + Remaining
+		totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
+		
+		log.Printf("Sequence Summary Stats - Done: %d, Failed: %d, Remaining: %d, Total Should Send: %d", 
+			totalDoneSend, totalFailedSend, totalRemainingSend, totalShouldSend)
 	}
 	
 	// Add flow counts to each sequence
@@ -2189,6 +2197,9 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			
 			if err != nil {
 				shouldSend, doneSend, failedSend, remainingSend = 0, 0, 0, 0
+			} else {
+				// Ensure shouldSend is the sum of all statuses for consistency
+				shouldSend = doneSend + failedSend + remainingSend
 			}
 			
 			sequenceData["should_send"] = shouldSend
