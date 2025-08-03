@@ -1626,6 +1626,7 @@
                                     <th>Phone Number</th>
                                     <th>Status</th>
                                     <th>Sent At</th>
+                                    <th>Error Message</th>
                                 </tr>
                             </thead>
                             <tbody id="leadDetailsTableBody">
@@ -6935,7 +6936,7 @@
             document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads - Step`;
             
             // Show loading state
-            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
+            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
             
             // Fetch lead details for specific step
             fetch(`/api/sequences/${currentSequenceForReport.id}/device/${deviceId}/step/${stepId}/leads?status=${status}`, { 
@@ -6946,12 +6947,12 @@
                     if (data.code === 'SUCCESS' && data.results) {
                         displayLeadDetails(data.results);
                     } else {
-                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted">No leads found</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading lead details:', error);
-                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading leads</td></tr>';
+                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading leads</td></tr>';
                 });
             
             // Show modal
@@ -6974,7 +6975,7 @@
             document.getElementById('leadDetailsTitle').textContent = `${statusText} Leads`;
             
             // Show loading state
-            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
+            document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
             
             // Fetch lead details
             fetch(endpoint, { credentials: 'include' })
@@ -6983,12 +6984,12 @@
                     if (data.code === 'SUCCESS' && data.results) {
                         displayLeadDetails(data.results);
                     } else {
-                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+                        document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted">No leads found</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error('Error loading lead details:', error);
-                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading leads</td></tr>';
+                    document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading leads</td></tr>';
                 });
             
             // Show modal
@@ -7078,13 +7079,14 @@
                                     ${lead.status || 'pending'}
                                 </span>
                             </td>
-                            <td>${lead.sentAt || '-'}</td>
+                            <td>${lead.sent_at || lead.sentAt || '-'}</td>
+                            <td>${lead.error_message || '-'}</td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No leads found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No leads found</td></tr>';
             }
         }
         
