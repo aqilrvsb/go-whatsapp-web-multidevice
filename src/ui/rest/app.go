@@ -2079,66 +2079,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	// Get total message counts across all sequences
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend int
 	
-	if db != nil {
-		// First get total should send (distinct contacts)
-		query := `
-			SELECT COUNT(DISTINCT recipient_phone)
-			FROM broadcast_messages
-			WHERE sequence_id IS NOT NULL
-			AND user_id = ?`
-		
-		args := []interface{}{session.UserID}
-		
-		if startDate != "" && endDate != "" {
-			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-			args = append(args, startDate, endDate)
-		} else if startDate != "" {
-			query += ` AND DATE(scheduled_at) >= ?`
-			args = append(args, startDate)
-		} else if endDate != "" {
-			query += ` AND DATE(scheduled_at) <= ?`
-			args = append(args, endDate)
-		}
-		
-		err := db.QueryRow(query, args...).Scan(&totalShouldSend)
-		if err != nil {
-			totalShouldSend = 0
-		}
-		
-		// Get status counts
-		query = `
-			SELECT 
-				COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
-				COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed,
-				COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining
-			FROM broadcast_messages
-			WHERE sequence_id IS NOT NULL
-			AND user_id = ?`
-		
-		if startDate != "" && endDate != "" {
-			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-			args = append(args, startDate, endDate)
-		} else if startDate != "" {
-			query += ` AND DATE(scheduled_at) >= ?`
-			args = append(args, startDate)
-		} else if endDate != "" {
-			query += ` AND DATE(scheduled_at) <= ?`
-			args = append(args, endDate)
-		}
-		
-		err = db.QueryRow(query, args...).Scan(&totalDoneSend, &totalFailedSend, &totalRemainingSend)
-		// Ensure totalRemainingSend is not negative
-		if totalRemainingSend < 0 {
-			totalRemainingSend = 0
-		}
-		
-		// Calculate totalShouldSend as the sum of all statuses
-		// This ensures consistency: Should Send = Done + Failed + Remaining
-		totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
-		
-		log.Printf("Sequence Summary Stats - Done: %d, Failed: %d, Remaining: %d, Total Should Send: %d", 
-			totalDoneSend, totalFailedSend, totalRemainingSend, totalShouldSend)
-	}
+	// We'll calculate these totals after processing individual sequences
 	
 	// Add flow counts to each sequence
 	sequencesWithFlows := []map[string]interface{}{}
@@ -2210,7 +2151,25 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			sequencesWithFlows = append(sequencesWithFlows, sequenceData)
 		}
 		
+		// Calculate totals from individual sequences
+		for _, seq := range sequencesWithFlows {
+			if done, ok := seq["done_send"].(int); ok {
+				totalDoneSend += done
+			}
+			if failed, ok := seq["failed_send"].(int); ok {
+				totalFailedSend += failed
+			}
+			if remaining, ok := seq["remaining_send"].(int); ok {
+				totalRemainingSend += remaining
+			}
+			if should, ok := seq["should_send"].(int); ok {
+				totalShouldSend += should
+			}
+		}
+		
 		log.Printf("Processed %d sequences with flows", len(sequencesWithFlows))
+		log.Printf("Calculated totals - Should: %d, Done: %d, Failed: %d, Remaining: %d", 
+			totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
 	} else {
 		log.Printf("Database connection is nil")
 	}
@@ -2232,44 +2191,6 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
 		},
 		"recent_sequences": sequencesWithFlows,
-	}
-	
-	// Get overall sequence broadcast statistics
-	if db != nil {
-		var totalSuccess, totalFailed, totalPending int
-		
-		query := `
-			SELECT 
-				COUNT(CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN 1 END) as done_send,
-				COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
-				COUNT(CASE WHEN status IN ('pending', 'queued') THEN 1 END) as remaining
-			FROM broadcast_messages
-			WHERE sequence_id IS NOT NULL
-			AND user_id = ?`
-		
-		args := []interface{}{session.UserID}
-		
-		if startDate != "" && endDate != "" {
-			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-			args = append(args, startDate, endDate)
-		} else if startDate != "" {
-			query += ` AND DATE(scheduled_at) >= ?`
-			args = append(args, startDate)
-		} else if endDate != "" {
-			query += ` AND DATE(scheduled_at) <= ?`
-			args = append(args, endDate)
-		}
-		
-		err := db.QueryRow(query, args...).Scan(&totalSuccess, &totalFailed, &totalPending)
-		
-		if err == nil {
-			summary["broadcast_stats"] = map[string]interface{}{
-				"total_success": totalSuccess,
-				"total_failed": totalFailed,
-				"total_pending": totalPending,
-				"total_messages": totalSuccess + totalFailed + totalPending,
-			}
-		}
 	}
 	
 	return c.JSON(utils.ResponseData{
