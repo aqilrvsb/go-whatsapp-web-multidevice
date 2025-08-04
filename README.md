@@ -1,10 +1,36 @@
 # WhatsApp Multi-Device System - Dual Database Edition
-**Last Updated: August 03, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
-**Status: ✅ Production-ready with Critical Fixes Applied**
+**Last Updated: August 04, 2025 - MySQL Application Data + PostgreSQL WhatsApp Sessions**  
+**Status: ✅ Production-ready with Timezone Fix Applied**
 
-## 🔧 Recent Updates (August 3, 2025)
+## 🚨 IMPORTANT: Timezone Configuration (August 4, 2025)
 
-### Critical Message Fix:
+### Server Timezone Adjustment:
+The system is configured to handle an 8-hour timezone difference between the server (UTC-8) and Malaysia time (UTC+8).
+
+**Applied Fix**: The broadcast worker now adds 8 hours when checking scheduled messages:
+```sql
+-- Before: Messages stuck as server time is 8 hours behind
+WHERE scheduled_at <= NOW()
+
+-- After: Correctly processes Malaysia-scheduled messages  
+WHERE scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
+```
+
+**Impact**: 
+- Messages scheduled in Malaysia time will be sent correctly
+- No more pending messages stuck at end of day
+- Worker checks 10-minute window adjusted for timezone
+
+**Note**: If server timezone changes, update the interval in `broadcast_repository.go`
+
+## 🔧 Recent Updates (August 4, 2025)
+
+### Timezone Fix:
+1. **Fixed 8-hour timezone mismatch**: Server (UTC-8) vs Malaysia (UTC+8)
+2. **Adjusted worker query**: Added 8-hour offset to scheduled message checks
+3. **Prevents stuck messages**: Messages no longer remain pending past scheduled time
+
+### Critical Message Fix (August 3, 2025):
 1. **Fixed Missing Messages**: Fixed critical bug where `GetPendingMessages` wasn't appending messages to return array
 2. **Anti-Spam Flow**: Fixed double anti-spam application - now applied once in BroadcastWorker for all device types
 3. **Platform Device Support**: Platform devices (Wablas/Whacenter) now also receive anti-spam (greeting + randomization)

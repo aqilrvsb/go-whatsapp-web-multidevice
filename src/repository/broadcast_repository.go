@@ -160,8 +160,8 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		WHERE bm.device_id = ? 
 		AND bm.status = 'pending'
 		AND bm.scheduled_at IS NOT NULL
-		AND bm.scheduled_at <= ?
-		AND bm.scheduled_at >= DATE_SUB(?, INTERVAL 10 MINUTE)
+		AND bm.scheduled_at <= DATE_ADD(?, INTERVAL 8 HOUR)
+		AND bm.scheduled_at >= DATE_ADD(DATE_SUB(?, INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
 		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
 		LIMIT ?
 	`	
