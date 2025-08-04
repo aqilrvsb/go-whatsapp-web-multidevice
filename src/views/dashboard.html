@@ -1554,6 +1554,17 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card bg-info text-white">
+                                        <div class="card-body">
+                                            <h4 id="totalLeads">0</h4>
+                                            <p class="mb-0">Total Leads</p>
+                                            <small>Unique Phone + Device</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -6071,6 +6082,19 @@
                     </div>
                 </div>
                 
+                <div class="row mb-4">
+                    <!-- Total Leads -->
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h3 class="text-info">${summary.total_leads || 0}</h3>
+                                <p class="text-muted mb-0">Total Leads</p>
+                                <small class="text-muted">Unique Phone + Device</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
@@ -6091,6 +6115,7 @@
                                                     <th>Contacts Done Send Message</th>
                                                     <th>Contacts Failed Send Message</th>
                                                     <th>Contacts Remaining Send Message</th>
+                                                    <th>Total Leads</th>
                                                     <th>Status</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -6106,6 +6131,7 @@
                                                         <td>${sequence.done_send || 0}</td>
                                                         <td>${sequence.failed_send || 0}</td>
                                                         <td>${sequence.remaining_send || 0}</td>
+                                                        <td>${sequence.total_leads || 0}</td>
                                                         <td>
                                                             <span class="badge bg-${getStatusColor(sequence.status)}">
                                                                 ${sequence.status}
@@ -6659,6 +6685,11 @@
             document.getElementById('contactsDoneSend').textContent = report.doneSend || 0;
             document.getElementById('contactsFailedSend').textContent = report.failedSend || 0;
             document.getElementById('contactsRemainingSend').textContent = report.remainingSend || 0;
+            
+            // Update total leads if element exists
+            if (document.getElementById('totalLeads')) {
+                document.getElementById('totalLeads').textContent = report.totalLeads || 0;
+            }
             
             // Update device table
             const tbody = document.getElementById('deviceReportTableBody');

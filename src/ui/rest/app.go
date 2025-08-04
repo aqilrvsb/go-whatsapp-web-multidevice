@@ -2218,7 +2218,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 	}
 	
 	// Get total message counts across all sequences
-	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend int
+	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsSum int
 	
 	// We'll calculate these totals after processing individual sequences
 	
@@ -2250,15 +2250,19 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			sequenceData["total_flows"] = flowCount
 			
 			// Get contact statistics for this sequence FROM broadcast_messages table
-			var shouldSend, doneSend, failedSend, remainingSend int
+			var shouldSend, doneSend, failedSend, remainingSend, totalLeads int
 			
-			// Build query with date filter
+			// Build query with date filter - UPDATED to use proper DISTINCT logic
 			query := `
 				SELECT 
-					COUNT(DISTINCT recipient_phone) AS total,
-					COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) AS done_send,
-					COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) AS failed,
-					COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) AS remaining
+					COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
+					COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') 
+						THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS done_send,
+					COUNT(DISTINCT CASE WHEN status = 'failed' 
+						THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS failed,
+					COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') 
+						THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS remaining,
+					COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) AS total_leads
 				FROM broadcast_messages
 				WHERE sequence_id = ?`
 			
@@ -2275,11 +2279,16 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			args = append(args, endDate)
 		}
 			
-			err = db.QueryRow(query, args...).Scan(&shouldSend, &doneSend, &failedSend, &remainingSend)
+			err = db.QueryRow(query, args...).Scan(&shouldSend, &doneSend, &failedSend, &remainingSend, &totalLeads)
 			
 			if err != nil {
-				shouldSend, doneSend, failedSend, remainingSend = 0, 0, 0, 0
+				log.Printf("Error getting sequence stats for %s: %v", sequence.ID, err)
+				shouldSend, doneSend, failedSend, remainingSend, totalLeads = 0, 0, 0, 0, 0
 			} else {
+				// Log the raw data for COLD Sequence
+				if sequence.Name == "COLD Sequence" {
+					log.Printf("COLD Sequence raw data - Done: %d, Failed: %d, Remaining: %d", doneSend, failedSend, remainingSend)
+				}
 				// Ensure shouldSend is the sum of all statuses for consistency
 				shouldSend = doneSend + failedSend + remainingSend
 			}
@@ -2288,6 +2297,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			sequenceData["done_send"] = doneSend
 			sequenceData["failed_send"] = failedSend
 			sequenceData["remaining_send"] = remainingSend
+			sequenceData["total_leads"] = totalLeads
 			
 			sequencesWithFlows = append(sequencesWithFlows, sequenceData)
 		}
@@ -2305,6 +2315,9 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			}
 			if should, ok := seq["should_send"].(int); ok {
 				totalShouldSend += should
+			}
+			if leads, ok := seq["total_leads"].(int); ok {
+				totalLeadsSum += leads
 			}
 		}
 		
@@ -2327,6 +2340,7 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 		"total_done_send": totalDoneSend,
 		"total_failed_send": totalFailedSend,
 		"total_remaining_send": totalRemainingSend,
+		"total_leads": totalLeadsSum,
 		"contacts": map[string]interface{}{
 			"total": totalContacts,
 			"average_per_sequence": float64(totalContacts) / float64(max(1, totalSequences)),
@@ -4623,6 +4637,13 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
 	log.Printf("Overall stats - Should: %d, Done: %d, Failed: %d, Remaining: %d",
 		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
+	
+	// Special logging for COLD Sequence
+	if sequence.Name == "COLD Sequence" {
+		log.Printf("COLD Sequence Device Report - Date filter: start=%s, end=%s", startDate, endDate)
+		log.Printf("COLD Sequence Device Report - Final totals: Should=%d (Done=%d + Failed=%d + Remaining=%d)", 
+			totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
+	}
 	
 	result := map[string]interface{}{
 		"totalDevices":        totalDevicesWithData,
