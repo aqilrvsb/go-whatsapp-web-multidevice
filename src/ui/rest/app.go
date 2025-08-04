@@ -4504,7 +4504,8 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				bm.sequence_stepid,
 				COUNT(DISTINCT bm.recipient_phone) as total,
 				COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN bm.recipient_phone END) as done_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send
+				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send,
+				COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued') THEN bm.recipient_phone END) as remaining_send
 			FROM broadcast_messages bm
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
@@ -4537,15 +4538,12 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		
 		for statsRows.Next() {
 			var stepId string
-			var total, doneSend, failedSend int
+			var total, doneSend, failedSend, remainingSend int
 			
-			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend)
+			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend)
 			if err != nil {
 				continue
 			}
-			
-			// Calculate remaining as: total - done - failed
-			remainingSend := total - doneSend - failedSend
 			
 			// Get step info
 			stepInfo, exists := stepMap[stepId]
@@ -4553,19 +4551,22 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				continue
 			}
 			
+			// Calculate should_send using the same logic as summary page
+			shouldSend := doneSend + failedSend + remainingSend
+			
 			stepReport := StepReport{
 				StepID:        stepId,
 				StepOrder:     stepInfo.Order,
 				StepName:      fmt.Sprintf("Step %d: %s", stepInfo.Order, stepInfo.MessageType),
 				DayNumber:     stepInfo.DayNumber,
-				ShouldSend:    total,
+				ShouldSend:    shouldSend,
 				DoneSend:      doneSend,
 				FailedSend:    failedSend,
 				RemainingSend: remainingSend,
 			}
 			
 			deviceReport.Steps = append(deviceReport.Steps, stepReport)
-			totalDeviceMessages += total
+			totalDeviceMessages += shouldSend
 		}
 		statsRows.Close()
 		
@@ -4583,14 +4584,12 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Calculate overall totals
-	var totalLeadCount, totalDoneSend, totalFailedSend, totalRemainingSend int
-	
+	// Calculate overall totals using the same logic as summary page
 	overallQuery := `
 		SELECT 
-			COUNT(DISTINCT recipient_phone) as total,
 			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
-			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send
+			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining_send
 		FROM broadcast_messages
 		WHERE sequence_id = ? 
 		AND user_id = ?`
@@ -4609,25 +4608,28 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		overallArgs = append(overallArgs, endDate)
 	}
 	
+	var totalDoneSend, totalFailedSend, totalRemainingSend int
 	err = db.QueryRow(overallQuery, overallArgs...).Scan(
-		&totalLeadCount, &totalDoneSend, &totalFailedSend)
+		&totalDoneSend, &totalFailedSend, &totalRemainingSend)
 	
 	if err != nil {
-		totalLeadCount, totalDoneSend, totalFailedSend = 0, 0, 0
+		totalDoneSend, totalFailedSend, totalRemainingSend = 0, 0, 0
 	}
 	
-	// Calculate remaining as: total - done - failed
-	totalRemainingSend = totalLeadCount - totalDoneSend - totalFailedSend
+	// Calculate total using the same logic as summary page
+	totalShouldSend := totalDoneSend + totalFailedSend + totalRemainingSend
 	
 	log.Printf("Sequence Device Report - Total devices: %d, Online: %d, Offline: %d", 
 		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
+	log.Printf("Overall stats - Should: %d, Done: %d, Failed: %d, Remaining: %d",
+		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
 	
 	result := map[string]interface{}{
 		"totalDevices":        totalDevicesWithData,
 		"activeDevices":       onlineDevicesWithData,
 		"disconnectedDevices": offlineDevicesWithData,
-		"totalLeads":          totalLeadCount,
-		"shouldSend":          totalLeadCount,
+		"totalLeads":          totalShouldSend,
+		"shouldSend":          totalShouldSend,
 		"doneSend":            totalDoneSend,
 		"failedSend":          totalFailedSend,
 		"remainingSend":       totalRemainingSend,
