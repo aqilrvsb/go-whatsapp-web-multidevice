@@ -2316,14 +2316,46 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 			if should, ok := seq["should_send"].(int); ok {
 				totalShouldSend += should
 			}
-			if leads, ok := seq["total_leads"].(int); ok {
-				totalLeadsSum += leads
+			// NOTE: We don't sum total_leads anymore - will calculate unique leads below
+		}
+		
+		// Get UNIQUE total leads across all sequences (not sum)
+		if db != nil {
+			var uniqueTotalLeads int
+			
+			// Build query with optional date filter
+			uniqueLeadsQuery := `
+				SELECT COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) 
+				FROM broadcast_messages
+				WHERE user_id = ?
+				AND sequence_id IS NOT NULL`
+			
+			uniqueLeadsArgs := []interface{}{session.UserID}
+			
+			if startDate != "" && endDate != "" {
+				uniqueLeadsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+				uniqueLeadsArgs = append(uniqueLeadsArgs, startDate, endDate)
+			} else if startDate != "" {
+				uniqueLeadsQuery += ` AND DATE(scheduled_at) >= ?`
+				uniqueLeadsArgs = append(uniqueLeadsArgs, startDate)
+			} else if endDate != "" {
+				uniqueLeadsQuery += ` AND DATE(scheduled_at) <= ?`
+				uniqueLeadsArgs = append(uniqueLeadsArgs, endDate)
+			}
+			
+			err := db.QueryRow(uniqueLeadsQuery, uniqueLeadsArgs...).Scan(&uniqueTotalLeads)
+			if err == nil {
+				totalLeadsSum = uniqueTotalLeads
+				log.Printf("Unique total leads across all sequences: %d", totalLeadsSum)
+			} else {
+				log.Printf("Error getting unique total leads: %v", err)
+				totalLeadsSum = 0
 			}
 		}
 		
 		log.Printf("Processed %d sequences with flows", len(sequencesWithFlows))
-		log.Printf("Calculated totals - Should: %d, Done: %d, Failed: %d, Remaining: %d", 
-			totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
+		log.Printf("Calculated totals - Should: %d, Done: %d, Failed: %d, Remaining: %d, Unique Leads: %d", 
+			totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsSum)
 	} else {
 		log.Printf("Database connection is nil")
 	}
@@ -4656,6 +4688,63 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
 	}
 	
+	// Calculate step-wise totals across ALL devices
+	stepTotalsQuery := `
+		SELECT 
+			sequence_stepid,
+			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) as total_messages,
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed' 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as failed_send,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as remaining_send,
+			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) as total_leads
+		FROM broadcast_messages
+		WHERE sequence_id = ? 
+		AND user_id = ?
+		AND sequence_stepid IS NOT NULL`
+	
+	stepTotalsArgs := []interface{}{sequenceId, session.UserID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		stepTotalsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+		stepTotalsArgs = append(stepTotalsArgs, startDate, endDate)
+	} else if startDate != "" {
+		stepTotalsQuery += ` AND DATE(scheduled_at) >= ?`
+		stepTotalsArgs = append(stepTotalsArgs, startDate)
+	} else if endDate != "" {
+		stepTotalsQuery += ` AND DATE(scheduled_at) <= ?`
+		stepTotalsArgs = append(stepTotalsArgs, endDate)
+	}
+	
+	stepTotalsQuery += ` GROUP BY sequence_stepid`
+	
+	stepTotals := make(map[string]map[string]interface{})
+	
+	stepTotalsRows, err := db.Query(stepTotalsQuery, stepTotalsArgs...)
+	if err == nil {
+		defer stepTotalsRows.Close()
+		
+		for stepTotalsRows.Next() {
+			var stepId string
+			var total, doneSend, failedSend, remainingSend, totalLeads int
+			
+			err := stepTotalsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend, &totalLeads)
+			if err == nil {
+				shouldSend := doneSend + failedSend + remainingSend
+				stepTotals[stepId] = map[string]interface{}{
+					"should_send":    shouldSend,
+					"done_send":      doneSend,
+					"failed_send":    failedSend,
+					"remaining_send": remainingSend,
+					"total_leads":    totalLeads,
+				}
+			}
+		}
+	}
+	
 	result := map[string]interface{}{
 		"totalDevices":        totalDevicesWithData,
 		"activeDevices":       onlineDevicesWithData,
@@ -4667,6 +4756,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		"remainingSend":       totalRemainingSend,
 		"devices":             deviceReports,
 		"steps":               steps,
+		"stepTotals":          stepTotals,  // NEW: Add step-wise totals
 		"sequence": map[string]interface{}{
 			"id":      sequence.ID,
 			"name":    sequence.Name,

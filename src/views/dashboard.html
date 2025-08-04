@@ -6806,38 +6806,74 @@
             const stepStats = {};
             const stepUniqueLeads = {}; // Track unique phone+device per step
             
-            if (report.devices && report.devices.length > 0) {
-                report.devices.forEach(device => {
-                    if (device.steps && device.steps.length > 0) {
-                        device.steps.forEach(step => {
-                            if (!stepStats[step.step_id]) {
-                                stepStats[step.step_id] = {
-                                    name: step.step_name,
-                                    order: step.step_order,
-                                    day: step.day_number || step.step_order,
-                                    should_send: 0,
-                                    done_send: 0,
-                                    failed_send: 0,
-                                    remaining_send: 0,
-                                    total_leads: 0
-                                };
-                                stepUniqueLeads[step.step_id] = new Set();
+            // Use stepTotals from backend if available
+            if (report.stepTotals) {
+                Object.entries(report.stepTotals).forEach(([stepId, totals]) => {
+                    // Find step info
+                    let stepInfo = null;
+                    for (const step of report.steps || []) {
+                        if (step.id === stepId) {
+                            stepInfo = step;
+                            break;
+                        }
+                    }
+                    
+                    if (stepInfo || report.devices.some(d => d.steps && d.steps.some(s => s.step_id === stepId))) {
+                        // Get step details from first device that has this step
+                        let stepDetails = null;
+                        for (const device of report.devices || []) {
+                            const step = (device.steps || []).find(s => s.step_id === stepId);
+                            if (step) {
+                                stepDetails = step;
+                                break;
                             }
-                            stepStats[step.step_id].should_send += (step.should_send || 0);
-                            stepStats[step.step_id].done_send += (step.done_send || 0);
-                            stepStats[step.step_id].failed_send += (step.failed_send || 0);
-                            stepStats[step.step_id].remaining_send += (step.remaining_send || 0);
-                            
-                            // For total_leads, we can't just sum because it's already unique per device
-                            // The backend gives us the count per device, but we need the total unique
-                            // For now, use the max value as an approximation
-                            stepStats[step.step_id].total_leads = Math.max(
-                                stepStats[step.step_id].total_leads,
-                                step.total_leads || 0
-                            );
-                        });
+                        }
+                        
+                        stepStats[stepId] = {
+                            name: stepDetails ? stepDetails.step_name : `Step ${stepId}`,
+                            order: stepDetails ? stepDetails.step_order : 0,
+                            day: stepDetails ? (stepDetails.day_number || stepDetails.step_order) : 0,
+                            should_send: totals.should_send || 0,
+                            done_send: totals.done_send || 0,
+                            failed_send: totals.failed_send || 0,
+                            remaining_send: totals.remaining_send || 0,
+                            total_leads: totals.total_leads || 0
+                        };
                     }
                 });
+            } else {
+                // Fallback to aggregating from devices (old method)
+                if (report.devices && report.devices.length > 0) {
+                    report.devices.forEach(device => {
+                        if (device.steps && device.steps.length > 0) {
+                            device.steps.forEach(step => {
+                                if (!stepStats[step.step_id]) {
+                                    stepStats[step.step_id] = {
+                                        name: step.step_name,
+                                        order: step.step_order,
+                                        day: step.day_number || step.step_order,
+                                        should_send: 0,
+                                        done_send: 0,
+                                        failed_send: 0,
+                                        remaining_send: 0,
+                                        total_leads: 0
+                                    };
+                                    stepUniqueLeads[step.step_id] = new Set();
+                                }
+                                stepStats[step.step_id].should_send += (step.should_send || 0);
+                                stepStats[step.step_id].done_send += (step.done_send || 0);
+                                stepStats[step.step_id].failed_send += (step.failed_send || 0);
+                                stepStats[step.step_id].remaining_send += (step.remaining_send || 0);
+                                
+                                // For total_leads, use the max value as approximation
+                                stepStats[step.step_id].total_leads = Math.max(
+                                    stepStats[step.step_id].total_leads,
+                                    step.total_leads || 0
+                                );
+                            });
+                        }
+                    });
+                }
             }
             
             // Sort steps by order
@@ -6906,6 +6942,19 @@
             if (sortedSteps.length === 0) {
                 stepStatsContainer.innerHTML = '<div class="col-12"><p class="text-muted text-center">No step data available</p></div>';
             }
+            
+            // Add clarification note about overlapping leads
+            const clarificationNote = `
+                <div class="col-12 mt-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Note:</strong> The "Total Leads" shown in each step may include the same contacts 
+                        who progress through multiple steps. The overall "Total Leads" count in the summary shows the 
+                        actual unique number of contacts across all steps.
+                    </div>
+                </div>
+            `;
+            stepStatsContainer.innerHTML += clarificationNote;
             
             // Update table header for sequence steps
             const tableHead = document.querySelector('#deviceReportTableBody').closest('table').querySelector('thead');
