@@ -49,7 +49,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN user_devices d ON bm.device_id = d.id
 		WHERE bm.status = 'pending'
-		AND bm.scheduled_at <= NOW()
+		AND bm.scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
 		ORDER BY bm.campaign_id, bm.sequence_id, bm.created_at
 		LIMIT 1000
 	`)
