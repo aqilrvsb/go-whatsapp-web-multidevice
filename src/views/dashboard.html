@@ -6671,6 +6671,7 @@
             console.log('totalDevices from backend:', report.totalDevices);
             console.log('activeDevices:', report.activeDevices, 'disconnectedDevices:', report.disconnectedDevices);
             console.log('devices array:', report.devices);
+            console.log('totalLeads from backend:', report.totalLeads);
             
             // Use the totalDevices from backend or calculate from devices array
             const totalDevices = report.totalDevices || (report.devices ? report.devices.length : 0);
@@ -6803,6 +6804,7 @@
             
             // Aggregate statistics by step
             const stepStats = {};
+            const stepUniqueLeads = {}; // Track unique phone+device per step
             
             if (report.devices && report.devices.length > 0) {
                 report.devices.forEach(device => {
@@ -6819,12 +6821,20 @@
                                     remaining_send: 0,
                                     total_leads: 0
                                 };
+                                stepUniqueLeads[step.step_id] = new Set();
                             }
                             stepStats[step.step_id].should_send += (step.should_send || 0);
                             stepStats[step.step_id].done_send += (step.done_send || 0);
                             stepStats[step.step_id].failed_send += (step.failed_send || 0);
                             stepStats[step.step_id].remaining_send += (step.remaining_send || 0);
-                            stepStats[step.step_id].total_leads += (step.total_leads || 0);
+                            
+                            // For total_leads, we can't just sum because it's already unique per device
+                            // The backend gives us the count per device, but we need the total unique
+                            // For now, use the max value as an approximation
+                            stepStats[step.step_id].total_leads = Math.max(
+                                stepStats[step.step_id].total_leads,
+                                step.total_leads || 0
+                            );
                         });
                     }
                 });

@@ -4646,8 +4646,8 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	log.Printf("Sequence Device Report - Total devices: %d, Online: %d, Offline: %d", 
 		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
-	log.Printf("Overall stats - Should: %d, Done: %d, Failed: %d, Remaining: %d",
-		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend)
+	log.Printf("Overall stats - Should: %d, Done: %d, Failed: %d, Remaining: %d, TotalLeads: %d",
+		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsCount)
 	
 	// Special logging for COLD Sequence
 	if sequence.Name == "COLD Sequence" {
