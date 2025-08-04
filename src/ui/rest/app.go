@@ -4478,6 +4478,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		DoneSend      int    `json:"done_send"`
 		FailedSend    int    `json:"failed_send"`
 		RemainingSend int    `json:"remaining_send"`
+		TotalLeads    int    `json:"total_leads"`
 	}
 	
 	type DeviceStepReport struct {
@@ -4512,14 +4513,18 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 			Steps:    []StepReport{},
 		}
 		
-		// Get stats for each step for this device
+		// Get stats for each step for this device - UPDATED to use new counting logic
 		stepStatsQuery := `
 			SELECT 
 				bm.sequence_stepid,
-				COUNT(DISTINCT bm.recipient_phone) as total,
-				COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN bm.recipient_phone END) as done_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send,
-				COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued') THEN bm.recipient_phone END) as remaining_send
+				COUNT(DISTINCT CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id)) as total,
+				COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') 
+					THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as done_send,
+				COUNT(DISTINCT CASE WHEN bm.status = 'failed' 
+					THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as failed_send,
+				COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued') 
+					THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as remaining_send,
+				COUNT(DISTINCT CONCAT(bm.recipient_phone, '|', bm.device_id)) as total_leads
 			FROM broadcast_messages bm
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
@@ -4552,9 +4557,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		
 		for statsRows.Next() {
 			var stepId string
-			var total, doneSend, failedSend, remainingSend int
+			var total, doneSend, failedSend, remainingSend, totalLeads int
 			
-			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend)
+			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend, &totalLeads)
 			if err != nil {
 				continue
 			}
@@ -4577,6 +4582,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				DoneSend:      doneSend,
 				FailedSend:    failedSend,
 				RemainingSend: remainingSend,
+				TotalLeads:    totalLeads,
 			}
 			
 			deviceReport.Steps = append(deviceReport.Steps, stepReport)
@@ -4598,12 +4604,17 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Calculate overall totals using the same logic as summary page
+	// Calculate overall totals using the same logic as summary page - UPDATED
 	overallQuery := `
 		SELECT 
-			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
-			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send,
-			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining_send
+			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) as total,
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed' 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as failed_send,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') 
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as remaining_send,
+			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) as total_leads
 		FROM broadcast_messages
 		WHERE sequence_id = ? 
 		AND user_id = ?`
@@ -4622,12 +4633,12 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		overallArgs = append(overallArgs, endDate)
 	}
 	
-	var totalDoneSend, totalFailedSend, totalRemainingSend int
+	var totalMessages, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsCount int
 	err = db.QueryRow(overallQuery, overallArgs...).Scan(
-		&totalDoneSend, &totalFailedSend, &totalRemainingSend)
+		&totalMessages, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeadsCount)
 	
 	if err != nil {
-		totalDoneSend, totalFailedSend, totalRemainingSend = 0, 0, 0
+		totalMessages, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsCount = 0, 0, 0, 0, 0
 	}
 	
 	// Calculate total using the same logic as summary page
@@ -4649,7 +4660,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		"totalDevices":        totalDevicesWithData,
 		"activeDevices":       onlineDevicesWithData,
 		"disconnectedDevices": offlineDevicesWithData,
-		"totalLeads":          totalShouldSend,
+		"totalLeads":          totalLeadsCount,
 		"shouldSend":          totalShouldSend,
 		"doneSend":            totalDoneSend,
 		"failedSend":          totalFailedSend,

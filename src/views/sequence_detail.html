@@ -326,6 +326,15 @@
                     <div class="metric-label">Contacts Remaining Send Message</div>
                 </div>
             </div>
+            
+            <!-- Total Leads Box -->
+            <div class="col-6 col-md-3 col-lg-2 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value text-info" id="totalLeads">0</div>
+                    <div class="metric-label">Total Leads</div>
+                    <small class="text-muted">Unique Phone + Device</small>
+                </div>
+            </div>
         </div>
 
         <!-- Flow Cards -->
@@ -583,7 +592,8 @@
                     shouldSend: totalShouldSend,
                     doneSend: 0,
                     failedSend: 0,
-                    remaining: totalShouldSend
+                    remaining: totalShouldSend,
+                    totalLeads: 0
                 };
                 
                 const flowCard = document.createElement('div');
@@ -608,6 +618,10 @@
                             <div class="stat-item">
                                 <div class="stat-value text-warning">${stats.remaining}</div>
                                 <div class="stat-label">Remaining</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value text-primary">${stats.totalLeads}</div>
+                                <div class="stat-label">Total Leads</div>
                             </div>
                         </div>
                     </div>
