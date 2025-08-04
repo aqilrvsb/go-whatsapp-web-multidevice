@@ -6816,13 +6816,15 @@
                                     should_send: 0,
                                     done_send: 0,
                                     failed_send: 0,
-                                    remaining_send: 0
+                                    remaining_send: 0,
+                                    total_leads: 0
                                 };
                             }
                             stepStats[step.step_id].should_send += (step.should_send || 0);
                             stepStats[step.step_id].done_send += (step.done_send || 0);
                             stepStats[step.step_id].failed_send += (step.failed_send || 0);
                             stepStats[step.step_id].remaining_send += (step.remaining_send || 0);
+                            stepStats[step.step_id].total_leads += (step.total_leads || 0);
                         });
                     }
                 });
@@ -6857,16 +6859,22 @@
                                             <small>Done Send</small>
                                         </div>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-6 mb-2">
                                         <div class="bg-danger text-white rounded p-2">
                                             <h5 class="mb-0">${stats.failed_send}</h5>
                                             <small>Failed Send</small>
                                         </div>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-6 mb-2">
                                         <div class="bg-warning text-white rounded p-2">
                                             <h5 class="mb-0">${stats.remaining_send}</h5>
                                             <small>Remaining</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="bg-info text-white rounded p-2">
+                                            <h5 class="mb-0">${stats.total_leads}</h5>
+                                            <small>Total Leads</small>
                                         </div>
                                     </div>
                                 </div>
@@ -6901,6 +6909,7 @@
                     <th>Contacts Done Send</th>
                     <th>Contacts Failed Send</th>
                     <th>Contacts Remaining</th>
+                    <th>Total Leads</th>
                     <th>Success Rate</th>
                     <th>Actions</th>
                     <th>JID</th>
@@ -6950,6 +6959,11 @@
                                         <a href="#" onclick="showSequenceStepLeadDetails('${device.id}', '${step.step_id}', 'pending'); return false;" class="text-warning">
                                             ${step.remaining_send || 0}
                                         </a>
+                                    </td>
+                                    <td>
+                                        <span class="text-info">
+                                            ${step.total_leads || 0}
+                                        </span>
                                     </td>
                                     <td>
                                         <div class="progress" style="height: 20px;">
