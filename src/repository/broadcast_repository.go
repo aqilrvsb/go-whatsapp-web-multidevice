@@ -157,12 +157,16 @@ func (r *BroadcastRepository) GetPendingMessages(deviceID string, limit int) ([]
 		LEFT JOIN campaigns c ON bm.campaign_id = c.id
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
-		WHERE bm.device_id = ? AND bm.status = 'pending'
-		AND (bm.scheduled_at IS NULL OR bm.scheduled_at <= ?)
+		WHERE bm.device_id = ? 
+		AND bm.status = 'pending'
+		AND bm.scheduled_at IS NOT NULL
+		AND bm.scheduled_at <= ?
+		AND bm.scheduled_at >= DATE_SUB(?, INTERVAL 10 MINUTE)
 		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
 		LIMIT ?
 	`	
-	rows, err := r.db.Query(query, deviceID, time.Now(), limit)
+	now := time.Now()
+	rows, err := r.db.Query(query, deviceID, now, now, limit)
 	if err != nil {
 		return nil, err
 	}
