@@ -129,6 +129,12 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/sequences/:id/device/:deviceId/step/:stepId/resend-failed", rest.ResendFailedSequenceStep)
 	app.Post("/api/sequences/:id/step/:stepId/resend", rest.ResendSequenceStepAllDevices)
 	
+	// Public routes (no auth required)
+	app.Get("/:device_name", rest.PublicDeviceDashboard)
+	app.Get("/api/public/device/:device_name/info", rest.GetPublicDeviceInfo)
+	app.Get("/api/public/device/:device_name/sequences", rest.GetPublicDeviceSequences)
+	app.Get("/sequence/:id/device-report", rest.PublicSequenceDeviceReport)
+	
 	// Device management endpoints
 	app.Put("/api/devices/:id/update-jid", rest.UpdateDeviceJID)
 	
@@ -5272,4 +5278,227 @@ func (handler *App) ResendSequenceStepAllDevices(c *fiber.Ctx) error {
 			"queued_count": rowsAffected,
 		},
 	})
+}
+
+
+// PublicDeviceDashboard renders the public device dashboard page
+func (handler *App) PublicDeviceDashboard(c *fiber.Ctx) error {
+	deviceName := c.Params("device_name")
+	
+	// Check if this is actually a device name (not other routes)
+	// Skip if it's a known route like "login", "api", etc.
+	knownRoutes := []string{"login", "api", "app", "device", "sequence", "status", "media"}
+	for _, route := range knownRoutes {
+		if deviceName == route {
+			return c.Next()
+		}
+	}
+	
+	// Render the public device dashboard template
+	return c.Render("public_device_dashboard", fiber.Map{
+		"DeviceName": deviceName,
+	})
+}
+
+// GetPublicDeviceInfo returns public device information
+func (handler *App) GetPublicDeviceInfo(c *fiber.Ctx) error {
+	deviceName := c.Params("device_name")
+	
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
+	defer db.Close()
+	
+	// Get device info
+	var device struct {
+		ID          string         `json:"id"`
+		DeviceName  string         `json:"device_name"`
+		JID         sql.NullString `json:"-"`
+		Platform    sql.NullString `json:"-"`
+		Status      string         `json:"status"`
+		CreatedAt   time.Time      `json:"created_at"`
+	}
+	
+	err = db.QueryRow(`
+		SELECT id, device_name, jid, platform, status, created_at
+		FROM user_devices
+		WHERE device_name = ?
+	`, deviceName).Scan(&device.ID, &device.DeviceName, &device.JID, &device.Platform, &device.Status, &device.CreatedAt)
+	
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Get lead count
+	var leadCount int
+	db.QueryRow("SELECT COUNT(*) FROM leads WHERE device_id = ?", device.ID).Scan(&leadCount)
+	
+	// Get messages sent count
+	var messagesSent int
+	db.QueryRow("SELECT COUNT(*) FROM broadcast_messages WHERE device_id = ? AND status = 'sent'", device.ID).Scan(&messagesSent)
+	
+	result := map[string]interface{}{
+		"id":           device.ID,
+		"device_name":  device.DeviceName,
+		"jid":          device.JID.String,
+		"platform":     device.Platform.String,
+		"status":       device.Status,
+		"created_at":   device.CreatedAt,
+		"total_leads":  leadCount,
+		"messages_sent": messagesSent,
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device info retrieved successfully",
+		Results: result,
+	})
+}
+
+// GetPublicDeviceSequences returns sequences for a specific device
+func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
+	deviceName := c.Params("device_name")
+	
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
+	defer db.Close()
+	
+	// First get device ID
+	var deviceID string
+	err = db.QueryRow("SELECT id FROM user_devices WHERE device_name = ?", deviceName).Scan(&deviceID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Get sequences that this device is involved in
+	query := `
+		SELECT DISTINCT
+			s.id,
+			s.name,
+			s.trigger,
+			(SELECT COUNT(DISTINCT ss.id) FROM sequence_steps ss WHERE ss.sequence_id = s.id) as total_flows,
+			COUNT(DISTINCT CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id)) as total_contacts,
+			COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') 
+				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as contacts_done,
+			COUNT(DISTINCT CASE WHEN bm.status IN ('failed', 'error') OR (bm.status = 'sent' AND bm.error_message IS NOT NULL AND bm.error_message != '') 
+				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as contacts_failed
+		FROM sequences s
+		INNER JOIN broadcast_messages bm ON bm.sequence_id = s.id
+		WHERE bm.device_id = ?
+		GROUP BY s.id, s.name, s.trigger
+		ORDER BY s.created_at DESC
+	`
+	
+	rows, err := db.Query(query, deviceID)
+	if err != nil {
+		log.Printf("Error querying sequences: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to fetch sequences",
+		})
+	}
+	defer rows.Close()
+	
+	sequences := []map[string]interface{}{}
+	for rows.Next() {
+		var seq struct {
+			ID             string
+			Name           string
+			Trigger        sql.NullString
+			TotalFlows     int
+			TotalContacts  int
+			ContactsDone   int
+			ContactsFailed int
+		}
+		
+		err := rows.Scan(&seq.ID, &seq.Name, &seq.Trigger, &seq.TotalFlows, 
+			&seq.TotalContacts, &seq.ContactsDone, &seq.ContactsFailed)
+		if err != nil {
+			continue
+		}
+		
+		successRate := 0.0
+		if seq.TotalContacts > 0 {
+			successRate = float64(seq.ContactsDone) / float64(seq.TotalContacts) * 100
+		}
+		
+		sequences = append(sequences, map[string]interface{}{
+			"id":               seq.ID,
+			"name":             seq.Name,
+			"trigger":          seq.Trigger.String,
+			"total_flows":      seq.TotalFlows,
+			"total_contacts":   seq.TotalContacts,
+			"contacts_done":    seq.ContactsDone,
+			"contacts_failed":  seq.ContactsFailed,
+			"success_rate":     fmt.Sprintf("%.1f", successRate),
+		})
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Sequences retrieved successfully",
+		Results: sequences,
+	})
+}
+
+
+// PublicSequenceDeviceReport renders the public sequence device report page
+func (handler *App) PublicSequenceDeviceReport(c *fiber.Ctx) error {
+	return c.Render("public_sequence_device_report", fiber.Map{})
 }
