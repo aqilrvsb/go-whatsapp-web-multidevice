@@ -5953,8 +5953,8 @@
             if (sequenceStartDate || sequenceEndDate) {
                 if (sequenceStartDate) params.append('start_date', sequenceStartDate);
                 if (sequenceEndDate) params.append('end_date', sequenceEndDate);
-            } else {
-                // Default to today on first load
+            } else if (sequenceShowTodayOnly) {
+                // Only apply today filter if explicitly requested
                 const today = new Date().toISOString().split('T')[0];
                 params.append('start_date', today);
                 params.append('end_date', today);
@@ -5963,10 +5963,13 @@
                 document.getElementById('sequenceStartDate').value = today;
                 document.getElementById('sequenceEndDate').value = today;
             }
+            // If no filters and not showing today only, show all data
             
             if (params.toString()) {
                 url += '?' + params.toString();
             }
+            
+            console.log('Loading sequence summary with URL:', url);
             
             fetch(url, {
                 credentials: 'include'
@@ -6609,11 +6612,20 @@
             // Update card header to "Sequence Details"
             document.querySelector('#campaignDeviceReportModal .card-header h6').textContent = 'Sequence Details';
             
+            // Get the current date filters from the inputs
+            const currentStartDate = document.getElementById('sequenceStartDate').value;
+            const currentEndDate = document.getElementById('sequenceEndDate').value;
+            
             // Use the same modal as campaign report but populate with sequence data
             document.getElementById('reportTitle').textContent = sequence.name || '-';
             document.getElementById('reportNiche').textContent = sequence.niche || '-';
             document.getElementById('reportTarget').innerHTML = `<span class="badge bg-info">Sequence</span>`;
-            document.getElementById('reportDate').textContent = sequence.created_at ? new Date(sequence.created_at).toLocaleDateString() : '-';
+            // Show the date range being used
+            if (currentStartDate && currentEndDate) {
+                document.getElementById('reportDate').textContent = `${currentStartDate} to ${currentEndDate}`;
+            } else {
+                document.getElementById('reportDate').textContent = sequence.created_at ? new Date(sequence.created_at).toLocaleDateString() : '-';
+            }
             document.getElementById('reportTime').textContent = sequence.trigger || '-';
             document.getElementById('reportStatus').innerHTML = `<span class="badge bg-${getStatusColor(sequence.status)}">${sequence.status}</span>`;
             
@@ -6624,9 +6636,9 @@
             let url = `/api/sequences/${sequence.id}/device-report`;
             const params = new URLSearchParams();
             
-            // Pass the same date filters from the summary
-            if (sequenceStartDate) params.append('start_date', sequenceStartDate);
-            if (sequenceEndDate) params.append('end_date', sequenceEndDate);
+            // Use the current date filters from the input fields
+            if (currentStartDate) params.append('start_date', currentStartDate);
+            if (currentEndDate) params.append('end_date', currentEndDate);
             
             if (params.toString()) {
                 url += '?' + params.toString();

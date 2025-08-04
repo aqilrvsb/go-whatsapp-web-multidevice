@@ -2285,10 +2285,6 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				log.Printf("Error getting sequence stats for %s: %v", sequence.ID, err)
 				shouldSend, doneSend, failedSend, remainingSend, totalLeads = 0, 0, 0, 0, 0
 			} else {
-				// Log the raw data for COLD Sequence
-				if sequence.Name == "COLD Sequence" {
-					log.Printf("COLD Sequence raw data - Done: %d, Failed: %d, Remaining: %d", doneSend, failedSend, remainingSend)
-				}
 				// Ensure shouldSend is the sum of all statuses for consistency
 				shouldSend = doneSend + failedSend + remainingSend
 			}
@@ -4648,10 +4644,9 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as remaining_send,
 			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) as total_leads
 		FROM broadcast_messages
-		WHERE sequence_id = ? 
-		AND user_id = ?`
+		WHERE sequence_id = ?`
 	
-	overallArgs := []interface{}{sequenceId, session.UserID}
+	overallArgs := []interface{}{sequenceId}
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
