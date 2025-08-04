@@ -195,6 +195,62 @@
             margin-top: 12px;
             font-size: 14px;
         }
+        
+        /* Broadcast History Styles */
+        .broadcast-history {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .history-timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .history-timeline::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 20px;
+            bottom: 0;
+            width: 2px;
+            background: #dee2e6;
+        }
+        
+        .history-item {
+            position: relative;
+            padding-bottom: 20px;
+        }
+        
+        .history-item:last-child {
+            padding-bottom: 0;
+        }
+        
+        .timeline-dot {
+            position: absolute;
+            left: -14px;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+            border: 2px solid #fff;
+        }
+        
+        .history-item.latest .timeline-dot {
+            background: var(--success);
+            width: 14px;
+            height: 14px;
+            left: -15px;
+        }
+        
+        .history-content {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
         .empty-state {
             text-align: center;
@@ -294,7 +350,6 @@
                             <span class="filter-chip active" data-trigger="all">All</span>
                             <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
                             <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
-                            <span class="filter-chip" data-trigger="history">History Triggers</span>
                             <!-- Dynamic trigger filters will be added here -->
                         </div>
                     </div>
@@ -545,11 +600,8 @@
         
         // Load leads
         function loadLeads() {
-            // Check if we need to include history triggers
-            const includeHistory = currentTriggerFilter === 'history';
-            const url = includeHistory 
-                ? `/api/devices/${deviceId}/leads?include_history=true`
-                : `/api/devices/${deviceId}/leads`;
+            // Always include broadcast history
+            const url = `/api/devices/${deviceId}/leads?include_broadcast_history=true`;
                 
             fetch(url, { credentials: 'include' })
                 .then(response => response.json())
@@ -642,7 +694,6 @@
                 <span class="filter-chip active" data-trigger="all">All</span>
                 <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
                 <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
-                <span class="filter-chip" data-trigger="history">History Triggers</span>
             `;
             
             // Add separator if there are triggers
@@ -659,16 +710,8 @@
                 chip.addEventListener('click', function() {
                     triggerFilters.querySelector('.filter-chip.active').classList.remove('active');
                     this.classList.add('active');
-                    const previousFilter = currentTriggerFilter;
                     currentTriggerFilter = this.dataset.trigger;
-                    
-                    // If switching to/from history, reload leads
-                    if ((previousFilter === 'history' && currentTriggerFilter !== 'history') ||
-                        (previousFilter !== 'history' && currentTriggerFilter === 'history')) {
-                        loadLeads();
-                    } else {
-                        filterLeads();
-                    }
+                    filterLeads();
                 });
             });
         }
@@ -678,6 +721,42 @@
             const lastInteraction = lead.last_interaction 
                 ? new Date(lead.last_interaction).toLocaleDateString() 
                 : 'Never';
+            
+            // Create broadcast history HTML
+            let historyHTML = '';
+            if (lead.broadcast_history && lead.broadcast_history.length > 0) {
+                historyHTML = `
+                    <div class="broadcast-history mt-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-clock-history text-primary me-2"></i>
+                            <strong class="text-primary">Sequence History</strong>
+                        </div>
+                        <div class="history-timeline">
+                            ${lead.broadcast_history.map((history, index) => `
+                                <div class="history-item ${index === 0 ? 'latest' : ''}">
+                                    <div class="timeline-dot"></div>
+                                    <div class="history-content">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong>${history.sequence_name}</strong>
+                                                <span class="badge bg-secondary ms-2">${history.step_name}</span>
+                                            </div>
+                                            <span class="text-muted small">${formatDate(history.sent_at)}</span>
+                                        </div>
+                                        <div class="mt-1">
+                                            <span class="badge bg-${history.status === 'sent' ? 'success' : history.status === 'failed' ? 'danger' : 'warning'} small">
+                                                ${history.status}
+                                            </span>
+                                            ${history.trigger_name ? `<span class="badge bg-info ms-1 small"><i class="bi bi-lightning"></i> ${history.trigger_name}</span>` : ''}
+                                        </div>
+                                        ${history.error_message ? `<div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> ${history.error_message}</div>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
             
             return `
                 <div class="lead-card ${selectedLeads.has(lead.id) ? 'selected' : ''}" data-lead-id="${lead.id}">
@@ -700,6 +779,7 @@
                                 </div>
                                 ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
                                 ${lead.trigger ? `<div class="mt-2"><span class="badge bg-info"><i class="bi bi-lightning"></i> Trigger: ${lead.trigger}</span></div>` : ''}
+                                ${historyHTML}
                             </div>
                             <div class="dropdown" onclick="event.stopPropagation()">
                                 <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
@@ -748,10 +828,6 @@
                 filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
             } else if (currentTriggerFilter === 'no-trigger') {
                 filtered = filtered.filter(lead => !lead.trigger || lead.trigger.trim() === '');
-            } else if (currentTriggerFilter === 'history') {
-                // For history triggers, we already loaded them from server
-                // Just show all leads that have triggers
-                filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
             } else if (currentTriggerFilter !== 'all') {
                 filtered = filtered.filter(lead => {
                     if (!lead.trigger) return false;
@@ -773,6 +849,25 @@
             }
             
             return filtered;
+        }
+        
+        // Helper function to format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays === 1) {
+                return 'Yesterday';
+            } else if (diffDays < 7) {
+                return `${diffDays} days ago`;
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
         }
         
         // Search leads
