@@ -4388,15 +4388,33 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	log.Printf("Found sequence: %s - %s", sequence.ID, sequence.Name)
 	
-	db := database.GetDB()
-	if db == nil {
-		log.Printf("Database connection is nil")
+	// Get MySQL connection directly like in sequence summary
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		log.Printf("Error opening MySQL connection: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "INTERNAL_ERROR",
 			Message: "Database connection error",
 		})
 	}
+	defer db.Close()
 	
 	// Get sequence steps first
 	stepsQuery := `
