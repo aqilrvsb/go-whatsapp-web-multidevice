@@ -4504,8 +4504,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 				bm.sequence_stepid,
 				COUNT(DISTINCT bm.recipient_phone) as total,
 				COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN bm.recipient_phone END) as done_send,
-				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send,
-				COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued') THEN bm.recipient_phone END) as remaining_send
+				COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.recipient_phone END) as failed_send
 			FROM broadcast_messages bm
 			WHERE bm.sequence_id = ? 
 			AND bm.device_id = ?
@@ -4538,12 +4537,15 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		
 		for statsRows.Next() {
 			var stepId string
-			var total, doneSend, failedSend, remainingSend int
+			var total, doneSend, failedSend int
 			
-			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend, &remainingSend)
+			err := statsRows.Scan(&stepId, &total, &doneSend, &failedSend)
 			if err != nil {
 				continue
 			}
+			
+			// Calculate remaining as: total - done - failed
+			remainingSend := total - doneSend - failedSend
 			
 			// Get step info
 			stepInfo, exists := stepMap[stepId]
@@ -4588,8 +4590,7 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		SELECT 
 			COUNT(DISTINCT recipient_phone) as total,
 			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') THEN recipient_phone END) as done_send,
-			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send,
-			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') THEN recipient_phone END) as remaining_send
+			COUNT(DISTINCT CASE WHEN status = 'failed' THEN recipient_phone END) as failed_send
 		FROM broadcast_messages
 		WHERE sequence_id = ? 
 		AND user_id = ?`
@@ -4609,11 +4610,14 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	}
 	
 	err = db.QueryRow(overallQuery, overallArgs...).Scan(
-		&totalLeadCount, &totalDoneSend, &totalFailedSend, &totalRemainingSend)
+		&totalLeadCount, &totalDoneSend, &totalFailedSend)
 	
 	if err != nil {
-		totalLeadCount, totalDoneSend, totalFailedSend, totalRemainingSend = 0, 0, 0, 0
+		totalLeadCount, totalDoneSend, totalFailedSend = 0, 0, 0
 	}
+	
+	// Calculate remaining as: total - done - failed
+	totalRemainingSend = totalLeadCount - totalDoneSend - totalFailedSend
 	
 	log.Printf("Sequence Device Report - Total devices: %d, Online: %d, Offline: %d", 
 		totalDevicesWithData, onlineDevicesWithData, offlineDevicesWithData)
