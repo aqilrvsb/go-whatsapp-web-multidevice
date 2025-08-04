@@ -127,6 +127,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/sequences/:id/device/:deviceId/leads", rest.GetSequenceDeviceLeads)
 	app.Get("/api/sequences/:id/device/:deviceId/step/:stepId/leads", rest.GetSequenceStepLeads)
 	app.Post("/api/sequences/:id/device/:deviceId/step/:stepId/resend-failed", rest.ResendFailedSequenceStep)
+	app.Post("/api/sequences/:id/step/:stepId/resend", rest.ResendSequenceStepAllDevices)
 	
 	// Device management endpoints
 	app.Put("/api/devices/:id/update-jid", rest.UpdateDeviceJID)
@@ -5148,5 +5149,127 @@ func (handler *App) UpdateDeviceJID(c *fiber.Ctx) error {
 		Status:  200,
 		Code:    "SUCCESS",
 		Message: "Device JID updated successfully",
+	})
+}
+
+
+// ResendSequenceStepAllDevices resends failed/remaining messages for a sequence step across all devices
+func (handler *App) ResendSequenceStepAllDevices(c *fiber.Ctx) error {
+	sequenceId := c.Params("id")
+	stepId := c.Params("stepId")
+	
+	// Get request body
+	var request struct {
+		ResendFailed    bool `json:"resend_failed"`
+		ResendRemaining bool `json:"resend_remaining"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Invalid request body",
+		})
+	}
+	
+	// Get session from cookie
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		log.Printf("Error opening MySQL connection: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
+	defer db.Close()
+	
+	// Build status filter
+	statusFilter := []string{}
+	if request.ResendFailed {
+		statusFilter = append(statusFilter, "'failed'")
+	}
+	if request.ResendRemaining {
+		statusFilter = append(statusFilter, "'pending'", "'queued'")
+	}
+	
+	if len(statusFilter) == 0 {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "No status selected for resend",
+		})
+	}
+	
+	statusCondition := fmt.Sprintf("status IN (%s)", strings.Join(statusFilter, ", "))
+	
+	// Update messages to pending for resend
+	updateQuery := fmt.Sprintf(`
+		UPDATE broadcast_messages 
+		SET status = 'pending',
+		    error_message = NULL,
+		    updated_at = NOW()
+		WHERE sequence_id = ?
+		AND sequence_stepid = ?
+		AND user_id = ?
+		AND %s
+	`, statusCondition)
+	
+	result, err := db.Exec(updateQuery, sequenceId, stepId, session.UserID)
+	if err != nil {
+		log.Printf("Error updating messages for resend: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to queue messages for resend",
+		})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("Queued %d messages for resend - Sequence: %s, Step: %s", rowsAffected, sequenceId, stepId)
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Successfully queued %d messages for resend", rowsAffected),
+		Results: map[string]interface{}{
+			"queued_count": rowsAffected,
+		},
 	})
 }

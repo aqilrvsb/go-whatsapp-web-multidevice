@@ -6948,6 +6948,13 @@
                                         </div>
                                     </div>
                                 </div>
+                                ${(stats.failed_send > 0 || stats.remaining_send > 0) ? `
+                                    <div class="mt-3 text-center">
+                                        <button class="btn btn-sm btn-warning" onclick="resendStepMessages('${stepId}', '${currentSequenceForReport.id}', '${currentSequenceForReport.name}')">
+                                            <i class="fas fa-redo"></i> Resend Failed/Remaining
+                                        </button>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -7369,6 +7376,53 @@
             .catch(error => {
                 console.error('Error retrying messages:', error);
                 showToast('Error retrying messages', 'error');
+            });
+        }
+        
+        // Resend messages for entire step
+        function resendStepMessages(stepId, sequenceId, sequenceName) {
+            const failedCount = currentDeviceReport.stepTotals[stepId].failed_send || 0;
+            const remainingCount = currentDeviceReport.stepTotals[stepId].remaining_send || 0;
+            const totalToResend = failedCount + remainingCount;
+            
+            if (totalToResend === 0) {
+                showAlert('info', 'No messages to resend for this step');
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to resend ${totalToResend} messages (${failedCount} failed + ${remainingCount} remaining) for this step?`)) {
+                return;
+            }
+            
+            showToast('Resending messages for step...', 'info');
+            
+            // Call API to resend messages for the step
+            fetch(`/api/sequences/${sequenceId}/step/${stepId}/resend`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    resend_failed: failedCount > 0,
+                    resend_remaining: remainingCount > 0
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    showToast(`Successfully queued ${data.results.queued_count || totalToResend} messages for resend!`, 'success');
+                    // Refresh the device report after a delay
+                    setTimeout(() => {
+                        showSequenceDeviceReport({ id: sequenceId, name: sequenceName });
+                    }, 2000);
+                } else {
+                    showToast(data.message || 'Failed to resend messages', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error resending step messages:', error);
+                showToast('Error resending messages', 'error');
             });
         }
         
