@@ -128,6 +128,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/sequences/:id/device/:deviceId/step/:stepId/leads", rest.GetSequenceStepLeads)
 	app.Post("/api/sequences/:id/device/:deviceId/step/:stepId/resend-failed", rest.ResendFailedSequenceStep)
 	app.Post("/api/sequences/:id/step/:stepId/resend", rest.ResendSequenceStepAllDevices)
+	app.Get("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	app.Post("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	
 	// Public routes (no auth required)
