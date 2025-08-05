@@ -77,7 +77,7 @@ func (rsm *RealtimeSyncManager) syncAllDevices() {
 	cm := GetClientManager()
 	allClients := cm.GetAllClients()
 	
-	logrus.Infof("🔄 Running real-time sync for %d devices", len(allClients))
+	// logrus.Infof("🔄 Running real-time sync for %d devices", len(allClients))
 	
 	// Use goroutines for parallel processing (optimized for 3000 devices)
 	var wg sync.WaitGroup
@@ -107,7 +107,7 @@ func (rsm *RealtimeSyncManager) syncAllDevices() {
 	}
 	
 	wg.Wait()
-	logrus.Info("✅ Real-time sync completed for all devices")
+	// logrus.Info("✅ Real-time sync completed for all devices")
 }
 
 // syncDevice syncs a single device

@@ -2,19 +2,22 @@ package usecase
 
 import (
 	"time"
-	"math/rand"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 )
 
 // StartBroadcastWorkerProcessor starts the background worker that processes queued messages
+// FIXED VERSION: Now uses Worker Pool System to prevent duplicate messages
 func StartBroadcastWorkerProcessor() {
-	logrus.Info("Starting broadcast worker processor...")
+	logrus.Info("Starting broadcast worker processor with Worker Pool System...")
 	
 	// Get repositories
 	broadcastRepo := repository.GetBroadcastRepository()
 	userRepo := repository.GetUserRepository()
+	
+	// Get the Ultra Scale Broadcast Manager (Worker Pool System)
+	broadcastManager := broadcast.GetBroadcastManager()
 	
 	// Process messages every 5 seconds
 	ticker := time.NewTicker(5 * time.Second)
@@ -39,7 +42,7 @@ func StartBroadcastWorkerProcessor() {
 			// Process each device
 			for _, deviceID := range devices {
 				// Get pending messages for this device
-				messages, err := broadcastRepo.GetPendingMessages(deviceID, 100) // Increased from 10 to 100 for better throughput
+				messages, err := broadcastRepo.GetPendingMessages(deviceID, 100)
 				if err != nil {
 					logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 					continue
@@ -59,7 +62,7 @@ func StartBroadcastWorkerProcessor() {
 				// PLATFORM FIX: Skip status check for platform devices
 				if device.Platform != "" {
 					// Platform device (Wablas/Whacenter) - always available via API
-					logrus.Infof("Processing %d messages for platform device %s (%s)", 
+					logrus.Infof("Processing %d messages for platform device %s (%s) using Worker Pool", 
 						len(messages), deviceID, device.Platform)
 				} else {
 					// WhatsApp Web device - check if online
@@ -68,61 +71,30 @@ func StartBroadcastWorkerProcessor() {
 						logrus.Debugf("Device %s is not online (status: %s), skipping", deviceID, device.Status)
 						continue
 					}
-					logrus.Infof("Processing %d messages for WhatsApp device %s", len(messages), deviceID)
+					logrus.Infof("Processing %d messages for WhatsApp device %s using Worker Pool", 
+						len(messages), deviceID)
 				}
 				
-				// Process messages directly
-				// Create self-healing message sender
-				messageSender := broadcast.NewWhatsAppMessageSender()
-				
-				for i, msg := range messages {
-					// Add delay BEFORE sending (except for first message)
-					if i > 0 {
-						if msg.MinDelay > 0 && msg.MaxDelay > 0 {
-							// Calculate random delay between min and max
-							minDelay := msg.MinDelay
-							maxDelay := msg.MaxDelay
-							
-							// Random delay between min and max
-							randomDelay := minDelay
-							if maxDelay > minDelay {
-								// Use proper random number generation
-								delayRange := maxDelay - minDelay
-								randomDelay = minDelay + rand.Intn(delayRange+1)
-							}
-							
-							delay := time.Duration(randomDelay) * time.Second
-							logrus.Infof("Applying delay of %d seconds before sending to %s", randomDelay, msg.RecipientPhone)
-							time.Sleep(delay)
-						} else {
-							// Default delay
-							logrus.Info("Applying default 5 second delay")
-							time.Sleep(5 * time.Second)
-						}
-					} else {
-						logrus.Infof("First message in batch - no delay for %s", msg.RecipientPhone)
-					}
+				// FIXED: Queue messages to Worker Pool instead of direct processing
+				// This prevents duplicate messages by using channel-based queuing
+				for _, msg := range messages {
+					// Worker Pool will handle:
+					// 1. Status updates (pending -> queued -> sent)
+					// 2. Anti-spam delays
+					// 3. Sequential sending with mutex lock
+					// 4. Automatic retries on failure
 					
-					// Update status to processing
-					err := broadcastRepo.UpdateMessageStatus(msg.ID, "processing", "")
+					err := broadcastManager.QueueMessage(&msg)
 					if err != nil {
-						logrus.Errorf("Failed to update message status: %v", err)
-						continue
-					}
-					
-					// SELF-HEALING: Use WhatsAppMessageSender instead of manager
-					// This ensures WhatsApp devices go through connection refresh
-					err = messageSender.SendMessage(msg.DeviceID, &msg)
-					if err != nil {
-						logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
-						// Update status to failed
+						logrus.Errorf("Failed to queue message %s to worker pool: %v", msg.ID, err)
+						// Update status to failed if can't queue
 						broadcastRepo.UpdateMessageStatus(msg.ID, "failed", err.Error())
 					} else {
-						logrus.Infof("Successfully sent message %s to %s", msg.ID, msg.RecipientPhone)
-						// Update status to sent
-						broadcastRepo.UpdateMessageStatus(msg.ID, "sent", "")
+						logrus.Debugf("Message %s queued to worker pool for device %s", msg.ID, deviceID)
 					}
 				}
+				
+				logrus.Infof("Queued %d messages to worker pool for device %s", len(messages), deviceID)
 			}
 		}
 	}

@@ -55,7 +55,7 @@ func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.Broa
 	
 	// Check if it's a platform device
 	if device.Platform != "" {
-		logrus.Infof("Sending via platform %s for device %s", device.Platform, device.DeviceName)
+		// logrus.Infof("Sending via platform %s for device %s", device.Platform, device.DeviceName)
 		return w.platformSender.SendMessage(
 			device.Platform,
 			device.JID,  // JID contains the instance/token for platform devices

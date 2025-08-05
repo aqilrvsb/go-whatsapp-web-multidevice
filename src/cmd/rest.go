@@ -187,6 +187,10 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartBroadcastCoordinator()
 	logrus.Info("Broadcast coordinator started")
 	
+	// Start broadcast worker processor - CRITICAL FOR WORKER POOL
+	go usecase.StartBroadcastWorkerProcessor()
+	logrus.Info("Broadcast worker processor started - using Worker Pool System")
+	
 	// Start campaign completion checker
 	go usecase.StartCampaignCompletionChecker()
 	logrus.Info("Campaign completion checker started")

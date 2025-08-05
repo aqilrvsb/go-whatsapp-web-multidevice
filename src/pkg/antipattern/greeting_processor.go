@@ -125,12 +125,12 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 
 // PrepareMessageWithGreeting adds greeting to message
 func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, name string, deviceID string, recipientPhone string) string {
-	logrus.Infof("[GREETING] START - Processing message for recipient_name='%s', phone='%s'", name, recipientPhone)
-	logrus.Infof("[GREETING] Name length: %d, Name bytes: %v", len(name), []byte(name))
+	// logrus.Infof("[GREETING] START - Processing message for recipient_name='%s', phone='%s'", name, recipientPhone)
+	// logrus.Infof("[GREETING] Name length: %d, Name bytes: %v", len(name), []byte(name))
 	
 	// STEP 1: Get the simple Malaysian greeting (NO SPINTAX!)
 	greeting := g.getSimpleGreeting(name)
-	logrus.Infof("[GREETING] Generated greeting: '%s'", greeting)
+	// logrus.Infof("[GREETING] Generated greeting: '%s'", greeting)
 	
 	// STEP 2: Process the message content
 	// First replace {name} in the message if exists
@@ -146,8 +146,8 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	
 	// STEP 3: Fix line breaks for WhatsApp
 	// Log original message to see what we're getting
-	logrus.Infof("[GREETING] Original message: '%s'", originalMessage)
-	logrus.Infof("[GREETING] Original message bytes: %v", []byte(originalMessage))
+	// logrus.Infof("[GREETING] Original message: '%s'", originalMessage)
+	// logrus.Infof("[GREETING] Original message bytes: %v", []byte(originalMessage))
 	
 	// WhatsApp uses actual newlines, not escaped ones
 	// Convert all possible line break formats to proper newlines
@@ -167,9 +167,9 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	finalMessage := greeting + "\n\n" + processedMessage
 	
 	// Log the message with visible line breaks for debugging
-	debugMessage := strings.ReplaceAll(finalMessage, "\n", "\\n")
-	logrus.Infof("[GREETING] Final message (debug view): %s", debugMessage[:min(200, len(debugMessage))])
-	logrus.Infof("[GREETING] Final message bytes (first 100): %v", []byte(finalMessage)[:min(100, len([]byte(finalMessage)))])
+	// debugMessage := strings.ReplaceAll(finalMessage, "\n", "\\n")
+	// logrus.Infof("[GREETING] Final message (debug view): %s", debugMessage[:min(200, len(debugMessage))])
+	// logrus.Infof("[GREETING] Final message bytes (first 100): %v", []byte(finalMessage)[:min(100, len([]byte(finalMessage)))])
 	
 	// Return the message with real newlines for WhatsApp
 	return finalMessage

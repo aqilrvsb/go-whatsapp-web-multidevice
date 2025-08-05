@@ -399,7 +399,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			db.Exec(`SELECT update_sequence_progress(?)`, *msg.SequenceID)
 		}
 		
-		logrus.Infof("Worker %d successfully sent message to %s", bw.workerID, msg.RecipientPhone)
+		// logrus.Infof("Worker %d successfully sent message to %s", bw.workerID, msg.RecipientPhone)
 	}
 	
 	bw.mu.Lock()
@@ -447,7 +447,7 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 	msg.Content = finalContent
 	msg.Message = finalContent
 	
-	logrus.Infof("[BROADCAST-WORKER] Final content with greeting: '%s'", finalContent)
+	// logrus.Infof("[BROADCAST-WORKER] Final content with greeting: '%s'", finalContent)
 	logrus.Debugf("Applied anti-spam for device %s: randomized and added greeting", bw.deviceID)
 	
 	// Use the self-healing message sender with modified content

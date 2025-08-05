@@ -42,7 +42,7 @@ func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, 
 	
 	// NO ANTI-SPAM HERE - Already handled by BroadcastWorker
 	
-	_ = time.Now() // startTime - for future use
+	startTime := time.Now()
 	var err error
 	
 	switch platform {
@@ -56,14 +56,16 @@ func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, 
 		err = fmt.Errorf("unknown platform: %s", platform)
 	}
 	
+	_ = time.Since(startTime)
+	
 	if err != nil {
-		// logrus.Errorf("[PLATFORM] ❌ FAILED sending via %s to %s - Error: %v", 
-		// 	platform, phone, err)
+		// logrus.Errorf("[PLATFORM] ❌ FAILED sending via %s to %s - Error: %v (took %v)", 
+		// 	platform, phone, err, duration)
 		return err
 	}
 	
-	// logrus.Infof("[PLATFORM] ✅ SUCCESS sending via %s to %s", 
-	// 	platform, phone)
+	// logrus.Infof("[PLATFORM] ✅ SUCCESS sending via %s to %s (took %v)", 
+	// 	platform, phone, duration)
 	return nil
 }
 

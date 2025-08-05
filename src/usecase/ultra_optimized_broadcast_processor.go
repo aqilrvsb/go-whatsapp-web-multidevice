@@ -165,6 +165,6 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	}
 	
 	if messageCount > 0 {
-		logrus.Infof("Queued %d messages to broadcast pools", messageCount)
+		// logrus.Infof("Queued %d messages to broadcast pools", messageCount)
 	}
 }
