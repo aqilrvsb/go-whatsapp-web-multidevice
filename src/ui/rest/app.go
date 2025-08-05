@@ -128,6 +128,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/sequences/:id/device/:deviceId/step/:stepId/leads", rest.GetSequenceStepLeads)
 	app.Post("/api/sequences/:id/device/:deviceId/step/:stepId/resend-failed", rest.ResendFailedSequenceStep)
 	app.Post("/api/sequences/:id/step/:stepId/resend", rest.ResendSequenceStepAllDevices)
+	app.Post("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	
 	// Public routes (no auth required)
 	app.Get("/:device_name", rest.PublicDeviceDashboard)
@@ -5501,4 +5502,226 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 // PublicSequenceDeviceReport renders the public sequence device report page
 func (handler *App) PublicSequenceDeviceReport(c *fiber.Ctx) error {
 	return c.Render("public_sequence_device_report", fiber.Map{})
+}
+
+
+// UpdateSequencePendingMessages updates pending broadcast messages with latest sequence step content
+func (handler *App) UpdateSequencePendingMessages(c *fiber.Ctx) error {
+	sequenceId := c.Params("id")
+	
+	// Get session
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+	
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+	
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
+	defer db.Close()
+	
+	// Step 1: Find changed steps by comparing with latest pending messages
+	detectQuery := `
+		SELECT 
+			ss.id as step_id,
+			ss.content as current_content,
+			ss.media_url as current_media,
+			latest_msg.content as message_content,
+			latest_msg.media_url as message_media
+		FROM sequence_steps ss
+		LEFT JOIN (
+			SELECT DISTINCT ON (sequence_stepid) 
+				sequence_stepid, content, media_url
+			FROM broadcast_messages
+			WHERE sequence_id = ? AND status = 'pending' AND user_id = ?
+			ORDER BY sequence_stepid, created_at DESC
+		) latest_msg ON latest_msg.sequence_stepid = ss.id
+		WHERE ss.sequence_id = ?
+	`
+	
+	// MySQL doesn't support DISTINCT ON, so we need to rewrite the query
+	detectQuery = `
+		SELECT 
+			ss.id as step_id,
+			ss.content as current_content,
+			ss.media_url as current_media,
+			latest_msg.content as message_content,
+			latest_msg.media_url as message_media
+		FROM sequence_steps ss
+		LEFT JOIN (
+			SELECT bm1.sequence_stepid, bm1.content, bm1.media_url
+			FROM broadcast_messages bm1
+			INNER JOIN (
+				SELECT sequence_stepid, MAX(created_at) as max_created
+				FROM broadcast_messages
+				WHERE sequence_id = ? AND status = 'pending' AND user_id = ?
+				GROUP BY sequence_stepid
+			) bm2 ON bm1.sequence_stepid = bm2.sequence_stepid 
+			AND bm1.created_at = bm2.max_created
+			WHERE bm1.sequence_id = ? AND bm1.status = 'pending' AND bm1.user_id = ?
+		) latest_msg ON latest_msg.sequence_stepid = ss.id
+		WHERE ss.sequence_id = ?
+	`
+	
+	rows, err := db.Query(detectQuery, sequenceId, session.UserID, sequenceId, session.UserID, sequenceId)
+	if err != nil {
+		log.Printf("Error detecting changed steps: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to detect changes",
+		})
+	}
+	defer rows.Close()
+	
+	type ChangedStep struct {
+		StepID       string
+		NewContent   string
+		NewMediaURL  string
+		MessageCount int
+	}
+	
+	var changedSteps []ChangedStep
+	var previewInfo []map[string]interface{}
+	
+	for rows.Next() {
+		var stepID, currentContent, currentMedia string
+		var messageContent, messageMedia sql.NullString
+		
+		err := rows.Scan(&stepID, &currentContent, &currentMedia, &messageContent, &messageMedia)
+		if err != nil {
+			continue
+		}
+		
+		// Check if content or media changed
+		contentChanged := !messageContent.Valid || messageContent.String != currentContent
+		mediaChanged := !messageMedia.Valid || messageMedia.String != currentMedia
+		
+		if contentChanged || mediaChanged {
+			// Count how many messages will be updated
+			var count int
+			countQuery := `
+				SELECT COUNT(*) 
+				FROM broadcast_messages 
+				WHERE sequence_stepid = ? AND status = 'pending' AND user_id = ?
+			`
+			db.QueryRow(countQuery, stepID, session.UserID).Scan(&count)
+			
+			if count > 0 {
+				changedSteps = append(changedSteps, ChangedStep{
+					StepID:       stepID,
+					NewContent:   currentContent,
+					NewMediaURL:  currentMedia,
+					MessageCount: count,
+				})
+				
+				// Get step details for preview
+				var dayNum int
+				stepQuery := `
+					SELECT COALESCE(day_number, day, 1) 
+					FROM sequence_steps 
+					WHERE id = ?
+				`
+				db.QueryRow(stepQuery, stepID).Scan(&dayNum)
+				
+				previewInfo = append(previewInfo, map[string]interface{}{
+					"step_id":       stepID,
+					"day":           dayNum,
+					"message_count": count,
+					"changes": map[string]bool{
+						"content": contentChanged,
+						"media":   mediaChanged,
+					},
+				})
+			}
+		}
+	}
+	
+	// If preview mode (no confirm parameter), return preview info
+	if c.Query("confirm") != "true" {
+		totalMessages := 0
+		for _, step := range changedSteps {
+			totalMessages += step.MessageCount
+		}
+		
+		return c.JSON(utils.ResponseData{
+			Status:  200,
+			Code:    "PREVIEW",
+			Message: fmt.Sprintf("%d steps have changes affecting %d messages", len(changedSteps), totalMessages),
+			Results: map[string]interface{}{
+				"total_messages": totalMessages,
+				"changed_steps":  len(changedSteps),
+				"steps":          previewInfo,
+			},
+		})
+	}
+	
+	// Step 2: Update messages for changed steps
+	totalUpdated := 0
+	
+	for _, step := range changedSteps {
+		updateQuery := `
+			UPDATE broadcast_messages 
+			SET content = ?,
+			    media_url = ?,
+			    updated_at = NOW()
+			WHERE sequence_stepid = ? 
+			AND status = 'pending' 
+			AND user_id = ?
+		`
+		
+		result, err := db.Exec(updateQuery, step.NewContent, step.NewMediaURL, step.StepID, session.UserID)
+		if err != nil {
+			log.Printf("Error updating messages for step %s: %v", step.StepID, err)
+			continue
+		}
+		
+		rowsAffected, _ := result.RowsAffected()
+		totalUpdated += int(rowsAffected)
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: fmt.Sprintf("Successfully updated %d pending messages", totalUpdated),
+		Results: map[string]interface{}{
+			"total_updated": totalUpdated,
+			"steps_updated": len(changedSteps),
+		},
+	})
 }

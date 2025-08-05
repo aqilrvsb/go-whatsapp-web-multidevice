@@ -4839,6 +4839,80 @@
             }
         }
         
+        async function updatePendingMessages(id) {
+            try {
+                // First, get preview of what will be updated
+                const previewResponse = await fetch(`/api/sequences/${id}/update-pending-messages`);
+                const previewData = await previewResponse.json();
+                
+                if (previewData.code === 'PREVIEW') {
+                    // Show preview to user
+                    let previewHtml = '<div class="text-start">';
+                    previewHtml += `<p><strong>Total messages to update:</strong> ${previewData.results.total_messages}</p>`;
+                    previewHtml += `<p><strong>Steps with changes:</strong> ${previewData.results.changed_steps}</p>`;
+                    
+                    if (previewData.results.steps && previewData.results.steps.length > 0) {
+                        previewHtml += '<div class="mt-3"><strong>Details:</strong><ul>';
+                        previewData.results.steps.forEach(step => {
+                            const changes = [];
+                            if (step.changes.content) changes.push('content');
+                            if (step.changes.media) changes.push('media');
+                            previewHtml += `<li>Day ${step.day}: ${step.message_count} messages (${changes.join(', ')} changed)</li>`;
+                        });
+                        previewHtml += '</ul></div>';
+                    }
+                    
+                    previewHtml += '</div>';
+                    
+                    const result = await Swal.fire({
+                        title: 'Update Pending Messages?',
+                        html: previewHtml,
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonColor: '#28a745',
+                        confirmButtonText: 'Yes, update them!',
+                        cancelButtonText: 'Cancel',
+                        width: 600
+                    });
+                    
+                    if (result.isConfirmed) {
+                        // Show loading
+                        Swal.fire({
+                            title: 'Updating Messages...',
+                            text: 'Please wait while we update the pending messages',
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+                            }
+                        });
+                        
+                        // Perform the update with confirm=true
+                        const updateResponse = await fetch(`/api/sequences/${id}/update-pending-messages?confirm=true`, {
+                            method: 'POST'
+                        });
+                        const updateData = await updateResponse.json();
+                        
+                        if (updateData.code === 'SUCCESS') {
+                            Swal.fire(
+                                'Updated!',
+                                `Successfully updated ${updateData.results.total_updated} messages in ${updateData.results.steps_updated} steps.`,
+                                'success'
+                            );
+                        } else {
+                            Swal.fire('Error', updateData.message || 'Failed to update messages', 'error');
+                        }
+                    }
+                } else if (previewData.results && previewData.results.total_messages === 0) {
+                    Swal.fire('No Changes', 'No pending messages need updating.', 'info');
+                } else {
+                    Swal.fire('Error', previewData.message || 'Failed to get update preview', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating pending messages:', error);
+                Swal.fire('Error', 'Failed to update pending messages', 'error');
+            }
+        }
+        
         async function loadSequences() {
             try {
                 const response = await fetch('/api/sequences');
@@ -4986,6 +5060,9 @@
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-primary" onclick="viewEditSequence('${seq.id}')" title="View/Edit Sequence">
                                         <i class="bi bi-eye"></i> View
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" onclick="updatePendingMessages('${seq.id}')" title="Update Pending Messages">
+                                        <i class="bi bi-arrow-repeat"></i> Update
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSequence('${seq.id}')" title="Delete Sequence">
                                         <i class="bi bi-trash"></i> Delete
