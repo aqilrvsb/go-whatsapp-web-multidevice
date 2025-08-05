@@ -329,31 +329,71 @@ func (s *sequenceService) UpdateSequence(sequenceID string, request domainSequen
 	
 	// Update steps if provided
 	if len(request.Steps) > 0 {
-		// Delete existing steps
-		if err := repo.DeleteSequenceSteps(sequenceID); err != nil {
-			logrus.Errorf("Failed to delete existing steps: %v", err)
+		// Get existing steps first
+		existingSteps, err := repo.GetSequenceSteps(sequenceID)
+		if err != nil {
+			logrus.Errorf("Failed to get existing steps: %v", err)
 		}
 		
-		// Create new steps
+		// Create a map of existing steps by day number
+		existingStepMap := make(map[int]*models.SequenceStep)
+		for _, step := range existingSteps {
+			existingStepMap[step.DayNumber] = &step
+		}
+		
+		// Track which steps to keep, update, or create
+		processedStepIDs := make(map[string]bool)
+		
+		// Process each step in the request
 		for _, stepReq := range request.Steps {
-			step := &models.SequenceStep{
-				SequenceID:        sequenceID,
-				DayNumber:         stepReq.DayNumber,
-				Trigger:           stepReq.Trigger,
-				NextTrigger:       stepReq.NextTrigger,
-				TriggerDelayHours: stepReq.TriggerDelayHours,
-				IsEntryPoint:      stepReq.IsEntryPoint,
-				MessageType:       stepReq.MessageType,
-				Content:           stepReq.Content,
-				MediaURL:          stepReq.MediaURL,
-				Caption:           stepReq.Caption,
-				TimeSchedule:      stepReq.TimeSchedule,
-				MinDelaySeconds:   stepReq.MinDelaySeconds,
-				MaxDelaySeconds:   stepReq.MaxDelaySeconds,
+			if existingStep, exists := existingStepMap[stepReq.DayNumber]; exists {
+				// Update existing step (preserving the ID)
+				existingStep.MessageType = stepReq.MessageType
+				existingStep.Content = stepReq.Content
+				existingStep.MediaURL = stepReq.MediaURL
+				existingStep.Caption = stepReq.Caption
+				existingStep.TimeSchedule = stepReq.TimeSchedule
+				existingStep.Trigger = stepReq.Trigger
+				existingStep.NextTrigger = stepReq.NextTrigger
+				existingStep.TriggerDelayHours = stepReq.TriggerDelayHours
+				existingStep.IsEntryPoint = stepReq.IsEntryPoint
+				existingStep.MinDelaySeconds = stepReq.MinDelaySeconds
+				existingStep.MaxDelaySeconds = stepReq.MaxDelaySeconds
+				
+				if err := repo.UpdateSequenceStep(existingStep); err != nil {
+					logrus.Errorf("Failed to update step: %v", err)
+				}
+				processedStepIDs[existingStep.ID] = true
+			} else {
+				// Create new step only if it doesn't exist
+				step := &models.SequenceStep{
+					SequenceID:        sequenceID,
+					DayNumber:         stepReq.DayNumber,
+					Trigger:           stepReq.Trigger,
+					NextTrigger:       stepReq.NextTrigger,
+					TriggerDelayHours: stepReq.TriggerDelayHours,
+					IsEntryPoint:      stepReq.IsEntryPoint,
+					MessageType:       stepReq.MessageType,
+					Content:           stepReq.Content,
+					MediaURL:          stepReq.MediaURL,
+					Caption:           stepReq.Caption,
+					TimeSchedule:      stepReq.TimeSchedule,
+					MinDelaySeconds:   stepReq.MinDelaySeconds,
+					MaxDelaySeconds:   stepReq.MaxDelaySeconds,
+				}
+				
+				if err := repo.CreateSequenceStep(step); err != nil {
+					logrus.Errorf("Failed to create step: %v", err)
+				}
 			}
-			
-			if err := repo.CreateSequenceStep(step); err != nil {
-				logrus.Errorf("Failed to create step: %v", err)
+		}
+		
+		// Delete steps that are no longer in the sequence
+		for _, existingStep := range existingSteps {
+			if !processedStepIDs[existingStep.ID] {
+				if err := repo.DeleteSequenceStep(existingStep.ID); err != nil {
+					logrus.Errorf("Failed to delete step %s: %v", existingStep.ID, err)
+				}
 			}
 		}
 		

@@ -492,3 +492,45 @@ func (r *sequenceRepository) GetActiveSequencesWithNiche() ([]models.Sequence, e
 	
 	return sequences, nil
 }
+
+// UpdateSequenceStep updates an existing sequence step
+func (r *sequenceRepository) UpdateSequenceStep(step *models.SequenceStep) error {
+	query := `
+		UPDATE sequence_steps SET
+			message_type = ?,
+			content = ?,
+			media_url = ?,
+			caption = ?,
+			time_schedule = ?,
+			` + "`trigger`" + ` = ?,
+			next_trigger = ?,
+			trigger_delay_hours = ?,
+			is_entry_point = ?,
+			min_delay_seconds = ?,
+			max_delay_seconds = ?,
+			updated_at = NOW()
+		WHERE id = ?
+	`
+	
+	_, err := r.db.Exec(query,
+		step.MessageType, step.Content, step.MediaURL, step.Caption,
+		step.TimeSchedule, step.Trigger, step.NextTrigger,
+		step.TriggerDelayHours, step.IsEntryPoint,
+		step.MinDelaySeconds, step.MaxDelaySeconds,
+		step.ID)
+		
+	if err != nil {
+		logrus.Errorf("Failed to update sequence step %s: %v", step.ID, err)
+	}
+	
+	return err
+}
+
+// DeleteSequenceStep deletes a single sequence step by ID
+func (r *sequenceRepository) DeleteSequenceStep(stepID string) error {
+	_, err := r.db.Exec("DELETE FROM sequence_steps WHERE id = ?", stepID)
+	if err != nil {
+		logrus.Errorf("Failed to delete sequence step %s: %v", stepID, err)
+	}
+	return err
+}
