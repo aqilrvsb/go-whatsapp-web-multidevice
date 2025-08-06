@@ -180,19 +180,22 @@ func HandleHistorySyncForChats(deviceID string, client *whatsmeow.Client, evt *e
 	// Also process messages
 	HandleHistorySyncForWebView(deviceID, evt)
 	
+	// DISABLED AUTO-SYNC: Now manual sync only via button
 	// Auto-save chats to leads after history sync
-	cm := GetClientManager()
-	if client, err := cm.GetClient(deviceID); err == nil && client.Store.ID != nil {
-		// Get user ID from device
-		userRepo := repository.GetUserRepository()
-		devices, _ := userRepo.GetAllDevices()
-		for _, device := range devices {
-			if device.ID == deviceID {
-				AutoSaveChatsToLeads(deviceID, device.UserID)
-				break
-			}
-		}
-	}
+	// cm := GetClientManager()
+	// if client, err := cm.GetClient(deviceID); err == nil && client.Store.ID != nil {
+	// 	// Get user ID from device
+	// 	userRepo := repository.GetUserRepository()
+	// 	devices, _ := userRepo.GetAllDevices()
+	// 	for _, device := range devices {
+	// 		if device.ID == deviceID {
+	// 			AutoSaveChatsToLeads(deviceID, device.UserID)
+	// 			break
+	// 		}
+	// 	}
+	// }
+	
+	logrus.Info("History sync complete. Use 'Sync Contacts' button to import contacts to leads.")
 }
 
 // GetChatsFromDatabase retrieves ONLY chats with actual messages
