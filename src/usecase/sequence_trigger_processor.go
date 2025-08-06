@@ -2,9 +2,15 @@ package usecase
 
 import (
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	sequenceProcessorMutex sync.Mutex
+	lastSequenceProcess    time.Time
 )
 
 // SequenceTriggerProcessor handles trigger-based sequence processing
@@ -21,6 +27,20 @@ func NewSequenceTriggerProcessor(db *sql.DB) *SequenceTriggerProcessor {
 
 // ProcessSequenceTriggers is the main entry point - now uses Direct Broadcast only
 func (s *SequenceTriggerProcessor) ProcessSequenceTriggers() error {
+	// CRITICAL FIX: Prevent concurrent processing
+	if !sequenceProcessorMutex.TryLock() {
+		logrus.Debug("Sequence processor already running, skipping this run")
+		return nil
+	}
+	defer sequenceProcessorMutex.Unlock()
+	
+	// Also prevent processing too frequently
+	if time.Since(lastSequenceProcess) < 4*time.Minute {
+		logrus.Debug("Sequence processor ran recently, skipping")
+		return nil
+	}
+	lastSequenceProcess = time.Now()
+	
 	start := time.Now()
 	
 	// Use Direct Broadcast processor

@@ -1488,8 +1488,14 @@
                     
                     <!-- Overall Statistics -->
                     <div class="card mb-3">
-                        <div class="card-header bg-light">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">Overall Statistics</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoRefreshToggle" style="cursor: pointer;">
+                                <label class="form-check-label" for="autoRefreshToggle" style="cursor: pointer;">
+                                    Auto Refresh (1 min)
+                                </label>
+                            </div>
                         </div>
                         <div class="card-body">
                             <!-- First row: 3 boxes -->
@@ -4079,10 +4085,8 @@
             
             if (isAutoRefreshEnabled) {
                 startAutoRefresh();
-                console.log('Auto-refresh enabled');
             } else {
                 stopAutoRefresh();
-                console.log('Auto-refresh disabled');
             }
         }
 
@@ -4200,10 +4204,8 @@
             
             if (isAutoRefreshEnabled) {
                 startAutoRefresh();
-                console.log('Auto-refresh enabled');
             } else {
                 stopAutoRefresh();
-                console.log('Auto-refresh disabled');
             }
         }
 
@@ -6704,6 +6706,7 @@
         // Campaign Device Report Functions
         let currentCampaignForReport = null;
         let currentDeviceReport = null; // Store the device report globally
+        let autoRefreshInterval = null; // Store the interval for auto-refresh
         
         function showCampaignDeviceReport(campaign) {
             // Store campaign for use in other functions
@@ -6745,6 +6748,9 @@
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('campaignDeviceReportModal'));
             modal.show();
+            
+            // Initialize auto-refresh functionality
+            initializeAutoRefresh();
         }
         
         // Sequence Device Report
@@ -6811,6 +6817,9 @@
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('campaignDeviceReportModal'));
             modal.show();
+            
+            // Initialize auto-refresh functionality
+            initializeAutoRefresh();
         }
         
         function displayDeviceReport(report) {
@@ -6942,6 +6951,114 @@
                 tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No device data available</td></tr>';
             }
         }
+        
+        // Auto-refresh functionality
+        function initializeAutoRefresh() {
+            // Clear any existing interval
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            
+            // Reset toggle to OFF when modal opens
+            const toggle = document.getElementById('autoRefreshToggle');
+            if (toggle) {
+                toggle.checked = false;
+                
+                // Remove any existing event listeners
+                toggle.removeEventListener('change', handleAutoRefreshToggle);
+                
+                // Add new event listener
+                toggle.addEventListener('change', handleAutoRefreshToggle);
+            }
+        }
+        
+        function handleAutoRefreshToggle() {
+            if (this.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+        
+        function startAutoRefresh() {
+            // Refresh immediately when turned on
+            refreshDeviceReport();
+            
+            // Then refresh every 60 seconds
+            autoRefreshInterval = setInterval(() => {
+                refreshDeviceReport();
+            }, 60000); // 60 seconds
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+        
+        function refreshDeviceReport() {
+            
+            // Check if it's a campaign or sequence report
+            if (currentCampaignForReport) {
+                // Refresh campaign report
+                fetch(`/api/campaigns/${currentCampaignForReport.id}/device-report`, { credentials: 'include' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS' && data.results) {
+                            currentDeviceReport = data.results;
+                            displayDeviceReport(data.results);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing campaign report:', error);
+                    });
+            } else if (currentSequenceForReport) {
+                // Refresh sequence report
+                const currentStartDate = document.getElementById('sequenceStartDate').value;
+                const currentEndDate = document.getElementById('sequenceEndDate').value;
+                
+                let url = `/api/sequences/${currentSequenceForReport.id}/device-report`;
+                const params = new URLSearchParams();
+                
+                if (currentStartDate) params.append('start_date', currentStartDate);
+                if (currentEndDate) params.append('end_date', currentEndDate);
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                fetch(url, { credentials: 'include' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 'SUCCESS' && data.results) {
+                            currentDeviceReport = data.results;
+                            displayDeviceReport(data.results);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing sequence report:', error);
+                    });
+            }
+        }
+        
+        // Clean up when modal is closed
+        document.getElementById('campaignDeviceReportModal').addEventListener('hidden.bs.modal', function () {
+            // Stop auto-refresh
+            stopAutoRefresh();
+            
+            // Reset toggle to OFF
+            const toggle = document.getElementById('autoRefreshToggle');
+            if (toggle) {
+                toggle.checked = false;
+            }
+            
+            // Clear current report references
+            currentCampaignForReport = null;
+            currentSequenceForReport = null;
+            currentDeviceReport = null;
+        });
         
         function displaySequenceDeviceReport(report) {
             console.log('Sequence Device Report:', report);

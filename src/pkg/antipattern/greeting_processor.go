@@ -5,7 +5,6 @@ import (
 	"time"
 	"math/rand"
 	"unicode"
-	"github.com/sirupsen/logrus"
 )
 
 // GreetingProcessor handles greeting for messages
@@ -41,33 +40,24 @@ func cleanName(name string) string {
 	// Trim any extra spaces
 	cleaned := strings.TrimSpace(result.String())
 	
-	logrus.Debugf("[GREETING] Name '%s' cleaned to '%s'", name, cleaned)
-	
 	return cleaned
 }
 
 // getSimpleGreeting returns a Malaysian greeting based on time
 func (g *GreetingProcessor) getSimpleGreeting(name string) string {
-	// Debug log the original name
-	logrus.Debugf("[GREETING] Original name from recipient_name: '%s'", name)
-	
 	// Clean the name by removing all numbers
 	cleanedName := cleanName(name)
 	
 	// If cleaned name is empty, use "Cik"
 	if cleanedName == "" {
-		logrus.Debugf("[GREETING] Cleaned name is empty, using 'Cik'")
 		name = "Cik"
 	} else {
-		logrus.Debugf("[GREETING] Using cleaned name: '%s'", cleanedName)
 		name = cleanedName
 	}
 	
 	// Get current hour and add 5 hours for Malaysia time adjustment
 	hour := time.Now().Hour()
 	hour = (hour + 5) % 24
-	
-	logrus.Debugf("[GREETING] Server hour + 5: %d", hour)
 	
 	var greeting string
 	
@@ -80,7 +70,6 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 			"Assalamualaikum {name}",
 		}
 		greeting = morningGreetings[rand.Intn(len(morningGreetings))]
-		logrus.Debugf("[GREETING] Morning greeting selected")
 	} else if hour >= 12 && hour < 15 {
 		// Afternoon
 		afternoonGreetings := []string{
@@ -89,7 +78,6 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 			"Hi {name}",
 		}
 		greeting = afternoonGreetings[rand.Intn(len(afternoonGreetings))]
-		logrus.Debugf("[GREETING] Afternoon greeting selected")
 	} else if hour >= 15 && hour < 19 {
 		// Late afternoon/evening
 		eveningGreetings := []string{
@@ -98,7 +86,6 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 			"Salam {name}",
 		}
 		greeting = eveningGreetings[rand.Intn(len(eveningGreetings))]
-		logrus.Debugf("[GREETING] Evening greeting selected")
 	} else {
 		// Night (7pm - 5am)
 		nightGreetings := []string{
@@ -108,7 +95,6 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 			"Pinjam masa {name}",
 		}
 		greeting = nightGreetings[rand.Intn(len(nightGreetings))]
-		logrus.Debugf("[GREETING] Night greeting selected")
 	}
 	
 	// Replace {name} with actual name
@@ -125,12 +111,8 @@ func (g *GreetingProcessor) GetAntiSpamGreeting(name string, deviceID string, re
 
 // PrepareMessageWithGreeting adds greeting to message
 func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, name string, deviceID string, recipientPhone string) string {
-	// logrus.Infof("[GREETING] START - Processing message for recipient_name='%s', phone='%s'", name, recipientPhone)
-	// logrus.Infof("[GREETING] Name length: %d, Name bytes: %v", len(name), []byte(name))
-	
 	// STEP 1: Get the simple Malaysian greeting (NO SPINTAX!)
 	greeting := g.getSimpleGreeting(name)
-	// logrus.Infof("[GREETING] Generated greeting: '%s'", greeting)
 	
 	// STEP 2: Process the message content
 	// First replace {name} in the message if exists
@@ -145,10 +127,6 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	}
 	
 	// STEP 3: Fix line breaks for WhatsApp
-	// Log original message to see what we're getting
-	// logrus.Infof("[GREETING] Original message: '%s'", originalMessage)
-	// logrus.Infof("[GREETING] Original message bytes: %v", []byte(originalMessage))
-	
 	// WhatsApp uses actual newlines, not escaped ones
 	// Convert all possible line break formats to proper newlines
 	processedMessage = strings.ReplaceAll(processedMessage, "\\n", "\n")
@@ -165,11 +143,6 @@ func (g *GreetingProcessor) PrepareMessageWithGreeting(originalMessage string, n
 	// For WhatsApp, we need actual newline characters, not escaped ones
 	// Using real newlines that WhatsApp will recognize
 	finalMessage := greeting + "\n\n" + processedMessage
-	
-	// Log the message with visible line breaks for debugging
-	// debugMessage := strings.ReplaceAll(finalMessage, "\n", "\\n")
-	// logrus.Infof("[GREETING] Final message (debug view): %s", debugMessage[:min(200, len(debugMessage))])
-	// logrus.Infof("[GREETING] Final message bytes (first 100): %v", []byte(finalMessage)[:min(100, len([]byte(finalMessage)))])
 	
 	// Return the message with real newlines for WhatsApp
 	return finalMessage

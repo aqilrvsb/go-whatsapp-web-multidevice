@@ -12,7 +12,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/stability"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
+	platform "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -24,7 +24,7 @@ import (
 // StableMessageSender handles WhatsApp message sending with ULTRA stability
 type StableMessageSender struct {
 	ultraStable     *stability.UltraStableConnection
-	platformSender  *external.PlatformSender
+	platformSender  *platform.PlatformSender
 	userRepo        *repository.UserRepository
 }
 
@@ -32,7 +32,7 @@ type StableMessageSender struct {
 func NewStableMessageSender() *StableMessageSender {
 	return &StableMessageSender{
 		ultraStable:    stability.GetUltraStableConnection(),
-		platformSender: external.NewPlatformSender(),
+		platformSender: platform.NewPlatformSender(),
 		userRepo:      repository.GetUserRepository(),
 	}
 }

@@ -28,7 +28,7 @@ func NewOptimizedCampaignTrigger(db *sql.DB) *OptimizedCampaignTrigger {
 
 // ProcessCampaigns uses TIMESTAMPTZ for timezone-aware campaign processing
 func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
-	// logrus.Info("Processing campaigns with optimized timezone handling...")
+	// Process campaigns with timezone handling
 	
 	// Query campaigns that are ready to send - MySQL compatible
 	query := `

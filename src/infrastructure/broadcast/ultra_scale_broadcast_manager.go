@@ -228,7 +228,7 @@ func (bwp *BroadcastWorkerPool) QueueMessage(msg *domainBroadcast.BroadcastMessa
 	case group.messageQueue <- msg:
 		// Update message status to queued
 		db := database.GetDB()
-		_, err := db.Exec(`UPDATE broadcast_messages SET STATUS = 'queued' WHERE id = ?`, msg.ID)
+		_, err := db.Exec(`UPDATE broadcast_messages SET STATUS = 'queued' WHERE id = ? AND status IN ('pending', 'processing')`, msg.ID)
 		if err != nil {
 			logrus.Errorf("Failed to update message status: %v", err)
 		}
@@ -389,7 +389,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.processedCount, 1)
 		}
 		// Update status to sent
-		db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ?`, msg.ID)
+		db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ? AND status IN ('queued', 'processing')`, msg.ID)
 		
 		// Update sequence progress if this is a sequence message
 		if msg.SequenceID != nil {
@@ -399,7 +399,7 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			db.Exec(`SELECT update_sequence_progress(?)`, *msg.SequenceID)
 		}
 		
-		// logrus.Infof("Worker %d successfully sent message to %s", bw.workerID, msg.RecipientPhone)
+		// Successfully sent message
 	}
 	
 	bw.mu.Lock()
@@ -414,16 +414,9 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 		return fmt.Errorf("message sender not initialized")
 	}
 	
-	// Debug log the incoming message
-	logrus.Infof("[BROADCAST-WORKER] Processing message ID: %s", msg.ID)
-	logrus.Infof("[BROADCAST-WORKER] Original Content: '%s'", msg.Content)
-	logrus.Infof("[BROADCAST-WORKER] Original Message: '%s'", msg.Message)
-	logrus.Infof("[BROADCAST-WORKER] RecipientName: '%s'", msg.RecipientName)
-	
 	// Check if content is empty and use Message field as fallback
 	if msg.Content == "" && msg.Message != "" {
 		msg.Content = msg.Message
-		logrus.Infof("[BROADCAST-WORKER] Content was empty, using Message field: '%s'", msg.Content)
 	}
 	
 	// Apply anti-spam for ALL devices (both WhatsApp Web and Platform)
@@ -433,7 +426,6 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 	
 	// STEP 1: Apply randomization to CONTENT ONLY
 	randomizedContent := messageRandomizer.RandomizeMessage(msg.Content)
-	logrus.Infof("[BROADCAST-WORKER] After randomization: '%s'", randomizedContent)
 	
 	// STEP 2: Add greeting to the randomized content
 	finalContent := greetingProcessor.PrepareMessageWithGreeting(
@@ -447,7 +439,6 @@ func (bw *BroadcastWorker) sendWhatsAppMessage(msg *domainBroadcast.BroadcastMes
 	msg.Content = finalContent
 	msg.Message = finalContent
 	
-	// logrus.Infof("[BROADCAST-WORKER] Final content with greeting: '%s'", finalContent)
 	logrus.Debugf("Applied anti-spam for device %s: randomized and added greeting", bw.deviceID)
 	
 	// Use the self-healing message sender with modified content

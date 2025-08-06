@@ -11,7 +11,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
+	platform "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/external"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
@@ -23,14 +23,14 @@ import (
 // WhatsAppMessageSender handles message sending with self-healing capabilities
 type WhatsAppMessageSender struct {
 	greetingProcessor  *antipattern.GreetingProcessor
-	platformSender     *external.PlatformSender
+	platformSender     *platform.PlatformSender
 }
 
 // NewWhatsAppMessageSender creates a new message sender
 func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 	return &WhatsAppMessageSender{
 		greetingProcessor: antipattern.NewGreetingProcessor(),
-		platformSender:    external.NewPlatformSender(),
+		platformSender:    platform.NewPlatformSender(),
 	}
 }
 

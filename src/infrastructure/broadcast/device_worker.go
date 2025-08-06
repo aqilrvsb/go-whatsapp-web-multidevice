@@ -123,8 +123,6 @@ func (dw *DeviceWorker) processMessages() {
 			dw.mu.Unlock()
 			
 			// Process the message
-			logrus.Infof("[DEVICE-WORKER] Processing message ID: %s, RecipientName: '%s', RecipientPhone: %s", 
-				msg.ID, msg.RecipientName, msg.RecipientPhone)
 			err := dw.sendMessage(msg)
 			
 			dw.mu.Lock()

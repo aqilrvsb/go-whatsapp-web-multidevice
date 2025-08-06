@@ -357,10 +357,12 @@ func StartTriggerProcessor() {
 				logrus.Errorf("Error processing campaign triggers: %v", err)
 			}
 			
+			// REMOVED: ProcessSequenceTriggers - now handled by dedicated processor
+			// This was causing duplicate message creation!
 			// Process sequence triggers for new leads
-			if err := cts.ProcessSequenceTriggers(); err != nil {
-				logrus.Errorf("Error processing sequence triggers: %v", err)
-			}
+			// if err := cts.ProcessSequenceTriggers(); err != nil {
+			// logrus.Errorf("Error processing sequence triggers: %v", err)
+			// }
 			
 			// Process daily sequence messages
 			if err := cts.ProcessDailySequenceMessages(); err != nil {

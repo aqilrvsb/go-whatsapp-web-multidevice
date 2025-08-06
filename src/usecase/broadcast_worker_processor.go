@@ -42,7 +42,7 @@ func StartBroadcastWorkerProcessor() {
 			// Process each device
 			for _, deviceID := range devices {
 				// Get pending messages for this device
-				messages, err := broadcastRepo.GetPendingMessages(deviceID, 100)
+				messages, err := broadcastRepo.GetPendingMessagesAndLock(deviceID, 100)
 				if err != nil {
 					logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 					continue

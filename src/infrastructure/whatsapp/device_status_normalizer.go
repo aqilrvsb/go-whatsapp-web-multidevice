@@ -89,9 +89,7 @@ func (n *DeviceStatusNormalizer) normalizeAllDevices() {
 		}
 	}
 	
-	if normalized > 0 || skipped > 0 {
-		logrus.Infof("Status normalization: %d normalized, %d skipped (platform devices)", normalized, skipped)
-	}
+	// Status normalization completed
 }
 
 // StopDeviceStatusNormalizer stops the normalizer
