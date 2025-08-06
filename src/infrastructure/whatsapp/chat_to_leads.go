@@ -7,7 +7,6 @@ import (
 	
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -57,16 +56,15 @@ func AutoSaveChatsToLeads(deviceID string, userID string) error {
 		
 		// Create new lead
 		lead := &models.Lead{
-			ID:           uuid.New().String(),
 			UserID:       userID,
 			DeviceID:     deviceID,
 			Name:         name,
 			Phone:        phone,
 			Niche:        "WHATSAPP_IMPORT", // Default niche for imported contacts
-			Source:       "whatsapp_sync",
 			Status:       "new",
 			TargetStatus: "prospect",
 			Trigger:      "",
+			Platform:     "whatsapp",
 			Notes:        fmt.Sprintf("Auto-imported from WhatsApp on %s", time.Now().Format("2006-01-02")),
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
@@ -118,16 +116,16 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		AND chat_jid NOT IN (
 			SELECT chat_jid FROM whatsapp_chats WHERE device_id = ?
 		)
-		ON DUPLICATE KEY UPDATE DO NOTHING
+		ON DUPLICATE KEY UPDATE last_message_time = VALUES(last_message_time)
 	`
-	_, err = tx.Exec(copyChatsQuery, newDeviceID, oldDeviceID)
+	_, err = tx.Exec(copyChatsQuery, newDeviceID, oldDeviceID, newDeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to copy chats: %v", err)
 	}
 	
 	// 2. Copy messages that don't exist in new device
 	copyMessagesQuery := `
-		INSERT INTO whatsapp_messages(
+		INSERT IGNORE INTO whatsapp_messages(
 			device_id, chat_jid, message_id, sender_jid, 
 			message_text, message_type, message_secrets, timestamp, created_at
 		)
@@ -138,9 +136,8 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 		AND message_id NOT IN (
 			SELECT message_id FROM whatsapp_messages WHERE device_id = ?
 		)
-		ON CONFLICT (device_id, message_id) DO NOTHING
 	`
-	_, err = tx.Exec(copyMessagesQuery, newDeviceID, oldDeviceID)
+	_, err = tx.Exec(copyMessagesQuery, newDeviceID, oldDeviceID, newDeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to copy messages: %v", err)
 	}
@@ -148,11 +145,11 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 	// 3. Copy leads that don't exist for new device
 	copyLeadsQuery := `
 		INSERT INTO leads(
-			id, user_id, device_id, name, phone, niche, 
-			status, target_status, trigger, journey, created_at, updated_at
+			user_id, device_id, name, phone, niche, 
+			status, target_status, ` + "`trigger`" + `, journey, created_at, updated_at
 		)
-		SELECT UUID(), user_id, ?, name, phone, niche,
-			status, target_status, trigger, 
+		SELECT user_id, ?, name, phone, niche,
+			status, target_status, ` + "`trigger`" + `, 
 			CONCAT(COALESCE(journey, ''), '\n[Copied FROM device: ', ?, ']'),
 			NOW(), NOW()
 		FROM leads
@@ -161,7 +158,7 @@ func MergeDeviceData(oldDeviceID, newDeviceID, userID string) error {
 			SELECT phone FROM leads WHERE device_id = ? AND user_id = ?
 		)
 	`
-	_, err = tx.Exec(copyLeadsQuery, newDeviceID, oldDeviceID, userID)
+	_, err = tx.Exec(copyLeadsQuery, newDeviceID, oldDeviceID, oldDeviceID, userID, newDeviceID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to copy leads: %v", err)
 	}
