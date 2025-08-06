@@ -408,7 +408,132 @@ func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) 
 	
 	return devices, rows.Err()
 }
+
 // GetDB returns the database connection
 func (r *BroadcastRepository) GetDB() *sql.DB {
 	return r.db
 }
+
+// GetPendingMessagesAndLock - Atomically fetch and update status to prevent race condition
+func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
+	// Start a transaction
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	
+	// First, atomically update pending messages to 'processing' to lock them
+	updateQuery := `
+		UPDATE broadcast_messages 
+		SET status = 'processing', 
+			updated_at = NOW()
+		WHERE device_id = ? 
+		AND status = 'pending'
+		AND scheduled_at IS NOT NULL
+		AND scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
+		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
+		ORDER BY scheduled_at ASC
+		LIMIT ?
+	`
+	
+	result, err := tx.Exec(updateQuery, deviceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	
+	if rowsAffected == 0 {
+		// No messages to process
+		return []domainBroadcast.BroadcastMessage{}, nil
+	}
+	
+	// Now fetch the messages we just locked
+	query := `
+		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
+			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url, 
+			bm.scheduled_at, bm.group_id, bm.group_order,
+			COALESCE(
+				c.min_delay_seconds, 
+				ss.min_delay_seconds, 
+				s.min_delay_seconds, 
+				10
+			) AS min_delay,
+			COALESCE(
+				c.max_delay_seconds, 
+				ss.max_delay_seconds, 
+				s.max_delay_seconds, 
+				30
+			) AS max_delay
+		FROM broadcast_messages bm
+		LEFT JOIN campaigns c ON bm.campaign_id = c.id
+		LEFT JOIN sequences s ON bm.sequence_id = s.id
+		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
+		WHERE bm.device_id = ? 
+		AND bm.status = 'processing'
+		AND bm.updated_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)
+		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
+	`
+	
+	rows, err := tx.Query(query, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var messages []domainBroadcast.BroadcastMessage
+	for rows.Next() {
+		var msg domainBroadcast.BroadcastMessage
+		var userID sql.NullString
+		var campaignID sql.NullInt64
+		var sequenceID, groupID sql.NullString
+		var groupOrder sql.NullInt64
+		var scheduledAt sql.NullTime
+		
+		err := rows.Scan(&msg.ID, &userID, &msg.DeviceID, &campaignID, &sequenceID,
+			&msg.RecipientPhone, &msg.RecipientName, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
+			&groupID, &groupOrder, &msg.MinDelay, &msg.MaxDelay)
+		if err != nil {
+			continue
+		}
+		
+		if userID.Valid {
+			msg.UserID = userID.String
+		}
+		if campaignID.Valid {
+			campaignIDInt := int(campaignID.Int64)
+			msg.CampaignID = &campaignIDInt
+		}
+		if sequenceID.Valid {
+			msg.SequenceID = &sequenceID.String
+		}
+		if groupID.Valid {
+			msg.GroupID = &groupID.String
+		}
+		if groupOrder.Valid {
+			groupOrderInt := int(groupOrder.Int64)
+			msg.GroupOrder = &groupOrderInt
+		}
+		if scheduledAt.Valid {
+			msg.ScheduledAt = scheduledAt.Time
+		}
+		
+		// Set ImageURL for backward compatibility
+		msg.ImageURL = msg.MediaURL
+		msg.Message = msg.Content
+		
+		messages = append(messages, msg)
+	}
+	
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	
+	return messages, nil
+}
+

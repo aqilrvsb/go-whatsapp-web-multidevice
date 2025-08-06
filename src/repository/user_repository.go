@@ -228,20 +228,24 @@ func (r *UserRepository) GetSession(token string) (*models.UserSession, error) {
 // AddUserDevice adds a device for a user
 func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserDevice, error) {
 	device := &models.UserDevice{
-		ID:         uuid.New().String(),
-		UserID:     userID,
-		DeviceName: deviceName,
-		Status:     "offline",
-		CreatedAt:  time.Now(),
-		LastSeen:   time.Now(),
+		ID:              uuid.New().String(),
+		UserID:          userID,
+		DeviceName:      deviceName,
+		Status:          "offline",
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		LastSeen:        time.Now(),
+		MinDelaySeconds: 5,
+		MaxDelaySeconds: 15,
 	}
 	
 	query := `
-		INSERT INTO user_devices(id, user_id, device_name, status, last_seen, created_at)
-		VALUES (?, ?, ?, ?, ?, ?), last_seen
+		INSERT INTO user_devices(id, user_id, device_name, status, last_seen, created_at, updated_at, min_delay_seconds, max_delay_seconds)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
-		device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
+	_, err := r.db.Exec(query, device.ID, device.UserID, device.DeviceName, 
+		device.Status, device.LastSeen, device.CreatedAt, device.UpdatedAt, 
+		device.MinDelaySeconds, device.MaxDelaySeconds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add device: %w", err)
 	}
@@ -252,21 +256,25 @@ func (r *UserRepository) AddUserDevice(userID, deviceName string) (*models.UserD
 // AddUserDeviceWithPhone adds a device for a user with phone number
 func (r *UserRepository) AddUserDeviceWithPhone(userID, deviceName, phone string) (*models.UserDevice, error) {
 	device := &models.UserDevice{
-		ID:         uuid.New().String(),
-		UserID:     userID,
-		DeviceName: deviceName,
-		Phone:      phone,
-		Status:     "offline",
-		CreatedAt:  time.Now(),
-		LastSeen:   time.Now(),
+		ID:              uuid.New().String(),
+		UserID:          userID,
+		DeviceName:      deviceName,
+		Phone:           phone,
+		Status:          "offline",
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		LastSeen:        time.Now(),
+		MinDelaySeconds: 5,
+		MaxDelaySeconds: 15,
 	}
 	
 	query := `
-		INSERT INTO user_devices(id, user_id, device_name, phone, status, last_seen, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?), last_seen
+		INSERT INTO user_devices(id, user_id, device_name, phone, status, last_seen, created_at, updated_at, min_delay_seconds, max_delay_seconds)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	err := r.db.QueryRow(query, device.ID, device.UserID, device.DeviceName, 
-		device.Phone, device.Status, device.LastSeen, device.CreatedAt).Scan(&device.CreatedAt, &device.LastSeen)
+	_, err := r.db.Exec(query, device.ID, device.UserID, device.DeviceName, 
+		device.Phone, device.Status, device.LastSeen, device.CreatedAt, device.UpdatedAt,
+		device.MinDelaySeconds, device.MaxDelaySeconds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add device with phone: %w", err)
 	}
