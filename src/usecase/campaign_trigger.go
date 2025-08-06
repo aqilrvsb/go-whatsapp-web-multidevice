@@ -280,18 +280,19 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 				continue
 			}
 			
-			// Check if we already created a message for this contact/day
+			// Check if we already created a message for this contact/step
 			var existingCount int
 			db := database.GetDB()
 			err = db.QueryRow(`
 				SELECT COUNT(*) FROM broadcast_messages 
-				WHERE sequence_id = ? 
+				WHERE sequence_stepid = ? 
 				AND recipient_phone = ? 
-				AND group_order = ?
-			`, sequence.ID, contact.ContactPhone, nextDay).Scan(&existingCount)
+				AND device_id = ?
+				AND status IN ('pending', 'processing', 'queued', 'sent')
+			`, nextStep.ID, contact.ContactPhone, device.ID).Scan(&existingCount)
 			
 			if err == nil && existingCount > 0 {
-				logrus.Infof("Message already exists for contact %s day %d, skipping", contact.ContactPhone, nextDay)
+				logrus.Infof("Message already exists for contact %s step %s, skipping", contact.ContactPhone, nextStep.ID)
 				continue
 			}
 			
@@ -300,6 +301,7 @@ func (cts *CampaignTriggerService) ProcessDailySequenceMessages() error {
 				UserID:         sequence.UserID,
 				DeviceID:       device.ID,
 				SequenceID:     &sequence.ID,
+				SequenceStepID: &nextStep.ID,
 				RecipientPhone: contact.ContactPhone,
 				RecipientName:  contact.ContactName,
 				Type:           nextStep.MessageType,

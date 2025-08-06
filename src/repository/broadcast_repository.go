@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -416,6 +417,9 @@ func (r *BroadcastRepository) GetDB() *sql.DB {
 
 // GetPendingMessagesAndLock - Atomically fetch and update status to prevent race condition
 func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
+	// Generate unique worker ID for this operation
+	workerID := fmt.Sprintf("%s_%d_%s", deviceID, time.Now().UnixNano(), uuid.New().String()[:8])
+	
 	// Start a transaction
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -426,10 +430,13 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 	// First, atomically update pending messages to 'processing' to lock them
 	updateQuery := `
 		UPDATE broadcast_messages 
-		SET status = 'processing', 
+		SET status = 'processing',
+			processing_worker_id = ?,
+			processing_started_at = NOW(),
 			updated_at = NOW()
 		WHERE device_id = ? 
 		AND status = 'pending'
+		AND processing_worker_id IS NULL
 		AND scheduled_at IS NOT NULL
 		AND scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
 		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
@@ -437,7 +444,7 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		LIMIT ?
 	`
 	
-	result, err := tx.Exec(updateQuery, deviceID, limit)
+	result, err := tx.Exec(updateQuery, workerID, deviceID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +463,7 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 	query := `
 		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
 			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url, 
-			bm.scheduled_at, bm.group_id, bm.group_order,
+			bm.scheduled_at, bm.group_id, bm.group_order, bm.sequence_stepid,
 			COALESCE(
 				c.min_delay_seconds, 
 				ss.min_delay_seconds, 
@@ -475,11 +482,11 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		WHERE bm.device_id = ? 
 		AND bm.status = 'processing'
-		AND bm.updated_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)
+		AND bm.processing_worker_id = ?
 		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
 	`
 	
-	rows, err := tx.Query(query, deviceID)
+	rows, err := tx.Query(query, deviceID, workerID)
 	if err != nil {
 		return nil, err
 	}
@@ -490,13 +497,13 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		var msg domainBroadcast.BroadcastMessage
 		var userID sql.NullString
 		var campaignID sql.NullInt64
-		var sequenceID, groupID sql.NullString
+		var sequenceID, groupID, sequenceStepID sql.NullString
 		var groupOrder sql.NullInt64
 		var scheduledAt sql.NullTime
 		
 		err := rows.Scan(&msg.ID, &userID, &msg.DeviceID, &campaignID, &sequenceID,
 			&msg.RecipientPhone, &msg.RecipientName, &msg.Type, &msg.Content, &msg.MediaURL, &scheduledAt,
-			&groupID, &groupOrder, &msg.MinDelay, &msg.MaxDelay)
+			&groupID, &groupOrder, &sequenceStepID, &msg.MinDelay, &msg.MaxDelay)
 		if err != nil {
 			continue
 		}
@@ -510,6 +517,9 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		}
 		if sequenceID.Valid {
 			msg.SequenceID = &sequenceID.String
+		}
+		if sequenceStepID.Valid {
+			msg.SequenceStepID = &sequenceStepID.String
 		}
 		if groupID.Valid {
 			msg.GroupID = &groupID.String

@@ -358,6 +358,15 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		maxDelay = 15 // Default maximum
 	}
 	
+	// SAFETY CHECK: Verify message wasn't already sent
+	db := database.GetDB()
+	var currentStatus string
+	err := db.QueryRow("SELECT status FROM broadcast_messages WHERE id = ?", msg.ID).Scan(&currentStatus)
+	if err == nil && currentStatus == "sent" {
+		logrus.Warnf("Worker %d: Message %s already sent, skipping duplicate send", bw.workerID, msg.ID)
+		return
+	}
+	
 	// This will block until it's this worker's turn to send
 	group.acquireSendPermission(minDelay, maxDelay)
 	
@@ -366,22 +375,22 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		bw.workerID, bw.deviceID, msg.ID, broadcastInfo, msg.RecipientPhone)
 	
 	// Send via WhatsApp
-	err := bw.sendWhatsAppMessage(msg)
+	sendErr := bw.sendWhatsAppMessage(msg)
 	
 	// IMPORTANT: Release permission after sending
 	group.releaseSendPermission()
 	
-	db := database.GetDB()
-	if err != nil {
+	db2 := database.GetDB()
+	if sendErr != nil {
 		atomic.AddInt64(&bw.failedCount, 1)
 		// Also increment pool's failed count
 		if bw.pool != nil {
 			atomic.AddInt64(&bw.pool.failedCount, 1)
 		}
 		// Update status to failed
-		db.Exec(`UPDATE broadcast_messages SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
-			err.Error(), msg.ID)
-		logrus.Errorf("Failed to send message %s: %v", msg.ID, err)
+		db2.Exec(`UPDATE broadcast_messages SET STATUS = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, 
+			sendErr.Error(), msg.ID)
+		logrus.Errorf("Failed to send message %s: %v", msg.ID, sendErr)
 	} else {
 		atomic.AddInt64(&bw.processedCount, 1)
 		// Also increment pool's processed count
@@ -389,14 +398,14 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 			atomic.AddInt64(&bw.pool.processedCount, 1)
 		}
 		// Update status to sent
-		db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ? AND status IN ('queued', 'processing')`, msg.ID)
+		db2.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ? AND status IN ('queued', 'processing')`, msg.ID)
 		
 		// Update sequence progress if this is a sequence message
 		if msg.SequenceID != nil {
-			db.Exec(`UPDATE sequence_contacts SET last_message_at = NOW() WHERE sequence_id = ? AND contact_phone = ?`,
+			db2.Exec(`UPDATE sequence_contacts SET last_message_at = NOW() WHERE sequence_id = ? AND contact_phone = ?`,
 				*msg.SequenceID, msg.RecipientPhone)
 			// Call the progress update function
-			db.Exec(`SELECT update_sequence_progress(?)`, *msg.SequenceID)
+			db2.Exec(`SELECT update_sequence_progress(?)`, *msg.SequenceID)
 		}
 		
 		// Successfully sent message

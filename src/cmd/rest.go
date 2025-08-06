@@ -10,6 +10,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/helpers"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
@@ -189,6 +190,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Start broadcast worker processor - CRITICAL FOR WORKER POOL
 	go usecase.StartBroadcastWorkerProcessor()
+	
+	// Start cleanup worker for stuck messages
+	go repository.StartCleanupWorker()
 	logrus.Info("Broadcast worker processor started - using Worker Pool System")
 	
 	// Start campaign completion checker

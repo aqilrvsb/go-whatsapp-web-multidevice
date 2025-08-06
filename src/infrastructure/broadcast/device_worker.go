@@ -122,6 +122,18 @@ func (dw *DeviceWorker) processMessages() {
 			dw.lastActivity = time.Now()
 			dw.mu.Unlock()
 			
+			// CRITICAL: Double-check message wasn't already sent to prevent duplicates
+			db := database.GetDB()
+			var currentStatus string
+			checkErr := db.QueryRow("SELECT status FROM broadcast_messages WHERE id = ?", msg.ID).Scan(&currentStatus)
+			if checkErr == nil && currentStatus == "sent" {
+				logrus.Warnf("Message %s already sent, skipping to prevent duplicate", msg.ID)
+				dw.mu.Lock()
+				dw.status = "idle"
+				dw.mu.Unlock()
+				continue
+			}
+			
 			// Process the message
 			err := dw.sendMessage(msg)
 			
