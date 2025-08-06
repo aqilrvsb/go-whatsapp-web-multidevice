@@ -2705,6 +2705,9 @@
                                         <li><a class="dropdown-item" href="#" onclick="viewDeviceStats('${device.id}')">
                                             <i class="bi bi-graph-up me-2"></i>View Analytics
                                         </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="syncContacts('${device.id}')">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Sync Contacts
+                                        </a></li>
                                         <li><a class="dropdown-item text-success" href="#" onclick="refreshDevice('${device.id}')">
                                             <i class="bi bi-arrow-clockwise me-2"></i>Refresh
                                         </a></li>
@@ -3181,6 +3184,71 @@
                     hideLoading();
                 });
             }
+        }
+
+        // Sync WhatsApp Contacts
+        function syncContacts(deviceId) {
+            const device = devices.find(d => d.id === deviceId);
+            if (!device) return;
+            
+            Swal.fire({
+                title: 'Sync WhatsApp Contacts?',
+                html: `
+                    <div class="text-start">
+                        <p>This will import all WhatsApp contacts from the last 6 months as leads.</p>
+                        <p class="text-info"><i class="bi bi-info-circle me-2"></i>Duplicate contacts will be skipped automatically.</p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Sync',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#25d366'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    showLoading();
+                    showToast('Syncing contacts... This may take a few seconds.', 'info');
+                    
+                    fetch(`/api/devices/${deviceId}/sync-contacts`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading();
+                        
+                        if (data.code === 'SUCCESS') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Contacts Synced!',
+                                text: data.message || 'Contacts have been imported successfully.',
+                                confirmButtonText: 'View Leads',
+                                showCancelButton: true,
+                                cancelButtonText: 'OK'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.location.href = `/device/${deviceId}/leads`;
+                                }
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Sync Failed',
+                                text: data.message || 'Failed to sync contacts'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        console.error('Error syncing contacts:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to sync contacts. Please try again.'
+                        });
+                    });
+                }
+            });
         }
 
         // Delete Device
