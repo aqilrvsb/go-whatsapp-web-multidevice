@@ -42,7 +42,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 			WHERE sequence_stepid = ? 
 			AND recipient_phone = ? 
 			AND device_id = ?
-			AND status IN ('pending', 'sent', 'queued')
+			AND status IN ('pending', 'sent', 'queued', 'processing')
 		`
 		
 		var count int
@@ -64,7 +64,7 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 			WHERE campaign_id = ? 
 			AND recipient_phone = ? 
 			AND device_id = ?
-			AND status IN ('pending', 'sent', 'queued')
+			AND status IN ('pending', 'sent', 'queued', 'processing')
 		`
 		
 		var count int

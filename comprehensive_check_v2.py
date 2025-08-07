@@ -30,7 +30,7 @@ columns_to_check = [
 for table, column in columns_to_check:
     cursor.execute(f"SHOW COLUMNS FROM {table} LIKE '{column}'")
     result = cursor.fetchone()
-    print(f"  {table}.{column}: {'✓ EXISTS' if result else '✗ MISSING'}")
+    print(f"  {table}.{column}: {'EXISTS' if result else 'MISSING'}")
 
 # Check indexes
 print("\n  Indexes:")
@@ -131,7 +131,7 @@ recent_seq = cursor.fetchall()
 print("\n  Recent Sequence Messages:")
 for msg in recent_seq:
     print(f"    ID: {msg[0][:8]}...")
-    print(f"      Step: {msg[1][:20]}..., Phone: {msg[2]}, Device: {msg[3][:8]}...")
+    print(f"      Step: {msg[1][:20] if msg[1] else 'None'}..., Phone: {msg[2]}, Device: {msg[3][:8] if msg[3] else 'None'}...")
     print(f"      Status: {msg[4]}, Worker: {msg[5][:20] if msg[5] else 'NULL'}...")
     print(f"      Created: {msg[6]}, Sent: {msg[7]}")
 
@@ -154,30 +154,4 @@ print(f"\n  Messages stuck in 'processing': {stuck[0]}")
 if stuck[0] > 0:
     print(f"    Oldest: {stuck[1]}, Newest: {stuck[2]}")
 
-# 6. VERIFY ATOMIC OPERATIONS
-print("\n\n6. ATOMIC OPERATION VERIFICATION")
-print("-"*50)
-
-# Check if messages are being locked properly
-cursor.execute("""
-SELECT 
-    processing_worker_id,
-    COUNT(*) as message_count
-FROM broadcast_messages 
-WHERE status = 'processing'
-AND processing_worker_id IS NOT NULL
-GROUP BY processing_worker_id
-HAVING COUNT(*) > 50
-LIMIT 5
-""")
-
-worker_loads = cursor.fetchall()
-print("\n  Workers with high message counts:")
-for load in worker_loads:
-    print(f"    Worker {load[0][:30]}...: {load[1]} messages")
-
 conn.close()
-
-print("\n\n" + "="*100)
-print("SUMMARY OF ISSUES TO FIX:")
-print("="*100)
