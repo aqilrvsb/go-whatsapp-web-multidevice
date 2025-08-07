@@ -7370,8 +7370,24 @@
             // Show loading state
             document.getElementById('leadDetailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading leads...</td></tr>';
             
+            // Build URL with date filters
+            let url = `/api/sequences/${currentSequenceForReport.id}/device/${deviceId}/step/${stepId}/leads?status=${status}`;
+            
+            // Get the current date filters from the sequence summary
+            const startDate = document.getElementById('sequenceStartDate').value;
+            const endDate = document.getElementById('sequenceEndDate').value;
+            
+            if (startDate) {
+                url += `&start_date=${startDate}`;
+            }
+            if (endDate) {
+                url += `&end_date=${endDate}`;
+            }
+            
+            console.log('Fetching sequence step leads with URL:', url);
+            
             // Fetch lead details for specific step
-            fetch(`/api/sequences/${currentSequenceForReport.id}/device/${deviceId}/step/${stepId}/leads?status=${status}`, { 
+            fetch(url, { 
                 credentials: 'include' 
             })
                 .then(response => response.json())

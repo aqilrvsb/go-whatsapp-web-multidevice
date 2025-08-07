@@ -3380,10 +3380,9 @@ func (handler *App) GetCampaignDeviceLeads(c *fiber.Ctx) error {
 			query += ` HAVING bm.status IN ('pending', 'queued')`
 		} else if status == "failed" {
 			query += ` HAVING bm.status IN ('failed', 'error')`
-		}
 	}
-	
-	query += ` ORDER BY bm.sent_at DESC`
+}
+
 	
 	// Execute query based on campaign type
 	var rows *sql.Rows
@@ -4909,6 +4908,10 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 	deviceId := c.Params("deviceId")
 	stepId := c.Params("stepId")
 	status := c.Query("status", "all")
+
+	// Get date filters from query params
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 	
 	// Get session from cookie
 	sessionToken := c.Cookies("session_token")
@@ -4945,6 +4948,9 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 	
 	// Use sequence ID directly as string
 	args := []interface{}{sequenceId, deviceId, stepId, session.UserID}
+
+	log.Printf("GetSequenceStepLeads - Sequence: %s, Device: %s, Step: %s, Status: %s, DateRange: %s to %s",
+		sequenceId, deviceId, stepId, status, startDate, endDate)
 	
 	// Add status filter if not "all"
 	if status != "all" {
@@ -4955,6 +4961,18 @@ func (handler *App) GetSequenceStepLeads(c *fiber.Ctx) error {
 		} else if status == "failed" {
 			query += ` AND bm.status IN ('failed', 'error')`
 		}
+	}
+	
+	// Add date filter if provided
+	if startDate != "" && endDate != "" {
+		query += ` AND DATE(bm.sent_at) BETWEEN ? AND ?`
+		args = append(args, startDate, endDate)
+	} else if startDate != "" {
+		query += ` AND DATE(bm.sent_at) >= ?`
+		args = append(args, startDate)
+	} else if endDate != "" {
+		query += ` AND DATE(bm.sent_at) <= ?`
+		args = append(args, endDate)
 	}
 	
 	query += ` ORDER BY bm.sent_at DESC`
