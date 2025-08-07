@@ -169,7 +169,7 @@ func (p *OptimizedBroadcastProcessor) processDeviceMessages(deviceID string) {
 	}
 	
 	// Get pending messages from database
-	messages, err := p.broadcastRepo.GetPendingMessages(deviceID, MESSAGE_BATCH_SIZE)
+	messages, err := p.broadcastRepo.GetPendingMessagesAndLock(deviceID, MESSAGE_BATCH_SIZE)
 	if err != nil {
 		logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 		return
