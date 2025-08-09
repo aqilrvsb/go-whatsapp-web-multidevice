@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
@@ -415,7 +416,7 @@ func (r *BroadcastRepository) GetDB() *sql.DB {
 	return r.db
 }
 
-// GetPendingMessagesAndLock - Atomically fetch and update status to prevent race condition
+// GetPendingMessagesAndLock - Atomically fetch and lock messages using FOR UPDATE SKIP LOCKED
 func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit int) ([]domainBroadcast.BroadcastMessage, error) {
 	// Generate unique worker ID for this operation
 	workerID := fmt.Sprintf("%s_%d_%s", deviceID, time.Now().UnixNano(), uuid.New().String()[:8])
@@ -427,39 +428,8 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 	}
 	defer tx.Rollback()
 	
-	// First, atomically update pending messages to 'processing' to lock them
-	updateQuery := `
-		UPDATE broadcast_messages 
-		SET status = 'processing',
-			processing_worker_id = ?,
-			processing_started_at = NOW(),
-			updated_at = NOW()
-		WHERE device_id = ? 
-		AND status = 'pending'
-		AND processing_worker_id IS NULL
-		AND scheduled_at IS NOT NULL
-		AND scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
-		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
-		ORDER BY scheduled_at ASC
-		LIMIT ?
-	`
-	
-	result, err := tx.Exec(updateQuery, workerID, deviceID, limit)
-	if err != nil {
-		return nil, err
-	}
-	
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return nil, err
-	}
-	
-	if rowsAffected == 0 {
-		// No messages to process
-		return []domainBroadcast.BroadcastMessage{}, nil
-	}
-	
-	// Now fetch the messages we just locked
+	// CRITICAL FIX: Use SELECT...FOR UPDATE SKIP LOCKED to atomically lock rows
+	// This prevents race conditions between multiple workers
 	query := `
 		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id, 
 			bm.recipient_phone, bm.recipient_name, bm.message_type, bm.content AS message, bm.media_url, 
@@ -481,18 +451,25 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		WHERE bm.device_id = ? 
-		AND bm.status = 'processing'
-		AND bm.processing_worker_id = ?
+		AND bm.status = 'pending'
+		AND bm.processing_worker_id IS NULL
+		AND bm.scheduled_at IS NOT NULL
+		AND bm.scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
+		AND bm.scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
 		ORDER BY bm.scheduled_at ASC, bm.group_id, bm.group_order
+		LIMIT ?
+		FOR UPDATE SKIP LOCKED
 	`
 	
-	rows, err := tx.Query(query, deviceID, workerID)
+	rows, err := tx.Query(query, deviceID, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	
 	var messages []domainBroadcast.BroadcastMessage
+	var messageIDs []string
+	
 	for rows.Next() {
 		var msg domainBroadcast.BroadcastMessage
 		var userID sql.NullString
@@ -537,12 +514,42 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		msg.Message = msg.Content
 		
 		messages = append(messages, msg)
+		messageIDs = append(messageIDs, msg.ID)
+	}
+	
+	// If we got messages, update their status to processing
+	if len(messageIDs) > 0 {
+		placeholders := make([]string, len(messageIDs))
+		args := make([]interface{}, 0, len(messageIDs)+2)
+		args = append(args, workerID)
+		
+		for i, id := range messageIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		
+		updateQuery := fmt.Sprintf(`
+			UPDATE broadcast_messages 
+			SET status = 'processing',
+				processing_worker_id = ?,
+				processing_started_at = NOW(),
+				updated_at = NOW()
+			WHERE id IN (%s)
+		`, strings.Join(placeholders, ","))
+		
+		_, err = tx.Exec(updateQuery, args...)
+		if err != nil {
+			// Log error but continue since we have the lock
+			logrus.Errorf("Failed to update message status: %v", err)
+		}
 	}
 	
 	// Commit the transaction
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	
+	logrus.Infof("Worker %s locked %d messages for device %s", workerID, len(messages), deviceID)
 	
 	return messages, nil
 }
