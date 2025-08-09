@@ -1,7 +1,14 @@
 @echo off
 cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+
+echo Adding files to git...
 git add -A
-git commit -m "Refactor: Clean multi-device architecture - remove single-device functions, add proper multi-device auto-reconnect"
+
+echo Committing changes...
+git commit -m "Fix: Update sent message queries to include 'processing' status check"
+
+echo Pushing to GitHub...
 git push origin main
+
 echo Done!
 pause

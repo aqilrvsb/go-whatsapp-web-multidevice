@@ -397,8 +397,8 @@ func (bw *BroadcastWorker) processMessage(msg *domainBroadcast.BroadcastMessage)
 		if bw.pool != nil {
 			atomic.AddInt64(&bw.pool.processedCount, 1)
 		}
-		// Update status to sent
-		db2.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW() WHERE id = ? AND status IN ('queued', 'processing')`, msg.ID)
+		// Update status to sent (preserve processing_worker_id for audit trail)
+		db2.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW() WHERE id = ? AND status IN ('queued', 'processing')`, msg.ID)
 		
 		// Update sequence progress if this is a sequence message
 		if msg.SequenceID != nil {

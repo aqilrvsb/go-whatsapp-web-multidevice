@@ -156,7 +156,7 @@ func (dw *DeviceWorker) processMessages() {
 				if msg.ID != "" {
 					// Direct update like skipped
 					db := database.GetDB()
-					_, updateErr := db.Exec(`UPDATE broadcast_messages SET STATUS = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('pending', 'queued')`, msg.ID)
+					_, updateErr := db.Exec(`UPDATE broadcast_messages SET status = 'sent', sent_at = NOW(), updated_at = NOW() WHERE id = ? AND status IN ('processing', 'pending', 'queued')`, msg.ID)
 					if updateErr != nil {
 						logrus.Errorf("Failed to update message status to sent: %v", updateErr)
 					}
