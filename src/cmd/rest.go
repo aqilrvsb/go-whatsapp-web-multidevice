@@ -61,6 +61,12 @@ func restServer(_ *cobra.Command, _ []string) {
 	}))
 
 	app.Use(middleware.Recovery())
+	
+	// IMPORTANT: Register public routes BEFORE auth middleware
+	rest.InitPublicDeviceRoutes(app, database.GetDB()) // Add public device view routes
+	rest.InitPublicDeviceAPI(app) // Add public device API endpoints
+	
+	// Now apply auth middleware - it won't affect routes registered above
 	app.Use(middleware.BasicAuth())
 	app.Use(middleware.CustomAuth()) // Add custom auth middleware
 	if config.AppDebug {
@@ -103,8 +109,6 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitTeamRoutes(app, database.GetDB()) // Add team member routes
 	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
 	rest.InitWebhookLead(app) // Add webhook endpoint for creating leads
-	rest.InitPublicDeviceRoutes(app, database.GetDB()) // Add public device view routes
-	rest.InitPublicDeviceAPI(app) // Add public device API endpoints
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
