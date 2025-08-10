@@ -643,7 +643,7 @@
         <!-- Tab Content -->
         <div class="tab-content" id="mainTabContent">
             <!-- Devices Tab -->
-            <div class="tab-pane fade show active" id="devices" role="tabpanel"> role="tabpanel">
+            <div class="tab-pane fade show active" id="devices" role="tabpanel">
                 <!-- Devices Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
@@ -1935,9 +1935,10 @@
 
         // Initialize Dashboard
         function initializeDashboard() {
-            // Initialize Campaign Chart
-            const campaignCtx = document.getElementById('campaignChart').getContext('2d');
-            window.campaignChart = new Chart(campaignCtx, {
+            // Campaign Chart
+            const campaignCtx = document.getElementById('campaignChart')?.getContext('2d');
+            if (campaignCtx) {
+                window.campaignChart = new Chart(campaignCtx, {
                 type: 'line',
                 data: {
                     labels: [],
@@ -2544,7 +2545,7 @@
         }
 
         // Render Devices
-        function renderDevices() {
+        function renderDevices() {() {
             const devicesGrid = document.getElementById('devicesGrid');
             const emptyState = document.getElementById('emptyDeviceState');
             
