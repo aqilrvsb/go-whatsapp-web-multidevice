@@ -49,9 +49,6 @@ func restServer(_ *cobra.Command, _ []string) {
 	})
 
 	app.Static("/statics", "./statics")
-	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
-		return c.SendFile("./statics/favicon.ico")
-	})
 	app.Use("/components", filesystem.New(filesystem.Config{
 		Root:       http.FS(EmbedViews),
 		PathPrefix: "views/components",
