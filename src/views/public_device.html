@@ -1990,6 +1990,86 @@
         const publicDeviceId = '{{.DeviceID}}';
         const isPublicView = true;
 
+        // Override API endpoints for public view
+        const originalLoadDevices = window.loadDevices || function() {};
+        const originalLoadCampaignSummary = window.loadCampaignSummary || function() {};
+        const originalLoadSequenceSummary = window.loadSequenceSummary || function() {};
+
+        // Override loadDevices for public view
+        window.loadDevices = function() {
+            fetch(`/api/public/device/${publicDeviceId}/devices`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.devices && data.devices.length > 0) {
+                        devices = data.devices;
+                        renderDevices();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading device:', error);
+                });
+        };
+
+        // Override loadCampaignSummary for public view
+        window.loadCampaignSummary = function(showAll = false) {
+            const filterDate = document.getElementById('campaignFilterDate')?.value || '';
+            const rangeStart = document.getElementById('campaignRangeStart')?.value || '';
+            const rangeEnd = document.getElementById('campaignRangeEnd')?.value || '';
+            
+            let url = `/api/public/device/${publicDeviceId}/campaign-summary`;
+            const params = new URLSearchParams();
+            
+            if (filterDate) {
+                params.append('date', filterDate);
+            } else if (rangeStart && rangeEnd) {
+                params.append('start_date', rangeStart);
+                params.append('end_date', rangeEnd);
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    displayCampaignSummary(data.campaigns || []);
+                })
+                .catch(error => {
+                    console.error('Error loading campaign summary:', error);
+                });
+        };
+
+        // Override loadSequenceSummary for public view
+        window.loadSequenceSummary = function() {
+            const filterDate = document.getElementById('sequenceFilterDate')?.value || '';
+            const rangeStart = document.getElementById('sequenceRangeStart')?.value || '';
+            const rangeEnd = document.getElementById('sequenceRangeEnd')?.value || '';
+            
+            let url = `/api/public/device/${publicDeviceId}/sequence-summary`;
+            const params = new URLSearchParams();
+            
+            if (filterDate) {
+                params.append('date', filterDate);
+            } else if (rangeStart && rangeEnd) {
+                params.append('start_date', rangeStart);
+                params.append('end_date', rangeEnd);
+            }
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    displaySequenceSummary(data.sequences || []);
+                })
+                .catch(error => {
+                    console.error('Error loading sequence summary:', error);
+                });
+        };
+
         // Override all API endpoints to use public routes
         const originalFetch = window.fetch;
         window.fetch = function(url, options) {
@@ -2027,7 +2107,30 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Dashboard v2.0.0 - New Analytics Dashboard');
+            console.log('Public Device View - Device ID:', publicDeviceId);
+            
+            // Disable auto-refresh for public view
+            isAutoRefreshEnabled = false;
+            
+            // Load initial data
+            loadDevices();
+            
+            // Set up tab change handlers
+            $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                const target = $(e.target).attr("href");
+                if (target === '#campaign-summary') {
+                    loadCampaignSummary();
+                } else if (target === '#sequence-summary') {
+                    loadSequenceSummary();
+                }
+            });
+            
+            // Update date filters
+            setDefaultDates();
+            
+            // Disable WebSocket for public view
+            console.log('WebSocket disabled for public view');
+        });
             initializeDashboard();
             loadDevices();
             loadNiches();
@@ -3646,8 +3749,9 @@
 
         // WebSocket Connection for Real-time Updates
         function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            // WebSocket disabled for public view
+            console.log('WebSocket disabled for public view');
+            return;
     
     // Store current user ID for filtering
     const currentUserId = localStorage.getItem('userId') || '';
