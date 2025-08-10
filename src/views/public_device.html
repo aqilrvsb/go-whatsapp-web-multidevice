@@ -2046,7 +2046,7 @@
         }
 
         // Set default dates
-        function setDefaultDates() {
+        function setDefaultDates() {() {
             const today = new Date();
             
             // Set both start and end date to today by default
@@ -8485,17 +8485,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadSequenceSummary();
         }
 
-        function setDefaultDates() {
-            const today = new Date();
-            const startDate = new Date(today);
-            startDate.setDate(today.getDate() - 7);
-            
-            const campaignDate = document.getElementById('campaignFilterDate');
-            const sequenceDate = document.getElementById('sequenceFilterDate');
-            
-            if (campaignDate) campaignDate.value = today.toISOString().split('T')[0];
-            if (sequenceDate) sequenceDate.value = today.toISOString().split('T')[0];
-        }
+        // setDefaultDates is already defined above
     </script>
 </body>
 </html>
