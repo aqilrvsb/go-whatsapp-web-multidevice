@@ -620,7 +620,7 @@
     </div>
 
     <!-- Main Content -->
-    <div class="container mt-4">
+    <div class="container-fluid mt-4";
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -2249,9 +2249,12 @@
                         devicesData = data;
                     } else if (data.results && Array.isArray(data.results.devices)) {
                         devicesData = data.results.devices;
+                    } else if (data.devices && Array.isArray(data.devices)) {
+                        // Handle public API response structure
+                        devicesData = data.devices;
                     } else {
                         console.error('Unexpected devices response structure:', data);
-                        return;
+                        devicesData = [];
                     }
                     
                     // Don't filter by date - show all devices
@@ -2796,19 +2799,19 @@
                                 <button class="btn btn-success btn-sm" onclick="openWhatsAppWeb('${device.id}')">
                                     <i class="bi bi-whatsapp"></i> WA
                                 </button>
-                                ${!isPublicView ? `<button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
+                                <button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
                                     <i class="bi bi-people"></i> Leads
-                                </button>` : ''}
+                                </button>
                             ` : `
                                 <button class="btn btn-success btn-sm mb-1" onclick="openWhatsAppWeb('${device.id}')">
                                     <i class="bi bi-whatsapp"></i> WA
                                 </button>
-                                ${!isPublicView ? `<div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
+                                    <i class="bi bi-people"></i> Leads
+                                </button>
+                                ${!isPublicView ? `<div class="btn-group btn-group-sm mt-1" role="group">
                                     <button class="btn btn-outline-primary" onclick="deviceActions('${device.id}')" title="Actions">
                                         <i class="bi bi-play"></i>
-                                    </button>
-                                    <button class="btn btn-outline-info" onclick="deviceLeads('${device.id}')" title="Leads">
-                                        <i class="bi bi-people"></i>
                                     </button>
                                     <button class="btn btn-outline-success" onclick="viewDeviceStats('${device.id}')" title="Stats">
                                         <i class="bi bi-graph-up"></i>
@@ -6207,6 +6210,9 @@
                     console.log('Sequence Summary Response:', data); // Debug log
                     if (data.code === 'SUCCESS') {
                         displaySequenceSummary(data.results);
+                    } else if (data.sequences || data.total !== undefined) {
+                        // Handle public API response format
+                        displaySequenceSummary(data);
                     } else {
                         document.getElementById('sequenceSummaryContent').innerHTML = 
                             '<div class="alert alert-danger">Failed to load sequence summary</div>';
@@ -6221,6 +6227,34 @@
         
         function displaySequenceSummary(summary) {
             console.log('DisplaySequenceSummary called with:', summary); // Debug log
+            
+            // Handle different response formats
+            if (Array.isArray(summary)) {
+                // If summary is an array of sequences, convert to expected format
+                summary = {
+                    sequences: { 
+                        total: summary.length, 
+                        active: summary.filter(s => s.status === 'active').length,
+                        inactive: summary.filter(s => s.status === 'inactive').length
+                    },
+                    contacts: { total: 0, average_per_sequence: 0, total_success: 0, total_remaining: 0 },
+                    recent_sequences: summary.slice(0, 5),
+                    total_devices: 0
+                };
+            } else if (summary && summary.sequences && Array.isArray(summary.sequences)) {
+                // If sequences is an array within the summary object
+                const sequences = summary.sequences;
+                summary = {
+                    sequences: { 
+                        total: summary.total || sequences.length, 
+                        active: sequences.filter(s => s.status === 'active').length,
+                        inactive: sequences.filter(s => s.status === 'inactive').length
+                    },
+                    contacts: summary.contacts || { total: 0, average_per_sequence: 0, total_success: 0, total_remaining: 0 },
+                    recent_sequences: sequences.slice(0, 5),
+                    total_devices: summary.total_devices || 0
+                };
+            }
             
             // Handle null or undefined summary
             if (!summary) {
