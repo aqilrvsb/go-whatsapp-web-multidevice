@@ -31,7 +31,7 @@ func InitPublicDeviceRoutes(app *fiber.App, db *sql.DB) {
 		
 		logrus.Infof("Public view accessed for device: %s (%s)", device.DeviceName, device.ID)
 		
-		// Render public device view
+		// Render EXACT dashboard - public_device.html is now exact copy of dashboard.html
 		return c.Render("views/public_device", fiber.Map{
 			"AppHost":        fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname()),
 			"AppVersion":     config.AppVersion,
@@ -41,6 +41,7 @@ func InitPublicDeviceRoutes(app *fiber.App, db *sql.DB) {
 			"MaxFileSize":    humanize.Bytes(uint64(config.WhatsappSettingMaxFileSize)),
 			"MaxVideoSize":   humanize.Bytes(uint64(config.WhatsappSettingMaxVideoSize)),
 			"IsPublicView":   true,
+			"BasicAuthToken": nil, // No auth for public view
 		})
 	})
 }
