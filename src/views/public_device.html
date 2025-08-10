@@ -1855,7 +1855,7 @@
         };
 
         // Override loadSequenceSummary for public view
-        window.loadSequenceSummary = function(showAll = false) {() {
+        window.loadSequenceSummary = function(showAll = false) {
             const filterDate = document.getElementById('sequenceFilterDate')?.value || '';
             const rangeStart = document.getElementById('sequenceRangeStart')?.value || '';
             const rangeEnd = document.getElementById('sequenceRangeEnd')?.value || '';
@@ -5767,7 +5767,7 @@
                 });
         }
         
-        function displayCampaignSummary(summary) {
+        function displayCampaignSummary(summary) {(summary) {
             console.log('Campaign Summary Data:', summary); // Debug log
             
             // Ensure campaigns exists
@@ -6049,7 +6049,7 @@
                 });
         }
         
-        function displaySequenceSummary(summary) {
+        function displaySequenceSummary(summary) {(summary) {
             console.log('DisplaySequenceSummary called with:', summary); // Debug log
             
             // Handle null or undefined summary
