@@ -685,14 +685,12 @@
                     </div>
                     <div class="d-flex gap-3 align-items-center">
                         <!-- Device Filter -->
-                        ${!isPublicView ? `
-                        <div>
+                        <div id="deviceFilterContainer" style="display: none;">
                             <label class="form-label mb-1 small">Filter by Device</label>
                             <select class="form-select form-select-sm" id="deviceFilter" onchange="updateDashboard()" style="width: 200px;">
                                 <option value="all">All Devices</option>
                             </select>
                         </div>
-                        ` : ''}
                         
                         <!-- Date Range -->
                         <div>
@@ -890,11 +888,9 @@
                         <!-- <button class="btn btn-danger me-2" onclick="clearAllSessions()">
                             <i class="bi bi-x-circle me-2"></i>Clear All Sessions
                         </button> -->
-                        ${!isPublicView ? `
-                        <button class="btn btn-primary" onclick="addNewDevice()">
+                        <button class="btn btn-primary" id="addDeviceBtn" onclick="addNewDevice()" style="display: none;">
                             <i class="bi bi-plus-circle me-2"></i>Add Device
                         </button>
-                        ` : ''}
                     </div>
                 </div>
 
@@ -948,11 +944,9 @@
                         <p class="text-muted mb-0">Create automated drip campaigns for your contacts</p>
                     </div>
                     <div>
-                        ${!isPublicView ? `
-                        <button class="btn btn-primary" onclick="openCreateSequenceModal()">
+                        <button class="btn btn-primary" id="createSequenceBtn" onclick="openCreateSequenceModal()" style="display: none;">
                             <i class="bi bi-plus-circle"></i> Create Sequence
                         </button>
-                        ` : ''}
                     </div>
                 </div>
                 
@@ -964,11 +958,6 @@
                                 <i class="bi bi-collection display-3 text-muted mb-3"></i>
                                 <h5>No Sequences Yet</h5>
                                 <p class="text-muted">Create your first automated message sequence</p>
-                                ${!isPublicView ? `
-                                <button class="btn btn-primary" onclick="openCreateSequenceModal()">
-                                    <i class="bi bi-plus-circle"></i> Create Sequence
-                                </button>
-                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -2052,6 +2041,18 @@
                 isAutoRefreshEnabled = false;
                 // Hide any admin-only buttons
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            } else {
+                // Show add device button for non-public view
+                const addDeviceBtn = document.getElementById('addDeviceBtn');
+                if (addDeviceBtn) addDeviceBtn.style.display = 'block';
+                
+                // Show create sequence button
+                const createSequenceBtn = document.getElementById('createSequenceBtn');
+                if (createSequenceBtn) createSequenceBtn.style.display = 'block';
+                
+                // Show device filter
+                const deviceFilterContainer = document.getElementById('deviceFilterContainer');
+                if (deviceFilterContainer) deviceFilterContainer.style.display = 'block';
             }
             
             initializeDashboard();
@@ -3008,7 +3009,7 @@
                         }, 20000); // Refresh every 20 seconds
                         
                         // Clear interval when modal is closed
-                        document.getElementById('qrModal').addEventListener('hidden.bs.modal', function () {
+                        document.getElementById('qrModal')?.addEventListener('hidden.bs.modal', function () {
                             if (qrRefreshInterval) {
                                 clearInterval(qrRefreshInterval);
                                 qrRefreshInterval = null;
