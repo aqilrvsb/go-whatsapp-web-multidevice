@@ -60,20 +60,32 @@ func InitPublicDeviceAPI(app *fiber.App) {
 	// Public API endpoints - no auth required
 	publicAPI := app.Group("/api/public/device/:deviceId")
 	
-	// Get device info
-	publicAPI.Get("/info", api.GetDeviceInfo)
+	// Device info endpoint
+	publicAPI.Get("/devices", api.GetDeviceInfo)
 	
-	// Get campaign summary for device
+	// Campaign summary endpoint
+	publicAPI.Get("/campaign-summary", api.GetCampaignSummary)
+	
+	// Sequence summary endpoint  
+	publicAPI.Get("/sequence-summary", api.GetSequenceSummary)
+	
+	// Leads endpoint
+	publicAPI.Get("/leads", api.GetLeads)
+	
+	// Get device statistics
+	publicAPI.Get("/info", api.GetDeviceStats)
+	
+	// Get campaigns for device
 	publicAPI.Get("/campaigns", api.GetDeviceCampaigns)
 	
-	// Get sequence summary for device
+	// Get sequences for device
 	publicAPI.Get("/sequences", api.GetDeviceSequences)
 	
-	// Get recent messages for device
+	// Get messages for device
 	publicAPI.Get("/messages", api.GetDeviceMessages)
 }
 
-func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
+func (api *PublicDeviceAPI) GetDeviceStats(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
 	
 	userRepo := repository.GetUserRepository()
@@ -119,6 +131,206 @@ func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
 			"status": device.Status,
 		},
 		"statistics": stats,
+	})
+}
+
+// GetCampaignSummary returns campaign summary data for the device
+func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	date := c.Query("date", "")
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	
+	db := database.GetDB()
+	
+	// Build date filter
+	dateFilter := ""
+	args := []interface{}{deviceID}
+	
+	if date != "" {
+		dateFilter = " AND DATE(bm.created_at) = ?"
+		args = append(args, date)
+	} else if startDate != "" && endDate != "" {
+		dateFilter = " AND DATE(bm.created_at) BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query := `
+		SELECT 
+			c.id,
+			c.name,
+			c.status,
+			c.start_time,
+			c.end_time,
+			COUNT(DISTINCT bm.id) as total_messages,
+			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_count,
+			COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as failed_count,
+			COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.id END) as pending_count,
+			COUNT(DISTINCT bm.recipient_phone) as unique_recipients
+		FROM campaigns c
+		LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id AND bm.device_id = ?` + dateFilter + `
+		GROUP BY c.id, c.name, c.status, c.start_time, c.end_time
+		ORDER BY c.created_at DESC
+	`
+	
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaign summary"})
+	}
+	defer rows.Close()
+	
+	var campaigns []fiber.Map
+	for rows.Next() {
+		var campaign struct {
+			ID               int            `json:"id"`
+			Name             string         `json:"name"`
+			Status           string         `json:"status"`
+			StartTime        sql.NullTime   `json:"start_time"`
+			EndTime          sql.NullTime   `json:"end_time"`
+			TotalMessages    int            `json:"total_messages"`
+			SentCount        int            `json:"sent_count"`
+			FailedCount      int            `json:"failed_count"`
+			PendingCount     int            `json:"pending_count"`
+			UniqueRecipients int            `json:"unique_recipients"`
+		}
+		
+		err := rows.Scan(
+			&campaign.ID,
+			&campaign.Name,
+			&campaign.Status,
+			&campaign.StartTime,
+			&campaign.EndTime,
+			&campaign.TotalMessages,
+			&campaign.SentCount,
+			&campaign.FailedCount,
+			&campaign.PendingCount,
+			&campaign.UniqueRecipients,
+		)
+		if err != nil {
+			continue
+		}
+		
+		campaigns = append(campaigns, fiber.Map{
+			"id":                campaign.ID,
+			"name":              campaign.Name,
+			"status":            campaign.Status,
+			"start_time":        campaign.StartTime.Time,
+			"end_time":          campaign.EndTime.Time,
+			"total_messages":    campaign.TotalMessages,
+			"sent_count":        campaign.SentCount,
+			"failed_count":      campaign.FailedCount,
+			"pending_count":     campaign.PendingCount,
+			"unique_recipients": campaign.UniqueRecipients,
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"campaigns": campaigns,
+		"total":     len(campaigns),
+	})
+}
+
+// GetSequenceSummary returns sequence summary data for the device
+func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	date := c.Query("date", "")
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
+	
+	db := database.GetDB()
+	
+	// Build date filter
+	dateFilter := ""
+	args := []interface{}{deviceID}
+	
+	if date != "" {
+		dateFilter = " AND DATE(bm.created_at) = ?"
+		args = append(args, date)
+	} else if startDate != "" && endDate != "" {
+		dateFilter = " AND DATE(bm.created_at) BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query := `
+		SELECT 
+			s.id,
+			s.name,
+			s.status,
+			COUNT(DISTINCT sc.id) as total_contacts,
+			COUNT(DISTINCT CASE WHEN sc.status = 'active' THEN sc.id END) as active_contacts,
+			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_contacts,
+			COUNT(DISTINCT bm.id) as total_messages,
+			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_count,
+			COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as failed_count
+		FROM sequences s
+		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
+		LEFT JOIN broadcast_messages bm ON s.id = bm.sequence_id AND bm.device_id = ?` + dateFilter + `
+		GROUP BY s.id, s.name, s.status
+		ORDER BY s.created_at DESC
+	`
+	
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequence summary"})
+	}
+	defer rows.Close()
+	
+	var sequences []fiber.Map
+	for rows.Next() {
+		var sequence struct {
+			ID                 string `json:"id"`
+			Name               string `json:"name"`
+			Status             string `json:"status"`
+			TotalContacts      int    `json:"total_contacts"`
+			ActiveContacts     int    `json:"active_contacts"`
+			CompletedContacts  int    `json:"completed_contacts"`
+			TotalMessages      int    `json:"total_messages"`
+			SentCount          int    `json:"sent_count"`
+			FailedCount        int    `json:"failed_count"`
+		}
+		
+		err := rows.Scan(
+			&sequence.ID,
+			&sequence.Name,
+			&sequence.Status,
+			&sequence.TotalContacts,
+			&sequence.ActiveContacts,
+			&sequence.CompletedContacts,
+			&sequence.TotalMessages,
+			&sequence.SentCount,
+			&sequence.FailedCount,
+		)
+		if err != nil {
+			continue
+		}
+		
+		sequences = append(sequences, fiber.Map{
+			"id":                 sequence.ID,
+			"name":               sequence.Name,
+			"status":             sequence.Status,
+			"total_contacts":     sequence.TotalContacts,
+			"active_contacts":    sequence.ActiveContacts,
+			"completed_contacts": sequence.CompletedContacts,
+			"total_messages":     sequence.TotalMessages,
+			"sent_count":         sequence.SentCount,
+			"failed_count":       sequence.FailedCount,
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"sequences": sequences,
+		"total":     len(sequences),
+	})
+}
+
+// GetLeads returns leads data for the device
+func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
+	_ = c.Params("deviceId") // deviceId available but not used for security
+	
+	// For public view, return empty leads list for security
+	return c.JSON(fiber.Map{
+		"leads": []fiber.Map{},
+		"total": 0,
 	})
 }
 
@@ -372,4 +584,31 @@ func calculateSuccessRate(sent, total int) float64 {
 		return 0
 	}
 	return float64(sent) / float64(total) * 100
+}
+// GetDeviceInfo returns device data for the devices tab
+func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// Return device data in the format expected by the devices tab
+	deviceData := fiber.Map{
+		"id":           device.ID,
+		"name":         device.DeviceName,
+		"phone":        device.Phone,
+		"status":       device.Status,
+		"created_at":   device.CreatedAt,
+		"updated_at":   device.UpdatedAt,
+		"is_connected": device.Status == "online",
+	}
+	
+	// Return as array since the frontend expects an array of devices
+	return c.JSON(fiber.Map{
+		"devices": []fiber.Map{deviceData},
+		"total":   1,
+	})
 }
