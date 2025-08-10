@@ -659,12 +659,14 @@
                     <i class="bi bi-cpu"></i> Worker Status
                 </button>
             </li> -->
-            <li class="nav-item" role="presentation">
+            <!-- Manage AI Tab - HIDDEN for public view -->
+            <!-- <li class="nav-item" role="presentation">
                 <button class="nav-link" id="manage-ai-tab" data-bs-toggle="tab" data-bs-target="#manage-ai" type="button">
                     <i class="bi bi-robot"></i> Manage AI
                 </button>
-            </li>
-            <li class="nav-item" role="presentation">
+            </li> -->
+            <!-- User Management Tab - HIDDEN for public view -->
+            <!-- <li class="nav-item" role="presentation">
                 <button class="nav-link" id="user-management-tab" data-bs-toggle="tab" data-bs-target="#user-management" type="button">
                     <i class="bi bi-people"></i> User Management
                 </button>
@@ -886,9 +888,11 @@
                         <!-- <button class="btn btn-danger me-2" onclick="clearAllSessions()">
                             <i class="bi bi-x-circle me-2"></i>Clear All Sessions
                         </button> -->
+                        ${!isPublicView ? `
                         <button class="btn btn-primary" onclick="addNewDevice()">
                             <i class="bi bi-plus-circle me-2"></i>Add Device
                         </button>
+                        ` : ''}
                     </div>
                 </div>
 
@@ -902,9 +906,11 @@
                     <i class="bi bi-phone" style="font-size: 64px; color: #dee2e6;"></i>
                     <h5 class="mt-3 text-muted">No devices connected</h5>
                     <p class="text-muted">Add a device to start using WhatsApp Analytics</p>
+                    ${!isPublicView ? `
                     <button class="btn btn-primary mt-3" onclick="addNewDevice()">
                         <i class="bi bi-plus-circle me-2"></i>Add Your First Device
                     </button>
+                    ` : ''}
                 </div>
             </div>
             
@@ -2016,11 +2022,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Get device ID from URL for public view
+        const pathParts = window.location.pathname.split('/');
+        const publicDeviceId = pathParts[2]; // /device/{deviceId}
+        const isPublicView = window.location.pathname.startsWith('/device/');
+        
         // Global variables
         let messageChart;
         let currentTimeRange = 7;
         let devices = [];
-        let currentDeviceFilter = 'all';
+        let currentDeviceFilter = isPublicView ? publicDeviceId : 'all';
         let refreshInterval;
         let currentScanningDeviceId = null; // Track which device is being scanned
         let qrRefreshInterval = null; // Track QR refresh interval globally
@@ -2028,10 +2039,20 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Dashboard v2.0.0 - New Analytics Dashboard');
+            console.log('Public Device View - Device ID:', publicDeviceId);
+            
+            // For public view, disable certain features
+            if (isPublicView) {
+                isAutoRefreshEnabled = false;
+                // Hide any admin-only buttons
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+            
             initializeDashboard();
             loadDevices();
-            loadNiches();
+            if (!isPublicView) {
+                loadNiches();
+            }
             setDefaultDates();
             updateDateTime();
             setInterval(updateDateTime, 1000);
@@ -2609,8 +2630,17 @@
 
         // Load Devices
         function loadDevices(silent = false) {
+            // Use different API endpoint for public view
+            const apiUrl = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/devices`
+                : '/api/devices';
+            
             // First try to check real-time connection status (optional)
-            fetch('/api/devices/check-connection', { credentials: 'include' })
+            const checkConnectionUrl = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/devices`
+                : '/api/devices/check-connection';
+                
+            fetch(checkConnectionUrl, { credentials: 'include' })
                 .then(response => {
                     // If check-connection fails, just continue
                     if (!response.ok) {
@@ -2620,7 +2650,7 @@
                 })
                 .then(statusData => {
                     // Connection status checked (or skipped), now load devices
-                    return fetch('/api/devices', { credentials: 'include' });
+                    return fetch(apiUrl, { credentials: 'include' });
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -2699,6 +2729,7 @@
                                     <span class="text-muted small">${isConnected ? 'Connected' : 'Disconnected'}</span>
                                 </div>
                             </div>
+                            ${!isPublicView ? `
                             <div class="dropdown position-absolute top-0 end-0 m-2">
                                 <button class="btn btn-sm btn-light p-1" type="button" data-bs-toggle="dropdown" style="width: 24px; height: 24px;">
                                     <i class="bi bi-three-dots-vertical" style="font-size: 12px;"></i>
@@ -2728,6 +2759,7 @@
                                     </a></li>
                                 </ul>
                             </div>
+                            ` : ''}
                         </div>
 
                         <!-- Phone Number Section -->
@@ -2740,20 +2772,20 @@
                         <!-- Action Buttons -->
                         <div class="d-grid gap-1">
                             ${!isConnected ? `
-                                <button class="btn btn-primary btn-sm" onclick="scanQR('${device.id}')">
+                                ${!isPublicView ? `<button class="btn btn-primary btn-sm" onclick="scanQR('${device.id}')">
                                     <i class="bi bi-qr-code"></i> QR
-                                </button>
+                                </button>` : ''}
                                 <button class="btn btn-success btn-sm" onclick="openWhatsAppWeb('${device.id}')">
                                     <i class="bi bi-whatsapp"></i> WA
                                 </button>
-                                <button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
+                                ${!isPublicView ? `<button class="btn btn-info btn-sm" onclick="deviceLeads('${device.id}')">
                                     <i class="bi bi-people"></i> Leads
-                                </button>
+                                </button>` : ''}
                             ` : `
                                 <button class="btn btn-success btn-sm mb-1" onclick="openWhatsAppWeb('${device.id}')">
                                     <i class="bi bi-whatsapp"></i> WA
                                 </button>
-                                <div class="btn-group btn-group-sm" role="group">
+                                ${!isPublicView ? `<div class="btn-group btn-group-sm" role="group">
                                     <button class="btn btn-outline-primary" onclick="deviceActions('${device.id}')" title="Actions">
                                         <i class="bi bi-play"></i>
                                     </button>
@@ -2763,7 +2795,7 @@
                                     <button class="btn btn-outline-success" onclick="viewDeviceStats('${device.id}')" title="Stats">
                                         <i class="bi bi-graph-up"></i>
                                     </button>
-                                </div>
+                                </div>` : ''}
                             `}
                         </div>
                     </div>
@@ -3647,6 +3679,12 @@
 
         // WebSocket Connection for Real-time Updates
         function connectWebSocket() {
+            // Skip WebSocket for public view
+            if (isPublicView) {
+                console.log('WebSocket disabled for public view');
+                return;
+            }
+            
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     
@@ -5828,7 +5866,10 @@
         }
         
         function loadCampaignSummary(showAll = false) {
-            let url = '/api/campaigns/summary';
+            // Use different API endpoint for public view
+            let url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/campaign-summary`
+                : '/api/campaigns/summary';
             
             // If not showing all, filter to today and tomorrow by default
             if (!showAll) {
@@ -6094,7 +6135,10 @@
         let sequenceEndDate = '';
         
         function loadSequenceSummary() {
-            let url = '/api/sequences/summary';
+            // Use different API endpoint for public view
+            let url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/sequence-summary`
+                : '/api/sequences/summary';
             
             // Build query parameters
             const params = new URLSearchParams();
