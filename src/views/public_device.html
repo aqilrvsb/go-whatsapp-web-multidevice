@@ -685,12 +685,14 @@
                     </div>
                     <div class="d-flex gap-3 align-items-center">
                         <!-- Device Filter -->
+                        ${!isPublicView ? `
                         <div>
                             <label class="form-label mb-1 small">Filter by Device</label>
                             <select class="form-select form-select-sm" id="deviceFilter" onchange="updateDashboard()" style="width: 200px;">
                                 <option value="all">All Devices</option>
                             </select>
                         </div>
+                        ` : ''}
                         
                         <!-- Date Range -->
                         <div>
@@ -946,9 +948,11 @@
                         <p class="text-muted mb-0">Create automated drip campaigns for your contacts</p>
                     </div>
                     <div>
+                        ${!isPublicView ? `
                         <button class="btn btn-primary" onclick="openCreateSequenceModal()">
                             <i class="bi bi-plus-circle"></i> Create Sequence
                         </button>
+                        ` : ''}
                     </div>
                 </div>
                 
@@ -960,9 +964,11 @@
                                 <i class="bi bi-collection display-3 text-muted mb-3"></i>
                                 <h5>No Sequences Yet</h5>
                                 <p class="text-muted">Create your first automated message sequence</p>
+                                ${!isPublicView ? `
                                 <button class="btn btn-primary" onclick="openCreateSequenceModal()">
                                     <i class="bi bi-plus-circle"></i> Create Sequence
                                 </button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -2223,7 +2229,11 @@
         // Update Device Analytics
         async function updateDeviceAnalytics(deviceFilter) {
             try {
-                const response = await fetch('/api/devices', {
+                const apiUrl = isPublicView 
+                    ? `/api/public/device/${publicDeviceId}/devices`
+                    : '/api/devices';
+                    
+                const response = await fetch(apiUrl, {
                     credentials: 'include'
                 });
                 
@@ -2288,9 +2298,11 @@
         // Update Campaign Analytics
         async function updateCampaignAnalytics(deviceFilter, startDate, endDate, nicheFilter) {
             try {
-                let url = `/api/campaigns/analytics?start=${startDate}&end=${endDate}`;
-                if (deviceFilter !== 'all') url += `&device=${deviceFilter}`;
-                if (nicheFilter !== 'all') url += `&niche=${nicheFilter}`;
+                let url = isPublicView
+                    ? `/api/public/device/${publicDeviceId}/campaign-summary?start=${startDate}&end=${endDate}`
+                    : `/api/campaigns/analytics?start=${startDate}&end=${endDate}`;
+                if (!isPublicView && deviceFilter !== 'all') url += `&device=${deviceFilter}`;
+                if (!isPublicView && nicheFilter !== 'all') url += `&niche=${nicheFilter}`;
                 
                 const response = await fetch(url, {
                     credentials: 'include'
@@ -2322,9 +2334,11 @@
         // Update Sequence Analytics
         async function updateSequenceAnalytics(deviceFilter, startDate, endDate, nicheFilter) {
             try {
-                let url = `/api/sequences/analytics?start=${startDate}&end=${endDate}`;
-                if (deviceFilter !== 'all') url += `&device=${deviceFilter}`;
-                if (nicheFilter !== 'all') url += `&niche=${nicheFilter}`;
+                let url = isPublicView
+                    ? `/api/public/device/${publicDeviceId}/sequence-summary?start=${startDate}&end=${endDate}`
+                    : `/api/sequences/analytics?start=${startDate}&end=${endDate}`;
+                if (!isPublicView && deviceFilter !== 'all') url += `&device=${deviceFilter}`;
+                if (!isPublicView && nicheFilter !== 'all') url += `&niche=${nicheFilter}`;
                 
                 const response = await fetch(url, {
                     credentials: 'include'
@@ -2666,6 +2680,9 @@
                         devices = data;
                     } else if (data.results && Array.isArray(data.results.devices)) {
                         devices = data.results.devices;
+                    } else if (data.devices && Array.isArray(data.devices)) {
+                        // Handle public API response structure
+                        devices = data.devices;
                     } else {
                         console.log('Unexpected devices response structure:', data);
                         devices = [];
@@ -4041,7 +4058,7 @@
         }
         
         // Load team members when user management tab is shown
-        document.getElementById('user-management-tab').addEventListener('shown.bs.tab', function() {
+        document.getElementById('user-management-tab')?.addEventListener('shown.bs.tab', function() {
             loadTeamMembers();
         });
         // Filter by Device
@@ -4054,6 +4071,9 @@
 
         // Update Device Filter Dropdown
         function updateDeviceFilter() {
+            // Skip for public view - only one device
+            if (isPublicView) return;
+            
             const deviceFilter = document.getElementById('deviceFilter');
             const previousValue = deviceFilter.value; // Save current selection
             
@@ -4173,6 +4193,9 @@
 
         // Update Device Filter Dropdown
         function updateDeviceFilter() {
+            // Skip for public view - only one device
+            if (isPublicView) return;
+            
             const deviceFilter = document.getElementById('deviceFilter');
             const previousValue = deviceFilter.value; // Save current selection
             
@@ -4451,14 +4474,14 @@
                         // Show all campaigns, not just first 3
                         campaignHTML += `
                             <div class="campaign-detail" style="font-size: 10px; margin: 2px 0; padding: 3px 5px; background: ${detailBg}; border-radius: 4px; border: 1px solid ${detailBorder}; position: relative;">
-                                <div style="position: absolute; right: 3px; top: 3px; display: flex; gap: 4px; z-index: 10;">
+                                ${!isPublicView ? `<div style="position: absolute; right: 3px; top: 3px; display: flex; gap: 4px; z-index: 10;">
                                     <i class="bi bi-files" onclick="cloneCampaign('${campaign.id}', event)" style="color: #0066cc; cursor: pointer; font-size: 12px;" title="Clone campaign"></i>
                                     <i class="bi bi-x-circle-fill" onclick="deleteCampaign('${campaign.id}', event)" style="color: #dc3545; cursor: pointer; font-size: 12px;" title="Delete campaign"></i>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 3px; padding-right: 40px;">
+                                </div>` : ''}
+                                <div style="display: flex; align-items: center; gap: 3px; padding-right: ${isPublicView ? '5px' : '40px'};">
                                     <span class="badge ${statusBg}" style="width: 8px; height: 8px; padding: 0; border-radius: 50%;" title="${campaign.status}"></span>
                                     ${campaign.ai === 'ai' ? '<i class="bi bi-robot text-primary" style="font-size: 12px;" title="AI Campaign"></i>' : ''}
-                                    <span onclick="editCampaign('${campaign.id}', '${dateStr}', event)" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #0066cc; text-decoration: none;" title="Click to edit: ${campaign.title}" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+                                    <span ${!isPublicView ? `onclick="editCampaign('${campaign.id}', '${dateStr}', event)" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: #0066cc; text-decoration: none;" title="Click to edit: ${campaign.title}" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'"` : `style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${campaign.title}"`}>
                                         ${campaign.title}
                                     </span>
                                 </div>
@@ -4479,7 +4502,7 @@
                 const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
                 
                 dayElement.innerHTML = `
-                    <div class="calendar-date" onclick="openCampaignModal('${dateStr}')" style="position: relative;">
+                    <div class="calendar-date" ${!isPublicView ? `onclick="openCampaignModal('${dateStr}')"` : ''} style="position: relative;">
                         <span style="font-size: 16px; font-weight: bold;">${day}</span>
                         <span style="font-size: 10px; color: #666; display: block; margin-top: -2px;">${dayName}</span>
                     </div>
@@ -4519,7 +4542,11 @@
         
         function loadCampaigns() {
             // Load campaigns from API
-            fetch('/api/campaigns', { credentials: 'include' })
+            const apiUrl = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/campaigns`
+                : '/api/campaigns';
+                
+            fetch(apiUrl, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     console.log('Campaign API response:', data);
@@ -5023,7 +5050,11 @@
         
         async function loadSequences() {
             try {
-                const response = await fetch('/api/sequences');
+                const apiUrl = isPublicView 
+                    ? `/api/public/device/${publicDeviceId}/sequences`
+                    : '/api/sequences';
+                    
+                const response = await fetch(apiUrl);
                 const data = await response.json();
                 
                 if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
@@ -5112,6 +5143,7 @@
                                 <small class="text-muted">
                                     <i class="bi bi-people"></i> ${seq.contacts_count || 0} contacts
                                 </small>
+                                ${!isPublicView ? `
                                 <div>
                                     <button class="btn btn-sm btn-outline-primary" onclick="viewEditSequence('${seq.id}')" title="View/Edit Sequence">
                                         <i class="bi bi-eye"></i> View
@@ -5129,6 +5161,7 @@
                                         </label>
                                     </div>
                                 </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -7088,7 +7121,7 @@
         }
         
         // Clean up when modal is closed
-        document.getElementById('campaignDeviceReportModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('campaignDeviceReportModal')?.addEventListener('hidden.bs.modal', function () {
             // Stop auto-refresh
             stopAutoRefresh();
             
