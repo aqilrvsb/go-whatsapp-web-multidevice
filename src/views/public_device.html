@@ -1799,16 +1799,28 @@
 
         // Override loadDevices for public view
         window.loadDevices = function() {
+            console.log('Loading device for public view:', publicDeviceId);
             fetch(`/api/public/device/${publicDeviceId}/devices`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.devices && data.devices.length > 0) {
+                    console.log('Device data received:', data);
+                    // Handle different response formats
+                    if (data.data) {
+                        // Single device response
+                        devices = [data.data];
+                    } else if (data.devices && data.devices.length > 0) {
                         devices = data.devices;
-                        renderDevices();
+                    } else if (Array.isArray(data)) {
+                        devices = data;
+                    } else {
+                        devices = [];
                     }
+                    renderDevices();
                 })
                 .catch(error => {
                     console.error('Error loading device:', error);
+                    devices = [];
+                    renderDevices();
                 });
         };
 
