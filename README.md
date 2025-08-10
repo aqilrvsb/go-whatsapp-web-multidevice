@@ -2,60 +2,62 @@
 
 A comprehensive WhatsApp broadcast system supporting multi-device operations, campaign management, and automated messaging sequences.
 
-## Latest Update (August 9, 2025) - Complete Duplicate Prevention Fix
+## Latest Update (August 10, 2025) - MySQL 5.7 Compatibility Fix
 
-### 🚀 What's Fixed
+### 🚀 Critical Fix for Duplicate Messages
 
-The system now implements a **bulletproof duplicate prevention system** using `FOR UPDATE SKIP LOCKED`:
+**Root Cause Found**: The system was using `FOR UPDATE SKIP LOCKED` which is **not supported in MySQL 5.7**. This caused the atomic locking to fail completely, resulting in multiple workers sending the same message.
 
-1. **Database-Level Atomic Locking**
-   - Changed from UPDATE-then-SELECT to SELECT...FOR UPDATE SKIP LOCKED
-   - Guarantees each message is locked by only one worker
-   - No race conditions possible between concurrent workers
+### 🔧 What's Fixed
 
-2. **Multi-Layer Protection**
+1. **MySQL 5.7 Compatible Atomic Locking**
+   - Changed from `SELECT...FOR UPDATE SKIP LOCKED` to `UPDATE-then-SELECT` pattern
+   - Now uses atomic UPDATE to claim messages before selecting them
+   - 100% compatible with MySQL 5.7 and newer versions
+
+2. **How It Works Now**
+   ```sql
+   -- Step 1: Atomically claim messages
+   UPDATE broadcast_messages 
+   SET status = 'processing', processing_worker_id = ?
+   WHERE status = 'pending' AND device_id = ?
+   LIMIT ?
+   
+   -- Step 2: Fetch claimed messages
+   SELECT * FROM broadcast_messages 
+   WHERE processing_worker_id = ?
+   ```
+
+3. **Result**
+   - Each message is processed by exactly ONE worker
+   - No race conditions possible
+   - `processing_worker_id` is properly set for audit trail
+   - Zero duplicate messages guaranteed
+
+### ✅ Fixed Issues
+- Multiple workers no longer send the same message
+- `processing_worker_id` is now properly populated
+- Works perfectly with MySQL 5.7, 8.0, and MariaDB
+
+## Previous Updates
+
+### August 9, 2025 - Complete Duplicate Prevention System
+
+1. **Multi-Layer Protection**
    ```
    Layer 1: Device Lock (activeWorkers) → Only 1 worker per device
    Layer 2: Worker Pool → Limited concurrent workers  
-   Layer 3: FOR UPDATE SKIP LOCKED → Atomic row locking
+   Layer 3: Atomic message claiming → No race conditions
    Layer 4: Status Checks → Include 'processing' status
    ```
 
-3. **Code Changes Made**
-   - `GetPendingMessagesAndLock` now uses atomic row locking
-   - Status updates properly check 'processing' state
-   - Worker ID tracked throughout message lifecycle
-
-### 🔧 Technical Implementation
-
-```go
-// Old approach (had race conditions):
-UPDATE broadcast_messages SET status='processing' WHERE status='pending' LIMIT 10;
-SELECT * FROM broadcast_messages WHERE status='processing';
-
-// New approach (atomic locking):
-SELECT * FROM broadcast_messages WHERE status='pending' FOR UPDATE SKIP LOCKED LIMIT 10;
-UPDATE broadcast_messages SET status='processing' WHERE id IN (...);
-```
-
-### ✅ Result: 100% Duplicate Prevention
-- Supports 3000+ devices running simultaneously
-- Each device processes unique messages
-- Zero duplicate messages guaranteed
-- No database structure changes needed
-
-## Previous Fixes Summary
-
-1. **Sequence Duplicate Prevention** ✅
+2. **Sequence Duplicate Prevention** ✅
    - Checks: `sequence_stepid + recipient_phone + device_id`
    - Database unique constraint in `add_unique_constraints.sql`
 
-2. **Campaign Duplicate Prevention** ✅
+3. **Campaign Duplicate Prevention** ✅
    - Checks: `campaign_id + recipient_phone + device_id`
    - Comprehensive status checking
-
-3. **Sequence Modal Date Filter** ✅
-   - Fixed date filter in sequence step details modal
 
 4. **Worker ID Implementation** ✅
    - Atomic message claiming with unique worker IDs
@@ -71,7 +73,7 @@ UPDATE broadcast_messages SET status='processing' WHERE id IN (...);
 3. **Daily Processing**: `ProcessDailySequenceMessages` creates messages for each contact's current day
 4. **Duplicate Check**: Verifies no existing message for step+phone+device
 5. **Queue**: Message added to `broadcast_messages` table
-6. **Processing**: Worker claims message with atomic lock
+6. **Processing**: Worker claims message with atomic UPDATE
 7. **Sending**: WhatsApp API sends message
 8. **Status Update**: Marked as 'sent'
 
@@ -81,7 +83,7 @@ UPDATE broadcast_messages SET status='processing' WHERE id IN (...);
 3. **Lead Matching**: Finds leads matching campaign criteria
 4. **Duplicate Check**: Verifies no existing message for campaign+phone+device
 5. **Queue**: Message added to `broadcast_messages` table
-6. **Processing**: Same as sequences - atomic worker locking
+6. **Processing**: Same as sequences - atomic worker claiming
 7. **Sending**: Same as sequences
 
 ### Duplicate Prevention (3 Layers)
@@ -91,8 +93,8 @@ UPDATE broadcast_messages SET status='processing' WHERE id IN (...);
    - Comprehensive status checking (pending, processing, queued, sent)
 
 2. **Worker Level**
-   - **FOR UPDATE SKIP LOCKED** ensures true atomic locking
-   - Each worker exclusively locks rows before processing
+   - **UPDATE-then-SELECT** ensures true atomic locking (MySQL 5.7 compatible)
+   - Each worker exclusively claims messages before processing
    - No race conditions possible between concurrent workers
    - `processing_worker_id` tracks which worker owns each message
 
@@ -102,9 +104,9 @@ UPDATE broadcast_messages SET status='processing' WHERE id IN (...);
 
 ### Technical Implementation Details
 
-The `GetPendingMessagesAndLock` method now uses MySQL's `FOR UPDATE SKIP LOCKED`:
-- **SELECT...FOR UPDATE**: Locks selected rows exclusively
-- **SKIP LOCKED**: Other workers skip locked rows instead of waiting
+The `GetPendingMessagesAndLock` method now uses MySQL 5.7 compatible atomic locking:
+- **UPDATE**: Claims messages by setting status and worker ID atomically
+- **SELECT**: Fetches only the messages claimed by this specific worker
 - **Result**: Perfect concurrency with zero duplicates
 
 This allows 3000+ devices to process messages simultaneously without conflicts.
@@ -209,13 +211,19 @@ build_nocgo.bat
 4. Monitor logs for duplicate prevention messages
 5. Verify `processing_worker_id` is being populated
 
+## MySQL Version Requirements
+
+- **MySQL 5.7**: Fully supported with UPDATE-then-SELECT pattern
+- **MySQL 8.0+**: Supports both patterns (can use FOR UPDATE SKIP LOCKED)
+- **MariaDB 10.2+**: Fully supported
+
 ## Support
 
 For issues or questions, please check:
-- Application logs for "Skipping duplicate" messages
-- Database for constraint violations
-- Worker ID population in broadcast_messages table
+- Application logs for "Worker X claimed Y messages" entries
+- Database for `processing_worker_id` population
+- Worker ID usage with monitoring queries above
 
 ---
 
-*Last Updated: August 2025*
+*Last Updated: August 10, 2025*

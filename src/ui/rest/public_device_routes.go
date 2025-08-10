@@ -44,6 +44,32 @@ func InitPublicDeviceRoutes(app *fiber.App, db *sql.DB) {
 			"BasicAuthToken": nil, // No auth for public view
 		})
 	})
+	
+	// Public leads view - no auth required
+	app.Get("/public/device/:deviceId/leads", func(c *fiber.Ctx) error {
+		deviceID := c.Params("deviceId")
+		if deviceID == "" {
+			return c.Status(404).SendString("Device not found")
+		}
+		
+		// Verify device exists
+		userRepo := repository.GetUserRepository()
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err != nil {
+			return c.Status(404).SendString("Device not found")
+		}
+		
+		logrus.Infof("Public leads view accessed for device: %s (%s)", device.DeviceName, device.ID)
+		
+		return c.Render("views/public_device_leads", fiber.Map{
+			"AppHost":        fmt.Sprintf("%s://%s", c.Protocol(), c.Hostname()),
+			"AppVersion":     config.AppVersion,
+			"DeviceID":       device.ID,
+			"DeviceName":     device.DeviceName,
+			"DevicePhone":    device.Phone,
+			"IsPublicView":   true,
+		})
+	})
 }
 
 // PublicDeviceAPI provides API endpoints for public device view
@@ -72,6 +98,12 @@ func InitPublicDeviceAPI(app *fiber.App) {
 	// Leads endpoint
 	publicAPI.Get("/leads", api.GetLeads)
 	
+	// Lead CRUD endpoints
+	publicAPI.Post("/lead", api.CreateLead)
+	publicAPI.Put("/lead/:leadId", api.UpdateLead)
+	publicAPI.Delete("/lead/:leadId", api.DeleteLead)
+	publicAPI.Post("/leads/import", api.ImportLeads)
+	
 	// Get device statistics
 	publicAPI.Get("/info", api.GetDeviceStats)
 	
@@ -94,133 +126,138 @@ func (api *PublicDeviceAPI) GetDeviceStats(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
-	// Get device statistics
-	db := database.GetDB()
-	var stats struct {
-		TotalMessages   int `json:"total_messages"`
-		SentMessages    int `json:"sent_messages"`
-		PendingMessages int `json:"pending_messages"`
-		FailedMessages  int `json:"failed_messages"`
-	}
-	
-	query := `
-		SELECT 
-			COUNT(*) as total_messages,
-			SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent_messages,
-			SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_messages,
-			SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_messages
-		FROM broadcast_messages 
-		WHERE device_id = ?
-	`
-	
-	err = db.QueryRow(query, deviceID).Scan(
-		&stats.TotalMessages,
-		&stats.SentMessages,
-		&stats.PendingMessages,
-		&stats.FailedMessages,
-	)
-	if err != nil {
-		logrus.Errorf("Failed to get device stats: %v", err)
-	}
-	
+	// Return simple device info
 	return c.JSON(fiber.Map{
 		"device": fiber.Map{
-			"id":     device.ID,
-			"name":   device.DeviceName,
-			"phone":  device.Phone,
-			"status": device.Status,
+			"id":         device.ID,
+			"name":       device.DeviceName,
+			"phone":      device.Phone,
+			"status":     device.Status,
+			"created_at": device.CreatedAt,
 		},
-		"statistics": stats,
 	})
 }
 
-// GetCampaignSummary returns campaign summary data for the device
+// GetCampaignSummary returns campaign data for public view
 func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
-	date := c.Query("date", "")
+	
+	// Get date filters
 	startDate := c.Query("start_date", "")
 	endDate := c.Query("end_date", "")
 	
-	db := database.GetDB()
-	
-	// Build date filter
-	dateFilter := ""
-	args := []interface{}{deviceID}
-	
-	if date != "" {
-		dateFilter = " AND DATE(bm.created_at) = ?"
-		args = append(args, date)
-	} else if startDate != "" && endDate != "" {
-		dateFilter = " AND DATE(bm.created_at) BETWEEN ? AND ?"
-		args = append(args, startDate, endDate)
-	}
-	
+	// Build query
 	query := `
 		SELECT 
 			c.id,
-			c.name,
-			c.status,
-			c.start_time,
-			c.end_time,
-			COUNT(DISTINCT bm.id) as total_messages,
-			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_count,
-			COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as failed_count,
-			COUNT(DISTINCT CASE WHEN bm.status = 'pending' THEN bm.id END) as pending_count,
-			COUNT(DISTINCT bm.recipient_phone) as unique_recipients
+			c.campaign_name as title,
+			c.niche,
+			c.target_status,
+			c.campaign_date,
+			c.time_schedule,
+			c.campaign_status as status,
+			c.message_template,
+			c.image_url,
+			c.ai_generated,
+			COALESCE(stats.total_sent, 0) as total_sent,
+			COALESCE(stats.total_failed, 0) as total_failed,
+			COALESCE(stats.total_pending, 0) as total_pending
 		FROM campaigns c
-		LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id AND bm.device_id = ?` + dateFilter + `
-		GROUP BY c.id, c.name, c.status, c.start_time, c.end_time
-		ORDER BY c.created_at DESC
+		LEFT JOIN (
+			SELECT 
+				campaign_id,
+				SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_sent,
+				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
+				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
+			FROM broadcast_messages
+			WHERE device_id = ?
+			GROUP BY campaign_id
+		) stats ON c.id = stats.campaign_id
+		WHERE c.device_id = ?
 	`
 	
-	rows, err := db.Query(query, args...)
+	args := []interface{}{deviceID, deviceID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		query += " AND c.campaign_date BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query += " ORDER BY c.campaign_date DESC, c.time_schedule DESC"
+	
+	// Execute query
+	rows, err := api.db.Query(query, args...)
 	if err != nil {
+		logrus.Errorf("Failed to get campaign summary: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaign summary"})
 	}
 	defer rows.Close()
 	
-	var campaigns []fiber.Map
+	campaigns := []fiber.Map{}
 	for rows.Next() {
 		var campaign struct {
-			ID               int            `json:"id"`
-			Name             string         `json:"name"`
-			Status           string         `json:"status"`
-			StartTime        sql.NullTime   `json:"start_time"`
-			EndTime          sql.NullTime   `json:"end_time"`
-			TotalMessages    int            `json:"total_messages"`
-			SentCount        int            `json:"sent_count"`
-			FailedCount      int            `json:"failed_count"`
-			PendingCount     int            `json:"pending_count"`
-			UniqueRecipients int            `json:"unique_recipients"`
+			ID             string
+			Title          string
+			Niche          sql.NullString
+			TargetStatus   sql.NullString
+			CampaignDate   string
+			TimeSchedule   sql.NullString
+			Status         string
+			MessageTemplate sql.NullString
+			ImageURL       sql.NullString
+			AIGenerated    bool
+			TotalSent      int
+			TotalFailed    int
+			TotalPending   int
 		}
 		
 		err := rows.Scan(
 			&campaign.ID,
-			&campaign.Name,
+			&campaign.Title,
+			&campaign.Niche,
+			&campaign.TargetStatus,
+			&campaign.CampaignDate,
+			&campaign.TimeSchedule,
 			&campaign.Status,
-			&campaign.StartTime,
-			&campaign.EndTime,
-			&campaign.TotalMessages,
-			&campaign.SentCount,
-			&campaign.FailedCount,
-			&campaign.PendingCount,
-			&campaign.UniqueRecipients,
+			&campaign.MessageTemplate,
+			&campaign.ImageURL,
+			&campaign.AIGenerated,
+			&campaign.TotalSent,
+			&campaign.TotalFailed,
+			&campaign.TotalPending,
 		)
+		
 		if err != nil {
+			logrus.Errorf("Failed to scan campaign: %v", err)
 			continue
 		}
 		
+		// Map status
+		status := "pending"
+		if campaign.Status == "completed" || campaign.TotalSent > 0 {
+			status = "completed"
+		} else if campaign.Status == "failed" || campaign.TotalFailed > 0 {
+			status = "failed"
+		} else if campaign.Status == "ongoing" {
+			status = "ongoing"
+		}
+		
 		campaigns = append(campaigns, fiber.Map{
-			"id":                campaign.ID,
-			"name":              campaign.Name,
-			"status":            campaign.Status,
-			"start_time":        campaign.StartTime.Time,
-			"end_time":          campaign.EndTime.Time,
-			"total_messages":    campaign.TotalMessages,
-			"sent_count":        campaign.SentCount,
-			"failed_count":      campaign.FailedCount,
-			"pending_count":     campaign.PendingCount,
-			"unique_recipients": campaign.UniqueRecipients,
+			"id":               campaign.ID,
+			"title":            campaign.Title,
+			"niche":            campaign.Niche.String,
+			"target_status":    campaign.TargetStatus.String,
+			"campaign_date":    campaign.CampaignDate,
+			"time_schedule":    campaign.TimeSchedule.String,
+			"status":           status,
+			"message_template": campaign.MessageTemplate.String,
+			"image_url":        campaign.ImageURL.String,
+			"ai":               map[bool]string{true: "ai", false: "manual"}[campaign.AIGenerated],
+			"total_sent":       campaign.TotalSent,
+			"total_failed":     campaign.TotalFailed,
+			"total_pending":    campaign.TotalPending,
+			"total_contacts":   campaign.TotalSent + campaign.TotalFailed + campaign.TotalPending,
 		})
 	}
 	
@@ -230,90 +267,98 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 	})
 }
 
-// GetSequenceSummary returns sequence summary data for the device
+// GetSequenceSummary returns sequence data for public view
 func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
-	date := c.Query("date", "")
+	
+	// Get date filters
 	startDate := c.Query("start_date", "")
 	endDate := c.Query("end_date", "")
 	
-	db := database.GetDB()
-	
-	// Build date filter
-	dateFilter := ""
-	args := []interface{}{deviceID}
-	
-	if date != "" {
-		dateFilter = " AND DATE(bm.created_at) = ?"
-		args = append(args, date)
-	} else if startDate != "" && endDate != "" {
-		dateFilter = " AND DATE(bm.created_at) BETWEEN ? AND ?"
-		args = append(args, startDate, endDate)
-	}
-	
+	// Build query
 	query := `
 		SELECT 
 			s.id,
-			s.name,
-			s.status,
-			COUNT(DISTINCT sc.id) as total_contacts,
-			COUNT(DISTINCT CASE WHEN sc.status = 'active' THEN sc.id END) as active_contacts,
-			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_contacts,
-			COUNT(DISTINCT bm.id) as total_messages,
-			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_count,
-			COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as failed_count
+			s.sequence_name,
+			s.description,
+			s.niche,
+			s.target_status,
+			s.start_trigger,
+			s.time_schedule,
+			s.is_active,
+			s.created_at,
+			COUNT(DISTINCT sl.id) as total_leads,
+			COUNT(DISTINCT CASE WHEN sl.status = 'completed' THEN sl.id END) as completed_leads
 		FROM sequences s
-		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		LEFT JOIN broadcast_messages bm ON s.id = bm.sequence_id AND bm.device_id = ?` + dateFilter + `
-		GROUP BY s.id, s.name, s.status
-		ORDER BY s.created_at DESC
+		LEFT JOIN sequence_leads sl ON s.id = sl.sequence_id
+		WHERE s.device_id = ?
 	`
 	
-	rows, err := db.Query(query, args...)
+	args := []interface{}{deviceID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		query += " AND DATE(s.created_at) BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query += " GROUP BY s.id ORDER BY s.created_at DESC"
+	
+	// Execute query
+	rows, err := api.db.Query(query, args...)
 	if err != nil {
+		logrus.Errorf("Failed to get sequence summary: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequence summary"})
 	}
 	defer rows.Close()
 	
-	var sequences []fiber.Map
+	sequences := []fiber.Map{}
 	for rows.Next() {
-		var sequence struct {
-			ID                 string `json:"id"`
-			Name               string `json:"name"`
-			Status             string `json:"status"`
-			TotalContacts      int    `json:"total_contacts"`
-			ActiveContacts     int    `json:"active_contacts"`
-			CompletedContacts  int    `json:"completed_contacts"`
-			TotalMessages      int    `json:"total_messages"`
-			SentCount          int    `json:"sent_count"`
-			FailedCount        int    `json:"failed_count"`
+		var seq struct {
+			ID             string
+			Name           string
+			Description    sql.NullString
+			Niche          sql.NullString
+			TargetStatus   sql.NullString
+			StartTrigger   sql.NullString
+			TimeSchedule   sql.NullString
+			IsActive       bool
+			CreatedAt      time.Time
+			TotalLeads     int
+			CompletedLeads int
 		}
 		
 		err := rows.Scan(
-			&sequence.ID,
-			&sequence.Name,
-			&sequence.Status,
-			&sequence.TotalContacts,
-			&sequence.ActiveContacts,
-			&sequence.CompletedContacts,
-			&sequence.TotalMessages,
-			&sequence.SentCount,
-			&sequence.FailedCount,
+			&seq.ID,
+			&seq.Name,
+			&seq.Description,
+			&seq.Niche,
+			&seq.TargetStatus,
+			&seq.StartTrigger,
+			&seq.TimeSchedule,
+			&seq.IsActive,
+			&seq.CreatedAt,
+			&seq.TotalLeads,
+			&seq.CompletedLeads,
 		)
+		
 		if err != nil {
+			logrus.Errorf("Failed to scan sequence: %v", err)
 			continue
 		}
 		
 		sequences = append(sequences, fiber.Map{
-			"id":                 sequence.ID,
-			"name":               sequence.Name,
-			"status":             sequence.Status,
-			"total_contacts":     sequence.TotalContacts,
-			"active_contacts":    sequence.ActiveContacts,
-			"completed_contacts": sequence.CompletedContacts,
-			"total_messages":     sequence.TotalMessages,
-			"sent_count":         sequence.SentCount,
-			"failed_count":       sequence.FailedCount,
+			"id":              seq.ID,
+			"name":            seq.Name,
+			"description":     seq.Description.String,
+			"niche":           seq.Niche.String,
+			"target_status":   seq.TargetStatus.String,
+			"trigger":         seq.StartTrigger.String,
+			"schedule_time":   seq.TimeSchedule.String,
+			"status":          map[bool]string{true: "active", false: "inactive"}[seq.IsActive],
+			"created_at":      seq.CreatedAt,
+			"contacts_count":  seq.TotalLeads,
+			"completed_count": seq.CompletedLeads,
 		})
 	}
 	
@@ -323,253 +368,163 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	})
 }
 
-// GetLeads returns leads data for the device
+// GetLeads returns leads for the device
 func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
-	_ = c.Params("deviceId") // deviceId available but not used for security
+	deviceID := c.Params("deviceId")
 	
-	// For public view, return empty leads list for security
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// Query leads
+	query := `
+		SELECT id, name, phone, niche, target_status, trigger, created_at
+		FROM leads
+		WHERE device_id = ?
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := api.db.Query(query, deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to get leads: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch leads"})
+	}
+	defer rows.Close()
+	
+	leads := []fiber.Map{}
+	for rows.Next() {
+		var lead struct {
+			ID           string
+			Name         string
+			Phone        string
+			Niche        string
+			TargetStatus string
+			Trigger      sql.NullString
+			CreatedAt    time.Time
+		}
+		
+		err := rows.Scan(
+			&lead.ID,
+			&lead.Name,
+			&lead.Phone,
+			&lead.Niche,
+			&lead.TargetStatus,
+			&lead.Trigger,
+			&lead.CreatedAt,
+		)
+		
+		if err != nil {
+			logrus.Errorf("Failed to scan lead: %v", err)
+			continue
+		}
+		
+		leads = append(leads, fiber.Map{
+			"id":            lead.ID,
+			"name":          lead.Name,
+			"phone":         lead.Phone,
+			"niche":         lead.Niche,
+			"target_status": lead.TargetStatus,
+			"trigger":       lead.Trigger.String,
+			"created_at":    lead.CreatedAt,
+		})
+	}
+	
 	return c.JSON(fiber.Map{
-		"leads": []fiber.Map{},
-		"total": 0,
+		"leads": leads,
+		"total": len(leads),
 	})
 }
 
+// GetDeviceCampaigns returns campaigns for the device
 func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
-	deviceID := c.Params("deviceId")
-	startDate := c.Query("start_date", time.Now().AddDate(0, 0, -30).Format("2006-01-02"))
-	endDate := c.Query("end_date", time.Now().Format("2006-01-02"))
-	
-	db := database.GetDB()
-	query := `
-		SELECT 
-			c.id,
-			c.name,
-			c.status,
-			c.start_time,
-			c.end_time,
-			COUNT(DISTINCT bm.id) as total_messages,
-			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_messages,
-			COUNT(DISTINCT CASE WHEN bm.status = 'failed' THEN bm.id END) as failed_messages,
-			COUNT(DISTINCT bm.recipient_phone) as unique_recipients
-		FROM campaigns c
-		LEFT JOIN broadcast_messages bm ON c.id = bm.campaign_id AND bm.device_id = ?
-		WHERE DATE(bm.created_at) BETWEEN ? AND ?
-		GROUP BY c.id, c.name, c.status, c.start_time, c.end_time
-		ORDER BY c.created_at DESC
-	`
-	
-	rows, err := db.Query(query, deviceID, startDate, endDate)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
-	}
-	defer rows.Close()
-	
-	var campaigns []fiber.Map
-	for rows.Next() {
-		var campaign struct {
-			ID               int            `json:"id"`
-			Name             string         `json:"name"`
-			Status           string         `json:"status"`
-			StartTime        sql.NullTime   `json:"start_time"`
-			EndTime          sql.NullTime   `json:"end_time"`
-			TotalMessages    int            `json:"total_messages"`
-			SentMessages     int            `json:"sent_messages"`
-			FailedMessages   int            `json:"failed_messages"`
-			UniqueRecipients int            `json:"unique_recipients"`
-		}
-		
-		err := rows.Scan(
-			&campaign.ID,
-			&campaign.Name,
-			&campaign.Status,
-			&campaign.StartTime,
-			&campaign.EndTime,
-			&campaign.TotalMessages,
-			&campaign.SentMessages,
-			&campaign.FailedMessages,
-			&campaign.UniqueRecipients,
-		)
-		if err != nil {
-			continue
-		}
-		
-		campaigns = append(campaigns, fiber.Map{
-			"id":                campaign.ID,
-			"name":              campaign.Name,
-			"status":            campaign.Status,
-			"start_time":        campaign.StartTime.Time,
-			"end_time":          campaign.EndTime.Time,
-			"total_messages":    campaign.TotalMessages,
-			"sent_messages":     campaign.SentMessages,
-			"failed_messages":   campaign.FailedMessages,
-			"unique_recipients": campaign.UniqueRecipients,
-			"success_rate":      calculateSuccessRate(campaign.SentMessages, campaign.TotalMessages),
-		})
-	}
-	
-	return c.JSON(fiber.Map{
-		"campaigns": campaigns,
-		"total":     len(campaigns),
-	})
+	return api.GetCampaignSummary(c)
 }
 
+// GetDeviceSequences returns sequences for the device
 func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
-	deviceID := c.Params("deviceId")
-	startDate := c.Query("start_date", time.Now().AddDate(0, 0, -30).Format("2006-01-02"))
-	endDate := c.Query("end_date", time.Now().Format("2006-01-02"))
-	
-	db := database.GetDB()
-	query := `
-		SELECT 
-			s.id,
-			s.name,
-			s.status,
-			COUNT(DISTINCT sc.id) as total_contacts,
-			COUNT(DISTINCT CASE WHEN sc.status = 'active' THEN sc.id END) as active_contacts,
-			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_contacts,
-			COUNT(DISTINCT bm.id) as total_messages,
-			COUNT(DISTINCT CASE WHEN bm.status = 'sent' THEN bm.id END) as sent_messages
-		FROM sequences s
-		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		LEFT JOIN broadcast_messages bm ON s.id = bm.sequence_id AND bm.device_id = ?
-		WHERE DATE(bm.created_at) BETWEEN ? AND ?
-		GROUP BY s.id, s.name, s.status
-		ORDER BY s.created_at DESC
-	`
-	
-	rows, err := db.Query(query, deviceID, startDate, endDate)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
-	}
-	defer rows.Close()
-	
-	var sequences []fiber.Map
-	for rows.Next() {
-		var sequence struct {
-			ID                 string `json:"id"`
-			Name               string `json:"name"`
-			Status             string `json:"status"`
-			TotalContacts      int    `json:"total_contacts"`
-			ActiveContacts     int    `json:"active_contacts"`
-			CompletedContacts  int    `json:"completed_contacts"`
-			TotalMessages      int    `json:"total_messages"`
-			SentMessages       int    `json:"sent_messages"`
-		}
-		
-		err := rows.Scan(
-			&sequence.ID,
-			&sequence.Name,
-			&sequence.Status,
-			&sequence.TotalContacts,
-			&sequence.ActiveContacts,
-			&sequence.CompletedContacts,
-			&sequence.TotalMessages,
-			&sequence.SentMessages,
-		)
-		if err != nil {
-			continue
-		}
-		
-		sequences = append(sequences, fiber.Map{
-			"id":                 sequence.ID,
-			"name":               sequence.Name,
-			"status":             sequence.Status,
-			"total_contacts":     sequence.TotalContacts,
-			"active_contacts":    sequence.ActiveContacts,
-			"completed_contacts": sequence.CompletedContacts,
-			"total_messages":     sequence.TotalMessages,
-			"sent_messages":      sequence.SentMessages,
-			"success_rate":       calculateSuccessRate(sequence.SentMessages, sequence.TotalMessages),
-		})
-	}
-	
-	return c.JSON(fiber.Map{
-		"sequences": sequences,
-		"total":     len(sequences),
-	})
+	return api.GetSequenceSummary(c)
 }
 
+// GetDeviceMessages returns messages for the device
 func (api *PublicDeviceAPI) GetDeviceMessages(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
-	limit := c.QueryInt("limit", 100)
+	
+	// Get pagination params
+	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
 	
-	db := database.GetDB()
+	// Query messages
 	query := `
 		SELECT 
-			bm.id,
-			bm.recipient_phone,
-			bm.recipient_name,
-			bm.message_type,
-			bm.content,
-			bm.status,
-			bm.created_at,
-			bm.sent_at,
-			c.name as campaign_name,
-			s.name as sequence_name
-		FROM broadcast_messages bm
-		LEFT JOIN campaigns c ON bm.campaign_id = c.id
-		LEFT JOIN sequences s ON bm.sequence_id = s.id
-		WHERE bm.device_id = ?
-		ORDER BY bm.created_at DESC
+			id,
+			campaign_id,
+			sequence_id,
+			lead_id,
+			message_content,
+			status,
+			created_at,
+			sent_at
+		FROM broadcast_messages
+		WHERE device_id = ?
+		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
 	`
 	
-	rows, err := db.Query(query, deviceID, limit, offset)
+	rows, err := api.db.Query(query, deviceID, limit, offset)
 	if err != nil {
+		logrus.Errorf("Failed to get messages: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch messages"})
 	}
 	defer rows.Close()
 	
-	var messages []fiber.Map
+	messages := []fiber.Map{}
 	for rows.Next() {
 		var msg struct {
-			ID             string         `json:"id"`
-			RecipientPhone string         `json:"recipient_phone"`
-			RecipientName  sql.NullString `json:"recipient_name"`
-			MessageType    string         `json:"message_type"`
-			Content        string         `json:"content"`
-			Status         string         `json:"status"`
-			CreatedAt      time.Time      `json:"created_at"`
-			SentAt         sql.NullTime   `json:"sent_at"`
-			CampaignName   sql.NullString `json:"campaign_name"`
-			SequenceName   sql.NullString `json:"sequence_name"`
+			ID             string
+			CampaignID     sql.NullString
+			SequenceID     sql.NullString
+			LeadID         sql.NullString
+			MessageContent string
+			Status         string
+			CreatedAt      time.Time
+			SentAt         sql.NullTime
 		}
 		
 		err := rows.Scan(
 			&msg.ID,
-			&msg.RecipientPhone,
-			&msg.RecipientName,
-			&msg.MessageType,
-			&msg.Content,
+			&msg.CampaignID,
+			&msg.SequenceID,
+			&msg.LeadID,
+			&msg.MessageContent,
 			&msg.Status,
 			&msg.CreatedAt,
 			&msg.SentAt,
-			&msg.CampaignName,
-			&msg.SequenceName,
 		)
+		
 		if err != nil {
+			logrus.Errorf("Failed to scan message: %v", err)
 			continue
 		}
 		
 		messages = append(messages, fiber.Map{
 			"id":               msg.ID,
-			"recipient_phone":  msg.RecipientPhone,
-			"recipient_name":   msg.RecipientName.String,
-			"message_type":     msg.MessageType,
-			"content":          msg.Content,
+			"campaign_id":      msg.CampaignID.String,
+			"sequence_id":      msg.SequenceID.String,
+			"lead_id":          msg.LeadID.String,
+			"message_content":  msg.MessageContent,
 			"status":           msg.Status,
 			"created_at":       msg.CreatedAt,
 			"sent_at":          msg.SentAt.Time,
-			"campaign_name":    msg.CampaignName.String,
-			"sequence_name":    msg.SequenceName.String,
 		})
 	}
 	
 	// Get total count
 	var total int
 	countQuery := `SELECT COUNT(*) FROM broadcast_messages WHERE device_id = ?`
-	db.QueryRow(countQuery, deviceID).Scan(&total)
+	api.db.QueryRow(countQuery, deviceID).Scan(&total)
 	
 	return c.JSON(fiber.Map{
 		"messages": messages,
@@ -585,6 +540,7 @@ func calculateSuccessRate(sent, total int) float64 {
 	}
 	return float64(sent) / float64(total) * 100
 }
+
 // GetDeviceInfo returns device data for the devices tab
 func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
@@ -610,5 +566,227 @@ func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"devices": []fiber.Map{deviceData},
 		"total":   1,
+	})
+}
+
+// CreateLead creates a new lead for the device
+func (api *PublicDeviceAPI) CreateLead(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	var lead struct {
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
+		Trigger      string `json:"trigger"`
+	}
+	
+	if err := c.BodyParser(&lead); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	
+	// Create lead in database
+	query := `
+		INSERT INTO leads (device_id, name, phone, niche, target_status, trigger, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+	
+	result, err := api.db.Exec(query, 
+		deviceID, 
+		lead.Name, 
+		lead.Phone, 
+		lead.Niche, 
+		lead.TargetStatus,
+		lead.Trigger,
+		time.Now(),
+	)
+	
+	if err != nil {
+		logrus.Errorf("Failed to create lead: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to create lead"})
+	}
+	
+	leadID, _ := result.LastInsertId()
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"lead_id": leadID,
+		"message": "Lead created successfully",
+	})
+}
+
+// UpdateLead updates an existing lead
+func (api *PublicDeviceAPI) UpdateLead(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	leadID := c.Params("leadId")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	var lead struct {
+		Name         string `json:"name"`
+		Phone        string `json:"phone"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
+		Trigger      string `json:"trigger"`
+	}
+	
+	if err := c.BodyParser(&lead); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	
+	// Update lead in database
+	query := `
+		UPDATE leads 
+		SET name = ?, phone = ?, niche = ?, target_status = ?, trigger = ?, updated_at = ?
+		WHERE id = ? AND device_id = ?
+	`
+	
+	result, err := api.db.Exec(query, 
+		lead.Name, 
+		lead.Phone, 
+		lead.Niche, 
+		lead.TargetStatus,
+		lead.Trigger,
+		time.Now(),
+		leadID,
+		deviceID,
+	)
+	
+	if err != nil {
+		logrus.Errorf("Failed to update lead: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update lead"})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return c.Status(404).JSON(fiber.Map{"error": "Lead not found"})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Lead updated successfully",
+	})
+}
+
+// DeleteLead deletes a lead
+func (api *PublicDeviceAPI) DeleteLead(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	leadID := c.Params("leadId")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// Delete lead from database
+	query := `DELETE FROM leads WHERE id = ? AND device_id = ?`
+	
+	result, err := api.db.Exec(query, leadID, deviceID)
+	
+	if err != nil {
+		logrus.Errorf("Failed to delete lead: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to delete lead"})
+	}
+	
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return c.Status(404).JSON(fiber.Map{"error": "Lead not found"})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Lead deleted successfully",
+	})
+}
+
+// ImportLeads imports multiple leads from CSV
+func (api *PublicDeviceAPI) ImportLeads(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	var request struct {
+		Leads []struct {
+			Name         string `json:"name"`
+			Phone        string `json:"phone"`
+			Niche        string `json:"niche"`
+			TargetStatus string `json:"target_status"`
+			Trigger      string `json:"trigger"`
+		} `json:"leads"`
+	}
+	
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	
+	if len(request.Leads) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "No leads to import"})
+	}
+	
+	// Start transaction
+	tx, err := api.db.Begin()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to start transaction"})
+	}
+	defer tx.Rollback()
+	
+	// Prepare insert statement
+	stmt, err := tx.Prepare(`
+		INSERT INTO leads (device_id, name, phone, niche, target_status, trigger, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to prepare statement"})
+	}
+	defer stmt.Close()
+	
+	// Insert each lead
+	successCount := 0
+	for _, lead := range request.Leads {
+		_, err := stmt.Exec(
+			deviceID,
+			lead.Name,
+			lead.Phone,
+			lead.Niche,
+			lead.TargetStatus,
+			lead.Trigger,
+			time.Now(),
+		)
+		if err != nil {
+			logrus.Errorf("Failed to insert lead %s: %v", lead.Name, err)
+			continue
+		}
+		successCount++
+	}
+	
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to commit transaction"})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": fmt.Sprintf("Successfully imported %d out of %d leads", successCount, len(request.Leads)),
+		"imported": successCount,
+		"total": len(request.Leads),
 	})
 }

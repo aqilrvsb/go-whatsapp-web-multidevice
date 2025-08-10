@@ -100,6 +100,18 @@
             height: 350px;
         }
 
+        /* Full width layout for all tabs */
+        .tab-pane {
+            padding: 0 20px;
+        }
+        
+        #campaignCalendar {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+        }
+
         .device-card {
             background: white;
             border-radius: 8px;
@@ -923,16 +935,7 @@
                 </div>
                 
                 <!-- Calendar Container -->
-                <div class="card">
-                    <div class="card-body">
-                        <!-- Debug info -->
-                        <div id="campaignDebug" class="alert alert-info mb-3" style="display: none;">
-                            <small>Debug: <span id="debugInfo"></span></small>
-                        </div>
-                        <!-- Calendar controls will be added here by JavaScript -->
-                        <div id="campaignCalendar"></div>
-                    </div>
-                </div>
+                <div id="campaignCalendar"></div>
             </div>
             
             <!-- Sequences Tab -->
@@ -4317,8 +4320,12 @@
         
         // Device Leads - Lead Management
         function deviceLeads(deviceId) {
-            // Don't need to check if device exists in array, just navigate
-            window.location.href = `/device/${deviceId}/leads`;
+            // Use public route for public view
+            if (isPublicView) {
+                window.location.href = `/public/device/${deviceId}/leads`;
+            } else {
+                window.location.href = `/device/${deviceId}/leads`;
+            }
         }
         
         // Campaign Calendar Functions
