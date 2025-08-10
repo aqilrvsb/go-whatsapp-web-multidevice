@@ -1855,7 +1855,7 @@
         };
 
         // Override loadSequenceSummary for public view
-        window.loadSequenceSummary = function() {
+        window.loadSequenceSummary = function(showAll = false) {() {
             const filterDate = document.getElementById('sequenceFilterDate')?.value || '';
             const rangeStart = document.getElementById('sequenceRangeStart')?.value || '';
             const rangeEnd = document.getElementById('sequenceRangeEnd')?.value || '';
@@ -1987,8 +1987,9 @@
             });
 
             // Initialize Sequence Chart
-            const sequenceCtx = document.getElementById('sequenceChart').getContext('2d');
-            window.sequenceChart = new Chart(sequenceCtx, {
+            const sequenceCtx = document.getElementById('sequenceChart')?.getContext('2d');
+            if (sequenceCtx) {
+                window.sequenceChart = new Chart(sequenceCtx, {
                 type: 'bar',
                 data: {
                     labels: [],
@@ -2022,6 +2023,7 @@
                     }
                 }
             });
+            }
 
             // Don't load data yet - wait for dates to be set
         }
@@ -8455,6 +8457,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+
+        // Public view filter functions
+        function filterCampaigns() {
+            loadCampaignSummary();
+        }
+
+        function filterCampaignsByRange() {
+            loadCampaignSummary();
+        }
+
+        function filterSequences() {
+            loadSequenceSummary();
+        }
+
+        function showSequencesToday() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sequenceFilterDate').value = today;
+            loadSequenceSummary();
+        }
+
+        function clearSequenceFilter() {
+            document.getElementById('sequenceFilterDate').value = '';
+            loadSequenceSummary();
+        }
+
+        function setDefaultDates() {
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 7);
+            
+            const campaignDate = document.getElementById('campaignFilterDate');
+            const sequenceDate = document.getElementById('sequenceFilterDate');
+            
+            if (campaignDate) campaignDate.value = today.toISOString().split('T')[0];
+            if (sequenceDate) sequenceDate.value = today.toISOString().split('T')[0];
+        }
     </script>
 </body>
 </html>
