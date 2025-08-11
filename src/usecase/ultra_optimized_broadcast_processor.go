@@ -1,29 +1,28 @@
 package usecase
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
-	domainBroadcast "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/sirupsen/logrus"
 )
 
 // UltraOptimizedBroadcastProcessor uses broadcast-specific worker pools
 type UltraOptimizedBroadcastProcessor struct {
-	manager broadcast.UltraScaleBroadcastManager
+	manager *broadcast.UltraScaleBroadcastManager
 	ticker  *time.Ticker
 }
 
 // StartUltraOptimizedBroadcastProcessor starts the ultra-optimized processor
 func StartUltraOptimizedBroadcastProcessor() {
 	processor := &UltraOptimizedBroadcastProcessor{
-		manager: *broadcast.GetUltraScaleBroadcastManager(),
-		ticker:  time.NewTicker(2 * time.Second), // Check every 2 seconds for faster response
+		manager: broadcast.GetUltraScaleBroadcastManager(),
+		ticker:  time.NewTicker(5 * time.Second), // Check every 5 seconds
 	}
 	
-	logrus.Info("Starting Ultra-Optimized Broadcast Processor for 3000+ devices")
+	logrus.Info("Ultra-optimized broadcast processor started (MySQL 5.7 compatible with worker locking)")
 	
 	// Process immediately on start
 	processor.processMessages()
@@ -35,136 +34,109 @@ func StartUltraOptimizedBroadcastProcessor() {
 }
 
 func (p *UltraOptimizedBroadcastProcessor) processMessages() {
-	db := database.GetDB()
+	// Get repository instance
+	broadcastRepo := repository.GetBroadcastRepository()
+	userRepo := repository.GetUserRepository()
 	
-	// Get pending messages grouped by broadcast
-	rows, err := db.Query(`
-		SELECT bm.id, bm.user_id, bm.device_id, bm.campaign_id, bm.sequence_id,
-			bm.recipient_phone, bm.recipient_name, bm.content AS message, bm.media_url AS image_url,
-			COALESCE(c.min_delay_seconds, 5) AS min_delay,
-			COALESCE(c.max_delay_seconds, 15) AS max_delay,
-			COALESCE(d.status, 'unknown') AS device_status,
-			COALESCE(d.platform, '') AS platform
-		FROM broadcast_messages bm
-		LEFT JOIN campaigns c ON bm.campaign_id = c.id
-		LEFT JOIN user_devices d ON bm.device_id = d.id
-		WHERE bm.status = 'pending'
-		AND bm.scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
-		ORDER BY bm.campaign_id, bm.sequence_id, bm.created_at
-		LIMIT 1000
-	`)
-	
+	// Get all devices with pending messages
+	devices, err := broadcastRepo.GetDevicesWithPendingMessages()
 	if err != nil {
-		logrus.Errorf("Failed to get pending messages: %v", err)
+		logrus.Errorf("Failed to get devices with pending messages: %v", err)
 		return
 	}
-	defer rows.Close()
+	
+	if len(devices) == 0 {
+		return
+	}
+	
+	logrus.Infof("Found %d devices with pending messages", len(devices))
 	
 	messageCount := 0
 	campaignPools := make(map[int]bool)
 	sequencePools := make(map[string]bool)
 	
-	for rows.Next() {
-		var msg domainBroadcast.BroadcastMessage
-		var campaignID *int
-		var sequenceID *string
-		var minDelay, maxDelay int
-		var deviceStatus sql.NullString
-		var devicePlatform string
-		var imageURL sql.NullString // Use sql.NullString for nullable fields
-		var recipientName sql.NullString // Add recipient name
-		
-		err := rows.Scan(
-			&msg.ID, &msg.UserID, &msg.DeviceID, &campaignID, &sequenceID,
-			&msg.RecipientPhone, &recipientName, &msg.Message, &imageURL, // Include recipient name
-			&minDelay, &maxDelay, &deviceStatus, &devicePlatform,
-		)
-		
+	// Process each device using GetPendingMessagesAndLock for atomic locking
+	for _, deviceID := range devices {
+		// Use GetPendingMessagesAndLock to atomically claim messages
+		messages, err := broadcastRepo.GetPendingMessagesAndLock(deviceID, 100)
 		if err != nil {
-			logrus.Errorf("Failed to scan message: %v", err)
+			logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
 			continue
 		}
 		
-		// Set recipient name
-		if recipientName.Valid {
-			msg.RecipientName = recipientName.String
-		} else {
-			msg.RecipientName = ""
+		if len(messages) == 0 {
+			continue
 		}
 		
-		// Convert NullString to string
-		if imageURL.Valid {
-			msg.ImageURL = imageURL.String
-		} else {
-			msg.ImageURL = ""
+		// Get device details
+		device, err := userRepo.GetDeviceByID(deviceID)
+		if err != nil {
+			logrus.Errorf("Failed to get device %s: %v", deviceID, err)
+			continue
 		}
 		
-		// Check device status - platform devices are always considered online
-		if devicePlatform == "" && deviceStatus.String != "connected" && deviceStatus.String != "online" {
+		// Check if device is online (platform devices always considered online)
+		if device.Platform == "" && device.Status != "connected" && device.Status != "online" {
 			// Skip this WhatsApp Web device - mark messages as skipped
+			db := database.GetDB()
 			db.Exec(`UPDATE broadcast_messages SET status = 'skipped', error_message = 'Device offline' 
-					 WHERE device_id = ? AND status = 'pending'`, msg.DeviceID)
+					 WHERE device_id = ? AND status = 'processing'`, deviceID)
 			continue
 		}
 		
-		// Set broadcast references
-		msg.CampaignID = campaignID
-		msg.SequenceID = sequenceID
-		msg.MinDelay = minDelay
-		msg.MaxDelay = maxDelay
-		msg.Type = "text"
-		if msg.ImageURL != "" {
-			msg.Type = "image"
-		}
-		
-		// Create pool if needed
-		if campaignID != nil && !campaignPools[*campaignID] {
-			_, err := p.manager.StartBroadcastPool("campaign", fmt.Sprintf("%d", *campaignID))
-			if err != nil {
-				logrus.Errorf("Failed to start campaign pool: %v", err)
-				continue
+		// Process each message
+		for _, msg := range messages {
+			// Create pool if needed
+			if msg.CampaignID != nil && !campaignPools[*msg.CampaignID] {
+				_, err := p.manager.StartBroadcastPool("campaign", fmt.Sprintf("%d", *msg.CampaignID))
+				if err != nil {
+					logrus.Errorf("Failed to start campaign pool: %v", err)
+					continue
+				}
+				campaignPools[*msg.CampaignID] = true
+				
+				// Update campaign status to processing
+				db := database.GetDB()
+				db.Exec(`UPDATE campaigns SET status = 'processing', 
+						 updated_at = NOW() 
+						 WHERE id = ?`, *msg.CampaignID)
 			}
-			campaignPools[*campaignID] = true
 			
-			// Update campaign status to processing
-			db.Exec(`UPDATE campaigns SET status = 'processing', 
-					 updated_at = NOW() 
-					 WHERE id = ?`, *campaignID)
-		}
-		
-		if sequenceID != nil && !sequencePools[*sequenceID] {
-			_, err := p.manager.StartBroadcastPool("sequence", *sequenceID)
-			if err != nil {
-				logrus.Errorf("Failed to start sequence pool: %v", err)
-				continue
+			if msg.SequenceID != nil && !sequencePools[*msg.SequenceID] {
+				_, err := p.manager.StartBroadcastPool("sequence", *msg.SequenceID)
+				if err != nil {
+					logrus.Errorf("Failed to start sequence pool: %v", err)
+					continue
+				}
+				sequencePools[*msg.SequenceID] = true
 			}
-			sequencePools[*sequenceID] = true
-		}
-		
-		// Queue message to appropriate pool
-		var broadcastType, broadcastID string
-		if msg.CampaignID != nil {
-			broadcastType = "campaign"
-			broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
-		} else if msg.SequenceID != nil {
-			broadcastType = "sequence"
-			broadcastID = *msg.SequenceID
-		}
-		
-		if broadcastType != "" {
-			err = p.manager.QueueMessageToBroadcast(broadcastType, broadcastID, &msg)
-			if err != nil {
-				logrus.Errorf("Failed to queue message: %v", err)
-				// Update to failed
-				db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ? WHERE id = ?`, 
-					err.Error(), msg.ID)
-			} else {
-				messageCount++
+			
+			// Queue message to appropriate pool
+			var broadcastType, broadcastID string
+			if msg.CampaignID != nil {
+				broadcastType = "campaign"
+				broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
+			} else if msg.SequenceID != nil {
+				broadcastType = "sequence"
+				broadcastID = *msg.SequenceID
+			}
+			
+			if broadcastType != "" {
+				err = p.manager.QueueMessageToBroadcast(broadcastType, broadcastID, &msg)
+				if err != nil {
+					logrus.Errorf("Failed to queue message: %v", err)
+					// Update to failed
+					db := database.GetDB()
+					db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ? WHERE id = ?`, 
+						err.Error(), msg.ID)
+				} else {
+					messageCount++
+				}
 			}
 		}
 	}
 	
 	if messageCount > 0 {
-		// logrus.Infof("Queued %d messages to broadcast pools", messageCount)
+		logrus.Infof("Queued %d messages to broadcast pools (with worker locking)", messageCount)
 	}
 }

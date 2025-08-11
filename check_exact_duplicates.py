@@ -1,172 +1,105 @@
-import pymysql
-from datetime import datetime, timedelta
-from collections import defaultdict
+import mysql.connector
+import sys
 
-# Database connection
-connection = pymysql.connect(
-    host='159.89.198.71',
-    user='admin_aqil',
-    password='admin_aqil',
-    database='admin_railway',
-    charset='utf8mb4',
-    cursorclass=pymysql.cursors.DictCursor
-)
+sys.stdout.reconfigure(encoding='utf-8')
+
+config = {
+    'host': '159.89.198.71',
+    'port': 3306,
+    'database': 'admin_railway',
+    'user': 'admin_aqil',
+    'password': 'admin_aqil'
+}
 
 try:
-    with connection.cursor() as cursor:
-        print("=== INVESTIGATING EXACT DUPLICATE TIMING ===\n")
-        
-        # Find messages sent at EXACTLY the same time with same content
-        query = """
-        SELECT 
-            a.id as id1,
-            b.id as id2,
-            a.recipient_phone,
-            a.recipient_name,
-            a.device_id as device1,
-            b.device_id as device2,
-            a.status as status1,
-            b.status as status2,
-            a.created_at,
-            a.scheduled_at,
-            a.sent_at as sent1,
-            b.sent_at as sent2,
-            a.sequence_stepid as step1,
-            b.sequence_stepid as step2,
-            TIMESTAMPDIFF(SECOND, a.sent_at, b.sent_at) as sent_diff_seconds,
-            LEFT(a.content, 50) as content_preview
-        FROM broadcast_messages a
-        JOIN broadcast_messages b ON 
-            a.recipient_phone = b.recipient_phone
-            AND a.id < b.id
-            AND a.sequence_stepid = b.sequence_stepid  -- Same step!
-            AND LEFT(a.content, 200) = LEFT(b.content, 200)  -- Same content!
-        WHERE 
-            a.status = 'sent' AND b.status = 'sent'
-            AND DATE(a.sent_at) = '2025-08-06'
-            AND ABS(TIMESTAMPDIFF(SECOND, a.sent_at, b.sent_at)) < 300  -- Within 5 minutes
-        ORDER BY sent_diff_seconds
-        LIMIT 20
-        """
-        
-        cursor.execute(query)
-        exact_duplicates = cursor.fetchall()
-        
-        print(f"Found {len(exact_duplicates)} exact duplicates sent within 5 minutes\n")
-        
-        for dup in exact_duplicates:
-            print(f"DUPLICATE FOUND:")
-            print(f"  Phone: {dup['recipient_phone']} ({dup['recipient_name']})")
-            print(f"  Content: {dup['content_preview']}...")
-            print(f"  Same Step ID: {dup['step1']}")
-            print(f"  Message IDs: {dup['id1']} vs {dup['id2']}")
-            print(f"  Devices: {dup['device1']} vs {dup['device2']}")
-            print(f"  Sent times: {dup['sent1']} vs {dup['sent2']}")
-            print(f"  Time diff: {dup['sent_diff_seconds']} seconds")
-            print(f"  Created at: {dup['created_at']}")
-            print(f"  Scheduled at: {dup['scheduled_at']}")
+    conn = mysql.connector.connect(**config)
+    cursor = conn.cursor(dictionary=True)
+    
+    print("=== CHECKING FOR DUPLICATES BY sequence_stepid + recipient_phone + device_id ===\n")
+    
+    # Check for duplicates with the exact combination
+    query = """
+    SELECT 
+        sequence_stepid,
+        recipient_phone,
+        device_id,
+        COUNT(*) as duplicate_count,
+        GROUP_CONCAT(id) as message_ids,
+        GROUP_CONCAT(status) as statuses,
+        GROUP_CONCAT(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s')) as created_times,
+        GROUP_CONCAT(DATE_FORMAT(sent_at, '%Y-%m-%d %H:%i:%s')) as sent_times
+    FROM broadcast_messages
+    WHERE sequence_stepid IS NOT NULL
+    GROUP BY sequence_stepid, recipient_phone, device_id
+    HAVING COUNT(*) > 1
+    ORDER BY duplicate_count DESC, recipient_phone
+    """
+    
+    cursor.execute(query)
+    duplicates = cursor.fetchall()
+    
+    if duplicates:
+        print(f"❌ FOUND {len(duplicates)} DUPLICATE COMBINATIONS:\n")
+        for i, dup in enumerate(duplicates, 1):
+            print(f"--- Duplicate #{i} ---")
+            print(f"Sequence Step ID: {dup['sequence_stepid']}")
+            print(f"Phone: {dup['recipient_phone']}")
+            print(f"Device ID: {dup['device_id']}")
+            print(f"Count: {dup['duplicate_count']} duplicates")
+            print(f"Message IDs: {dup['message_ids']}")
+            print(f"Statuses: {dup['statuses']}")
+            print(f"Created times: {dup['created_times']}")
+            print(f"Sent times: {dup['sent_times']}")
             print()
+    else:
+        print("✅ NO DUPLICATES FOUND!")
+        print("All messages have unique combination of sequence_stepid + recipient_phone + device_id")
+    
+    # Also check specifically for the phone number 60128198574
+    print("\n=== CHECKING SPECIFIC PHONE NUMBER 60128198574 ===\n")
+    
+    query2 = """
+    SELECT 
+        sequence_stepid,
+        device_id,
+        COUNT(*) as count,
+        GROUP_CONCAT(id) as message_ids,
+        GROUP_CONCAT(status) as statuses
+    FROM broadcast_messages
+    WHERE recipient_phone LIKE '%128198574%'
+      AND sequence_stepid IS NOT NULL
+    GROUP BY sequence_stepid, device_id
+    ORDER BY count DESC
+    """
+    
+    cursor.execute(query2)
+    phone_results = cursor.fetchall()
+    
+    if phone_results:
+        print(f"Found {len(phone_results)} unique sequence steps for this phone:")
+        has_duplicates = False
+        for result in phone_results:
+            if result['count'] > 1:
+                has_duplicates = True
+                print(f"\n❌ DUPLICATE FOUND:")
+                print(f"Sequence Step: {result['sequence_stepid']}")
+                print(f"Device: {result['device_id']}")
+                print(f"Count: {result['count']}")
+                print(f"Message IDs: {result['message_ids']}")
+                print(f"Statuses: {result['statuses']}")
         
-        # Check if same device or different devices
-        print("\n=== DEVICE PATTERN ANALYSIS ===\n")
+        if not has_duplicates:
+            print("✅ No duplicates for phone 60128198574")
+            print("Each sequence_stepid + device_id combination appears only once")
+    else:
+        print("No sequence messages found for this phone number")
         
-        query = """
-        SELECT 
-            CASE 
-                WHEN a.device_id = b.device_id THEN 'SAME_DEVICE'
-                ELSE 'DIFFERENT_DEVICES'
-            END as device_pattern,
-            COUNT(*) as count,
-            AVG(ABS(TIMESTAMPDIFF(SECOND, a.sent_at, b.sent_at))) as avg_time_diff
-        FROM broadcast_messages a
-        JOIN broadcast_messages b ON 
-            a.recipient_phone = b.recipient_phone
-            AND a.id < b.id
-            AND a.sequence_stepid = b.sequence_stepid
-            AND LEFT(a.content, 200) = LEFT(b.content, 200)
-        WHERE 
-            a.status = 'sent' AND b.status = 'sent'
-            AND DATE(a.sent_at) = '2025-08-06'
-        GROUP BY device_pattern
-        """
-        
-        cursor.execute(query)
-        device_patterns = cursor.fetchall()
-        
-        for pattern in device_patterns:
-            print(f"{pattern['device_pattern']}: {pattern['count']} duplicates")
-            print(f"  Average time difference: {pattern['avg_time_diff']:.1f} seconds")
-        
-        # Check worker processing pattern
-        print("\n\n=== WORKER PROCESSING PATTERN ===\n")
-        
-        # Messages that were pending at the same time
-        query = """
-        SELECT 
-            DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:00') as minute,
-            COUNT(*) as messages_created,
-            COUNT(DISTINCT device_id) as devices_used,
-            GROUP_CONCAT(DISTINCT status) as statuses
-        FROM broadcast_messages
-        WHERE DATE(scheduled_at) = '2025-08-06'
-            AND sequence_stepid IN (
-                SELECT DISTINCT sequence_stepid 
-                FROM broadcast_messages 
-                WHERE DATE(sent_at) = '2025-08-06'
-                GROUP BY recipient_phone, sequence_stepid
-                HAVING COUNT(*) > 1
-            )
-        GROUP BY minute
-        HAVING messages_created > 10
-        ORDER BY messages_created DESC
-        LIMIT 10
-        """
-        
-        cursor.execute(query)
-        patterns = cursor.fetchall()
-        
-        print("Times when duplicate messages were created in bulk:")
-        for p in patterns:
-            print(f"  {p['minute']}: {p['messages_created']} messages on {p['devices_used']} devices")
-            print(f"    Statuses: {p['statuses']}")
-        
-        # Check specific example timeline
-        print("\n\n=== TIMELINE FOR SPECIFIC DUPLICATE ===\n")
-        
-        example_phone = '60122712014'
-        query = """
-        SELECT 
-            id,
-            status,
-            device_id,
-            created_at,
-            scheduled_at,
-            sent_at,
-            TIMESTAMPDIFF(SECOND, scheduled_at, sent_at) as process_delay,
-            sequence_stepid,
-            LEFT(content, 50) as content
-        FROM broadcast_messages
-        WHERE recipient_phone = %s
-            AND DATE(scheduled_at) = '2025-08-06'
-            AND sequence_stepid = '72e96e33-2169-4d72-8d2d-041eab647e53'
-        ORDER BY created_at, sent_at
-        """
-        
-        cursor.execute(query, (example_phone,))
-        timeline = cursor.fetchall()
-        
-        print(f"Timeline for {example_phone}:")
-        for msg in timeline:
-            print(f"\n  Message ID: {msg['id']}")
-            print(f"  Status: {msg['status']}")
-            print(f"  Device: {msg['device_id']}")
-            print(f"  Created: {msg['created_at']}")
-            print(f"  Scheduled: {msg['scheduled_at']}")
-            print(f"  Sent: {msg['sent_at']}")
-            if msg['sent_at']:
-                print(f"  Process delay: {msg['process_delay']} seconds after scheduled time")
-
+except Exception as e:
+    print(f"Error: {e}")
+    import traceback
+    traceback.print_exc()
 finally:
-    connection.close()
-
-print("\n=== Analysis Complete ===")
+    if 'cursor' in locals():
+        cursor.close()
+    if 'conn' in locals():
+        conn.close()

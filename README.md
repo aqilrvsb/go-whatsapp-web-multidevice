@@ -2,7 +2,49 @@
 
 A comprehensive WhatsApp broadcast system supporting multi-device operations, campaign management, and automated messaging sequences.
 
-## Latest Update (August 10, 2025) - MySQL 5.7 Compatibility Fix
+## Latest Update (August 11, 2025) - Critical Race Condition Fix
+
+### 🚨 Critical Fix for Duplicate Messages
+
+**Issue Found**: The `UltraOptimizedBroadcastProcessor` was NOT using the MySQL 5.7 compatible atomic locking, causing race conditions where multiple workers could process the same message.
+
+### 🔧 What's Fixed
+
+1. **UltraOptimizedBroadcastProcessor Now Uses Atomic Locking**
+   - Changed from simple SELECT query to `GetPendingMessagesAndLock` method
+   - Each worker now atomically claims messages before processing
+   - `processing_worker_id` is properly set for every message
+   - No more race conditions between concurrent workers
+
+2. **How It Works Now**
+   ```go
+   // Old approach (RACE CONDITION):
+   SELECT * FROM broadcast_messages WHERE status = 'pending'
+   
+   // New approach (ATOMIC LOCKING):
+   // Step 1: Atomically claim messages
+   UPDATE broadcast_messages 
+   SET status = 'processing', processing_worker_id = ?
+   WHERE status = 'pending' AND device_id = ?
+   
+   // Step 2: Fetch only claimed messages
+   SELECT * FROM broadcast_messages 
+   WHERE processing_worker_id = ?
+   ```
+
+3. **Result**
+   - Each message is processed by exactly ONE worker
+   - `processing_worker_id` is now properly populated
+   - No more duplicate messages sent to recipients
+   - Full MySQL 5.7 compatibility maintained
+
+### ✅ Fixed Issues
+- Duplicate messages being sent to same recipient
+- NULL `processing_worker_id` in database
+- Race conditions in high-concurrency scenarios
+- Multiple workers processing same message
+
+## Previous Update (August 10, 2025) - MySQL 5.7 Compatibility Fix
 
 ### 🚀 Critical Fix for Duplicate Messages
 
