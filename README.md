@@ -44,6 +44,53 @@ A comprehensive WhatsApp broadcast system supporting multi-device operations, ca
 - Race conditions in high-concurrency scenarios
 - Multiple workers processing same message
 
+## Complete System Flow (A to Z)
+
+### **CAMPAIGN FLOW:**
+1. **Trigger** → `ProcessCampaigns()` runs every minute
+2. **Query** → Finds campaigns where `scheduled_at <= NOW()`
+3. **Execute** → `executeCampaign()` gets matching leads by niche/status
+4. **Queue** → `broadcastRepo.QueueMessage()` inserts with duplicate check
+5. **Status** → Campaign marked as 'triggered'
+
+### **SEQUENCE FLOW:**
+1. **Trigger** → `ProcessDailySequenceMessages()` runs periodically
+2. **Query** → Gets active sequences and enrolled contacts
+3. **Check** → Verifies next step exists and no duplicate
+4. **Queue** → `broadcastRepo.QueueMessage()` inserts with duplicate check
+5. **Progress** → Updates contact to next step
+
+### **BROADCAST PROCESSOR FLOW (WITH FIX):**
+1. **Start** → `UltraOptimizedBroadcastProcessor` runs every 5 seconds
+2. **Get Devices** → `GetDevicesWithPendingMessages()` finds devices with pending messages
+3. **Lock Messages** → `GetPendingMessagesAndLock()` atomically claims messages
+   - Sets `status = 'processing'`
+   - Sets `processing_worker_id = unique_id`
+   - Sets `processing_started_at = NOW()`
+4. **Check Device** → Verifies device is online
+5. **Create Pool** → Creates broadcast pool if needed
+6. **Queue to Pool** → `QueueMessageToBroadcast()` adds to worker queue
+7. **Update Status** → Changes to 'queued'
+
+### **WORKER PROCESSING:**
+1. **Worker Gets Message** → From internal queue
+2. **Safety Check** → Verifies not already sent
+3. **Rate Limit** → Waits for send permission (5-15 seconds)
+4. **Send** → `sendWhatsAppMessage()` sends via WhatsApp
+5. **Update Status**:
+   - **Success** → `UPDATE status = 'sent', sent_at = NOW()`
+   - **Failed** → `UPDATE status = 'failed', error_message = ?`
+
+### **Message Status Flow:**
+```
+pending → processing → queued → sent/failed
+```
+
+### **Duplicate Prevention Layers:**
+1. **Application Level** → QueueMessage checks before insert
+2. **Database Level** → Atomic locking with processing_worker_id
+3. **Worker Level** → Safety check before sending
+
 ## Previous Update (August 10, 2025) - MySQL 5.7 Compatibility Fix
 
 ### 🚀 Critical Fix for Duplicate Messages
