@@ -142,9 +142,9 @@ func (api *PublicDeviceAPI) GetDeviceStats(c *fiber.Ctx) error {
 func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
 	
-	// Get date filters
-	startDate := c.Query("start_date", "")
-	endDate := c.Query("end_date", "")
+	// Get date filters - handle both formats
+	startDate := c.Query("start_date", c.Query("start", ""))
+	endDate := c.Query("end_date", c.Query("end", ""))
 	
 	// Build query
 	query := `
@@ -271,11 +271,11 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	deviceID := c.Params("deviceId")
 	
-	// Get date filters
-	startDate := c.Query("start_date", "")
-	endDate := c.Query("end_date", "")
+	// Get date filters - handle both formats
+	startDate := c.Query("start_date", c.Query("start", ""))
+	endDate := c.Query("end_date", c.Query("end", ""))
 	
-	// Build query
+	// Build query - get sequence summary with message counts
 	query := `
 		SELECT 
 			s.id,
@@ -287,14 +287,27 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			s.time_schedule,
 			s.is_active,
 			s.created_at,
-			COUNT(DISTINCT sl.id) as total_leads,
-			COUNT(DISTINCT CASE WHEN sl.status = 'completed' THEN sl.id END) as completed_leads
+			COUNT(DISTINCT sc.id) as total_contacts,
+			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_count,
+			COALESCE(messages.total_sent, 0) as total_sent,
+			COALESCE(messages.total_failed, 0) as total_failed,
+			COALESCE(messages.total_pending, 0) as total_pending
 		FROM sequences s
-		LEFT JOIN sequence_leads sl ON s.id = sl.sequence_id
+		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
+		LEFT JOIN (
+			SELECT 
+				sequence_id,
+				SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_sent,
+				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
+				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
+			FROM broadcast_messages
+			WHERE device_id = ?
+			GROUP BY sequence_id
+		) messages ON s.id = messages.sequence_id
 		WHERE s.device_id = ?
 	`
 	
-	args := []interface{}{deviceID}
+	args := []interface{}{deviceID, deviceID}
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
@@ -324,8 +337,11 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			TimeSchedule   sql.NullString
 			IsActive       bool
 			CreatedAt      time.Time
-			TotalLeads     int
-			CompletedLeads int
+			TotalContacts  int
+			CompletedCount int
+			TotalSent      int
+			TotalFailed    int
+			TotalPending   int
 		}
 		
 		err := rows.Scan(
@@ -338,8 +354,11 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			&seq.TimeSchedule,
 			&seq.IsActive,
 			&seq.CreatedAt,
-			&seq.TotalLeads,
-			&seq.CompletedLeads,
+			&seq.TotalContacts,
+			&seq.CompletedCount,
+			&seq.TotalSent,
+			&seq.TotalFailed,
+			&seq.TotalPending,
 		)
 		
 		if err != nil {
@@ -357,8 +376,11 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			"schedule_time":   seq.TimeSchedule.String,
 			"status":          map[bool]string{true: "active", false: "inactive"}[seq.IsActive],
 			"created_at":      seq.CreatedAt,
-			"contacts_count":  seq.TotalLeads,
-			"completed_count": seq.CompletedLeads,
+			"contacts_count":  seq.TotalContacts,
+			"completed_count": seq.CompletedCount,
+			"total_sent":      seq.TotalSent,
+			"total_failed":    seq.TotalFailed,
+			"total_pending":   seq.TotalPending,
 		})
 	}
 	
@@ -445,7 +467,95 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 
 // GetDeviceSequences returns sequences for the device
 func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
-	return api.GetSequenceSummary(c)
+	deviceID := c.Params("deviceId")
+	
+	// Get sequences for this device
+	query := `
+		SELECT 
+			s.id,
+			s.sequence_name,
+			s.description,
+			s.niche,
+			s.target_status,
+			s.start_trigger,
+			s.time_schedule,
+			s.is_active,
+			s.created_at,
+			COUNT(DISTINCT sl.id) as total_leads,
+			COUNT(DISTINCT CASE WHEN sl.status = 'completed' THEN sl.id END) as completed_leads,
+			COUNT(DISTINCT ss.id) as total_steps
+		FROM sequences s
+		LEFT JOIN sequence_leads sl ON s.id = sl.sequence_id
+		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
+		WHERE s.device_id = ?
+		GROUP BY s.id
+		ORDER BY s.created_at DESC
+	`
+	
+	rows, err := api.db.Query(query, deviceID)
+	if err != nil {
+		logrus.Errorf("Failed to get sequences: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
+	}
+	defer rows.Close()
+	
+	sequences := []fiber.Map{}
+	for rows.Next() {
+		var seq struct {
+			ID             string
+			Name           string
+			Description    sql.NullString
+			Niche          sql.NullString
+			TargetStatus   sql.NullString
+			StartTrigger   sql.NullString
+			TimeSchedule   sql.NullString
+			IsActive       bool
+			CreatedAt      time.Time
+			TotalLeads     int
+			CompletedLeads int
+			TotalSteps     int
+		}
+		
+		err := rows.Scan(
+			&seq.ID,
+			&seq.Name,
+			&seq.Description,
+			&seq.Niche,
+			&seq.TargetStatus,
+			&seq.StartTrigger,
+			&seq.TimeSchedule,
+			&seq.IsActive,
+			&seq.CreatedAt,
+			&seq.TotalLeads,
+			&seq.CompletedLeads,
+			&seq.TotalSteps,
+		)
+		
+		if err != nil {
+			logrus.Errorf("Failed to scan sequence: %v", err)
+			continue
+		}
+		
+		sequences = append(sequences, fiber.Map{
+			"id":              seq.ID,
+			"name":            seq.Name,
+			"description":     seq.Description.String,
+			"niche":           seq.Niche.String,
+			"target_status":   seq.TargetStatus.String,
+			"trigger":         seq.StartTrigger.String,
+			"schedule_time":   seq.TimeSchedule.String,
+			"status":          map[bool]string{true: "active", false: "inactive"}[seq.IsActive],
+			"created_at":      seq.CreatedAt,
+			"contacts_count":  seq.TotalLeads,
+			"completed_count": seq.CompletedLeads,
+			"days":            seq.TotalSteps,
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"sequences": sequences,
+		"total":     len(sequences),
+	})
 }
 
 // GetDeviceMessages returns messages for the device

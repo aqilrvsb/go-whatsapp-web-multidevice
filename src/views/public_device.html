@@ -632,7 +632,7 @@
     </div>
 
     <!-- Main Content -->
-    <div class="container-fluid mt-4">
+    <div class="container-fluid mt-4 px-4">
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -5068,10 +5068,22 @@
                 const response = await fetch(apiUrl);
                 const data = await response.json();
                 
-                if (data.code === 'SUCCESS' && data.results && data.results.length > 0) {
-                    sequences = data.results; // Store sequences globally like campaigns
+                let sequencesData = [];
+                
+                // Handle different response structures
+                if (data.code === 'SUCCESS' && data.results) {
+                    sequencesData = data.results;
+                } else if (data.sequences && Array.isArray(data.sequences)) {
+                    // Handle public API response structure
+                    sequencesData = data.sequences;
+                } else if (Array.isArray(data)) {
+                    sequencesData = data;
+                }
+                
+                if (sequencesData.length > 0) {
+                    sequences = sequencesData; // Store sequences globally
                     console.log('Loaded sequences:', sequences); // Debug log
-                    displaySequences(data.results);
+                    displaySequences(sequencesData);
                 } else {
                     // Show empty state
                     const container = document.getElementById('sequencesList');
@@ -5082,10 +5094,10 @@
                                     <div class="card-body text-center py-5">
                                         <i class="bi bi-collection display-3 text-muted mb-3"></i>
                                         <h5>No Sequences Yet</h5>
-                                        <p class="text-muted">Create your first automated message sequence</p>
-                                        <button class="btn btn-primary" onclick="openCreateSequenceModal()">
+                                        <p class="text-muted">${isPublicView ? 'No sequences available' : 'Create your first automated message sequence'}</p>
+                                        ${!isPublicView ? `<button class="btn btn-primary" onclick="openCreateSequenceModal()">
                                             <i class="bi bi-plus-circle"></i> Create Sequence
-                                        </button>
+                                        </button>` : ''}
                                     </div>
                                 </div>
                             </div>
