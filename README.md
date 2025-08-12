@@ -41,6 +41,13 @@ AND scheduled_at > DATE_SUB(NOW(), INTERVAL 48 HOUR)
 LIMIT 500;
 ```
 
+### Performance Optimization:
+Add this index for faster queries (especially important with 3000+ devices):
+```sql
+CREATE INDEX idx_broadcast_optimize 
+ON broadcast_messages(status, device_id, scheduled_at);
+```
+
 ---
 
 ## Previous Update (August 11, 2025) - Critical Race Condition Fix
