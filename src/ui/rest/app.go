@@ -135,6 +135,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/:device_name", rest.PublicDeviceDashboard)
 	app.Get("/api/public/device/:device_name/info", rest.GetPublicDeviceInfo)
 	app.Get("/api/public/device/:device_name/sequences", rest.GetPublicDeviceSequences)
+	app.Get("/api/public/device/:device_id/leads", rest.GetPublicDeviceLeads)
 	app.Get("/sequence/:id/device-report", rest.PublicSequenceDeviceReport)
 	
 	// Device management endpoints
@@ -5514,6 +5515,162 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Sequences retrieved successfully",
 		Results: sequences,
+	})
+}
+
+// GetPublicDeviceLeads returns leads for a specific device (public view)
+func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
+	deviceId := c.Params("device_id")
+	
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+	
+	// Convert mysql:// URL to DSN format if needed
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+	
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Database connection error",
+		})
+	}
+	defer db.Close()
+	
+	// Verify device exists
+	var deviceExists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_devices WHERE id = ?)", deviceId).Scan(&deviceExists)
+	if err != nil || !deviceExists {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Get leads for this device
+	query := `
+		SELECT 
+			id,
+			user_id,
+			device_id,
+			name,
+			phone,
+			email,
+			niche,
+			source,
+			status,
+			target_status,
+			trigger,
+			notes,
+			created_at,
+			updated_at
+		FROM leads
+		WHERE device_id = ?
+		ORDER BY created_at DESC
+	`
+	
+	rows, err := db.Query(query, deviceId)
+	if err != nil {
+		log.Printf("Error querying leads: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to fetch leads",
+		})
+	}
+	defer rows.Close()
+	
+	leads := []map[string]interface{}{}
+	for rows.Next() {
+		var lead struct {
+			ID           string
+			UserID       string
+			DeviceID     string
+			Name         string
+			Phone        string
+			Email        sql.NullString
+			Niche        sql.NullString
+			Source       sql.NullString
+			Status       sql.NullString
+			TargetStatus sql.NullString
+			Trigger      sql.NullString
+			Notes        sql.NullString
+			CreatedAt    time.Time
+			UpdatedAt    sql.NullTime
+		}
+		
+		err := rows.Scan(
+			&lead.ID,
+			&lead.UserID,
+			&lead.DeviceID,
+			&lead.Name,
+			&lead.Phone,
+			&lead.Email,
+			&lead.Niche,
+			&lead.Source,
+			&lead.Status,
+			&lead.TargetStatus,
+			&lead.Trigger,
+			&lead.Notes,
+			&lead.CreatedAt,
+			&lead.UpdatedAt,
+		)
+		
+		if err != nil {
+			log.Printf("Error scanning lead: %v", err)
+			continue
+		}
+		
+		// Get last interaction for this lead
+		var lastInteraction sql.NullTime
+		db.QueryRow(`
+			SELECT MAX(sent_at) 
+			FROM broadcast_messages 
+			WHERE recipient_phone = ? AND device_id = ? AND status = 'sent'
+		`, lead.Phone, deviceId).Scan(&lastInteraction)
+		
+		leadMap := map[string]interface{}{
+			"id":               lead.ID,
+			"user_id":          lead.UserID,
+			"device_id":        lead.DeviceID,
+			"name":             lead.Name,
+			"phone":            lead.Phone,
+			"email":            lead.Email.String,
+			"niche":            lead.Niche.String,
+			"source":           lead.Source.String,
+			"status":           lead.Status.String,
+			"target_status":    lead.TargetStatus.String,
+			"trigger":          lead.Trigger.String,
+			"notes":            lead.Notes.String,
+			"journey":          lead.Notes.String, // Map notes to journey for compatibility
+			"created_at":       lead.CreatedAt,
+		}
+		
+		if lastInteraction.Valid {
+			leadMap["last_interaction"] = lastInteraction.Time
+		}
+		
+		leads = append(leads, leadMap)
+	}
+	
+	return c.JSON(map[string]interface{}{
+		"leads": leads,
+		"device": map[string]interface{}{
+			"id": deviceId,
+		},
 	})
 }
 
