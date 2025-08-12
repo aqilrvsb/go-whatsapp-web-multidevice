@@ -5565,15 +5565,15 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 			device_id,
 			name,
 			phone,
-			email,
-			niche,
-			source,
-			status,
-			target_status,
-			trigger,
-			notes,
+			COALESCE(email, '') as email,
+			COALESCE(niche, '') as niche,
+			COALESCE(source, 'manual') as source,
+			COALESCE(status, '') as status,
+			COALESCE(target_status, 'prospect') as target_status,
+			COALESCE(` + "`trigger`" + `, '') as trigger,
+			COALESCE(journey, '') as journey,
 			created_at,
-			updated_at
+			COALESCE(updated_at, created_at) as updated_at
 		FROM leads
 		WHERE device_id = ?
 		ORDER BY created_at DESC
@@ -5596,15 +5596,15 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 			DeviceID     string
 			Name         string
 			Phone        string
-			Email        sql.NullString
-			Niche        sql.NullString
-			Source       sql.NullString
-			Status       sql.NullString
-			TargetStatus sql.NullString
-			Trigger      sql.NullString
-			Notes        sql.NullString
+			Email        string
+			Niche        string
+			Source       string
+			Status       string
+			TargetStatus string
+			Trigger      string
+			Journey      string
 			CreatedAt    time.Time
-			UpdatedAt    sql.NullTime
+			UpdatedAt    time.Time
 		}
 		
 		err := rows.Scan(
@@ -5619,7 +5619,7 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 			&lead.Status,
 			&lead.TargetStatus,
 			&lead.Trigger,
-			&lead.Notes,
+			&lead.Journey,
 			&lead.CreatedAt,
 			&lead.UpdatedAt,
 		)
@@ -5643,14 +5643,14 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 			"device_id":        lead.DeviceID,
 			"name":             lead.Name,
 			"phone":            lead.Phone,
-			"email":            lead.Email.String,
-			"niche":            lead.Niche.String,
-			"source":           lead.Source.String,
-			"status":           lead.Status.String,
-			"target_status":    lead.TargetStatus.String,
-			"trigger":          lead.Trigger.String,
-			"notes":            lead.Notes.String,
-			"journey":          lead.Notes.String, // Map notes to journey for compatibility
+			"email":            lead.Email,
+			"niche":            lead.Niche,
+			"source":           lead.Source,
+			"status":           lead.Status,
+			"target_status":    lead.TargetStatus,
+			"trigger":          lead.Trigger,
+			"notes":            lead.Journey,
+			"journey":          lead.Journey, // Map journey to both fields for compatibility
 			"created_at":       lead.CreatedAt,
 		}
 		
