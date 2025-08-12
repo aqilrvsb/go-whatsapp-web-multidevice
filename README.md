@@ -2,7 +2,48 @@
 
 A comprehensive WhatsApp broadcast system supporting multi-device operations, campaign management, and automated messaging sequences.
 
-## Latest Update (August 11, 2025) - Critical Race Condition Fix
+## Latest Update (August 12, 2025) - 10-Minute Window Fix
+
+### 🔧 Fixed: Stuck Pending Messages Issue
+
+**Problem Found**: Messages older than 10 minutes were being permanently ignored due to the 10-minute time window restriction, causing 386+ messages to get stuck in pending status forever.
+
+**Solution Applied**: 
+- Changed the time window from 10 minutes to 1 hour
+- This allows recovery from short downtime while maintaining query optimization
+- Messages up to 1 hour old will now be processed
+
+**Code Changes**:
+```sql
+-- Changed from:
+AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
+
+-- To:
+AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 HOUR), INTERVAL 8 HOUR)
+```
+
+**Files Modified**:
+- `src/repository/broadcast_repository.go` - Updated `GetPendingMessagesAndLock()` method
+- Changed 2 occurrences of `INTERVAL 10 MINUTE` to `INTERVAL 1 HOUR`
+
+**Result**:
+- Messages stuck due to system downtime can now recover within 1 hour
+- Better balance between performance optimization and reliability
+- No more permanently stuck messages
+
+### To Fix Currently Stuck Messages:
+```sql
+UPDATE broadcast_messages 
+SET scheduled_at = NOW()
+WHERE status = 'pending'
+AND scheduled_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+AND scheduled_at > DATE_SUB(NOW(), INTERVAL 48 HOUR)
+LIMIT 500;
+```
+
+---
+
+## Previous Update (August 11, 2025) - Critical Race Condition Fix
 
 ### 🚨 Critical Fix for Duplicate Messages
 
