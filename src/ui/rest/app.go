@@ -5541,10 +5541,8 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 	
 	db, err := sql.Open("mysql", mysqlURI)
 	if err != nil {
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "INTERNAL_ERROR",
-			Message: "Database connection error",
+		return c.Status(500).JSON(map[string]interface{}{
+			"error": "Database connection error",
 		})
 	}
 	defer db.Close()
@@ -5553,10 +5551,8 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 	var deviceExists bool
 	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_devices WHERE id = ?)", deviceId).Scan(&deviceExists)
 	if err != nil || !deviceExists {
-		return c.Status(404).JSON(utils.ResponseData{
-			Status:  404,
-			Code:    "NOT_FOUND",
-			Message: "Device not found",
+		return c.Status(404).JSON(map[string]interface{}{
+			"error": "Device not found",
 		})
 	}
 	
@@ -5585,10 +5581,8 @@ func (handler *App) GetPublicDeviceLeads(c *fiber.Ctx) error {
 	rows, err := db.Query(query, deviceId)
 	if err != nil {
 		log.Printf("Error querying leads: %v", err)
-		return c.Status(500).JSON(utils.ResponseData{
-			Status:  500,
-			Code:    "INTERNAL_ERROR",
-			Message: "Failed to fetch leads",
+		return c.Status(500).JSON(map[string]interface{}{
+			"error": "Failed to fetch leads",
 		})
 	}
 	defer rows.Close()
