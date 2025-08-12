@@ -28,6 +28,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type App struct {
