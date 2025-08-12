@@ -4582,23 +4582,7 @@
                     // Group campaigns by date
                     campaignArray.forEach(campaign => {
                         // Ensure date is in YYYY-MM-DD format
-                        let date = campaign.campaign_date; {
-                        campaigns = {};
-                        const campaignArray = Array.isArray(data.results) ? data.results : [];
-                        console.log('Processing campaigns:', campaignArray.length);
-                        
-                        // Hide debug info - uncomment for debugging
-                        // const debugDiv = document.getElementById('campaignDebug');
-                        // const debugInfo = document.getElementById('debugInfo');
-                        // if (debugDiv && debugInfo) {
-                        //     debugDiv.style.display = 'block';
-                        //     debugInfo.textContent = `Found ${campaignArray.length} campaigns. `;
-                        // }
-                        
-                        // Group campaigns by date
-                        campaignArray.forEach(campaign => {
-                            // Ensure date is in YYYY-MM-DD format
-                            let date = campaign.campaign_date;
+                        let date = campaign.campaign_date;
                             if (date.includes('T')) {
                                 date = date.split('T')[0];
                             }
@@ -4618,6 +4602,7 @@
                         //     debugInfo.textContent += `Dates: ${Object.keys(campaigns).join(', ')}`;
                         // }
                         
+                    if (campaignArray && campaignArray.length > 0) {
                         renderCalendar();
                     } else {
                         // Show no campaigns message - uncomment for debugging
