@@ -429,15 +429,14 @@
         
         // Load leads
         function loadLeads() {
-            const url = `/api/devices/${deviceId}/leads`;
+            const url = `/api/public/device/${deviceId}/leads`;
                 
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    // Handle the response format from authenticated API
-                    const leadsData = data.Results || data.leads || [];
-                    if (Array.isArray(leadsData)) {
-                        leads = leadsData;
+                    // Handle the response format from public API
+                    if (data.leads && Array.isArray(data.leads)) {
+                        leads = data.leads;
                         document.getElementById('totalLeads').textContent = leads.length;
                         buildNicheFilters();
                         displayLeads();
