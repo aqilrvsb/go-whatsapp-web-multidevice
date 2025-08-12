@@ -87,7 +87,7 @@ func InitPublicDeviceAPI(app *fiber.App) {
 	publicAPI := app.Group("/api/public/device/:deviceId")
 	
 	// Device info endpoint
-	publicAPI.Get("/devices", api.GetDeviceInfo)
+	publicAPI.Get("/devices", api.GetDevices)
 	
 	// Campaign summary endpoint
 	publicAPI.Get("/campaign-summary", api.GetCampaignSummary)
@@ -478,6 +478,35 @@ func (api *PublicDeviceAPI) GetDeviceInfo(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// GetDevices returns all devices (for public view, returns only the current device)
+func (api *PublicDeviceAPI) GetDevices(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// For public view, only return the current device
+	devices := []fiber.Map{
+		{
+			"id":           device.ID,
+			"device_name":  device.DeviceName,
+			"phone":        device.Phone,
+			"jid":          device.Phone,
+			"status":       device.Status,
+			"created_at":   device.CreatedAt,
+		},
+	}
+	
+	return c.JSON(fiber.Map{
+		"code": "SUCCESS",
+		"results": devices,
+	})
+}
+
 
 // GetLeads returns leads for the device
 func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
