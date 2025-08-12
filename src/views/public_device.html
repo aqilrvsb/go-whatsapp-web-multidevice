@@ -4554,14 +4554,31 @@
         function loadCampaigns() {
             // Load campaigns from API
             const apiUrl = isPublicView 
-                ? `/api/public/device/${publicDeviceId}/campaigns`
+                ? `/api/public/device/${publicDeviceId}/campaign-summary`
                 : '/api/campaigns';
                 
             fetch(apiUrl, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     console.log('Campaign API response:', data);
-                    if (data.code === 'SUCCESS' && data.results !== null) {
+                    
+                    // Handle different response formats
+                    let campaignArray = [];
+                    if (isPublicView && data.campaigns) {
+                        // Public API format
+                        campaignArray = data.campaigns;
+                    } else if (data.code === 'SUCCESS' && data.results !== null) {
+                        // Authenticated API format
+                        campaignArray = Array.isArray(data.results) ? data.results : [];
+                    }
+                    
+                    campaigns = {};
+                    console.log('Processing campaigns:', campaignArray.length);
+                    
+                    // Group campaigns by date
+                    campaignArray.forEach(campaign => {
+                        // Ensure date is in YYYY-MM-DD format
+                        let date = campaign.campaign_date; {
                         campaigns = {};
                         const campaignArray = Array.isArray(data.results) ? data.results : [];
                         console.log('Processing campaigns:', campaignArray.length);
@@ -5942,7 +5959,12 @@
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS' && data.results) {
+                    // Handle different response formats
+                    if (isPublicView && data.campaigns) {
+                        // Public API format
+                        displayCampaignSummary(data.campaigns);
+                    } else if (data.code === 'SUCCESS' && data.results) {
+                        // Authenticated API format
                         displayCampaignSummary(data.results);
                     } else {
                         document.getElementById('campaignSummaryContent').innerHTML = 
