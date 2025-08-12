@@ -2,24 +2,29 @@
 
 A comprehensive WhatsApp broadcast system supporting multi-device operations, campaign management, and automated messaging sequences.
 
-## Latest Update (August 12, 2025) - 10-Minute Window Fix
+## Latest Update (August 12, 2025) - Timezone Consistency Fix
 
-### 🔧 Fixed: Stuck Pending Messages Issue
+### 🔧 Fixed: Processing Timestamps & Time Window
 
-**Problem Found**: Messages older than 10 minutes were being permanently ignored due to the 10-minute time window restriction, causing 386+ messages to get stuck in pending status forever.
+**Problems Fixed**:
+1. Messages older than 10 minutes were permanently ignored (10-minute window too short)
+2. `processing_started_at` showed UTC time while system uses Malaysia time (+8)
 
-**Solution Applied**: 
-- Changed the time window from 10 minutes to 1 hour
-- This allows recovery from short downtime while maintaining query optimization
-- Messages up to 1 hour old will now be processed
+**Solutions Applied**:
+1. **Extended time window from 10 minutes to 1 hour**
+   - Allows recovery from short downtime
+   - Prevents messages from being permanently stuck
+2. **Fixed `processing_started_at` to use Malaysia time**
+   - Now shows `DATE_ADD(NOW(), INTERVAL 8 HOUR)` 
+   - Consistent with scheduling logic and timezone
 
 **Code Changes**:
 ```sql
--- Changed from:
-AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 MINUTE), INTERVAL 8 HOUR)
-
--- To:
+-- Time window (in GetPendingMessagesAndLock):
 AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 HOUR), INTERVAL 8 HOUR)
+
+-- Processing timestamp:
+processing_started_at = DATE_ADD(NOW(), INTERVAL 8 HOUR)
 ```
 
 **Files Modified**:

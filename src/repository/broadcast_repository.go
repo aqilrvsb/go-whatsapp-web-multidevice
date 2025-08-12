@@ -425,7 +425,7 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		UPDATE broadcast_messages 
 		SET status = 'processing',
 			processing_worker_id = ?,
-			processing_started_at = NOW(),
+			processing_started_at = DATE_ADD(NOW(), INTERVAL 8 HOUR),
 			updated_at = NOW()
 		WHERE device_id = ? 
 		AND status = 'pending'
