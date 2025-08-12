@@ -2661,7 +2661,9 @@
                 ? `/api/public/device/${publicDeviceId}/devices`
                 : '/api/devices/check-connection';
                 
-            fetch(checkConnectionUrl, { credentials: 'include' })
+                const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+                
+            fetch(checkConnectionUrl, fetchOptions)
                 .then(response => {
                     // If check-connection fails, just continue
                     if (!response.ok) {
@@ -2671,7 +2673,7 @@
                 })
                 .then(statusData => {
                     // Connection status checked (or skipped), now load devices
-                    return fetch(apiUrl, { credentials: 'include' });
+                    return fetch(apiUrl, fetchOptions);
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -4557,7 +4559,9 @@
                 ? `/api/public/device/${publicDeviceId}/campaign-summary`
                 : '/api/campaigns';
                 
-            fetch(apiUrl, { credentials: 'include' })
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+                
+            fetch(apiUrl, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
                     console.log('Campaign API response:', data);
@@ -5082,7 +5086,8 @@
                     ? `/api/public/device/${publicDeviceId}/sequences`
                     : '/api/sequences';
                     
-                const response = await fetch(apiUrl);
+                const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+                const response = await fetch(apiUrl, fetchOptions);
                 const data = await response.json();
                 
                 let sequencesData = [];
@@ -5956,7 +5961,9 @@
                 url += `?start_date=${todayStr}&end_date=${tomorrowStr}`;
             }
             
-            fetch(url)
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
                     // Handle different response formats
@@ -6243,9 +6250,9 @@
             
             console.log('Loading sequence summary with URL:', url);
             
-            fetch(url, {
-                credentials: 'include'
-            })
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
                     console.log('Sequence Summary Response:', data); // Debug log
