@@ -24,11 +24,7 @@
         .navbar {
             background-color: white !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-        }
-
-        .navbar-brand {
-            color: var(--primary) !important;
-            font-weight: 600;
+            padding: 1rem 0;
         }
 
         .device-info {
@@ -36,25 +32,238 @@
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 24px;
-            box-shadow: var(--card-shadow);
+            border-left: 4px solid var(--primary);
         }
 
-        .table-responsive {
+        .lead-card {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 20px;
             box-shadow: var(--card-shadow);
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 16px;
+            position: relative;
         }
 
-        .btn-whatsapp {
-            background-color: var(--primary);
+        .lead-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .lead-card.selected {
+            background: #f0f8ff;
+            border-left: 4px solid var(--primary);
+        }
+
+        .lead-checkbox {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+            /* Always visible - no special positioning */
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        .lead-checkbox:checked {
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        .lead-checkbox:focus {
+            box-shadow: 0 0 0 0.25rem rgba(95, 173, 173, 0.25) !important;
+            border-color: #5fadad !important;
+        }
+        
+        /* Style all checkboxes with the same color */
+        input[type="checkbox"].form-check-input:checked {
+            background-color: #5fadad !important;
+            border-color: #5fadad !important;
+        }
+        
+        input[type="checkbox"].form-check-input:focus {
+            box-shadow: 0 0 0 0.25rem rgba(95, 173, 173, 0.25) !important;
+            border-color: #5fadad !important;
+        }
+
+        .lead-card-content {
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+
+        .bulk-actions {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .bulk-actions.show {
+            display: flex;
+        }
+
+        .selected-count {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .lead-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .lead-status.new {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .lead-status.contacted {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .lead-status.qualified {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .lead-status.converted {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .lead-status.lost {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .add-lead-btn {
+            background: var(--success);
             color: white;
             border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s;
         }
 
-        .btn-whatsapp:hover {
-            background-color: var(--primary-dark);
+        .add-lead-btn:hover {
+            background: var(--primary-dark);
             color: white;
+            transform: translateY(-2px);
+        }
+
+        .search-box {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px 16px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .filter-chip {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: #f5f5f5;
+            margin: 0 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .lead-journey {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        
+        /* Broadcast History Styles */
+        .broadcast-history {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .history-timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .history-timeline::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 20px;
+            bottom: 0;
+            width: 2px;
+            background: #dee2e6;
+        }
+        
+        .history-item {
+            position: relative;
+            padding-bottom: 20px;
+        }
+        
+        .history-item:last-child {
+            padding-bottom: 0;
+        }
+        
+        .timeline-dot {
+            position: absolute;
+            left: -14px;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+            border: 2px solid #fff;
+        }
+        
+        .history-item.latest .timeline-dot {
+            background: var(--success);
+            width: 14px;
+            height: 14px;
+            left: -15px;
+        }
+        
+        .history-content {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .modal-header {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
         }
     </style>
 </head>
@@ -62,87 +271,97 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="bi bi-whatsapp"></i> WhatsApp Analytics
+            <a class="navbar-brand" href="/dashboard">
+                <i class="bi bi-whatsapp" style="color: var(--success); font-size: 24px;"></i>
+                <span style="color: var(--primary); font-weight: 600; margin-left: 8px;">WhatsApp Analytics</span>
             </a>
-            <div class="ms-auto">
-                <span class="navbar-text me-3">
-                    <i class="bi bi-person-circle"></i> Public View
-                </span>
-            </div>
+            <button class="btn btn-outline-secondary" onclick="history.back()">
+                <i class="bi bi-arrow-left"></i> Back
+            </button>
         </div>
     </nav>
 
-    <!-- Navigation Bar -->
-    <div class="navigation-bar bg-light py-2 px-3 border-bottom">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="history.back()">
-                    <i class="bi bi-arrow-left"></i> Back
-                </button>
-                <button class="btn btn-sm btn-outline-primary ms-2" onclick="goToDevice()">
-                    <i class="bi bi-house"></i> Device Dashboard
-                </button>
-            </div>
-            <div class="breadcrumb mb-0">
-                <span class="text-muted">You are here: </span>
-                <span id="currentPage">Device Leads</span>
-            </div>
-        </div>
-    </div>
-
     <!-- Main Content -->
-    <div class="container-fluid mt-4 px-4">
+    <div class="container mt-4">
         <!-- Device Info -->
         <div class="device-info">
-            <div class="row align-items-center">
-                <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
                     <h4 class="mb-1">
-                        <i class="bi bi-phone-fill text-primary me-2"></i>
-                        <span id="deviceName">Loading...</span>
+                        <i class="bi bi-people-fill text-primary"></i>
+                        Lead Management - <span id="deviceName">Loading...</span>
                     </h4>
                     <p class="text-muted mb-0">
-                        <i class="bi bi-telephone me-1"></i>
-                        <span id="devicePhone">Loading...</span>
+                        Device ID: <span id="deviceId"></span> | 
+                        Total Leads: <span id="totalLeads">0</span>
                     </p>
                 </div>
-                <div class="col-auto">
-                    <button class="btn btn-primary" onclick="importLeads()" style="display: none;">
-                        <i class="bi bi-cloud-upload"></i> Import Leads
-                    </button>
-                    <button class="btn btn-success ms-2" onclick="addLead()" style="display: none;">
-                        <i class="bi bi-plus-circle"></i> Add Lead
-                    </button>
+                <div>
+                    <!-- Hide these buttons for public view -->
                 </div>
             </div>
         </div>
 
-        <!-- Leads Table -->
-        <div class="table-responsive">
-            <h5 class="mb-3">Lead Management</h5>
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Niche</th>
-                        <th>Status</th>
-                        <th>Trigger</th>
-                        <th>Created</th>
-                        <th style="display: none;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="leadsTableBody">
-                    <tr>
-                        <td colspan="7" class="text-center">
-                            <div class="spinner-border spinner-border-sm" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            Loading leads...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Search and Filters -->
+        <div class="bg-white rounded-3 p-3 mb-4 shadow-sm">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0" id="searchInput" 
+                               placeholder="Search by name, phone, niche, or trigger..." onkeyup="searchLeads()">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Status:</span>
+                        <div id="statusFilters">
+                            <span class="filter-chip active" data-status="all">All</span>
+                            <span class="filter-chip" data-status="prospect">Prospect</span>
+                            <span class="filter-chip" data-status="customer">Customer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Niche:</span>
+                        <div id="nicheFilters" style="max-width: 300px; overflow-x: auto; white-space: nowrap;">
+                            <span class="filter-chip active" data-niche="all">All</span>
+                            <!-- Dynamic niche filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Trigger:</span>
+                        <div id="triggerFilters" style="max-width: 300px; overflow-x: auto; white-space: nowrap;">
+                            <span class="filter-chip active" data-trigger="all">All</span>
+                            <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
+                            <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+                            <!-- Dynamic trigger filters will be added here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <!-- Hide select all for public view -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Leads List -->
+        <div id="leadsList">
+            <!-- Leads will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <i class="bi bi-people" style="font-size: 64px; color: #dee2e6;"></i>
+            <h5 class="mt-3 text-muted">No leads found</h5>
+            <p class="text-muted">No leads available for this device</p>
         </div>
     </div>
 
@@ -153,105 +372,282 @@
         const deviceId = pathParts[pathParts.length - 2];
         const isPublicView = window.location.pathname.includes('/public/');
         
-        // Load device info and leads
+        // Global variables
+        let leads = [];
+        let currentFilter = 'all';
+        let currentNicheFilter = 'all';
+        let currentTriggerFilter = 'all';
+        let selectedLeads = new Set();
+        
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Loading leads for device:', deviceId);
+            document.getElementById('deviceId').textContent = deviceId;
+            
+            // Load device info and leads
             loadDeviceInfo();
             loadLeads();
             
-            // Hide action buttons for public view
-            if (isPublicView) {
-                document.querySelectorAll('[onclick="importLeads()"], [onclick="addLead()"]').forEach(btn => {
-                    btn.style.display = 'none';
+            // Setup status filter handlers
+            document.querySelectorAll('#statusFilters .filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    document.querySelector('#statusFilters .filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentFilter = this.dataset.status;
+                    filterLeads();
+                });
+            });
+            
+            // Setup trigger filter handlers
+            document.querySelectorAll('#triggerFilters .filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    document.querySelector('#triggerFilters .filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    const previousFilter = currentTriggerFilter;
+                    currentTriggerFilter = this.dataset.trigger;
+                    
+                    // If switching to/from history, reload leads
+                    if ((previousFilter === 'history' && currentTriggerFilter !== 'history') ||
+                        (previousFilter !== 'history' && currentTriggerFilter === 'history')) {
+                        loadLeads();
+                    } else {
+                        filterLeads();
+                    }
+                });
+            });
+        });
+        
+        // Load device info
+        function loadDeviceInfo() {
+            const apiUrl = `/api/public/device/${deviceId}/info`;
+            
+            fetch(apiUrl, { credentials: 'include' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.device) {
+                        document.getElementById('deviceName').textContent = data.device.name || 'Unknown Device';
+                    }
+                })
+                .catch(error => console.error('Error loading device:', error));
+        }
+        
+        // Load leads
+        function loadLeads() {
+            const url = `/api/public/device/${deviceId}/leads`;
+                
+            fetch(url, { credentials: 'include' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.leads && Array.isArray(data.leads)) {
+                        leads = data.leads;
+                        document.getElementById('totalLeads').textContent = leads.length;
+                        buildNicheFilters();
+                        displayLeads();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading leads:', error);
+                    leads = [];
+                    displayLeads();
+                });
+        }
+        
+        // Display leads
+        function displayLeads() {
+            const leadsList = document.getElementById('leadsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            const filteredLeads = getFilteredLeads();
+            
+            if (filteredLeads.length === 0) {
+                leadsList.innerHTML = '';
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+                leadsList.innerHTML = filteredLeads.map(lead => createLeadCard(lead)).join('');
+            }
+        }
+        
+        // Build niche filters from leads
+        function buildNicheFilters() {
+            const nicheSet = new Set();
+            
+            // Collect all unique niches
+            leads.forEach(lead => {
+                if (lead.niche) {
+                    const niches = lead.niche.split(',').map(n => n.trim());
+                    niches.forEach(niche => nicheSet.add(niche));
+                }
+            });
+            
+            // Build filter HTML
+            const nicheFilters = document.getElementById('nicheFilters');
+            nicheFilters.innerHTML = '<span class="filter-chip active" data-niche="all">All</span>';
+            
+            Array.from(nicheSet).sort().forEach(niche => {
+                nicheFilters.innerHTML += `<span class="filter-chip" data-niche="${niche}">${niche}</span>`;
+            });
+            
+            // Add click handlers
+            nicheFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    nicheFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentNicheFilter = this.dataset.niche;
+                    filterLeads();
+                });
+            });
+            
+            // Build trigger filters too
+            buildTriggerFilters();
+        }
+        
+        // Build trigger filters from leads
+        function buildTriggerFilters() {
+            const triggerSet = new Set();
+            
+            // Collect all unique triggers
+            leads.forEach(lead => {
+                if (lead.trigger) {
+                    const triggers = lead.trigger.split(',').map(t => t.trim());
+                    triggers.forEach(trigger => triggerSet.add(trigger));
+                }
+            });
+            
+            // Build filter HTML
+            const triggerFilters = document.getElementById('triggerFilters');
+            triggerFilters.innerHTML = `
+                <span class="filter-chip active" data-trigger="all">All</span>
+                <span class="filter-chip" data-trigger="has-trigger">Has Trigger</span>
+                <span class="filter-chip" data-trigger="no-trigger">No Trigger</span>
+            `;
+            
+            // Add separator if there are triggers
+            if (triggerSet.size > 0) {
+                triggerFilters.innerHTML += '<span style="margin: 0 8px; color: #ccc;">|</span>';
+            }
+            
+            Array.from(triggerSet).sort().forEach(trigger => {
+                triggerFilters.innerHTML += `<span class="filter-chip" data-trigger="${trigger}">${trigger}</span>`;
+            });
+            
+            // Add click handlers
+            triggerFilters.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    triggerFilters.querySelector('.filter-chip.active').classList.remove('active');
+                    this.classList.add('active');
+                    currentTriggerFilter = this.dataset.trigger;
+                    filterLeads();
+                });
+            });
+        }
+        
+        // Create lead card HTML (simplified for public view)
+        function createLeadCard(lead) {
+            const lastInteraction = lead.last_interaction 
+                ? new Date(lead.last_interaction).toLocaleDateString() 
+                : 'Never';
+            
+            return `
+                <div class="lead-card" data-lead-id="${lead.id}">
+                    <div class="d-flex align-items-start">
+                        <div class="lead-card-content">
+                            <div class="flex-grow-1">
+                                <h5 class="mb-1">${lead.name}</h5>
+                                <p class="mb-2">
+                                    <i class="bi bi-telephone text-muted"></i> ${lead.phone}
+                                    ${lead.niche ? `<span class="ms-3"><i class="bi bi-briefcase text-muted"></i> ${lead.niche}</span>` : ''}
+                                </p>
+                                <div class="d-flex align-items-center">
+                                    <span class="lead-status ${lead.target_status || lead.status}">${(lead.target_status || lead.status || '').toUpperCase()}</span>
+                                    <span class="text-muted small ms-3">Last interaction: ${lastInteraction}</span>
+                                </div>
+                                ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
+                                ${lead.trigger ? `<div class="mt-2"><span class="badge bg-info"><i class="bi bi-lightning"></i> Trigger: ${lead.trigger}</span></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Filter leads
+        function getFilteredLeads() {
+            let filtered = leads;
+            
+            // Status filter
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(lead => (lead.target_status || lead.status) === currentFilter);
+            }
+            
+            // Niche filter
+            if (currentNicheFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.niche) return false;
+                    const niches = lead.niche.split(',').map(n => n.trim());
+                    return niches.includes(currentNicheFilter);
                 });
             }
-        });
-
-        async function loadDeviceInfo() {
-            try {
-                const response = await fetch(`/api/public/device/${deviceId}/info`);
-                const data = await response.json();
-                
-                if (data.device) {
-                    document.getElementById('deviceName').textContent = data.device.name || 'Unknown Device';
-                    document.getElementById('devicePhone').textContent = data.device.phone || 'Not connected';
-                }
-            } catch (error) {
-                console.error('Error loading device info:', error);
+            
+            // Trigger filter
+            if (currentTriggerFilter === 'has-trigger') {
+                filtered = filtered.filter(lead => lead.trigger && lead.trigger.trim() !== '');
+            } else if (currentTriggerFilter === 'no-trigger') {
+                filtered = filtered.filter(lead => !lead.trigger || lead.trigger.trim() === '');
+            } else if (currentTriggerFilter !== 'all') {
+                filtered = filtered.filter(lead => {
+                    if (!lead.trigger) return false;
+                    const triggers = lead.trigger.split(',').map(t => t.trim());
+                    return triggers.includes(currentTriggerFilter);
+                });
+            }
+            
+            // Search filter
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(lead => 
+                    lead.name.toLowerCase().includes(searchTerm) ||
+                    lead.phone.includes(searchTerm) ||
+                    (lead.niche && lead.niche.toLowerCase().includes(searchTerm)) ||
+                    (lead.trigger && lead.trigger.toLowerCase().includes(searchTerm)) ||
+                    (lead.journey && lead.journey.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            return filtered;
+        }
+        
+        // Helper function to format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays === 1) {
+                return 'Yesterday';
+            } else if (diffDays < 7) {
+                return `${diffDays} days ago`;
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             }
         }
-
-        async function loadLeads() {
-            try {
-                const response = await fetch(`/api/public/device/${deviceId}/leads`);
-                const data = await response.json();
-                
-                const tbody = document.getElementById('leadsTableBody');
-                
-                if (!data.leads || data.leads.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No leads found</td></tr>';
-                    return;
-                }
-                
-                tbody.innerHTML = data.leads.map(lead => `
-                    <tr>
-                        <td>${lead.name}</td>
-                        <td>${lead.phone}</td>
-                        <td><span class="badge bg-info">${lead.niche}</span></td>
-                        <td><span class="badge bg-${getStatusColor(lead.target_status)}">${lead.target_status}</span></td>
-                        <td>${lead.trigger || '-'}</td>
-                        <td>${new Date(lead.created_at).toLocaleDateString()}</td>
-                        ${!isPublicView ? `<td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="editLead('${lead.id}')">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteLead('${lead.id}')">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>` : ''}
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading leads:', error);
-                document.getElementById('leadsTableBody').innerHTML = 
-                    '<tr><td colspan="7" class="text-center text-danger">Error loading leads</td></tr>';
-            }
+        
+        // Search leads
+        function searchLeads() {
+            displayLeads();
         }
-
-        function getStatusColor(status) {
-            const colors = {
-                'prospect': 'primary',
-                'reached': 'success',
-                'engaged': 'warning',
-                'converted': 'info',
-                'lost': 'danger'
-            };
-            return colors[status] || 'secondary';
+        
+        // Filter leads
+        function filterLeads() {
+            displayLeads();
         }
-
-        function goToDevice() {
-            window.location.href = `/device/${deviceId}`;
-        }
-
-        // Lead management functions (disabled for public view)
-        function addLead() {
-            if (isPublicView) return;
-            // Implementation for adding lead
-        }
-
-        function importLeads() {
-            if (isPublicView) return;
-            // Implementation for importing leads
-        }
-
-        function editLead(leadId) {
-            if (isPublicView) return;
-            // Implementation for editing lead
-        }
-
-        function deleteLead(leadId) {
-            if (isPublicView) return;
-            // Implementation for deleting lead
+        
+        // Show alert (minimal version)
+        function showAlert(type, message) {
+            console.log(`${type}: ${message}`);
         }
     </script>
 </body>
