@@ -297,7 +297,7 @@
                     </p>
                 </div>
                 <div>
-                    <!-- Hide these buttons for public view -->
+                    <!-- Hide buttons for public view -->
                 </div>
             </div>
         </div>
@@ -347,7 +347,7 @@
                     </div>
                 </div>
                 <div class="col-md-4 text-end">
-                    <!-- Hide select all for public view -->
+                    <!-- Hide Select All for public view -->
                 </div>
             </div>
         </div>
@@ -370,14 +370,13 @@
         // Get device ID from URL
         const pathParts = window.location.pathname.split('/');
         const deviceId = pathParts[pathParts.length - 2];
-        const isPublicView = window.location.pathname.includes('/public/');
+        const isPublicView = true; // Always true for public view
         
         // Global variables
         let leads = [];
         let currentFilter = 'all';
         let currentNicheFilter = 'all';
         let currentTriggerFilter = 'all';
-        let selectedLeads = new Set();
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -418,9 +417,7 @@
         
         // Load device info
         function loadDeviceInfo() {
-            const apiUrl = `/api/public/device/${deviceId}/info`;
-            
-            fetch(apiUrl, { credentials: 'include' })
+            fetch(`/api/public/device/${deviceId}/info`, { credentials: 'include' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.device) {
@@ -616,25 +613,6 @@
             return filtered;
         }
         
-        // Helper function to format date
-        function formatDate(dateStr) {
-            if (!dateStr) return '-';
-            const date = new Date(dateStr);
-            const now = new Date();
-            const diffTime = Math.abs(now - date);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 0) {
-                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            } else if (diffDays === 1) {
-                return 'Yesterday';
-            } else if (diffDays < 7) {
-                return `${diffDays} days ago`;
-            } else {
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            }
-        }
-        
         // Search leads
         function searchLeads() {
             displayLeads();
@@ -643,11 +621,6 @@
         // Filter leads
         function filterLeads() {
             displayLeads();
-        }
-        
-        // Show alert (minimal version)
-        function showAlert(type, message) {
-            console.log(`${type}: ${message}`);
         }
     </script>
 </body>
