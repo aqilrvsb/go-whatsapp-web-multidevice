@@ -530,7 +530,7 @@ func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
 	search := c.Query("search", "")
 	
 	// Build query
-	query := "SELECT id, phone, name, niche, status, created_at FROM leads WHERE device_id = ?"
+	query := "SELECT id, phone, name, niche, target_status, created_at FROM leads WHERE device_id = ?"
 	countQuery := "SELECT COUNT(*) FROM leads WHERE device_id = ?"
 	args := []interface{}{device.ID}
 	
@@ -542,8 +542,8 @@ func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
 	}
 	
 	if status != "" && status != "all" {
-		query += " AND status = ?"
-		countQuery += " AND status = ?"
+		query += " AND target_status = ?"
+		countQuery += " AND target_status = ?"
 		args = append(args, status)
 	}
 	
@@ -574,26 +574,26 @@ func (api *PublicDeviceAPI) GetLeads(c *fiber.Ctx) error {
 	leads := []fiber.Map{}
 	for rows.Next() {
 		var lead struct {
-			ID        string
-			Phone     string
-			Name      sql.NullString
-			Niche     sql.NullString
-			Status    sql.NullString
-			CreatedAt time.Time
+			ID           string
+			Phone        string
+			Name         sql.NullString
+			Niche        sql.NullString
+			TargetStatus sql.NullString
+			CreatedAt    time.Time
 		}
 		
-		err := rows.Scan(&lead.ID, &lead.Phone, &lead.Name, &lead.Niche, &lead.Status, &lead.CreatedAt)
+		err := rows.Scan(&lead.ID, &lead.Phone, &lead.Name, &lead.Niche, &lead.TargetStatus, &lead.CreatedAt)
 		if err != nil {
 			continue
 		}
 		
 		leads = append(leads, fiber.Map{
-			"id":         lead.ID,
-			"phone":      lead.Phone,
-			"name":       lead.Name.String,
-			"niche":      lead.Niche.String,
-			"status":     lead.Status.String,
-			"created_at": lead.CreatedAt.Format("2006-01-02 15:04:05"),
+			"id":            lead.ID,
+			"phone":         lead.Phone,
+			"name":          lead.Name.String,
+			"niche":         lead.Niche.String,
+			"target_status": lead.TargetStatus.String,
+			"created_at":    lead.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	
@@ -623,10 +623,10 @@ func (api *PublicDeviceAPI) CreateLead(c *fiber.Ctx) error {
 	}
 	
 	var lead struct {
-		Phone  string `json:"phone"`
-		Name   string `json:"name"`
-		Niche  string `json:"niche"`
-		Status string `json:"status"`
+		Phone        string `json:"phone"`
+		Name         string `json:"name"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
 	}
 	
 	if err := c.BodyParser(&lead); err != nil {
@@ -635,8 +635,8 @@ func (api *PublicDeviceAPI) CreateLead(c *fiber.Ctx) error {
 	
 	// Insert lead
 	result, err := api.db.Exec(
-		"INSERT INTO leads (device_id, phone, name, niche, status) VALUES (?, ?, ?, ?, ?)",
-		device.ID, lead.Phone, lead.Name, lead.Niche, lead.Status,
+		"INSERT INTO leads (device_id, phone, name, niche, target_status) VALUES (?, ?, ?, ?, ?)",
+		device.ID, lead.Phone, lead.Name, lead.Niche, lead.TargetStatus,
 	)
 	
 	if err != nil {
@@ -665,10 +665,10 @@ func (api *PublicDeviceAPI) UpdateLead(c *fiber.Ctx) error {
 	}
 	
 	var lead struct {
-		Phone  string `json:"phone"`
-		Name   string `json:"name"`
-		Niche  string `json:"niche"`
-		Status string `json:"status"`
+		Phone        string `json:"phone"`
+		Name         string `json:"name"`
+		Niche        string `json:"niche"`
+		TargetStatus string `json:"target_status"`
 	}
 	
 	if err := c.BodyParser(&lead); err != nil {
@@ -677,8 +677,8 @@ func (api *PublicDeviceAPI) UpdateLead(c *fiber.Ctx) error {
 	
 	// Update lead
 	_, err = api.db.Exec(
-		"UPDATE leads SET phone = ?, name = ?, niche = ?, status = ? WHERE id = ? AND device_id = ?",
-		lead.Phone, lead.Name, lead.Niche, lead.Status, leadID, device.ID,
+		"UPDATE leads SET phone = ?, name = ?, niche = ?, target_status = ? WHERE id = ? AND device_id = ?",
+		lead.Phone, lead.Name, lead.Niche, lead.TargetStatus, leadID, device.ID,
 	)
 	
 	if err != nil {
