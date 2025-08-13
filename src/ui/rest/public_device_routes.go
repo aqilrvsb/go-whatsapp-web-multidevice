@@ -184,10 +184,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			WHERE device_id = ?
 			GROUP BY campaign_id
 		) stats ON c.id = stats.campaign_id
-		WHERE c.device_id = ?
+		WHERE c.user_id = ?
 	`
 	
-	args := []interface{}{device.ID, device.ID}
+	args := []interface{}{device.ID, device.UserID}
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
@@ -326,14 +326,14 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			WHERE device_id = ? AND sequence_id IS NOT NULL
 			GROUP BY sequence_id
 		) messages ON s.id = messages.sequence_id
-		WHERE s.device_id = ?
+		WHERE s.user_id = ?
 		GROUP BY s.id, s.sequence_name, s.description, s.niche, s.target_status, 
 				 s.start_trigger, s.time_schedule, s.is_active, s.created_at,
 				 messages.total_sent, messages.total_failed, messages.total_pending
 		ORDER BY s.created_at DESC
 	`
 	
-	args := []interface{}{device.ID, device.ID}
+	args := []interface{}{device.ID, device.UserID}
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
@@ -774,9 +774,9 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 		SELECT id, campaign_name, niche, target_status, campaign_date, 
 		       time_schedule, campaign_status, message_template, image_url
 		FROM campaigns 
-		WHERE device_id = ?
+		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
-	`, device.ID)
+	`, device.UserID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
@@ -857,10 +857,10 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		FROM sequences s
 		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		WHERE s.device_id = ?
+		WHERE s.user_id = ?
 		GROUP BY s.id, s.sequence_name, s.start_trigger, s.is_active
 		ORDER BY s.created_at DESC
-	`, device.ID)
+	`, device.UserID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
