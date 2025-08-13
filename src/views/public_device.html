@@ -5951,9 +5951,9 @@
                 .then(response => response.json())
                 .then(data => {
                     // Handle different response formats
-                    if (isPublicView && data.campaigns) {
-                        // Public API format
-                        displayCampaignSummary(data.campaigns);
+                    if (isPublicView && data.recent_campaigns) {
+                        // Public API format - pass the entire data object
+                        displayCampaignSummary(data);
                     } else if (data.code === 'SUCCESS' && data.results) {
                         // Authenticated API format
                         displayCampaignSummary(data.results);
