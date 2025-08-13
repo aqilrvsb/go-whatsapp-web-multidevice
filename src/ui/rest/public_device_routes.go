@@ -764,7 +764,7 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	
 	// Verify device exists
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByID(deviceID)
+	_, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
@@ -845,7 +845,7 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	
 	// Verify device exists
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByID(deviceID)
+	_, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
