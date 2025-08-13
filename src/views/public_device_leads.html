@@ -417,7 +417,7 @@
         
         // Load device info
         function loadDeviceInfo() {
-            fetch(`/api/public/device/${deviceId}/info`, { credentials: 'include' })
+            fetch(`/api/public/device/${deviceId}/info`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.device) {
@@ -435,7 +435,10 @@
                 .then(response => response.json())
                 .then(data => {
                     // Handle the response format from public API
-                    if (data.leads && Array.isArray(data.leads)) {
+                    if (data.code === 'SUCCESS' && data.results && data.results.leads && Array.isArray(data.results.leads)) {
+                        leads = data.results.leads;
+                        document.getElementById('totalLeads').textContent = data.results.pagination ? data.results.pagination.total : leads.length;
+                    } else if (data.leads && Array.isArray(data.leads)) {
                         leads = data.leads;
                         document.getElementById('totalLeads').textContent = leads.length;
                         buildNicheFilters();
