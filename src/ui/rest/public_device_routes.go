@@ -184,10 +184,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			WHERE device_id = ?
 			GROUP BY campaign_id
 		) stats ON c.id = stats.campaign_id
-		WHERE c.user_id = ?
+		WHERE c.device_id = ?
 	`
 	
-	args := []interface{}{device.ID, device.UserID}
+	args := []interface{}{device.ID, device.ID}
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
@@ -326,14 +326,14 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			WHERE device_id = ? AND sequence_id IS NOT NULL
 			GROUP BY sequence_id
 		) messages ON s.id = messages.sequence_id
-		WHERE s.user_id = ?
+		WHERE s.device_id = ?
 		GROUP BY s.id, s.sequence_name, s.description, s.niche, s.target_status, 
 				 s.start_trigger, s.time_schedule, s.is_active, s.created_at,
 				 messages.total_sent, messages.total_failed, messages.total_pending
 		ORDER BY s.created_at DESC
 	`
 	
-	args := []interface{}{device.ID, device.UserID}
+	args := []interface{}{device.ID, device.ID}
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
@@ -769,6 +769,13 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
+	// Get user_id from device
+	var userID string
+	err = api.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", deviceID).Scan(&userID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
+	}
+	
 	// Get campaigns
 	rows, err := api.db.Query(`
 		SELECT id, campaign_name, niche, target_status, campaign_date, 
@@ -776,7 +783,7 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 		FROM campaigns 
 		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
-	`, device.UserID)
+	`, userID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
@@ -843,6 +850,13 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
+	// Get user_id from device
+	var userID string
+	err = api.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", deviceID).Scan(&userID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
+	}
+	
 	// Get sequences with statistics
 	rows, err := api.db.Query(`
 		SELECT 
@@ -860,7 +874,7 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		WHERE s.user_id = ?
 		GROUP BY s.id, s.sequence_name, s.start_trigger, s.is_active
 		ORDER BY s.created_at DESC
-	`, device.UserID)
+	`, userID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
