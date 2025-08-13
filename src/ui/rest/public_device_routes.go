@@ -766,8 +766,11 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
+		logrus.Errorf("GetDeviceCampaigns - Device not found: %s, error: %v", deviceID, err)
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
+	
+	logrus.Infof("GetDeviceCampaigns - Device found: %s, UserID: %s", device.ID, device.UserID)
 	
 	// Get campaigns filtered by user_id
 	rows, err := api.db.Query(`
@@ -779,6 +782,7 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	`, device.UserID)
 	
 	if err != nil {
+		logrus.Errorf("GetDeviceCampaigns - Query failed for user %s: %v", device.UserID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
 	}
 	defer rows.Close()
@@ -840,8 +844,11 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
+		logrus.Errorf("GetDeviceSequences - Device not found: %s, error: %v", deviceID, err)
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
+	
+	logrus.Infof("GetDeviceSequences - Device found: %s, UserID: %s", device.ID, device.UserID)
 	
 	// Get sequences with statistics filtered by user_id
 	rows, err := api.db.Query(`
@@ -863,6 +870,7 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	`, device.UserID)
 	
 	if err != nil {
+		logrus.Errorf("GetDeviceSequences - Query failed for user %s: %v", device.UserID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
 	}
 	defer rows.Close()
