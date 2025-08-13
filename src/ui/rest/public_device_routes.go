@@ -178,14 +178,15 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			c.message,
 			c.image_url,
 			c.ai,
+			COALESCE(stats.total_contacts, 0) as total_contacts,
 			COALESCE(stats.total_sent, 0) as total_sent,
 			COALESCE(stats.total_failed, 0) as total_failed,
-			COALESCE(stats.total_pending, 0) as total_pending,
-			COALESCE(leads_count.total_leads, 0) as total_leads
+			COALESCE(stats.total_pending, 0) as total_pending
 		FROM campaigns c
 		LEFT JOIN (
 			SELECT 
 				campaign_id,
+				COUNT(*) as total_contacts,
 				SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_sent,
 				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
 				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
@@ -193,16 +194,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			WHERE device_id = ?
 			GROUP BY campaign_id
 		) stats ON c.id = stats.campaign_id
-		LEFT JOIN (
-			SELECT 
-				COUNT(*) as total_leads
-			FROM leads
-			WHERE user_id = ?
-		) leads_count ON 1=1
 		WHERE c.user_id = ?
 	`
 	
-	args := []interface{}{device.ID, userID, userID}
+	args := []interface{}{device.ID, userID}
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
@@ -233,10 +228,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			MessageTemplate sql.NullString
 			ImageURL       sql.NullString
 			AI             sql.NullString
+			TotalContacts  int
 			TotalSent      int
 			TotalFailed    int
 			TotalPending   int
-			TotalLeads     int
 		}
 		
 		err := rows.Scan(
@@ -250,10 +245,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			&campaign.MessageTemplate,
 			&campaign.ImageURL,
 			&campaign.AI,
+			&campaign.TotalContacts,
 			&campaign.TotalSent,
 			&campaign.TotalFailed,
 			&campaign.TotalPending,
-			&campaign.TotalLeads,
 		)
 		
 		if err != nil {
@@ -285,11 +280,11 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			"total_sent":       campaign.TotalSent,
 			"total_failed":     campaign.TotalFailed,
 			"total_pending":    campaign.TotalPending,
-			"total_contacts":   campaign.TotalLeads,
+			"total_contacts":   campaign.TotalContacts,
 			"done_send":        campaign.TotalSent,
 			"failed_send":      campaign.TotalFailed,
 			"remaining_send":   campaign.TotalPending,
-			"should_send":      campaign.TotalLeads,
+			"should_send":      campaign.TotalContacts,
 		})
 	}
 	
@@ -309,7 +304,7 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 		if pending, ok := campaign["total_pending"].(int); ok {
 			totalPending += pending
 		}
-		if contacts, ok := campaign["total_contacts"].(int); ok {
+		if contacts, ok := campaign["should_send"].(int); ok {
 			totalContacts += contacts
 		}
 	}
@@ -375,15 +370,16 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			s.created_at,
 			COUNT(DISTINCT sc.id) as total_contacts,
 			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_count,
+			COALESCE(messages.total_contacts, 0) as total_message_contacts,
 			COALESCE(messages.total_sent, 0) as total_sent,
 			COALESCE(messages.total_failed, 0) as total_failed,
-			COALESCE(messages.total_pending, 0) as total_pending,
-			COALESCE(leads_count.total_leads, 0) as total_leads
+			COALESCE(messages.total_pending, 0) as total_pending
 		FROM sequences s
 		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
 		LEFT JOIN (
 			SELECT 
 				sequence_id,
+				COUNT(*) as total_contacts,
 				SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_sent,
 				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
 				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
@@ -391,21 +387,14 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			WHERE device_id = ? AND sequence_id IS NOT NULL
 			GROUP BY sequence_id
 		) messages ON s.id = messages.sequence_id
-		LEFT JOIN (
-			SELECT 
-				COUNT(*) as total_leads
-			FROM leads
-			WHERE user_id = ?
-		) leads_count ON 1=1
 		WHERE s.user_id = ?
 		GROUP BY s.id, s.name, s.description, s.niche, s.target_status, 
 				 s.trigger, s.time_schedule, s.is_active, s.created_at,
-				 messages.total_sent, messages.total_failed, messages.total_pending,
-				 leads_count.total_leads
+				 messages.total_contacts, messages.total_sent, messages.total_failed, messages.total_pending
 		ORDER BY s.created_at DESC
 	`
 	
-	args := []interface{}{device.ID, userID, userID}
+	args := []interface{}{device.ID, userID}
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
@@ -420,25 +409,24 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	totalFailed := 0
 	totalPending := 0
 	totalContacts := 0
-	totalLeadsCount := 0
 	
 	for rows.Next() {
 		var seq struct {
-			ID             string
-			Name           string
-			Description    sql.NullString
-			Niche          sql.NullString
-			TargetStatus   sql.NullString
-			StartTrigger   string
-			TimeSchedule   sql.NullString
-			IsActive       bool
-			CreatedAt      time.Time
-			TotalContacts  int
-			CompletedCount int
-			TotalSent      int
-			TotalFailed    int
-			TotalPending   int
-			TotalLeads     int
+			ID                   string
+			Name                 string
+			Description          sql.NullString
+			Niche                sql.NullString
+			TargetStatus         sql.NullString
+			StartTrigger         string
+			TimeSchedule         sql.NullString
+			IsActive             bool
+			CreatedAt            time.Time
+			TotalContacts        int
+			CompletedCount       int
+			TotalMessageContacts int
+			TotalSent            int
+			TotalFailed          int
+			TotalPending         int
 		}
 		
 		err := rows.Scan(
@@ -453,10 +441,10 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			&seq.CreatedAt,
 			&seq.TotalContacts,
 			&seq.CompletedCount,
+			&seq.TotalMessageContacts,
 			&seq.TotalSent,
 			&seq.TotalFailed,
 			&seq.TotalPending,
-			&seq.TotalLeads,
 		)
 		
 		if err != nil {
@@ -468,8 +456,7 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		totalSent += seq.TotalSent
 		totalFailed += seq.TotalFailed
 		totalPending += seq.TotalPending
-		totalContacts += seq.TotalContacts
-		totalLeadsCount = seq.TotalLeads // Same for all sequences
+		totalContacts += seq.TotalMessageContacts
 		
 		// Calculate completion rate
 		completionRate := 0.0
@@ -501,7 +488,7 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		"sequences": sequences,
 		"summary": fiber.Map{
 			"total_sequences": len(sequences),
-			"total_contacts":  totalLeadsCount,
+			"total_contacts":  totalContacts,
 			"total_sent":      totalSent,
 			"total_failed":    totalFailed,
 			"total_pending":   totalPending,
