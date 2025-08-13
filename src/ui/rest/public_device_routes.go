@@ -191,7 +191,7 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
 				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
 			FROM broadcast_messages
-			WHERE device_id = ?
+			WHERE device_id = ? AND campaign_id IS NOT NULL
 			GROUP BY campaign_id
 		) stats ON c.id = stats.campaign_id
 		WHERE c.user_id = ?
@@ -294,6 +294,33 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 	totalPending := 0
 	totalContacts := 0
 	
+	// Also get overall broadcast stats for campaigns only
+	var broadcastStats struct {
+		TotalShouldSend   int
+		TotalDoneSend     int
+		TotalFailedSend   int
+		TotalRemainingSend int
+	}
+	
+	err = api.db.QueryRow(`
+		SELECT 
+			COUNT(*) as total_should_send,
+			SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_done_send,
+			SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed_send,
+			SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_remaining_send
+		FROM broadcast_messages
+		WHERE device_id = ? AND campaign_id IS NOT NULL
+	`, device.ID).Scan(
+		&broadcastStats.TotalShouldSend,
+		&broadcastStats.TotalDoneSend,
+		&broadcastStats.TotalFailedSend,
+		&broadcastStats.TotalRemainingSend,
+	)
+	
+	if err != nil {
+		logrus.Warnf("Failed to get broadcast stats: %v", err)
+	}
+	
 	for _, campaign := range campaigns {
 		if sent, ok := campaign["total_sent"].(int); ok {
 			totalSent += sent
@@ -320,10 +347,10 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			"failed":     0, // You can calculate this based on status
 		},
 		"broadcast_stats": fiber.Map{
-			"total_should_send":    totalContacts,
-			"total_done_send":      totalSent,
-			"total_failed_send":    totalFailed,
-			"total_remaining_send": totalPending,
+			"total_should_send":    broadcastStats.TotalShouldSend,
+			"total_done_send":      broadcastStats.TotalDoneSend,
+			"total_failed_send":    broadcastStats.TotalFailedSend,
+			"total_remaining_send": broadcastStats.TotalRemainingSend,
 		},
 		"total": len(campaigns),
 	})
