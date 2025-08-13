@@ -25,11 +25,17 @@
         .navbar {
             background-color: white !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            padding: 0.5rem 0;
         }
 
         .navbar-brand {
             color: var(--primary) !important;
             font-weight: 600;
+        }
+        
+        .navigation-bar {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
         }
 
         .metric-card {
@@ -100,9 +106,27 @@
             height: 350px;
         }
 
+        /* Tab content padding */
+        .tab-content {
+            padding: 20px;
+            background-color: var(--light-bg);
+        }
+        
         /* Full width layout for all tabs */
         .tab-pane {
+            padding: 0;
+        }
+        
+        /* Container styling to match dashboard */
+        .container-fluid {
             padding: 0 20px;
+        }
+        
+        /* Main tabs container */
+        #mainTabs {
+            background-color: white;
+            padding: 0 20px;
+            margin-bottom: 0;
         }
         
         #campaignCalendar {
@@ -198,6 +222,9 @@
 
         .nav-tabs {
             border-bottom: 2px solid #e9ecef;
+            background-color: white;
+            padding: 0 20px;
+            margin: 0;
         }
 
         .nav-tabs .nav-link {
@@ -585,7 +612,7 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container">
+        <div class="container-fluid">
             <a class="navbar-brand" href="/">
                 <i class="bi bi-whatsapp"></i> WhatsApp Analytics
             </a>
@@ -602,7 +629,7 @@
 
     <!-- Navigation Bar -->
     <div class="navigation-bar bg-light py-2 px-3 border-bottom">
-        <div class="container d-flex justify-content-between align-items-center">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
             <div>
                 <button class="btn btn-sm btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-arrow-left"></i> Back
@@ -610,19 +637,6 @@
                 <button class="btn btn-sm btn-outline-primary ms-2" onclick="window.location.href='/dashboard'">
                     <i class="bi bi-house"></i> Home
                 </button>
-                
-                <!-- System Status Icons - HIDDEN -->
-                <!-- <div class="btn-group ms-3" role="group">
-                    <button class="btn btn-sm btn-outline-success" onclick="checkRedisStatus()" title="Check Redis Status">
-                        <i class="bi bi-database-check"></i> Redis
-                    </button>
-                    <button class="btn btn-sm btn-outline-info" onclick="checkDeviceWorker()" title="Check Device Worker">
-                        <i class="bi bi-cpu"></i> Device Worker
-                    </button>
-                    <button class="btn btn-sm btn-outline-warning" onclick="checkAllWorkers()" title="Check All Workers">
-                        <i class="bi bi-diagram-3"></i> All Workers
-                    </button>
-                </div> -->
             </div>
             <div class="breadcrumb mb-0">
                 <span class="text-muted">You are here: </span>
@@ -630,9 +644,11 @@
             </div>
         </div>
     </div>
+        </div>
+    </div>
 
     <!-- Main Content -->
-    <div class="container-fluid mt-4 px-4">
+    <div class="container-fluid mt-4">
         <!-- Tabs -->
         <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
             <li class="nav-item" role="presentation">
