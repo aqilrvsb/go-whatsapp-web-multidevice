@@ -293,9 +293,44 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Calculate totals from campaigns
+	totalSent := 0
+	totalFailed := 0
+	totalPending := 0
+	totalContacts := 0
+	
+	for _, campaign := range campaigns {
+		if sent, ok := campaign["total_sent"].(int); ok {
+			totalSent += sent
+		}
+		if failed, ok := campaign["total_failed"].(int); ok {
+			totalFailed += failed
+		}
+		if pending, ok := campaign["total_pending"].(int); ok {
+			totalPending += pending
+		}
+		if contacts, ok := campaign["total_contacts"].(int); ok {
+			totalContacts += contacts
+		}
+	}
+	
 	return c.JSON(fiber.Map{
-		"campaigns": campaigns,
-		"total":     len(campaigns),
+		"recent_campaigns": campaigns,
+		"campaigns": fiber.Map{
+			"total":      len(campaigns),
+			"pending":    0, // You can calculate this based on status
+			"triggered":  0, // You can calculate this based on status
+			"processing": 0, // You can calculate this based on status
+			"completed":  0, // You can calculate this based on status
+			"failed":     0, // You can calculate this based on status
+		},
+		"broadcast_stats": fiber.Map{
+			"total_should_send":    totalContacts,
+			"total_done_send":      totalSent,
+			"total_failed_send":    totalFailed,
+			"total_remaining_send": totalPending,
+		},
+		"total": len(campaigns),
 	})
 }
 
