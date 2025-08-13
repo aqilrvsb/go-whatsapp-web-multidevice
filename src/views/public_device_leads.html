@@ -115,7 +115,7 @@
             color: var(--primary);
         }
 
-        .lead-status {
+        .lead-target_status {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 20px;
@@ -123,27 +123,27 @@
             font-weight: 500;
         }
 
-        .lead-status.new {
+        .lead-target_status.new {
             background: #e3f2fd;
             color: #1976d2;
         }
 
-        .lead-status.contacted {
+        .lead-target_status.contacted {
             background: #fff3e0;
             color: #f57c00;
         }
 
-        .lead-status.qualified {
+        .lead-target_status.qualified {
             background: #e8f5e9;
             color: #388e3c;
         }
 
-        .lead-status.converted {
+        .lead-target_status.converted {
             background: #f3e5f5;
             color: #7b1fa2;
         }
 
-        .lead-status.lost {
+        .lead-target_status.lost {
             background: #ffebee;
             color: #c62828;
         }
@@ -356,7 +356,12 @@
                     </div>
                 </div>
                 <div class="col-md-4 text-end">
-                    <!-- Hide Select All for public view -->
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        <label class="form-check-label" for="selectAll">
+                            Select All
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -729,7 +734,7 @@
                                     ${lead.niche ? `<span class="ms-3"><i class="bi bi-briefcase text-muted"></i> ${lead.niche}</span>` : ''}
                                 </p>
                                 <div class="d-flex align-items-center">
-                                    <span class="lead-status ${lead.target_status || lead.status}">${(lead.target_status || lead.status || '').toUpperCase()}</span>
+                                    <span class="lead-target_status ${lead.target_status || lead.status}">${(lead.target_status || lead.status || '').toUpperCase()}</span>
                                     <span class="text-muted small ms-3">Last interaction: ${lastInteraction}</span>
                                 </div>
                                 ${lead.journey ? `<div class="lead-journey">${lead.journey}</div>` : ''}
