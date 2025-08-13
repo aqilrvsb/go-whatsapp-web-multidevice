@@ -764,26 +764,19 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	
 	// Verify device exists
 	userRepo := repository.GetUserRepository()
-	_, err := userRepo.GetDeviceByID(deviceID)
+	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
-	// Get user_id from device
-	var userID string
-	err = api.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", deviceID).Scan(&userID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
-	}
-	
-	// Get campaigns
+	// Get campaigns filtered by user_id
 	rows, err := api.db.Query(`
 		SELECT id, campaign_name, niche, target_status, campaign_date, 
 		       time_schedule, campaign_status, message_template, image_url
 		FROM campaigns 
 		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
-	`, userID)
+	`, device.UserID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
@@ -845,19 +838,12 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	
 	// Verify device exists
 	userRepo := repository.GetUserRepository()
-	_, err := userRepo.GetDeviceByID(deviceID)
+	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
-	// Get user_id from device
-	var userID string
-	err = api.db.QueryRow("SELECT user_id FROM user_devices WHERE id = ?", deviceID).Scan(&userID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
-	}
-	
-	// Get sequences with statistics
+	// Get sequences with statistics filtered by user_id
 	rows, err := api.db.Query(`
 		SELECT 
 			s.id,
@@ -874,7 +860,7 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		WHERE s.user_id = ?
 		GROUP BY s.id, s.sequence_name, s.start_trigger, s.is_active
 		ORDER BY s.created_at DESC
-	`, userID)
+	`, device.UserID)
 	
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
