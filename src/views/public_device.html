@@ -120,12 +120,13 @@
         .device-card {
             background: white;
             border-radius: 8px;
-            padding: 12px;
+            padding: 20px;
             box-shadow: var(--card-shadow);
             border: 1px solid #e9ecef;
             transition: all 0.3s;
             height: 100%;
             position: relative;
+            margin-bottom: 20px;
         }
 
         .device-card.connected {
@@ -2739,7 +2740,7 @@
             const phoneDisplay = device.phone && device.phone !== 'Not connected' ? device.phone : null;
             
             return `
-                <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="col-lg-12 col-md-12 col-sm-12">
                     <div class="device-card ${isConnected ? 'connected' : ''}">
                         <!-- Card Header -->
                         <div class="d-flex flex-column align-items-center text-center mb-3">
@@ -2747,7 +2748,7 @@
                                 <i class="bi bi-phone-fill" style="font-size: 24px; color: ${isConnected ? 'var(--success)' : '#6c757d'};"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1">${device.name}</h6>
+                                <h6 class="mb-1">${device.name || device.device_name || 'Unknown Device'}</h6>
                                 <div class="d-flex align-items-center justify-content-center">
                                     <span class="device-status ${device.status}"></span>
                                     <span class="text-muted small">${isConnected ? 'Connected' : 'Disconnected'}</span>
