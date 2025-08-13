@@ -4555,7 +4555,7 @@
         function loadCampaigns() {
             // Load campaigns from API
             const apiUrl = isPublicView 
-                ? `/api/public/device/${publicDeviceId}/campaign-summary`
+                ? `/api/public/device/${publicDeviceId}/campaigns`
                 : '/api/campaigns';
                 
             const fetchOptions = isPublicView ? {} : { credentials: 'include' };
@@ -4567,12 +4567,12 @@
                     
                     // Handle different response formats
                     let campaignArray = [];
-                    if (isPublicView && data.campaigns) {
-                        // Public API format
-                        campaignArray = data.campaigns;
-                    } else if (data.code === 'SUCCESS' && data.results !== null) {
-                        // Authenticated API format
+                    if (data.code === 'SUCCESS' && data.results !== null) {
+                        // Both authenticated and public API format
                         campaignArray = Array.isArray(data.results) ? data.results : [];
+                    } else if (data.campaigns) {
+                        // Legacy format
+                        campaignArray = data.campaigns;
                     }
                     
                     campaigns = {};
