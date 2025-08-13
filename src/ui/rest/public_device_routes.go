@@ -169,15 +169,15 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 	query := `
 		SELECT 
 			c.id,
-			c.campaign_name as title,
+			c.title,
 			c.niche,
 			c.target_status,
 			c.campaign_date,
 			c.time_schedule,
-			c.campaign_status as status,
-			c.message_template,
+			c.status,
+			c.message,
 			c.image_url,
-			c.ai_generated,
+			c.ai,
 			COALESCE(stats.total_sent, 0) as total_sent,
 			COALESCE(stats.total_failed, 0) as total_failed,
 			COALESCE(stats.total_pending, 0) as total_pending
@@ -225,7 +225,7 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			Status         string
 			MessageTemplate sql.NullString
 			ImageURL       sql.NullString
-			AIGenerated    bool
+			AI             sql.NullString
 			TotalSent      int
 			TotalFailed    int
 			TotalPending   int
@@ -241,7 +241,7 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			&campaign.Status,
 			&campaign.MessageTemplate,
 			&campaign.ImageURL,
-			&campaign.AIGenerated,
+			&campaign.AI,
 			&campaign.TotalSent,
 			&campaign.TotalFailed,
 			&campaign.TotalPending,
@@ -272,7 +272,7 @@ func (api *PublicDeviceAPI) GetCampaignSummary(c *fiber.Ctx) error {
 			"status":           status,
 			"message_template": campaign.MessageTemplate.String,
 			"image_url":        campaign.ImageURL.String,
-			"ai":               map[bool]string{true: "ai", false: "manual"}[campaign.AIGenerated],
+			"ai":               campaign.AI.String,
 			"total_sent":       campaign.TotalSent,
 			"total_failed":     campaign.TotalFailed,
 			"total_pending":    campaign.TotalPending,
@@ -317,11 +317,11 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	query := `
 		SELECT 
 			s.id,
-			s.sequence_name,
+			s.name,
 			s.description,
 			s.niche,
 			s.target_status,
-			s.start_trigger,
+			s.trigger,
 			s.time_schedule,
 			s.is_active,
 			s.created_at,
@@ -343,8 +343,8 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			GROUP BY sequence_id
 		) messages ON s.id = messages.sequence_id
 		WHERE s.user_id = ?
-		GROUP BY s.id, s.sequence_name, s.description, s.niche, s.target_status, 
-				 s.start_trigger, s.time_schedule, s.is_active, s.created_at,
+		GROUP BY s.id, s.name, s.description, s.niche, s.target_status, 
+				 s.trigger, s.time_schedule, s.is_active, s.created_at,
 				 messages.total_sent, messages.total_failed, messages.total_pending
 		ORDER BY s.created_at DESC
 	`
@@ -795,8 +795,8 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	
 	// Get campaigns filtered by user_id (not device_id)
 	rows, err := api.db.Query(`
-		SELECT id, campaign_name, niche, target_status, campaign_date, 
-		       time_schedule, campaign_status, message_template, image_url
+		SELECT id, title, niche, target_status, campaign_date, 
+		       time_schedule, status, message, image_url
 		FROM campaigns 
 		WHERE user_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
@@ -879,8 +879,8 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	rows, err := api.db.Query(`
 		SELECT 
 			s.id,
-			s.sequence_name as name,
-			s.start_trigger as trigger,
+			s.name,
+			s.trigger,
 			s.is_active,
 			COUNT(DISTINCT ss.id) as total_flows,
 			COUNT(DISTINCT sc.id) as total_contacts,
@@ -890,7 +890,7 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
 		WHERE s.user_id = ?
-		GROUP BY s.id, s.sequence_name, s.start_trigger, s.is_active
+		GROUP BY s.id, s.name, s.trigger, s.is_active
 		ORDER BY s.created_at DESC
 	`, userID)
 	
