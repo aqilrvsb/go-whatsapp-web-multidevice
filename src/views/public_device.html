@@ -102,13 +102,12 @@
 
         /* Tab content padding */
         .tab-content {
-            padding: 20px;
             background-color: var(--light-bg);
         }
         
         /* Full width layout for all tabs */
         .tab-pane {
-            padding: 0;
+            padding: 20px 0;
         }
         
         #campaignCalendar {
@@ -930,7 +929,11 @@
                 </div>
                 
                 <!-- Calendar Container -->
-                <div id="campaignCalendar"></div>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="campaignCalendar"></div>
+                    </div>
+                </div>
             </div>
             
             <!-- Sequences Tab -->
