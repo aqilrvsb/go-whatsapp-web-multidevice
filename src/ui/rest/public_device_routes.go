@@ -864,13 +864,16 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 		
 		campaigns = append(campaigns, fiber.Map{
 			"id":               campaign.ID,
+			"title":            campaign.Name,
 			"campaign_name":    campaign.Name,
 			"niche":            campaign.Niche.String,
 			"target_status":    campaign.TargetStatus.String,
 			"campaign_date":    campaign.CampaignDate,
 			"time_schedule":    campaign.TimeSchedule.String,
+			"status":           campaign.Status,
 			"campaign_status":  campaign.Status,
 			"message_template": campaign.MessageTemplate.String,
+			"message":          campaign.MessageTemplate.String,
 			"image_url":        campaign.ImageURL.String,
 		})
 	}
