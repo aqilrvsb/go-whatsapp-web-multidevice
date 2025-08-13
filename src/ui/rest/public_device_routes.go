@@ -766,42 +766,19 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
-		logrus.Errorf("GetDeviceCampaigns - Device not found: %s, error: %v", deviceID, err)
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
-	// Log all device details
-	logrus.Infof("GetDeviceCampaigns - Device details: ID=%s, UserID=%s, Name=%s, Phone=%s, Status=%s", 
-		device.ID, device.UserID, device.DeviceName, device.Phone, device.Status)
-	
-	// If UserID is empty, that's our problem
-	if device.UserID == "" {
-		logrus.Errorf("GetDeviceCampaigns - Device %s has no UserID!", device.ID)
-		return c.Status(500).JSON(fiber.Map{"error": "Device has no associated user"})
-	}
-	
-	logrus.Infof("GetDeviceCampaigns - Device found: %s, UserID: %s", device.ID, device.UserID)
-	
-	// Debug: Let's see what user this device belongs to
-	var userEmail string
-	err = api.db.QueryRow("SELECT email FROM users WHERE id = ?", device.UserID).Scan(&userEmail)
-	if err != nil {
-		logrus.Errorf("GetDeviceCampaigns - Failed to get user email for UserID %s: %v", device.UserID, err)
-	} else {
-		logrus.Infof("GetDeviceCampaigns - Device belongs to user: %s", userEmail)
-	}
-	
-	// Get campaigns filtered by user_id
+	// Get campaigns filtered by device_id
 	rows, err := api.db.Query(`
 		SELECT id, campaign_name, niche, target_status, campaign_date, 
 		       time_schedule, campaign_status, message_template, image_url
 		FROM campaigns 
-		WHERE user_id = ?
+		WHERE device_id = ?
 		ORDER BY campaign_date DESC, time_schedule DESC
-	`, device.UserID)
+	`, device.ID)
 	
 	if err != nil {
-		logrus.Errorf("GetDeviceCampaigns - Query failed for user %s: %v", device.UserID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch campaigns"})
 	}
 	defer rows.Close()
@@ -863,13 +840,10 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 	userRepo := repository.GetUserRepository()
 	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
-		logrus.Errorf("GetDeviceSequences - Device not found: %s, error: %v", deviceID, err)
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
-	logrus.Infof("GetDeviceSequences - Device found: %s, UserID: %s", device.ID, device.UserID)
-	
-	// Get sequences with statistics filtered by user_id
+	// Get sequences with statistics filtered by device_id
 	rows, err := api.db.Query(`
 		SELECT 
 			s.id,
@@ -883,13 +857,12 @@ func (api *PublicDeviceAPI) GetDeviceSequences(c *fiber.Ctx) error {
 		FROM sequences s
 		LEFT JOIN sequence_steps ss ON s.id = ss.sequence_id
 		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		WHERE s.user_id = ?
+		WHERE s.device_id = ?
 		GROUP BY s.id, s.sequence_name, s.start_trigger, s.is_active
 		ORDER BY s.created_at DESC
-	`, device.UserID)
+	`, device.ID)
 	
 	if err != nil {
-		logrus.Errorf("GetDeviceSequences - Query failed for user %s: %v", device.UserID, err)
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
 	}
 	defer rows.Close()
