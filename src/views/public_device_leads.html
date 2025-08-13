@@ -297,7 +297,16 @@
                     </p>
                 </div>
                 <div>
-                    <!-- Hide buttons for public view -->
+                    <button class="btn btn-outline-primary me-2" onclick="exportLeads()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                    <button class="btn btn-outline-primary me-2" onclick="document.getElementById('importFile').click()">
+                        <i class="bi bi-upload"></i> Import
+                    </button>
+                    <input type="file" id="importFile" accept=".csv" style="display: none;" onchange="importLeads(this)">
+                    <button class="add-lead-btn" onclick="openAddLeadModal()">
+                        <i class="bi bi-plus-circle"></i> Add Lead
+                    </button>
                 </div>
             </div>
         </div>
@@ -352,6 +361,19 @@
             </div>
         </div>
 
+        <!-- Bulk Actions -->
+        <div class="bulk-actions" id="bulkActions" style="display: none;">
+            <span class="selected-count">
+                <span id="selectedCount">0</span> selected
+            </span>
+            <button class="btn btn-sm btn-danger" onclick="bulkDelete()">
+                <i class="bi bi-trash"></i> Delete Selected
+            </button>
+            <button class="btn btn-sm btn-warning ms-2" onclick="bulkUpdate()">
+                <i class="bi bi-pencil"></i> Update Selected
+            </button>
+        </div>
+
         <!-- Leads List -->
         <div id="leadsList">
             <!-- Leads will be loaded here -->
@@ -363,7 +385,131 @@
             <h5 class="mt-3 text-muted">No leads found</h5>
             <p class="text-muted">No leads available for this device</p>
         </div>
+    
+    <!-- Add/Edit Lead Modal -->
+    <div class="modal fade" id="leadModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="leadModalTitle">Add New Lead</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="leadForm">
+                        <input type="hidden" id="leadId">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="leadName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="leadPhone" placeholder="60123456789" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Niche</label>
+                                <input type="text" class="form-control" id="leadNiche" placeholder="e.g., EXSTART or EXSTART,ITADRESS">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-control" id="leadStatus">
+                                    <option value="prospect">Prospect</option>
+                                    <option value="customer">Customer</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Trigger</label>
+                                <input type="text" class="form-control" id="leadTrigger" placeholder="e.g., EXSTART or EXSTART,ITADRESS">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Journey</label>
+                                <input type="text" class="form-control" id="leadJourney" placeholder="e.g., Joined webinar, Downloaded guide">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveLead()">Save Lead</button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Leads from CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Upload a CSV file with the following columns:</p>
+                    <ul>
+                        <li><strong>name</strong> (required) - Lead's name</li>
+                        <li><strong>phone</strong> (required) - Phone number in format like 60123456789</li>
+                        <li><strong>niche</strong> (required) - Can be single (EXSTART) or multiple (EXSTART,ITADRESS)</li>
+                        <li><strong>target_status</strong> (required) - Either "prospect" or "customer"</li>
+                        <li><strong>trigger</strong> (optional) - Can be single (EXSTART) or multiple (EXSTART,ITADRESS)</li>
+                    </ul>
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i> <strong>Note:</strong> Only these 5 columns are accepted. Any other columns will be ignored.
+                    </div>
+                    <div class="mt-3">
+                        <input type="file" class="form-control" id="importFileInput" accept=".csv">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="processImport()">Import Leads</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Update Modal -->
+    <div class="modal fade" id="bulkUpdateModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Update Selected Leads</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Update <span id="bulkUpdateCount">0</span> selected lead(s)</p>
+                    <form id="bulkUpdateForm">
+                        <div class="mb-3">
+                            <label class="form-label">Niche (leave empty to keep current)</label>
+                            <input type="text" class="form-control" id="bulkNiche" placeholder="e.g., EXSTART or EXSTART,ITADRESS">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status (leave unchanged to keep current)</label>
+                            <select class="form-control" id="bulkStatus">
+                                <option value="">-- Keep Current --</option>
+                                <option value="prospect">Prospect</option>
+                                <option value="customer">Customer</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Trigger (leave empty to keep current)</label>
+                            <input type="text" class="form-control" id="bulkTrigger" placeholder="e.g., EXSTART or EXSTART,ITADRESS">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveBulkUpdate()">Update Leads</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -377,10 +523,19 @@
         let currentFilter = 'all';
         let currentNicheFilter = 'all';
         let currentTriggerFilter = 'all';
+        let leadModal;
+        let importModal;
+        let bulkUpdateModal;
+        let selectedLeads = new Set();
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('deviceId').textContent = deviceId;
+            
+            // Initialize modals
+            leadModal = new bootstrap.Modal(document.getElementById('leadModal'));
+            importModal = new bootstrap.Modal(document.getElementById('importModal'));
+            bulkUpdateModal = new bootstrap.Modal(document.getElementById('bulkUpdateModal'));
             
             // Load device info and leads
             loadDeviceInfo();
@@ -549,11 +704,16 @@
                 : 'Never';
             
             return `
-                <div class="lead-card" data-lead-id="${lead.id}">
+                <div class="lead-card \${selectedLeads.has(lead.id) ? 'selected' : ''}" data-lead-id="\${lead.id}">
                     <div class="d-flex align-items-start">
-                        <div class="lead-card-content">
+                        <input type="checkbox" class="form-check-input lead-checkbox" 
+                               value="\${lead.id}" 
+                               \${selectedLeads.has(lead.id) ? 'checked' : ''}
+                               onchange="toggleLeadSelection('\${lead.id}')"
+                               onclick="event.stopPropagation()">
+                        <div class="lead-card-content" onclick="editLead('\${lead.id}')">
                             <div class="flex-grow-1">
-                                <h5 class="mb-1">${lead.name}</h5>
+                                <h5 class="mb-1" style="cursor: pointer; color: var(--primary);">\${lead.name}</h5>
                                 <p class="mb-2">
                                     <i class="bi bi-telephone text-muted"></i> ${lead.phone}
                                     ${lead.niche ? `<span class="ms-3"><i class="bi bi-briefcase text-muted"></i> ${lead.niche}</span>` : ''}
@@ -625,6 +785,377 @@
         // Filter leads
         function filterLeads() {
             displayLeads();
+        }
+    </script>
+</body>
+</html>        
+        // Toggle select all
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.lead-checkbox');
+            
+            if (selectAll.checked) {
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    selectedLeads.add(cb.value);
+                });
+            } else {
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                });
+                selectedLeads.clear();
+            }
+            
+            updateBulkActionsVisibility();
+            updateSelectedCount();
+        }
+        
+        // Toggle individual lead selection
+        function toggleLeadSelection(leadId) {
+            if (selectedLeads.has(leadId)) {
+                selectedLeads.delete(leadId);
+            } else {
+                selectedLeads.add(leadId);
+            }
+            
+            updateBulkActionsVisibility();
+            updateSelectedCount();
+            updateSelectAllCheckbox();
+        }
+        
+        // Update bulk actions visibility
+        function updateBulkActionsVisibility() {
+            const bulkActions = document.getElementById('bulkActions');
+            if (selectedLeads.size > 0) {
+                bulkActions.style.display = 'flex';
+            } else {
+                bulkActions.style.display = 'none';
+            }
+        }
+        
+        // Update selected count
+        function updateSelectedCount() {
+            document.getElementById('selectedCount').textContent = selectedLeads.size;
+            document.getElementById('bulkUpdateCount').textContent = selectedLeads.size;
+        }
+        
+        // Update select all checkbox
+        function updateSelectAllCheckbox() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.lead-checkbox');
+            
+            if (checkboxes.length === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else if (selectedLeads.size === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else if (selectedLeads.size === checkboxes.length) {
+                selectAll.checked = true;
+                selectAll.indeterminate = false;
+            } else {
+                selectAll.checked = false;
+                selectAll.indeterminate = true;
+            }
+        }
+        
+        // Open add lead modal
+        function openAddLeadModal() {
+            document.getElementById('leadModalTitle').textContent = 'Add New Lead';
+            document.getElementById('leadForm').reset();
+            document.getElementById('leadId').value = '';
+            document.getElementById('leadStatus').value = 'prospect';
+            leadModal.show();
+        }
+        
+        // Edit lead
+        function editLead(leadId) {
+            const lead = leads.find(l => l.id === leadId);
+            if (lead) {
+                document.getElementById('leadModalTitle').textContent = 'Edit Lead';
+                document.getElementById('leadId').value = lead.id;
+                document.getElementById('leadName').value = lead.name;
+                document.getElementById('leadPhone').value = lead.phone;
+                document.getElementById('leadNiche').value = lead.niche || '';
+                document.getElementById('leadStatus').value = lead.target_status || lead.status || 'prospect';
+                document.getElementById('leadTrigger').value = lead.trigger || '';
+                document.getElementById('leadJourney').value = lead.journey || '';
+                leadModal.show();
+            }
+        }
+        
+        // Save lead
+        function saveLead() {
+            const leadId = document.getElementById('leadId').value;
+            const leadData = {
+                device_id: deviceId,
+                name: document.getElementById('leadName').value,
+                phone: document.getElementById('leadPhone').value,
+                niche: document.getElementById('leadNiche').value,
+                status: document.getElementById('leadStatus').value,
+                trigger: document.getElementById('leadTrigger').value,
+                journey: document.getElementById('leadJourney').value
+            };
+            
+            const url = leadId 
+                ? `/api/public/device/${deviceId}/lead/${leadId}`
+                : `/api/public/device/${deviceId}/lead`;
+            const method = leadId ? 'PUT' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(leadData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 'SUCCESS') {
+                    leadModal.hide();
+                    loadLeads();
+                    showAlert('success', leadId ? 'Lead updated successfully!' : 'Lead added successfully!');
+                } else {
+                    showAlert('danger', data.message || 'Failed to save lead');
+                }
+            })
+            .catch(error => {
+                showAlert('danger', 'Error: ' + error.message);
+            });
+        }
+        
+        // Bulk delete
+        function bulkDelete() {
+            if (selectedLeads.size === 0) return;
+            
+            if (confirm(`Are you sure you want to delete ${selectedLeads.size} lead(s)?`)) {
+                const promises = Array.from(selectedLeads).map(leadId => 
+                    fetch(`/api/public/device/${deviceId}/lead/${leadId}`, {
+                        method: 'DELETE'
+                    })
+                );
+                
+                Promise.all(promises)
+                    .then(() => {
+                        selectedLeads.clear();
+                        loadLeads();
+                        showAlert('success', 'Selected leads deleted successfully!');
+                    })
+                    .catch(error => {
+                        showAlert('danger', 'Error deleting leads: ' + error.message);
+                    });
+            }
+        }
+        
+        // Open bulk update modal
+        function bulkUpdate() {
+            if (selectedLeads.size === 0) return;
+            document.getElementById('bulkUpdateForm').reset();
+            bulkUpdateModal.show();
+        }
+        
+        // Save bulk update
+        function saveBulkUpdate() {
+            const updates = {
+                niche: document.getElementById('bulkNiche').value,
+                status: document.getElementById('bulkStatus').value,
+                trigger: document.getElementById('bulkTrigger').value
+            };
+            
+            const promises = Array.from(selectedLeads).map(leadId => {
+                const lead = leads.find(l => l.id === leadId);
+                if (lead) {
+                    const updateData = {
+                        device_id: deviceId,
+                        name: lead.name,
+                        phone: lead.phone,
+                        niche: updates.niche || lead.niche || '',
+                        status: updates.status || lead.target_status || lead.status || 'prospect',
+                        trigger: updates.trigger || lead.trigger || '',
+                        journey: lead.journey || ''
+                    };
+                    
+                    return fetch(`/api/public/device/${deviceId}/lead/${leadId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updateData)
+                    });
+                }
+            });
+            
+            Promise.all(promises)
+                .then(() => {
+                    bulkUpdateModal.hide();
+                    selectedLeads.clear();
+                    loadLeads();
+                    showAlert('success', 'Selected leads updated successfully!');
+                })
+                .catch(error => {
+                    showAlert('danger', 'Error updating leads: ' + error.message);
+                });
+        }
+        
+        // Export leads
+        function exportLeads() {
+            const csvContent = createCSV(leads);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `leads_${deviceId}_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Create CSV content
+        function createCSV(leadsData) {
+            const headers = ['name', 'phone', 'niche', 'target_status', 'trigger'];
+            const rows = leadsData.map(lead => [
+                lead.name || '',
+                lead.phone || '',
+                lead.niche || '',
+                lead.target_status || lead.status || '',
+                lead.trigger || ''
+            ]);
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+            
+            return csvContent;
+        }
+        
+        // Import leads
+        function importLeads(input) {
+            const file = input.files[0];
+            if (file) {
+                importModal.show();
+                document.getElementById('importFileInput').files = input.files;
+            }
+            input.value = ''; // Clear input
+        }
+        
+        // Process import
+        function processImport() {
+            const fileInput = document.getElementById('importFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showAlert('danger', 'Please select a file');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split(/\r?\n/);
+                
+                if (lines.length < 2) {
+                    showAlert('danger', 'CSV file is empty or invalid');
+                    return;
+                }
+                
+                const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+                const newLeads = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    
+                    const values = parseCSVLine(lines[i]);
+                    const lead = {};
+                    
+                    headers.forEach((header, index) => {
+                        if (values[index]) {
+                            lead[header] = values[index].trim();
+                        }
+                    });
+                    
+                    if (lead.phone && lead.name) {
+                        newLeads.push({
+                            device_id: deviceId,
+                            phone: lead.phone,
+                            name: lead.name,
+                            niche: lead.niche || '',
+                            status: lead.target_status || lead.status || 'prospect',
+                            trigger: lead.trigger || ''
+                        });
+                    }
+                }
+                
+                if (newLeads.length === 0) {
+                    showAlert('danger', 'No valid leads found in the CSV file');
+                    return;
+                }
+                
+                // Import leads one by one
+                const promises = newLeads.map(lead => 
+                    fetch(`/api/public/device/${deviceId}/lead`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(lead)
+                    })
+                );
+                
+                Promise.all(promises)
+                    .then(() => {
+                        importModal.hide();
+                        loadLeads();
+                        showAlert('success', `Successfully imported ${newLeads.length} leads!`);
+                    })
+                    .catch(error => {
+                        showAlert('danger', 'Error importing leads: ' + error.message);
+                    });
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // Parse CSV line
+        function parseCSVLine(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            values.push(current.trim());
+            return values;
+        }
+        
+        // Show alert
+        function showAlert(type, message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+            alertDiv.style.zIndex = '9999';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
         }
     </script>
 </body>
