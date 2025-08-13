@@ -770,7 +770,26 @@ func (api *PublicDeviceAPI) GetDeviceCampaigns(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
 	}
 	
+	// Log all device details
+	logrus.Infof("GetDeviceCampaigns - Device details: ID=%s, UserID=%s, Name=%s, Phone=%s, Status=%s", 
+		device.ID, device.UserID, device.DeviceName, device.Phone, device.Status)
+	
+	// If UserID is empty, that's our problem
+	if device.UserID == "" {
+		logrus.Errorf("GetDeviceCampaigns - Device %s has no UserID!", device.ID)
+		return c.Status(500).JSON(fiber.Map{"error": "Device has no associated user"})
+	}
+	
 	logrus.Infof("GetDeviceCampaigns - Device found: %s, UserID: %s", device.ID, device.UserID)
+	
+	// Debug: Let's see what user this device belongs to
+	var userEmail string
+	err = api.db.QueryRow("SELECT email FROM users WHERE id = ?", device.UserID).Scan(&userEmail)
+	if err != nil {
+		logrus.Errorf("GetDeviceCampaigns - Failed to get user email for UserID %s: %v", device.UserID, err)
+	} else {
+		logrus.Infof("GetDeviceCampaigns - Device belongs to user: %s", userEmail)
+	}
 	
 	// Get campaigns filtered by user_id
 	rows, err := api.db.Query(`
