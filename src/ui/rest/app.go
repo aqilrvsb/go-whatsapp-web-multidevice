@@ -5451,6 +5451,9 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 	
+	// Debug log
+	log.Printf("GetPublicDeviceSequences - Device: %s, StartDate: %s, EndDate: %s", deviceName, startDate, endDate)
+	
 	// Build query with optional date filtering
 	query := `
 		SELECT DISTINCT
@@ -5471,20 +5474,27 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 	
 	// Add date filters if provided
 	if startDate != "" && endDate != "" {
-		query += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
-		args = append(args, startDate, endDate)
+		query += ` AND (DATE(bm.scheduled_at) BETWEEN ? AND ? OR (bm.scheduled_at IS NULL AND DATE(bm.created_at) BETWEEN ? AND ?))`
+		args = append(args, startDate, endDate, startDate, endDate)
+		log.Printf("Adding date range filter: %s to %s", startDate, endDate)
 	} else if startDate != "" {
-		query += ` AND DATE(bm.scheduled_at) >= ?`
-		args = append(args, startDate)
+		query += ` AND (DATE(bm.scheduled_at) >= ? OR (bm.scheduled_at IS NULL AND DATE(bm.created_at) >= ?))`
+		args = append(args, startDate, startDate)
+		log.Printf("Adding start date filter: %s", startDate)
 	} else if endDate != "" {
-		query += ` AND DATE(bm.scheduled_at) <= ?`
-		args = append(args, endDate)
+		query += ` AND (DATE(bm.scheduled_at) <= ? OR (bm.scheduled_at IS NULL AND DATE(bm.created_at) <= ?))`
+		args = append(args, endDate, endDate)
+		log.Printf("Adding end date filter: %s", endDate)
 	}
 	
 	query += `
 		GROUP BY s.id, s.name, s.trigger
 		ORDER BY s.created_at DESC
 	`
+	
+	// Debug log the final query
+	log.Printf("Final query: %s", query)
+	log.Printf("Query args: %v", args)
 	
 	rows, err := db.Query(query, args...)
 	if err != nil {

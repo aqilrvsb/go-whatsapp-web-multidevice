@@ -408,11 +408,20 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		FROM broadcast_messages bm
 		LEFT JOIN sequences s ON bm.sequence_id = s.id
 		WHERE bm.device_id = ? AND bm.sequence_id IS NOT NULL
-		GROUP BY bm.sequence_id
-		ORDER BY s.created_at DESC
 	`
 	
 	args := []interface{}{device.ID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		query += " AND DATE(bm.scheduled_at) BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query += `
+		GROUP BY bm.sequence_id
+		ORDER BY s.created_at DESC
+	`
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
