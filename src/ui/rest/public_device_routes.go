@@ -115,6 +115,10 @@ func InitPublicDeviceAPI(app *fiber.App) {
 	
 	// Get messages for device
 	publicAPI.Get("/messages", api.GetDeviceMessages)
+	
+	// Device report endpoints
+	publicAPI.Get("/campaigns/:campaignId/device-report", api.GetCampaignDeviceReport)
+	publicAPI.Get("/sequences/:sequenceId/device-report", api.GetSequenceDeviceReport)
 }
 
 func (api *PublicDeviceAPI) GetDeviceStats(c *fiber.Ctx) error {
@@ -1105,5 +1109,176 @@ func (api *PublicDeviceAPI) GetDeviceMessages(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"code": "SUCCESS",
 		"results": messages,
+	})
+}
+
+
+// GetCampaignDeviceReport returns device report for a specific campaign
+func (api *PublicDeviceAPI) GetCampaignDeviceReport(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	campaignID := c.Params("campaignId")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// Get broadcast messages for this campaign and device
+	query := `
+		SELECT 
+			bm.device_id,
+			ud.device_name,
+			ud.phone,
+			COUNT(*) as total_messages,
+			SUM(CASE WHEN bm.status = 'sent' THEN 1 ELSE 0 END) as sent,
+			SUM(CASE WHEN bm.status = 'failed' THEN 1 ELSE 0 END) as failed,
+			SUM(CASE WHEN bm.status = 'pending' THEN 1 ELSE 0 END) as pending
+		FROM broadcast_messages bm
+		JOIN user_devices ud ON bm.device_id = ud.id
+		WHERE bm.campaign_id = ? AND bm.device_id = ?
+		GROUP BY bm.device_id, ud.device_name, ud.phone
+	`
+	
+	rows, err := api.db.Query(query, campaignID, device.ID)
+	if err != nil {
+		logrus.Errorf("Failed to get campaign device report: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get device report"})
+	}
+	defer rows.Close()
+	
+	devices := []fiber.Map{}
+	for rows.Next() {
+		var deviceReport struct {
+			DeviceID      string
+			DeviceName    string
+			Phone         string
+			TotalMessages int
+			Sent          int
+			Failed        int
+			Pending       int
+		}
+		
+		err := rows.Scan(
+			&deviceReport.DeviceID,
+			&deviceReport.DeviceName,
+			&deviceReport.Phone,
+			&deviceReport.TotalMessages,
+			&deviceReport.Sent,
+			&deviceReport.Failed,
+			&deviceReport.Pending,
+		)
+		
+		if err != nil {
+			continue
+		}
+		
+		devices = append(devices, fiber.Map{
+			"device_id":       deviceReport.DeviceID,
+			"device_name":     deviceReport.DeviceName,
+			"phone":           deviceReport.Phone,
+			"total_messages":  deviceReport.TotalMessages,
+			"sent":            deviceReport.Sent,
+			"failed":          deviceReport.Failed,
+			"pending":         deviceReport.Pending,
+			"completion_rate": fmt.Sprintf("%.1f%%", float64(deviceReport.Sent)/float64(deviceReport.TotalMessages)*100),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"devices": devices,
+		"total":   len(devices),
+	})
+}
+
+// GetSequenceDeviceReport returns device report for a specific sequence
+func (api *PublicDeviceAPI) GetSequenceDeviceReport(c *fiber.Ctx) error {
+	deviceID := c.Params("deviceId")
+	sequenceID := c.Params("sequenceId")
+	
+	// Get date filters
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	
+	// Verify device exists
+	userRepo := repository.GetUserRepository()
+	device, err := userRepo.GetDeviceByID(deviceID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Device not found"})
+	}
+	
+	// Build query with optional date filters
+	query := `
+		SELECT 
+			bm.device_id,
+			ud.device_name,
+			ud.phone,
+			COUNT(*) as total_messages,
+			SUM(CASE WHEN bm.status = 'sent' THEN 1 ELSE 0 END) as sent,
+			SUM(CASE WHEN bm.status = 'failed' THEN 1 ELSE 0 END) as failed,
+			SUM(CASE WHEN bm.status = 'pending' THEN 1 ELSE 0 END) as pending
+		FROM broadcast_messages bm
+		JOIN user_devices ud ON bm.device_id = ud.id
+		WHERE bm.sequence_id = ? AND bm.device_id = ?
+	`
+	
+	args := []interface{}{sequenceID, device.ID}
+	
+	if startDate != "" && endDate != "" {
+		query += " AND DATE(bm.created_at) BETWEEN ? AND ?"
+		args = append(args, startDate, endDate)
+	}
+	
+	query += " GROUP BY bm.device_id, ud.device_name, ud.phone"
+	
+	rows, err := api.db.Query(query, args...)
+	if err != nil {
+		logrus.Errorf("Failed to get sequence device report: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to get device report"})
+	}
+	defer rows.Close()
+	
+	devices := []fiber.Map{}
+	for rows.Next() {
+		var deviceReport struct {
+			DeviceID      string
+			DeviceName    string
+			Phone         string
+			TotalMessages int
+			Sent          int
+			Failed        int
+			Pending       int
+		}
+		
+		err := rows.Scan(
+			&deviceReport.DeviceID,
+			&deviceReport.DeviceName,
+			&deviceReport.Phone,
+			&deviceReport.TotalMessages,
+			&deviceReport.Sent,
+			&deviceReport.Failed,
+			&deviceReport.Pending,
+		)
+		
+		if err != nil {
+			continue
+		}
+		
+		devices = append(devices, fiber.Map{
+			"device_id":       deviceReport.DeviceID,
+			"device_name":     deviceReport.DeviceName,
+			"phone":           deviceReport.Phone,
+			"total_messages":  deviceReport.TotalMessages,
+			"sent":            deviceReport.Sent,
+			"failed":          deviceReport.Failed,
+			"pending":         deviceReport.Pending,
+			"completion_rate": fmt.Sprintf("%.1f%%", float64(deviceReport.Sent)/float64(deviceReport.TotalMessages)*100),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"devices": devices,
+		"total":   len(devices),
 	})
 }

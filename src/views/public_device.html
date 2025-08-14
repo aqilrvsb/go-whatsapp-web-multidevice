@@ -6893,12 +6893,22 @@
             document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
             
             // Fetch device report data
-            fetch(`/api/campaigns/${campaign.id}/device-report`, { credentials: 'include' })
+            const url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/campaigns/${campaign.id}/device-report`
+                : `/api/campaigns/${campaign.id}/device-report`;
+                
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
                         currentDeviceReport = data.results; // Store the report globally
                         displayDeviceReport(data.results);
+                    } else if (data.devices) {
+                        // Handle public API response format
+                        currentDeviceReport = data;
+                        displayDeviceReport(data);
                     } else {
                         document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load device report</td></tr>';
                     }
@@ -6950,7 +6960,9 @@
             document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
             
             // Build URL with date filters
-            let url = `/api/sequences/${sequence.id}/device-report`;
+            let url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/sequences/${sequence.id}/device-report`
+                : `/api/sequences/${sequence.id}/device-report`;
             const params = new URLSearchParams();
             
             // Use the current date filters from the input fields
@@ -6962,12 +6974,18 @@
             }
             
             // Fetch device report data for sequence
-            fetch(url, { credentials: 'include' })
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS' && data.results) {
                         currentDeviceReport = data.results; // Store the report globally
                         displayDeviceReport(data.results);
+                    } else if (data.devices || data.steps) {
+                        // Handle public API response format
+                        currentDeviceReport = data;
+                        displayDeviceReport(data);
                     } else {
                         document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Failed to load device report</td></tr>';
                     }
