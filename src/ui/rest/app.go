@@ -5447,6 +5447,11 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 	}
 	
 	// Get sequences that this device is involved in
+	// Get date filter parameters
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	
+	// Build query with optional date filtering
 	query := `
 		SELECT DISTINCT
 			s.id,
@@ -5460,12 +5465,28 @@ func (handler *App) GetPublicDeviceSequences(c *fiber.Ctx) error {
 				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) as contacts_failed
 		FROM sequences s
 		INNER JOIN broadcast_messages bm ON bm.sequence_id = s.id
-		WHERE bm.device_id = ?
+		WHERE bm.device_id = ?`
+	
+	args := []interface{}{deviceID}
+	
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		query += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
+		args = append(args, startDate, endDate)
+	} else if startDate != "" {
+		query += ` AND DATE(bm.scheduled_at) >= ?`
+		args = append(args, startDate)
+	} else if endDate != "" {
+		query += ` AND DATE(bm.scheduled_at) <= ?`
+		args = append(args, endDate)
+	}
+	
+	query += `
 		GROUP BY s.id, s.name, s.trigger
 		ORDER BY s.created_at DESC
 	`
 	
-	rows, err := db.Query(query, deviceID)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		log.Printf("Error querying sequences: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
