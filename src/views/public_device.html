@@ -6207,9 +6207,23 @@
         let sequenceEndDate = '';
         
         function loadSequenceSummary() {
+            // Extract device name from URL for public view
+            let deviceName = '';
+            if (isPublicView) {
+                // URL is typically like: /Device-Name or ends with /Device-Name
+                const pathParts = window.location.pathname.split('/');
+                deviceName = pathParts[pathParts.length - 1];
+                
+                // Remove any query parameters
+                if (deviceName.includes('?')) {
+                    deviceName = deviceName.split('?')[0];
+                }
+                console.log('Public view - Device name extracted:', deviceName);
+            }
+            
             // Use different API endpoint for public view
             let url = isPublicView 
-                ? `/api/public/device/${publicDeviceId}/sequence-summary`
+                ? `/api/public/device/${deviceName}/sequences`  // Correct endpoint with device name
                 : '/api/sequences/summary';
             
             // Build query parameters
@@ -6243,8 +6257,22 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log('Sequence Summary Response:', data); // Debug log
-                    if (data.code === 'SUCCESS') {
-                        displaySequenceSummary(data.results);
+                    if (data.code === 'SUCCESS' && data.results) {
+                        // For public view, transform the array response
+                        if (isPublicView && Array.isArray(data.results)) {
+                            const sequences = data.results;
+                            const transformedData = {
+                                sequences: sequences,
+                                total: sequences.length,
+                                total_should_send: sequences.reduce((sum, s) => sum + (s.total_contacts || 0), 0),
+                                total_done_send: sequences.reduce((sum, s) => sum + (s.contacts_done || 0), 0),
+                                total_failed_send: sequences.reduce((sum, s) => sum + (s.contacts_failed || 0), 0),
+                                total_remaining_send: sequences.reduce((sum, s) => sum + ((s.total_contacts || 0) - (s.contacts_done || 0) - (s.contacts_failed || 0)), 0)
+                            };
+                            displaySequenceSummary(transformedData);
+                        } else {
+                            displaySequenceSummary(data.results);
+                        }
                     } else if (data.sequences || data.total !== undefined) {
                         // Handle public API response format
                         displaySequenceSummary(data);
@@ -6262,6 +6290,87 @@
         
         function displaySequenceSummary(summary) {
             console.log('DisplaySequenceSummary called with:', summary); // Debug log
+            
+            // Handle public view format (data from GetPublicDeviceSequences)
+            if (summary.sequences && Array.isArray(summary.sequences) && isPublicView) {
+                const sequences = summary.sequences;
+                
+                // Build the HTML for public view
+                let html = `
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total Sequences</h5>
+                                    <h2>${summary.total || sequences.length}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Should Send</h5>
+                                    <h2>${summary.total_should_send || 0}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Done Send</h5>
+                                    <h2 class="text-success">${summary.total_done_send || 0}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Failed Send</h5>
+                                    <h2 class="text-danger">${summary.total_failed_send || 0}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Sequence Name</th>
+                                    <th>Trigger</th>
+                                    <th>Total Flows</th>
+                                    <th>Total Contacts</th>
+                                    <th>Done</th>
+                                    <th>Failed</th>
+                                    <th>Success Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sequences.map(seq => `
+                                    <tr>
+                                        <td>${seq.name}</td>
+                                        <td><span class="badge bg-info">${seq.trigger || 'N/A'}</span></td>
+                                        <td>${seq.total_flows || 0}</td>
+                                        <td>${seq.total_contacts || 0}</td>
+                                        <td class="text-success">${seq.contacts_done || 0}</td>
+                                        <td class="text-danger">${seq.contacts_failed || 0}</td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" style="width: ${seq.success_rate || 0}%">
+                                                    ${seq.success_rate || 0}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('sequenceSummaryContent').innerHTML = html;
+                return;
+            }
             
             // Handle different response formats
             if (Array.isArray(summary)) {

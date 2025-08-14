@@ -434,6 +434,25 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		logrus.Infof("Found %d sequence broadcast messages for device %s", messageCount, device.ID)
 	}
 	
+	// Also let's see what sequence IDs we have
+	sequenceRows, err := api.db.Query(`
+		SELECT DISTINCT sequence_id, COUNT(*) as count
+		FROM broadcast_messages 
+		WHERE device_id = ? AND sequence_id IS NOT NULL
+		GROUP BY sequence_id
+	`, device.ID)
+	
+	if err == nil {
+		defer sequenceRows.Close()
+		for sequenceRows.Next() {
+			var seqID string
+			var count int
+			if err := sequenceRows.Scan(&seqID, &count); err == nil {
+				logrus.Infof("Device %s has %d messages for sequence %s", device.ID, count, seqID)
+			}
+		}
+	}
+	
 	sequences := []fiber.Map{}
 	totalSent := 0
 	totalFailed := 0
@@ -481,6 +500,9 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			logrus.Errorf("Failed to scan sequence: %v", err)
 			continue
 		}
+		
+		logrus.Infof("Scanned sequence: ID=%s, Name=%s, Messages=%d, Sent=%d, Failed=%d, Pending=%d", 
+			seq.ID, seq.Name, seq.TotalMessageContacts, seq.TotalSent, seq.TotalFailed, seq.TotalPending)
 		
 		// Update totals
 		totalSent += seq.TotalSent
