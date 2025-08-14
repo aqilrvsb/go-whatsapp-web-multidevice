@@ -6710,10 +6710,18 @@
             document.getElementById('campaignRangeEnd').value = '';
             
             // Send date filter to backend
-            fetch(`/api/campaigns/summary?start_date=${filterDate}&end_date=${filterDate}`)
+            const url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/campaign-summary?start_date=${filterDate}&end_date=${filterDate}`
+                : `/api/campaigns/summary?start_date=${filterDate}&end_date=${filterDate}`;
+                
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS' && data.results) {
+                    if (isPublicView && data.recent_campaigns) {
+                        displayCampaignSummary(data);
+                    } else if (data.code === 'SUCCESS' && data.results) {
                         displayCampaignSummary(data.results);
                     }
                 })
@@ -6754,10 +6762,18 @@
             document.getElementById('campaignFilterDate').value = '';
             
             // Send date range to backend
-            fetch(`/api/campaigns/summary?start_date=${startDate}&end_date=${endDate}`)
+            const url = isPublicView 
+                ? `/api/public/device/${publicDeviceId}/campaign-summary?start_date=${startDate}&end_date=${endDate}`
+                : `/api/campaigns/summary?start_date=${startDate}&end_date=${endDate}`;
+                
+            const fetchOptions = isPublicView ? {} : { credentials: 'include' };
+            
+            fetch(url, fetchOptions)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.code === 'SUCCESS' && data.results) {
+                    if (isPublicView && data.recent_campaigns) {
+                        displayCampaignSummary(data);
+                    } else if (data.code === 'SUCCESS' && data.results) {
                         displayCampaignSummary(data.results);
                     }
                 })
