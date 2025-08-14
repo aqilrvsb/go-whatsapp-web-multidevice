@@ -388,6 +388,7 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 	}
 	
 	// Build query - use user_id for sequences table, device_id for broadcast_messages
+	// Modified to include sequences that have messages for this device
 	query := `
 		SELECT 
 			s.id,
@@ -407,7 +408,7 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			COALESCE(messages.total_pending, 0) as total_pending
 		FROM sequences s
 		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		LEFT JOIN (
+		INNER JOIN (
 			SELECT 
 				sequence_id,
 				COUNT(*) as total_contacts,
@@ -418,14 +419,18 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			WHERE device_id = ? AND sequence_id IS NOT NULL
 			GROUP BY sequence_id
 		) messages ON s.id = messages.sequence_id
-		WHERE s.user_id = ?
+		WHERE s.user_id = ? OR s.id IN (
+			SELECT DISTINCT sequence_id 
+			FROM broadcast_messages 
+			WHERE device_id = ? AND sequence_id IS NOT NULL
+		)
 		GROUP BY s.id, s.name, s.description, s.niche, s.target_status, 
 				 s.trigger, s.time_schedule, s.is_active, s.created_at,
 				 messages.total_contacts, messages.total_sent, messages.total_failed, messages.total_pending
 		ORDER BY s.created_at DESC
 	`
 	
-	args := []interface{}{device.ID, userID}
+	args := []interface{}{device.ID, userID, device.ID}
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
@@ -434,6 +439,18 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequence summary"})
 	}
 	defer rows.Close()
+	
+	// First, let's check if there are any broadcast messages for sequences
+	var messageCount int
+	err = api.db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM broadcast_messages 
+		WHERE device_id = ? AND sequence_id IS NOT NULL
+	`, device.ID).Scan(&messageCount)
+	
+	if err == nil {
+		logrus.Infof("Found %d sequence broadcast messages for device %s", messageCount, device.ID)
+	}
 	
 	sequences := []fiber.Map{}
 	totalSent := 0
