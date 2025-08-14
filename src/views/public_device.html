@@ -6295,81 +6295,38 @@
             if (summary.sequences && Array.isArray(summary.sequences) && isPublicView) {
                 const sequences = summary.sequences;
                 
-                // Build the HTML for public view
-                let html = `
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Total Sequences</h5>
-                                    <h2>${summary.total || sequences.length}</h2>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Should Send</h5>
-                                    <h2>${summary.total_should_send || 0}</h2>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Done Send</h5>
-                                    <h2 class="text-success">${summary.total_done_send || 0}</h2>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Failed Send</h5>
-                                    <h2 class="text-danger">${summary.total_failed_send || 0}</h2>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Sequence Name</th>
-                                    <th>Trigger</th>
-                                    <th>Total Flows</th>
-                                    <th>Total Contacts</th>
-                                    <th>Done</th>
-                                    <th>Failed</th>
-                                    <th>Success Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${sequences.map(seq => `
-                                    <tr>
-                                        <td>${seq.name}</td>
-                                        <td><span class="badge bg-info">${seq.trigger || 'N/A'}</span></td>
-                                        <td>${seq.total_flows || 0}</td>
-                                        <td>${seq.total_contacts || 0}</td>
-                                        <td class="text-success">${seq.contacts_done || 0}</td>
-                                        <td class="text-danger">${seq.contacts_failed || 0}</td>
-                                        <td>
-                                            <div class="progress" style="height: 20px;">
-                                                <div class="progress-bar bg-success" style="width: ${seq.success_rate || 0}%">
-                                                    ${seq.success_rate || 0}%
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                // Transform to match dashboard format
+                const transformedSummary = {
+                    sequences: { 
+                        total: summary.total || sequences.length,
+                        active: sequences.filter(s => s.status === 'active').length,
+                        inactive: sequences.filter(s => s.status === 'inactive').length
+                    },
+                    total_flows: summary.total_flows || sequences.reduce((sum, s) => sum + (s.total_flows || 0), 0),
+                    total_should_send: summary.total_should_send || 0,
+                    total_done_send: summary.total_done_send || 0,
+                    total_failed_send: summary.total_failed_send || 0,
+                    total_remaining_send: summary.total_remaining_send || 0,
+                    total_leads: summary.total_leads || 0,
+                    recent_sequences: sequences.map(seq => ({
+                        id: seq.id,
+                        name: seq.name,
+                        niche: seq.niche || '-',
+                        trigger: seq.trigger || '-',
+                        total_flows: seq.total_flows || 0,
+                        should_send: seq.total_contacts || 0,
+                        done_send: seq.contacts_done || 0,
+                        failed_send: seq.contacts_failed || 0,
+                        remaining_send: (seq.total_contacts || 0) - (seq.contacts_done || 0) - (seq.contacts_failed || 0),
+                        total_leads: seq.total_contacts || 0,
+                        status: seq.status || 'active',
+                        success_rate: seq.success_rate || '0'
+                    })),
+                    total_devices: 1
+                };
                 
-                document.getElementById('sequenceSummaryContent').innerHTML = html;
-                return;
+                // Use the transformed summary
+                summary = transformedSummary;
             }
             
             // Handle different response formats
