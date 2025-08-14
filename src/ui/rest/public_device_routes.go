@@ -387,104 +387,46 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
 	}
 	
-	// Simple query - just get broadcast_messages grouped by sequence_id
+	// Get ALL sequences for the user (like dashboard does)
+	// Then calculate stats for this specific device
 	query := `
-		SELECT 
-			bm.sequence_id as id,
-			COALESCE(s.name, 'Unknown Sequence') as name,
+		SELECT DISTINCT
+			s.id,
+			s.name,
 			COALESCE(s.description, '') as description,
 			COALESCE(s.niche, '') as niche,
 			COALESCE(s.target_status, '') as target_status,
 			COALESCE(s.trigger, '') as trigger,
 			COALESCE(s.time_schedule, '') as time_schedule,
 			COALESCE(s.is_active, 1) as is_active,
-			COALESCE(s.created_at, NOW()) as created_at,
-			0 as total_contacts,
-			0 as completed_count,
-			COUNT(*) as total_message_contacts,
-			SUM(CASE WHEN bm.status = 'sent' THEN 1 ELSE 0 END) as total_sent,
-			SUM(CASE WHEN bm.status = 'failed' THEN 1 ELSE 0 END) as total_failed,
-			SUM(CASE WHEN bm.status = 'pending' THEN 1 ELSE 0 END) as total_pending
-		FROM broadcast_messages bm
-		LEFT JOIN sequences s ON bm.sequence_id = s.id
-		WHERE bm.device_id = ? AND bm.sequence_id IS NOT NULL
-	`
-	
-	args := []interface{}{device.ID}
-	
-	// Add date filters if provided
-	if startDate != "" && endDate != "" {
-		query += " AND DATE(bm.scheduled_at) BETWEEN ? AND ?"
-		args = append(args, startDate, endDate)
-	}
-	
-	query += `
-		GROUP BY bm.sequence_id
+			s.created_at,
+			(SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = s.id) as total_flows
+		FROM sequences s
+		WHERE s.user_id = ?
 		ORDER BY s.created_at DESC
 	`
 	
-	// Execute query
-	rows, err := api.db.Query(query, args...)
+	rows, err := api.db.Query(query, userID)
 	if err != nil {
-		logrus.Errorf("Failed to get sequence summary for device %s: %v", device.ID, err)
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequence summary"})
+		logrus.Errorf("Failed to get sequences for user %s: %v", userID, err)
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch sequences"})
 	}
 	defer rows.Close()
 	
-	// First, let's check if there are any broadcast messages for sequences
-	var messageCount int
-	err = api.db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM broadcast_messages 
-		WHERE device_id = ? AND sequence_id IS NOT NULL
-	`, device.ID).Scan(&messageCount)
-	
-	if err == nil {
-		logrus.Infof("Found %d sequence broadcast messages for device %s", messageCount, device.ID)
-	}
-	
-	// Also let's see what sequence IDs we have
-	sequenceRows, err := api.db.Query(`
-		SELECT DISTINCT sequence_id, COUNT(*) as count
-		FROM broadcast_messages 
-		WHERE device_id = ? AND sequence_id IS NOT NULL
-		GROUP BY sequence_id
-	`, device.ID)
-	
-	if err == nil {
-		defer sequenceRows.Close()
-		for sequenceRows.Next() {
-			var seqID string
-			var count int
-			if err := sequenceRows.Scan(&seqID, &count); err == nil {
-				logrus.Infof("Device %s has %d messages for sequence %s", device.ID, count, seqID)
-			}
-		}
-	}
-	
 	sequences := []fiber.Map{}
-	totalSent := 0
-	totalFailed := 0
-	totalPending := 0
-	totalContacts := 0
 	
 	for rows.Next() {
 		var seq struct {
-			ID                   string
-			Name                 string
-			Description          sql.NullString
-			Niche                sql.NullString
-			TargetStatus         sql.NullString
-			StartTrigger         string
-			TimeSchedule         sql.NullString
-			IsActive             bool
-			CreatedAt            time.Time
-			TotalContacts        int
-			CompletedCount       int
-			TotalMessageContacts int
-			TotalSent            int
-			TotalFailed          int
-			TotalPending         int
+			ID           string
+			Name         string
+			Description  sql.NullString
+			Niche        sql.NullString
+			TargetStatus sql.NullString
+			Trigger      string
+			TimeSchedule sql.NullString
+			IsActive     bool
+			CreatedAt    time.Time
+			TotalFlows   int
 		}
 		
 		err := rows.Scan(
@@ -493,16 +435,11 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			&seq.Description,
 			&seq.Niche,
 			&seq.TargetStatus,
-			&seq.StartTrigger,
+			&seq.Trigger,
 			&seq.TimeSchedule,
 			&seq.IsActive,
 			&seq.CreatedAt,
-			&seq.TotalContacts,
-			&seq.CompletedCount,
-			&seq.TotalMessageContacts,
-			&seq.TotalSent,
-			&seq.TotalFailed,
-			&seq.TotalPending,
+			&seq.TotalFlows,
 		)
 		
 		if err != nil {
@@ -510,19 +447,41 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			continue
 		}
 		
-		logrus.Infof("Scanned sequence: ID=%s, Name=%s, Messages=%d, Sent=%d, Failed=%d, Pending=%d", 
-			seq.ID, seq.Name, seq.TotalMessageContacts, seq.TotalSent, seq.TotalFailed, seq.TotalPending)
+		// Now get the broadcast statistics for THIS DEVICE ONLY
+		statsQuery := `
+			SELECT 
+				COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone)) AS total,
+				COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') 
+					THEN CONCAT(sequence_stepid, '|', recipient_phone) END) AS done_send,
+				COUNT(DISTINCT CASE WHEN status = 'failed' 
+					THEN CONCAT(sequence_stepid, '|', recipient_phone) END) AS failed,
+				COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') 
+					THEN CONCAT(sequence_stepid, '|', recipient_phone) END) AS remaining,
+				COUNT(DISTINCT recipient_phone) AS total_leads
+			FROM broadcast_messages
+			WHERE sequence_id = ? AND device_id = ?
+		`
 		
-		// Update totals
-		totalSent += seq.TotalSent
-		totalFailed += seq.TotalFailed
-		totalPending += seq.TotalPending
-		totalContacts += seq.TotalMessageContacts
+		statsArgs := []interface{}{seq.ID, device.ID}
 		
-		// Calculate completion rate
-		completionRate := 0.0
-		if seq.TotalContacts > 0 {
-			completionRate = float64(seq.CompletedCount) / float64(seq.TotalContacts) * 100
+		// Add date filters if provided
+		if startDate != "" && endDate != "" {
+			statsQuery += " AND DATE(scheduled_at) BETWEEN ? AND ?"
+			statsArgs = append(statsArgs, startDate, endDate)
+		}
+		
+		var totalContacts, doneSend, failedSend, remainingSend, totalLeads int
+		err = api.db.QueryRow(statsQuery, statsArgs...).Scan(
+			&totalContacts,
+			&doneSend,
+			&failedSend,
+			&remainingSend,
+			&totalLeads,
+		)
+		
+		if err != nil {
+			logrus.Warnf("Failed to get stats for sequence %s: %v", seq.ID, err)
+			totalContacts, doneSend, failedSend, remainingSend, totalLeads = 0, 0, 0, 0, 0
 		}
 		
 		sequences = append(sequences, fiber.Map{
@@ -531,29 +490,56 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 			"description":      seq.Description.String,
 			"niche":            seq.Niche.String,
 			"target_status":    seq.TargetStatus.String,
-			"trigger":          seq.StartTrigger,
+			"trigger":          seq.Trigger,
 			"time_schedule":    seq.TimeSchedule.String,
 			"is_active":        seq.IsActive,
-			"created_at":       seq.CreatedAt.Format("2006-01-02"),
-			"total_contacts":   seq.TotalContacts,
-			"completed_count":  seq.CompletedCount,
-			"completion_rate":  fmt.Sprintf("%.1f", completionRate),
-			"total_sent":       seq.TotalSent,
-			"total_failed":     seq.TotalFailed,
-			"total_pending":    seq.TotalPending,
+			"created_at":       seq.CreatedAt,
+			"total_flows":      seq.TotalFlows,
+			"total_contacts":   totalContacts,
+			"contacts_done":    doneSend,
+			"contacts_failed":  failedSend,
+			"contacts_remaining": remainingSend,
+			"total_leads":      totalLeads,
+			"status":           map[string]bool{"active": seq.IsActive},
 		})
 	}
 	
-	// Return both individual sequences and summary
+	// Calculate totals from the sequences
+	totalSent := 0
+	totalFailed := 0
+	totalPending := 0
+	totalContacts := 0
+	totalFlows := 0
+	
+	for _, seq := range sequences {
+		if done, ok := seq["contacts_done"].(int); ok {
+			totalSent += done
+		}
+		if failed, ok := seq["contacts_failed"].(int); ok {
+			totalFailed += failed
+		}
+		if remaining, ok := seq["contacts_remaining"].(int); ok {
+			totalPending += remaining
+		}
+		if flows, ok := seq["total_flows"].(int); ok {
+			totalFlows += flows
+		}
+	}
+	
+	totalContacts = totalSent + totalFailed + totalPending
+
+	
+	// Return the results in the format expected by the frontend
 	return c.JSON(fiber.Map{
-		"sequences": sequences,
-		"summary": fiber.Map{
-			"total_sequences": len(sequences),
-			"total_contacts":  totalContacts,
-			"total_sent":      totalSent,
-			"total_failed":    totalFailed,
-			"total_pending":   totalPending,
-		},
+		"code": "SUCCESS",
+		"results": sequences,
+		"total": len(sequences),
+		"total_should_send": totalContacts,
+		"total_done_send": totalSent,
+		"total_failed_send": totalFailed,
+		"total_remaining_send": totalPending,
+		"total_flows": totalFlows,
+		"total_leads": totalContacts,
 	})
 }
 
