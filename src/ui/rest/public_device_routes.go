@@ -387,50 +387,32 @@ func (api *PublicDeviceAPI) GetSequenceSummary(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to get user information"})
 	}
 	
-	// Build query - use user_id for sequences table, device_id for broadcast_messages
-	// Modified to include sequences that have messages for this device
+	// Simple query - just get broadcast_messages grouped by sequence_id
 	query := `
 		SELECT 
-			s.id,
-			s.name,
-			s.description,
-			s.niche,
-			s.target_status,
-			s.trigger,
-			s.time_schedule,
-			s.is_active,
-			s.created_at,
-			COUNT(DISTINCT sc.id) as total_contacts,
-			COUNT(DISTINCT CASE WHEN sc.status = 'completed' THEN sc.id END) as completed_count,
-			COALESCE(messages.total_contacts, 0) as total_message_contacts,
-			COALESCE(messages.total_sent, 0) as total_sent,
-			COALESCE(messages.total_failed, 0) as total_failed,
-			COALESCE(messages.total_pending, 0) as total_pending
-		FROM sequences s
-		LEFT JOIN sequence_contacts sc ON s.id = sc.sequence_id
-		INNER JOIN (
-			SELECT 
-				sequence_id,
-				COUNT(*) as total_contacts,
-				SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as total_sent,
-				SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as total_failed,
-				SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as total_pending
-			FROM broadcast_messages
-			WHERE device_id = ? AND sequence_id IS NOT NULL
-			GROUP BY sequence_id
-		) messages ON s.id = messages.sequence_id
-		WHERE s.user_id = ? OR s.id IN (
-			SELECT DISTINCT sequence_id 
-			FROM broadcast_messages 
-			WHERE device_id = ? AND sequence_id IS NOT NULL
-		)
-		GROUP BY s.id, s.name, s.description, s.niche, s.target_status, 
-				 s.trigger, s.time_schedule, s.is_active, s.created_at,
-				 messages.total_contacts, messages.total_sent, messages.total_failed, messages.total_pending
+			bm.sequence_id as id,
+			COALESCE(s.name, 'Unknown Sequence') as name,
+			COALESCE(s.description, '') as description,
+			COALESCE(s.niche, '') as niche,
+			COALESCE(s.target_status, '') as target_status,
+			COALESCE(s.trigger, '') as trigger,
+			COALESCE(s.time_schedule, '') as time_schedule,
+			COALESCE(s.is_active, 1) as is_active,
+			COALESCE(s.created_at, NOW()) as created_at,
+			0 as total_contacts,
+			0 as completed_count,
+			COUNT(*) as total_message_contacts,
+			SUM(CASE WHEN bm.status = 'sent' THEN 1 ELSE 0 END) as total_sent,
+			SUM(CASE WHEN bm.status = 'failed' THEN 1 ELSE 0 END) as total_failed,
+			SUM(CASE WHEN bm.status = 'pending' THEN 1 ELSE 0 END) as total_pending
+		FROM broadcast_messages bm
+		LEFT JOIN sequences s ON bm.sequence_id = s.id
+		WHERE bm.device_id = ? AND bm.sequence_id IS NOT NULL
+		GROUP BY bm.sequence_id
 		ORDER BY s.created_at DESC
 	`
 	
-	args := []interface{}{device.ID, userID, device.ID}
+	args := []interface{}{device.ID}
 	
 	// Execute query
 	rows, err := api.db.Query(query, args...)
