@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/sirupsen/logrus"
@@ -110,13 +112,33 @@ func (bc *BroadcastCoordinator) CanStartBroadcast(userID string, broadcastType s
 func (bc *BroadcastCoordinator) LockBroadcast(userID string, broadcastType string, broadcastID string) error {
 	db := database.GetDB()
 	
+	// Check database type
+	dbType := "mysql"
+	if dbURI := os.Getenv("MYSQL_URI"); dbURI == "" {
+		dbURI = os.Getenv("DB_URI")
+		if dbURI == "" || strings.Contains(dbURI, "postgres") {
+			dbType = "postgres"
+		}
+	}
+	
 	// Create a broadcast lock record
-	_, err := db.Exec(`
-		INSERT INTO broadcast_locks(user_id, broadcast_type, broadcast_id, locked_at)
-		VALUES (?, ?, ?, NOW())
-		ON CONFLICT (user_id) DO UPDATE 
-		SET broadcast_type = ?, broadcast_id = ?, locked_at = NOW()
-	`, userID, broadcastType, broadcastID)
+	var err error
+	if dbType == "mysql" {
+		_, err = db.Exec(`
+			INSERT INTO broadcast_locks(user_id, broadcast_type, broadcast_id, locked_at)
+			VALUES (?, ?, ?, NOW())
+			ON DUPLICATE KEY UPDATE 
+			broadcast_type = VALUES(broadcast_type), broadcast_id = VALUES(broadcast_id), locked_at = NOW()
+		`, userID, broadcastType, broadcastID)
+	} else {
+		// PostgreSQL
+		_, err = db.Exec(`
+			INSERT INTO broadcast_locks(user_id, broadcast_type, broadcast_id, locked_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (user_id) DO UPDATE 
+			SET broadcast_type = $2, broadcast_id = $3, locked_at = NOW()
+		`, userID, broadcastType, broadcastID)
+	}
 	
 	if err != nil {
 		// Table might not exist, try to create it

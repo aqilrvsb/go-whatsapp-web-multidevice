@@ -55,9 +55,7 @@ func StoreChat(deviceID, chatJID, name string, lastMessageTime time.Time) error 
 	query := `
 		INSERT INTO whatsapp_chats (device_id, chat_jid, chat_name, last_message_time)
 		VALUES (?, ?, ?, ?)
-		ON DUPLICATE KEY UPDATE 
-			chat_name = VALUES(chat_name),
-			last_message_time = VALUES(last_message_time)
+		ON DUPLICATE KEY UPDATE chat_name = VALUES(chat_name), last_message_time = VALUES(last_message_time)
 	`
 	
 	_, err := db.Exec(query, deviceID, chatJID, name, lastMessageTime)

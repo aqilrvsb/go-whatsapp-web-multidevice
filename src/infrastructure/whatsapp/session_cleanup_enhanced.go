@@ -3,6 +3,7 @@ package whatsapp
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 	
 	"github.com/sirupsen/logrus"
@@ -42,17 +43,40 @@ func ClearWhatsAppSessionData(deviceID string) error {
 	
 	logrus.Infof("Clearing WhatsApp session for device %s with JID %s", deviceID, jid.String)
 	
-	// Disable foreign key checks temporarily for cleanup
-	_, err = db.Exec("SET session_replication_role = 'replica'")
-	if err != nil {
-		logrus.Warnf("Failed to disable FK checks: %v", err)
-	}
-	defer func() {
-		_, err = db.Exec("SET session_replication_role = 'origin'")
-		if err != nil {
-			logrus.Warnf("Failed to re-enable FK checks: %v", err)
+	// Check database type
+	dbType := "mysql"
+	if dbURI := os.Getenv("MYSQL_URI"); dbURI == "" {
+		dbURI = os.Getenv("DB_URI")
+		if dbURI == "" || strings.Contains(dbURI, "postgres") {
+			dbType = "postgres"
 		}
-	}()
+	}
+	
+	// Disable foreign key checks temporarily for cleanup
+	if dbType == "mysql" {
+		_, err = db.Exec("SET FOREIGN_KEY_CHECKS = 0")
+		if err != nil {
+			logrus.Warnf("Failed to disable FK checks: %v", err)
+		}
+		defer func() {
+			_, err = db.Exec("SET FOREIGN_KEY_CHECKS = 1")
+			if err != nil {
+				logrus.Warnf("Failed to re-enable FK checks: %v", err)
+			}
+		}()
+	} else {
+		// PostgreSQL
+		_, err = db.Exec("SET session_replication_role = 'replica'")
+		if err != nil {
+			logrus.Warnf("Failed to disable FK checks: %v", err)
+		}
+		defer func() {
+			_, err = db.Exec("SET session_replication_role = 'origin'")
+			if err != nil {
+				logrus.Warnf("Failed to re-enable FK checks: %v", err)
+			}
+		}()
+	}
 	
 	// Clear all whatsmeow tables that might contain this JID
 	// Using a more robust approach with different column names
