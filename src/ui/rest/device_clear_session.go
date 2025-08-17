@@ -60,24 +60,23 @@ func (handler *App) ClearDeviceSession(c *fiber.Ctx) error {
 	
 	logrus.Infof("Clearing WhatsApp session for device %s (%s)", device.ID, device.DeviceName)
 	
-	// Disconnect WhatsApp client
-	cm := whatsapp.GetClientManager()
-	var jid string
-	var phone string
+	// Use enhanced logout for complete cleanup
+	err = whatsapp.EnhancedLogout(deviceID)
+	if err != nil {
+		logrus.Errorf("Error during enhanced logout: %v", err)
+	}
 	
-	// Get phone and JID BEFORE doing anything
-	if client, err := cm.GetClient(deviceID); err == nil && client != nil {
-		// Get JID and phone before any disconnect/logout
-		if client.Store != nil && client.Store.ID != nil {
-			jid = client.Store.ID.String()
-			phone = client.Store.ID.User
-			logrus.Infof("Got from client - Phone: %s, JID: %s", phone, jid)
-		}
+	// Verify logout was successful
+	if !whatsapp.VerifyDeviceLoggedOut(deviceID) {
+		logrus.Warn("Device may not be fully logged out - forcing additional cleanup")
 		
-		// Logout from WhatsApp to remove from linked devices
-		if client.IsConnected() {
-			err = client.Logout(c.UserContext())
-			if err != nil {
+		// Force remove from all managers
+		cm := whatsapp.GetClientManager()
+		cm.RemoveClient(deviceID)
+		
+		dcm := whatsapp.GetDeviceConnectionManager()
+		dcm.RemoveConnection(deviceID)
+	}
 				logrus.Errorf("Error logging out from WhatsApp: %v", err)
 			} else {
 				logrus.Info("Successfully logged out from WhatsApp (removed from linked devices)")

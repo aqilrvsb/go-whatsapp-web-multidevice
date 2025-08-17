@@ -105,6 +105,30 @@
                             }, 1000);
                         }, 500);
                     }
+                    
+                    // Check for logout messages
+                    if (data.code === 'DEVICE_LOGGED_OUT') {
+                        console.log('Device logout detected:', data.code);
+                        
+                        // Update device status immediately
+                        if (data.result && data.result.deviceId) {
+                            const deviceElement = document.querySelector(`[data-device-id="${data.result.deviceId}"]`);
+                            if (deviceElement) {
+                                const statusElement = deviceElement.querySelector('.device-status, .status-indicator');
+                                if (statusElement) {
+                                    statusElement.classList.remove('online', 'connected');
+                                    statusElement.classList.add('offline', 'disconnected');
+                                }
+                            }
+                        }
+                        
+                        // Reload device list
+                        setTimeout(() => {
+                            if (window.loadDevices) {
+                                window.loadDevices();
+                            }
+                        }, 1000);
+                    }
                 } catch (e) {
                     console.error('Error parsing WebSocket message:', e);
                 }

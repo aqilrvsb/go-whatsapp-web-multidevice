@@ -1528,49 +1528,17 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 	
 	logrus.Infof("Logging out device %s (%s)", device.ID, device.DeviceName)
 	
-	// Disconnect WhatsApp client
-	cm := whatsapp.GetClientManager()
-	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
-		// Logout from WhatsApp
-		if client.IsConnected() {
-			err = client.Logout(c.UserContext())
-			if err != nil {
-				logrus.Errorf("Error logging out: %v", err)
-			}
-		}
-		
-		// Disconnect client
-		client.Disconnect()
-		
-		// Remove from client manager
-		cm.RemoveClient(deviceId)
-		
-		logrus.Info("WhatsApp client disconnected and removed from manager")
-	}
-	
-	// Get current device info before updating
-	var phone, jid sql.NullString
-	err = userRepo.DB().QueryRow("SELECT phone, jid from user_devices WHERE id = ?", deviceId).Scan(&phone, &jid)
+	// Use enhanced logout for complete cleanup
+	err = whatsapp.EnhancedLogout(deviceId)
 	if err != nil {
-		logrus.Warnf("Failed to get device info: %v", err)
+		logrus.Errorf("Error during enhanced logout: %v", err)
+		// Continue with response even if error
 	}
 	
-	// Update device status in database but KEEP phone and JID
-	phoneStr := ""
-	jidStr := ""
-	if phone.Valid {
-		phoneStr = phone.String
+	// Verify logout was successful
+	if !whatsapp.VerifyDeviceLoggedOut(deviceId) {
+		logrus.Warn("Device may not be fully logged out")
 	}
-	if jid.Valid {
-		jidStr = jid.String
-	}
-	err = userRepo.UpdateDeviceStatus(deviceId, "disconnected", phoneStr, jidStr)
-	if err != nil {
-		logrus.Errorf("Error updating device status: %v", err)
-	}
-	
-	// Clean up any session data
-	whatsapp.ClearConnectionSession(session.UserID)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,
