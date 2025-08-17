@@ -53,10 +53,10 @@ func StoreWhatsAppMessageWithMedia(deviceID, chatJID, messageID, senderJID, mess
 	query := `
 		INSERT INTO whatsapp_messages(device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (device_id, message_id) DO UPDATE
-		SET message_text = EXCLUDED.message_text,
-		    message_secrets = EXCLUDED.message_secrets,
-		    timestamp = EXCLUDED.timestamp
+		ON DUPLICATE KEY UPDATE
+			message_text = VALUES(message_text),
+			message_secrets = VALUES(message_secrets),
+			timestamp = VALUES(timestamp)
 	`
 	
 	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL, time.Now().Unix())
@@ -95,11 +95,11 @@ func StoreWhatsAppMessageWithMediaAndTimestamp(deviceID, chatJID, messageID, sen
 	query := `
 		INSERT INTO whatsapp_messages(device_id, chat_jid, message_id, sender_jid, message_text, message_type, message_secrets, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (device_id, message_id) DO UPDATE SET
-			message_text = EXCLUDED.message_text,
-			message_type = EXCLUDED.message_type,
-			message_secrets = EXCLUDED.message_secrets,
-			timestamp = EXCLUDED.timestamp
+		ON DUPLICATE KEY UPDATE
+			message_text = VALUES(message_text),
+			message_type = VALUES(message_type),
+			message_secrets = VALUES(message_secrets),
+			timestamp = VALUES(timestamp)
 	`
 	
 	_, err := db.Exec(query, deviceID, chatJID, messageID, senderJID, messageText, messageType, mediaURL, timestamp)
