@@ -3637,6 +3637,46 @@
                             console.log('Device paired:', data.message);
                             // Don't close modal yet, wait for full connection
                             break;
+                            
+                        case 'QR_CONNECTED':
+                            // QR code scanned successfully
+                            console.log('QR Connected:', data.message);
+                            
+                            // Close QR modal
+                            const qrModalElement = document.getElementById('qrModal');
+                            if (qrModalElement) {
+                                const qrModal = bootstrap.Modal.getInstance(qrModalElement);
+                                if (qrModal) {
+                                    qrModal.hide();
+                                }
+                            }
+                            
+                            // Clear QR refresh interval
+                            if (qrRefreshInterval) {
+                                clearInterval(qrRefreshInterval);
+                                qrRefreshInterval = null;
+                            }
+                            
+                            // Get device info from result
+                            const qrDeviceId = data.result?.deviceId || currentScanningDeviceId;
+                            
+                            // Show success message
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'QR Code Scanned!',
+                                text: 'WhatsApp is connecting... Please wait.',
+                                timer: 3000,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                            
+                            // Reload devices after a short delay
+                            setTimeout(() => {
+                                loadDevices();
+                            }, 2000);
+                            
+                            break;
+                            
                         case 'DEVICE_CONNECTED':
                             // Device fully connected and logged in
                             console.log('Device fully connected:', data.message);
