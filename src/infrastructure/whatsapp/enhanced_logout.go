@@ -6,13 +6,10 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/database"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	waLog "go.mau.fi/whatsmeow/util/log"
@@ -24,7 +21,7 @@ func EnhancedLogout(deviceID string) error {
 	
 	// Step 1: Get device info
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDevice(deviceID)
+	device, err := userRepo.GetDeviceByID(deviceID)
 	if err != nil {
 		return fmt.Errorf("device not found: %v", err)
 	}
@@ -46,7 +43,7 @@ func EnhancedLogout(deviceID string) error {
 		// Logout from WhatsApp
 		if client.IsConnected() {
 			logrus.Info("Logging out from WhatsApp...")
-			err := client.Logout()
+			err := client.Logout(context.Background())
 			if err != nil {
 				logrus.Errorf("WhatsApp logout error: %v", err)
 			} else {
@@ -71,7 +68,7 @@ func EnhancedLogout(deviceID string) error {
 	// Step 3: Clear from multidevice manager
 	dm := multidevice.GetDeviceManager()
 	if dm != nil {
-		dm.RemoveDevice(deviceID)
+		dm.UpdateDeviceStatus(deviceID, false, phoneNumber)
 	}
 	
 	// Step 4: Clear device store in WhatsApp database
@@ -83,7 +80,7 @@ func EnhancedLogout(deviceID string) error {
 	}
 	
 	// Step 5: Clear WhatsApp session data
-	err = ClearWhatsAppSessionEnhanced(context.Background(), deviceID)
+	err = ClearWhatsAppSessionData(deviceID)
 	if err != nil {
 		logrus.Errorf("Error clearing WhatsApp session: %v", err)
 	}
@@ -205,7 +202,7 @@ func VerifyDeviceLoggedOut(deviceID string) bool {
 	
 	// Check database status
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDevice(deviceID)
+	device, err := userRepo.GetDeviceByID(deviceID)
 	if err == nil && device != nil && device.Status != "offline" {
 		logrus.Warnf("Device %s status is not offline: %s", deviceID, device.Status)
 		return false

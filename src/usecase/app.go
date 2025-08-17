@@ -13,7 +13,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	fiberUtils "github.com/gofiber/fiber/v2/utils"
 	"github.com/sirupsen/logrus"
@@ -38,7 +37,8 @@ func NewAppService(waCli *whatsmeow.Client, db *sqlstore.Container) domainApp.IA
 
 // Helper function to get device ID from connection session
 func getDeviceIDFromSession() string {
-	if sessions := whatsapp.GetConnectionSessions(); sessions != nil {
+	// Helper function to get device ID from connection session
+	if sessions := whatsapp.GetAllConnectionSessions(); sessions != nil {
 		for _, session := range sessions {
 			if session != nil && session.DeviceID != "" {
 				return session.DeviceID

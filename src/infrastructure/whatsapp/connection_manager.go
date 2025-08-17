@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
@@ -30,12 +29,12 @@ type ConnectionInfo struct {
 
 var (
 	dcm  *DeviceConnectionManager
-	once sync.Once
+	dcmOnce sync.Once
 )
 
 // GetDeviceConnectionManager returns singleton instance
 func GetDeviceConnectionManager() *DeviceConnectionManager {
-	once.Do(func() {
+	dcmOnce.Do(func() {
 		dcm = &DeviceConnectionManager{
 			activeConnections: make(map[string]*ConnectionInfo),
 			connectionLocks:   make(map[string]*sync.Mutex),
@@ -161,7 +160,7 @@ func HandleStreamReplaced(ctx context.Context, deviceID string, evt *events.Stre
 		
 		// Check if device should reconnect
 		userRepo := repository.GetUserRepository()
-		device, err := userRepo.GetDevice(deviceID)
+		device, err := userRepo.GetDeviceByID(deviceID)
 		if err != nil || device == nil {
 			return
 		}
