@@ -13,6 +13,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	pkgError "github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/error"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/validations"
 	fiberUtils "github.com/gofiber/fiber/v2/utils"
 	"github.com/sirupsen/logrus"
@@ -102,6 +103,18 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				}
 			case *events.PairSuccess:
 				logrus.Infof("Pair success event: %s", v.ID.String())
+				
+				// Send QR_CONNECTED WebSocket message
+				if deviceID != "" {
+					websocket.Broadcast <- websocket.BroadcastMessage{
+						Code:    "QR_CONNECTED",
+						Message: "QR code scan successful",
+						Result: map[string]interface{}{
+							"deviceId": deviceID,
+							"success":  true,
+						},
+					}
+				}
 		case *events.Connected, *events.PushNameSetting:
 			logrus.Info("Connected event received - device fully connected!")
 			
@@ -110,6 +123,20 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				phoneNumber := newClient.Store.ID.User
 				jid := newClient.Store.ID.String()
 				logrus.Infof("Device connected - Phone: %s, JID: %s", phoneNumber, jid)
+				
+				// Send DEVICE_CONNECTED WebSocket message
+				if deviceID != "" {
+					websocket.Broadcast <- websocket.BroadcastMessage{
+						Code:    "DEVICE_CONNECTED",
+						Message: "Device successfully connected",
+						Result: map[string]interface{}{
+							"deviceId": deviceID,
+							"phone":    phoneNumber,
+							"jid":      jid,
+							"status":   "online",
+						},
+					}
+				}
 				
 				// Update device by phone number - simple and direct
 				userRepo := repository.GetUserRepository()
