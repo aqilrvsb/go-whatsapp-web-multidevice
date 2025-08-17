@@ -1603,14 +1603,29 @@ func (handler *App) SimpleLogout(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Update device status to offline
+	logrus.Infof("SimpleLogout called for device: %s", deviceId)
+	
+	// Get device info first to preserve phone and jid
 	userRepo := repository.GetUserRepository()
-	err := userRepo.UpdateDeviceStatus(deviceId, "offline", "", "")
+	device, err := userRepo.GetDeviceByID(deviceId)
 	if err != nil {
+		logrus.Errorf("Failed to get device: %v", err)
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Device not found",
+		})
+	}
+	
+	// Update device status to offline
+	logrus.Infof("Updating device %s status to offline (phone: %s, jid: %s)", deviceId, device.Phone, device.JID)
+	err = userRepo.UpdateDeviceStatus(deviceId, "offline", device.Phone, device.JID)
+	if err != nil {
+		logrus.Errorf("Failed to update device status: %v", err)
 		return c.Status(500).JSON(utils.ResponseData{
 			Status:  500,
 			Code:    "ERROR",
-			Message: "Failed to update device status",
+			Message: "Failed to update device status: " + err.Error(),
 		})
 	}
 	
@@ -1620,6 +1635,8 @@ func (handler *App) SimpleLogout(c *fiber.Ctx) error {
 		client.Disconnect()
 		cm.RemoveClient(deviceId)
 	}
+	
+	logrus.Infof("Device %s successfully logged out", deviceId)
 	
 	return c.JSON(utils.ResponseData{
 		Status:  200,

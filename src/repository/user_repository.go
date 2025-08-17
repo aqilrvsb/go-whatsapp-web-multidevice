@@ -382,7 +382,7 @@ func (r *UserRepository) UpdateDeviceStatus(deviceID, status string, phone, jid 
 		UPDATE user_devices SET status = ?, last_seen = CURRENT_TIMESTAMP, phone = ?, jid = ?
 		WHERE id = ?
 	`
-	_, err := r.db.Exec(query, deviceID, status, phone, jid)
+	_, err := r.db.Exec(query, status, phone, jid, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to update device status: %w", err)
 	}
