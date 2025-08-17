@@ -148,9 +148,29 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				}
 				
 				// Find the device ID by phone for client manager registration
+				// Get the ACTUAL device ID that was used for scanning
 				var deviceID string
-				err = userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
-				if err == nil && deviceID != "" {
+				
+				// First check if there's a connection session with this phone
+				allSessions := whatsapp.GetAllConnectionSessions()
+				for _, session := range allSessions {
+					if session != nil && session.DeviceID != "" {
+						// This is the device that initiated the QR scan
+						deviceID = session.DeviceID
+						logrus.Infof("Found device ID %s from connection session", deviceID)
+						break
+					}
+				}
+				
+				// If not found in session, look in database by phone
+				if deviceID == "" {
+					err = userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+					if err != nil {
+						logrus.Warnf("No device found for phone %s: %v", phoneNumber, err)
+					}
+				}
+				
+				if deviceID != "" {
 					// Register with client manager
 					cm := whatsapp.GetClientManager()
 					cm.AddClient(deviceID, newClient)
@@ -174,32 +194,63 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 		case *events.Message:
 			// Handle incoming messages for WhatsApp Web
 			if config.WhatsappChatStorage {
-				// Find device ID for this client
-				userRepo := repository.GetUserRepository()
-				if newClient.Store.ID != nil {
-					phoneNumber := newClient.Store.ID.User
-					var deviceID string
-					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
-					if err == nil && deviceID != "" {
-						// Store chat and message
-						whatsapp.HandleMessageForChats(deviceID, newClient, v)
+				// Find device ID for this client - use session first
+				var deviceID string
+				
+				// Check connection sessions first
+				allSessions := whatsapp.GetAllConnectionSessions()
+				for _, session := range allSessions {
+					if session != nil && session.DeviceID != "" {
+						deviceID = session.DeviceID
+						break
 					}
+				}
+				
+				// Fallback to database lookup by phone if not in session
+				if deviceID == "" && newClient.Store.ID != nil {
+					userRepo := repository.GetUserRepository()
+					phoneNumber := newClient.Store.ID.User
+					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+					if err != nil {
+						logrus.Warnf("No device found for message handling: %v", err)
+					}
+				}
+				
+				if deviceID != "" {
+					// Store chat and message
+					whatsapp.HandleMessageForChats(deviceID, newClient, v)
 				}
 			}
 		case *events.HistorySync:
 			// Handle history sync for WhatsApp Web
 			logrus.Infof("=== HISTORY SYNC EVENT RECEIVED IN LOGIN! Type: %s ===", v.Data.GetSyncType())
 			if config.WhatsappChatStorage {
-				// Find device ID for this client
-				userRepo := repository.GetUserRepository()
-				if newClient.Store.ID != nil {
-					phoneNumber := newClient.Store.ID.User
-					var deviceID string
-					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
-					if err == nil && deviceID != "" {
-						// Process history sync
-						whatsapp.HandleHistorySyncForChats(deviceID, newClient, v)
+				// Find device ID for this client - use session first
+				var deviceID string
+				
+				// Check connection sessions first
+				allSessions := whatsapp.GetAllConnectionSessions()
+				for _, session := range allSessions {
+					if session != nil && session.DeviceID != "" {
+						deviceID = session.DeviceID
+						break
 					}
+				}
+				
+				// Fallback to database lookup by phone if not in session
+				if deviceID == "" && newClient.Store.ID != nil {
+					userRepo := repository.GetUserRepository()
+					phoneNumber := newClient.Store.ID.User
+					err := userRepo.DB().QueryRow(`SELECT id FROM user_devices WHERE phone = ? LIMIT 1`, phoneNumber).Scan(&deviceID)
+					if err != nil {
+						logrus.Warnf("No device found for history sync: %v", err)
+					}
+				}
+				
+				if deviceID != "" {
+					// Process history sync
+					whatsapp.HandleHistorySyncForChats(deviceID, newClient, v)
+					whatsapp.HandleHistorySyncForWebView(deviceID, v)
 				}
 			}
 			// Keep the client alive by adding keepalive monitoring
