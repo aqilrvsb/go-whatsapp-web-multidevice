@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 	
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/tracker"
 	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types/events"
@@ -96,13 +97,26 @@ func (sc *StableClient) handleEvent(evt interface{}) {
 	
 	switch v := evt.(type) {
 	case *events.LoggedOut:
-		logrus.Warnf("Device %s received LoggedOut event - IGNORING and forcing reconnection", sc.DeviceID)
-		// IGNORE logout - immediately reconnect
+		// Check if this was an intentional logout
+		tracker := tracker.GetLogoutTracker()
+		if tracker.IsLoggedOut(sc.DeviceID) {
+			logrus.Infof("Device %s was intentionally logged out - NOT reconnecting", sc.DeviceID)
+			sc.mu.Lock()
+			sc.ForceConnected = false
+			sc.mu.Unlock()
+			return
+		}
+		logrus.Warnf("Device %s received LoggedOut event - forcing reconnection", sc.DeviceID)
 		go sc.forceReconnect()
 		
 	case *events.Disconnected:
+		// Check if this was an intentional logout
+		tracker := tracker.GetLogoutTracker()
+		if tracker.IsLoggedOut(sc.DeviceID) {
+			logrus.Infof("Device %s was intentionally logged out - NOT reconnecting", sc.DeviceID)
+			return
+		}
 		logrus.Warnf("Device %s disconnected - forcing immediate reconnection", sc.DeviceID)
-		// Force immediate reconnection
 		go sc.forceReconnect()
 		
 	case *events.StreamError:
@@ -136,6 +150,13 @@ func (sc *StableClient) handleEvent(evt interface{}) {
 
 // forceReconnect forces a reconnection no matter what
 func (sc *StableClient) forceReconnect() {
+	// Check if this device was intentionally logged out
+	tracker := tracker.GetLogoutTracker()
+	if tracker.IsLoggedOut(sc.DeviceID) {
+		logrus.Infof("Device %s was intentionally logged out - skipping reconnection", sc.DeviceID)
+		return
+	}
+	
 	sc.mu.Lock()
 	if sc.isReconnecting {
 		sc.mu.Unlock()
@@ -185,6 +206,14 @@ func (sc *StableClient) maintainConnection() {
 	for sc.ForceConnected {
 		select {
 		case <-ticker.C:
+			// Check if device was intentionally logged out
+			tracker := tracker.GetLogoutTracker()
+			if tracker.IsLoggedOut(sc.DeviceID) {
+				logrus.Infof("Device %s was logged out - stopping maintenance", sc.DeviceID)
+				sc.ForceConnected = false
+				return
+			}
+			
 			// Check if connected
 			if !sc.Client.IsConnected() {
 				logrus.Warnf("Device %s not connected in maintain loop - forcing reconnection", sc.DeviceID)

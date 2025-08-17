@@ -7,6 +7,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/tracker"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,10 @@ import (
 // EnhancedLogout performs complete logout with all cleanup steps
 func EnhancedLogout(deviceID string) error {
 	logrus.Infof("=== STARTING ENHANCED LOGOUT FOR DEVICE %s ===", deviceID)
+	
+	// Step 0: Mark device as intentionally logged out
+	lt := tracker.GetLogoutTracker()
+	lt.MarkLoggedOut(deviceID)
 	
 	// Step 1: Get device info
 	userRepo := repository.GetUserRepository()

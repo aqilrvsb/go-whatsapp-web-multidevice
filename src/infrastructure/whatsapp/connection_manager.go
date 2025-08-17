@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/tracker"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/sirupsen/logrus"
@@ -162,6 +163,13 @@ func HandleStreamReplaced(ctx context.Context, deviceID string, evt *events.Stre
 		userRepo := repository.GetUserRepository()
 		device, err := userRepo.GetDeviceByID(deviceID)
 		if err != nil || device == nil {
+			return
+		}
+		
+		// Check if device was intentionally logged out
+		lt := tracker.GetLogoutTracker()
+		if lt.IsLoggedOut(deviceID) {
+			logrus.Debugf("Device %s was logged out - not reconnecting", deviceID)
 			return
 		}
 		
