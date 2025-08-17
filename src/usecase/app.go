@@ -50,20 +50,8 @@ func getDeviceIDFromSession() string {
 }
 
 func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
-	// Get device ID from session to prevent duplicate connections
-	deviceID := getDeviceIDFromSession()
-	if deviceID != "" {
-		dcm := whatsapp.GetDeviceConnectionManager()
-		if !dcm.PreventDuplicateConnection(deviceID) {
-			return response, fmt.Errorf("device is already connecting or connected")
-		}
-		defer func() {
-			// Remove from connecting state if error occurs
-			if err != nil {
-				dcm.RemoveConnection(deviceID)
-			}
-		}()
-	}
+	// Don't try to get device ID from session here - it causes issues
+	// The device ID will be available when registerDeviceAfterConnection is called
 	
 	// For multi-device support, we need to create a new client for this login attempt
 	if service.db == nil {
@@ -88,9 +76,12 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	newClient.AddEventHandler(func(evt interface{}) {
 		// Process events asynchronously to prevent WebSocket blocking
 		go func() {
+			// Get device ID from session when handling events
+			currentDeviceID := getDeviceIDFromSession()
+			
 			// Handle device-specific events
-			if deviceID != "" {
-				whatsapp.HandleDeviceEvent(context.Background(), deviceID, evt)
+			if currentDeviceID != "" {
+				whatsapp.HandleDeviceEvent(context.Background(), currentDeviceID, evt)
 			}
 			
 			switch v := evt.(type) {
@@ -110,12 +101,12 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				logrus.Infof("Pair success event: %s", v.ID.String())
 				
 				// Send QR_CONNECTED WebSocket message
-				if deviceID != "" {
+				if currentDeviceID != "" {
 					websocket.Broadcast <- websocket.BroadcastMessage{
 						Code:    "QR_CONNECTED",
 						Message: "QR code scan successful",
 						Result: map[string]interface{}{
-							"deviceId": deviceID,
+							"deviceId": currentDeviceID,
 							"success":  true,
 						},
 					}
@@ -130,12 +121,12 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				logrus.Infof("Device connected - Phone: %s, JID: %s", phoneNumber, jid)
 				
 				// Send DEVICE_CONNECTED WebSocket message
-				if deviceID != "" {
+				if currentDeviceID != "" {
 					websocket.Broadcast <- websocket.BroadcastMessage{
 						Code:    "DEVICE_CONNECTED",
 						Message: "Device successfully connected",
 						Result: map[string]interface{}{
-							"deviceId": deviceID,
+							"deviceId": currentDeviceID,
 							"phone":    phoneNumber,
 							"jid":      jid,
 							"status":   "online",
