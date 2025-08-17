@@ -95,6 +95,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/devices/:deviceId/reconnect", ReconnectDeviceSession) // Actual reconnection with session
 	app.Get("/api/devices/:deviceId/qr", rest.GetDeviceQR)
 	app.Post("/api/devices/:deviceId/disconnect", rest.DisconnectDevice)
+	app.Post("/api/devices/:deviceId/logout", rest.SimpleLogout) // Simple logout endpoint
 	app.Post("/api/devices/:deviceId/reset", rest.ResetDevice)
 	app.Post("/api/devices/:deviceId/clear-session", rest.ClearDeviceSession)
 	app.Post("/api/devices/clear-all-sessions", rest.ClearAllSessions)
@@ -1587,6 +1588,46 @@ func (handler *App) ReconnectDevice(c *fiber.Ctx) error {
 		Results: map[string]interface{}{
 			"deviceId": deviceId,
 			"status":   "reconnecting",
+		},
+	})
+}
+
+// SimpleLogout just updates device status to offline
+func (handler *App) SimpleLogout(c *fiber.Ctx) error {
+	deviceId := c.Params("deviceId")
+	if deviceId == "" {
+		return c.Status(400).JSON(utils.ResponseData{
+			Status:  400,
+			Code:    "BAD_REQUEST",
+			Message: "Device ID is required",
+		})
+	}
+	
+	// Update device status to offline
+	userRepo := repository.GetUserRepository()
+	err := userRepo.UpdateDeviceStatus(deviceId, "offline", "", "")
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to update device status",
+		})
+	}
+	
+	// Try to disconnect client if exists (optional)
+	cm := whatsapp.GetClientManager()
+	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
+		client.Disconnect()
+		cm.RemoveClient(deviceId)
+	}
+	
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Device logged out",
+		Results: map[string]interface{}{
+			"device_id": deviceId,
+			"status":   "offline",
 		},
 	})
 }

@@ -2987,16 +2987,11 @@
                 });
         }
 
-        // Logout Device (properly clears session)
+        // Logout Device (simple - just update status to offline)
         function logoutDevice(deviceId) {
             Swal.fire({
                 title: 'Logout Device?',
-                html: `
-                    <div class="text-start">
-                        <p>This will disconnect the device from WhatsApp and clear its session.</p>
-                        <p class="text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i>You will need to scan the QR code again to reconnect.</p>
-                    </div>
-                `,
+                text: 'This will disconnect the device from WhatsApp.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Yes, Logout',
@@ -3004,16 +2999,8 @@
                 confirmButtonColor: '#dc3545'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    showLoading();
-                    
-                    // Set a timeout to hide loading in case of any issues
-                    const loadingTimeout = setTimeout(() => {
-                        hideLoading();
-                        showToast('Operation is taking longer than expected...', 'warning');
-                    }, 15000); // 15 seconds timeout
-                    
-                    // Use the new clear-session endpoint that properly clears WhatsApp tables
-                    fetch(`/api/devices/${deviceId}/clear-session`, {
+                    // Simple logout - just update status
+                    fetch(`/api/devices/${deviceId}/logout`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: {
@@ -3022,42 +3009,22 @@
                     })
                     .then(response => response.json())
                     .then(data => {
-                        clearTimeout(loadingTimeout);
-                        hideLoading();
-                        
                         if (data.code === 'SUCCESS') {
-                            // Update device status
+                            // Update device status locally
                             const device = devices.find(d => d.id === deviceId);
                             if (device) {
                                 device.status = 'offline';
-                                // Keep phone and JID for reconnection
-                                device.lastSeen = new Date().toISOString();
                             }
                             renderDevices();
                             
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Device Logged Out!',
-                                text: 'The device has been disconnected and session cleared. You can now scan QR code to connect again.',
-                                timer: 3000,
-                                showConfirmButton: false
-                            });
-                            
-                            // Refresh devices
-                            setTimeout(loadDevices, 2000);
+                            showToast('Device logged out successfully', 'success');
                         } else {
-                            throw new Error(data.message || 'Failed to clear session');
+                            throw new Error(data.message || 'Failed to logout');
                         }
                     })
                     .catch(error => {
-                        clearTimeout(loadingTimeout);
-                        console.error('Error clearing session:', error);
-                        hideLoading();
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Operation Failed',
-                            text: error.message || 'Failed to logout device. Please try again.'
-                        });
+                        console.error('Error logging out:', error);
+                        showToast(error.message || 'Failed to logout device', 'error');
                     });
                 }
             });
