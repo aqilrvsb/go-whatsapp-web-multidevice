@@ -36,7 +36,34 @@ func NewAppService(waCli *whatsmeow.Client, db *sqlstore.Container) domainApp.IA
 	}
 }
 
+// Helper function to get device ID from connection session
+func getDeviceIDFromSession() string {
+	if sessions := whatsapp.GetConnectionSessions(); sessions != nil {
+		for _, session := range sessions {
+			if session != nil && session.DeviceID != "" {
+				return session.DeviceID
+			}
+		}
+	}
+	return ""
+}
+
 func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginResponse, err error) {
+	// Get device ID from session to prevent duplicate connections
+	deviceID := getDeviceIDFromSession()
+	if deviceID != "" {
+		dcm := whatsapp.GetDeviceConnectionManager()
+		if !dcm.PreventDuplicateConnection(deviceID) {
+			return response, fmt.Errorf("device is already connecting or connected")
+		}
+		defer func() {
+			// Remove from connecting state if error occurs
+			if err != nil {
+				dcm.RemoveConnection(deviceID)
+			}
+		}()
+	}
+	
 	// For multi-device support, we need to create a new client for this login attempt
 	if service.db == nil {
 		return response, fmt.Errorf("database not initialized")
@@ -69,6 +96,10 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 				// Let auto-reconnect handle it
 			case *events.StreamReplaced:
 				logrus.Warn("Stream replaced - another client connected with same credentials")
+				// Handle stream replaced properly
+				if deviceID := getDeviceIDFromSession(); deviceID != "" {
+					whatsapp.HandleStreamReplaced(context.Background(), deviceID, v)
+				}
 			case *events.PairSuccess:
 				logrus.Infof("Pair success event: %s", v.ID.String())
 		case *events.Connected, *events.PushNameSetting:
@@ -102,16 +133,12 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 					cm.AddClient(deviceID, newClient)
 					logrus.Infof("Registered device %s with client manager", deviceID)
 					
-					// Send WebSocket notification
-					websocket.Broadcast <- websocket.BroadcastMessage{
-						Code:    "DEVICE_CONNECTED",
-						Message: "WhatsApp fully connected and logged in",
-						Result: map[string]interface{}{
-							"phone":    phoneNumber,
-							"jid":      jid,
-							"deviceId": deviceID,
-						},
-					}
+					// Register with device connection manager
+					dcm := whatsapp.GetDeviceConnectionManager()
+					dcm.RegisterConnection(deviceID, newClient, phoneNumber, jid)
+					
+					// Send proper connection success notification
+					whatsapp.HandleConnectionSuccess(deviceID, phoneNumber, jid)
 				}
 			}
 			
