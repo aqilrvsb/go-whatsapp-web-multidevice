@@ -277,28 +277,38 @@ func (r *leadAIRepository) GetCampaignProgress(campaignID int) ([]models.AICampa
 	return progresses, nil
 }
 func (r *leadAIRepository) UpdateCampaignProgress(progress *models.AICampaignProgress) error {
-	query := `
-
-		INSERT INTO ai_campaign_progress(campaign_id, device_id, leads_sent, leads_failed, status)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT (campaign_id, device_id) 
-		DO UPDATE SET 
-			leads_sent = ?,
-			leads_failed = ?,
-			status = ?,
-			last_activity = CURRENT_TIMESTAMP,
-			updated_at = CURRENT_TIMESTAMP`
+	// First try to update existing record
+	updateQuery := `
+		UPDATE ai_campaign_progress 
+		SET leads_sent = ?, leads_failed = ?, status = ?, 
+		    last_activity = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE campaign_id = ? AND device_id = ?
+	`
 	
-	_, err := r.db.Exec(
-		query,
-		progress.CampaignID,
-		progress.DeviceID,
-		progress.LeadsSent,
-		progress.LeadsFailed,
-		progress.Status,
-	)
+	result, err := r.db.Exec(updateQuery, progress.LeadsSent, progress.LeadsFailed, progress.Status,
+		progress.CampaignID, progress.DeviceID)
+	if err != nil {
+		return err
+	}
 	
-	return err
+	// Check if any rows were updated
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	
+	// If no rows were updated, insert new record
+	if rowsAffected == 0 {
+		insertQuery := `
+			INSERT INTO ai_campaign_progress(campaign_id, device_id, leads_sent, leads_failed, status)
+			VALUES (?, ?, ?, ?, ?)
+		`
+		_, err = r.db.Exec(insertQuery, progress.CampaignID, progress.DeviceID,
+			progress.LeadsSent, progress.LeadsFailed, progress.Status)
+		return err
+	}
+	
+	return nil
 }
 
 // Helper methods

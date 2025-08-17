@@ -38,15 +38,30 @@ func NewMessageAnalyticsRepository() *MessageAnalyticsRepository {
 // RecordMessage records a new message
 func (r *MessageAnalyticsRepository) RecordMessage(userID, deviceID, messageID, jid, content string, isFromMe bool, status string) error {
 	id := uuid.New().String()
-	query := `
-		INSERT INTO message_analytics(id, user_id, device_id, message_id, jid, content, is_from_me, ` + "`status`" + `)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (message_id) 
-		DO UPDATE SET status = ?, updated_at = CURRENT_TIMESTAMP
-	`
-	_, err := r.db.Exec(query, id, userID, deviceID, messageID, jid, content, isFromMe, status)
-	if err != nil {
-		return fmt.Errorf("failed to record message: %w", err)
+	
+	// First check if message already exists
+	var existingID string
+	err := r.db.QueryRow("SELECT id FROM message_analytics WHERE message_id = ?", messageID).Scan(&existingID)
+	
+	if err == nil {
+		// Message exists, update status
+		updateQuery := `UPDATE message_analytics SET ` + "`status`" + ` = ?, updated_at = CURRENT_TIMESTAMP WHERE message_id = ?`
+		_, err = r.db.Exec(updateQuery, status, messageID)
+		if err != nil {
+			return fmt.Errorf("failed to update message status: %w", err)
+		}
+	} else if err == sql.ErrNoRows {
+		// Message doesn't exist, insert new
+		insertQuery := `
+			INSERT INTO message_analytics(id, user_id, device_id, message_id, jid, content, is_from_me, ` + "`status`" + `)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`
+		_, err = r.db.Exec(insertQuery, id, userID, deviceID, messageID, jid, content, isFromMe, status)
+		if err != nil {
+			return fmt.Errorf("failed to insert message: %w", err)
+		}
+	} else {
+		return fmt.Errorf("failed to check existing message: %w", err)
 	}
 	
 	return nil
