@@ -65,9 +65,8 @@ func (r *OptimizedWhatsAppRepository) BatchSaveChats(chats []WhatsAppChat) error
 		 last_message_time, unread_count, avatar_url, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE 
-		DO UPDATE SET 
 			chat_name = VALUES(chat_name),
-			is_muted = EXCLUDED.is_muted,
+			is_muted = VALUES(is_muted),
 			last_message_text = CASE 
 				WHEN VALUES(last_message_time) > whatsapp_chats.last_message_time 
 				THEN VALUES(last_message_text) 
@@ -79,6 +78,8 @@ func (r *OptimizedWhatsAppRepository) BatchSaveChats(chats []WhatsAppChat) error
 				ELSE whatsapp_chats.last_message_time 
 			END,
 			unread_count = VALUES(unread_count),
+			avatar_url = VALUES(avatar_url),
+			updated_at = VALUES(updated_at)
 			avatar_url = VALUES(avatar_url),
 			updated_at = VALUES(updated_at)
 	`)

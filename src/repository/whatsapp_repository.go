@@ -58,10 +58,9 @@ func (r *WhatsAppRepository) SaveOrUpdateChat(chat *WhatsAppChat) error {
 		 last_message_time, unread_count, avatar_url, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE 
-		DO UPDATE SET 
 			chat_name = VALUES(chat_name),
 			is_group = VALUES(is_group),
-			is_muted = EXCLUDED.is_muted,
+			is_muted = VALUES(is_muted),
 			last_message_text = VALUES(last_message_text),
 			last_message_time = VALUES(last_message_time),
 			unread_count = VALUES(unread_count),
