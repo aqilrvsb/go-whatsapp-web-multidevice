@@ -102,7 +102,7 @@ func (p *OptimizedBroadcastProcessor) processNewMessages() {
 		return
 	}
 	
-	logrus.Debugf("Found %d devices with pending messages", len(devices))
+	// logrus.Debugf("Found %d devices with pending messages", len(devices))
 	
 	// Process each device in parallel
 	var wg sync.WaitGroup

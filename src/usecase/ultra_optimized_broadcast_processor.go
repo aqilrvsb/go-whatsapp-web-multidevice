@@ -49,7 +49,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		return
 	}
 	
-	logrus.Infof("Found %d devices with pending messages", len(devices))
+	// logrus.Infof("Found %d devices with pending messages", len(devices))
 	
 	messageCount := 0
 	campaignPools := make(map[int]bool)

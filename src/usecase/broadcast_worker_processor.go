@@ -37,7 +37,7 @@ func StartBroadcastWorkerProcessor() {
 				continue // No pending messages
 			}
 			
-			logrus.Infof("Found %d devices with pending messages", len(devices))
+			// logrus.Infof("Found %d devices with pending messages", len(devices))
 			
 			// Process each device
 			for _, deviceID := range devices {
