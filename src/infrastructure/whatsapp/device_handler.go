@@ -172,15 +172,19 @@ func handleDeviceConnected(ctx context.Context, deviceID string) {
 	// Clear QR channel
 	ClearDeviceQRChannel(deviceID)
 	
-	// Broadcast connection success
-	websocket.Broadcast <- websocket.BroadcastMessage{
-		Code:    "DEVICE_CONNECTED",
-		Message: "WhatsApp fully connected and logged in",
-		Result: map[string]interface{}{
-			"deviceId": deviceID,
-			"phone":    phoneNumber,
-			"jid":      jid,
-		},
+	// Broadcast connection success only if not already sent from registerDeviceAfterConnection
+	// Check if this is coming from init.go's Connected event
+	if conn.Client != nil && conn.Client.Store != nil && conn.Client.Store.ID != nil {
+		// This is a properly registered device, send the broadcast
+		websocket.Broadcast <- websocket.BroadcastMessage{
+			Code:    "DEVICE_CONNECTED",
+			Message: "WhatsApp fully connected and logged in",
+			Result: map[string]interface{}{
+				"deviceId": deviceID,
+				"phone":    phoneNumber,
+				"jid":      jid,
+			},
+		}
 	}
 	
 	// Trigger initial sync after connection

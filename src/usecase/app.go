@@ -398,23 +398,41 @@ func (service serviceApp) registerDeviceAfterConnection(client *whatsmeow.Client
 	// Check all connection sessions to find the matching device
 	allSessions := whatsapp.GetAllConnectionSessions()
 	
-	for deviceID, session := range allSessions {
+	// First, try to find a session that matches this user
+	for sessionKey, session := range allSessions {
 		if session != nil && session.DeviceID != "" {
-			logrus.Infof("Found session for device %s, user %s", deviceID, session.UserID)
+			logrus.Infof("Found session for key %s, device %s, user %s", sessionKey, session.DeviceID, session.UserID)
 			
-			// Register the client with ClientManager
+			// Use the device ID from the session (this is the one the frontend is expecting)
+			deviceID := session.DeviceID
+			
+			// Register the client with ClientManager using the correct device ID
 			cm := whatsapp.GetClientManager()
-			cm.AddClient(session.DeviceID, client)
-			logrus.Infof("Successfully registered device %s with ClientManager", session.DeviceID)
+			cm.AddClient(deviceID, client)
+			logrus.Infof("Successfully registered device %s with ClientManager", deviceID)
 			
-			// IMPORTANT: Keep a reference to prevent garbage collection
-			// The ClientManager should maintain this reference
-			
-			// Update device status in database
-			// This is handled in the Connected event handler in init.go
+			// Update device in database and send success notification
+			userRepo := repository.GetUserRepository()
+			err := userRepo.UpdateDeviceStatus(deviceID, "online", phoneNumber, jid)
+			if err != nil {
+				logrus.Errorf("Failed to update device status: %v", err)
+			} else {
+				logrus.Infof("Successfully updated device %s to online status", deviceID)
+				
+				// Send WebSocket notification for the correct device ID
+				websocket.Broadcast <- websocket.BroadcastMessage{
+					Code:    "DEVICE_CONNECTED",
+					Message: "WhatsApp fully connected and logged in",
+					Result: map[string]interface{}{
+						"deviceId": deviceID,
+						"phone":    phoneNumber,
+						"jid":      jid,
+					},
+				}
+			}
 			
 			// Clear the session
-			whatsapp.ClearConnectionSession(deviceID)
+			whatsapp.ClearConnectionSession(sessionKey)
 			break
 		}
 	}

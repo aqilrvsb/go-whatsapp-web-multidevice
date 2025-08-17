@@ -211,25 +211,10 @@ func handleLoggedOut(_ context.Context) {
 func handleConnectionEvents(ctx context.Context) {
 	log.Infof("WhatsApp connection event received")
 	
-	// Get the current device ID from the global client
-	if cli == nil || cli.Store == nil || cli.Store.ID == nil {
-		log.Warnf("Connection event received but client not ready")
-		return
-	}
-	
-	// Find the device ID for this client
-	cm := GetClientManager()
-	allClients := cm.GetAllClients()
-	
-	for deviceID, client := range allClients {
-		if client == cli {
-			// This is the device that connected
-			handleDeviceConnected(ctx, deviceID)
-			return
-		}
-	}
-	
-	log.Warnf("Connection event received but device not found in client manager")
+	// For the global client, we should not handle Connected events
+	// They should be handled by device-specific handlers in app.go
+	// This prevents duplicate DEVICE_CONNECTED messages
+	return
 }
 
 func handleStreamReplaced(_ context.Context) {
