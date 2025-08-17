@@ -88,6 +88,11 @@ func (service serviceApp) Login(ctx context.Context) (response domainApp.LoginRe
 	newClient.AddEventHandler(func(evt interface{}) {
 		// Process events asynchronously to prevent WebSocket blocking
 		go func() {
+			// Handle device-specific events
+			if deviceID != "" {
+				whatsapp.HandleDeviceEvent(context.Background(), deviceID, evt)
+			}
+			
 			switch v := evt.(type) {
 			case *events.Disconnected:
 				logrus.Warnf("Device disconnected event received")

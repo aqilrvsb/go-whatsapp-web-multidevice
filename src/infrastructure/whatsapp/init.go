@@ -208,13 +208,28 @@ func handleLoggedOut(_ context.Context) {
 	}
 }
 
-func handleConnectionEvents(_ context.Context) {
+func handleConnectionEvents(ctx context.Context) {
 	log.Infof("WhatsApp connection event received")
 	
-	// DISABLED: Global client handler causes multi-device issues
-	// Each device should handle its own connection events through device-specific handlers
-	// See app.go Login() function for device-specific handling
-	return
+	// Get the current device ID from the global client
+	if cli == nil || cli.Store == nil || cli.Store.ID == nil {
+		log.Warnf("Connection event received but client not ready")
+		return
+	}
+	
+	// Find the device ID for this client
+	cm := GetClientManager()
+	allClients := cm.GetAllClients()
+	
+	for deviceID, client := range allClients {
+		if client == cli {
+			// This is the device that connected
+			handleDeviceConnected(ctx, deviceID)
+			return
+		}
+	}
+	
+	log.Warnf("Connection event received but device not found in client manager")
 }
 
 func handleStreamReplaced(_ context.Context) {
