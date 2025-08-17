@@ -24,6 +24,7 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -1528,16 +1529,39 @@ func (handler *App) LogoutDevice(c *fiber.Ctx) error {
 	
 	logrus.Infof("Logging out device %s (%s)", device.ID, device.DeviceName)
 	
-	// Use enhanced logout for complete cleanup
-	err = whatsapp.EnhancedLogout(deviceId)
+	// Simple approach - just update database status to offline
+	err = userRepo.UpdateDeviceStatus(deviceId, "offline", device.Phone, device.JID)
 	if err != nil {
-		logrus.Errorf("Error during enhanced logout: %v", err)
-		// Continue with response even if error
+		logrus.Errorf("Error updating device status: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "ERROR",
+			Message: "Failed to update device status",
+		})
 	}
 	
-	// Verify logout was successful
-	if !whatsapp.VerifyDeviceLoggedOut(deviceId) {
-		logrus.Warn("Device may not be fully logged out")
+	// Disconnect WhatsApp client if exists
+	cm := whatsapp.GetClientManager()
+	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
+		if client.IsConnected() {
+			client.Logout(context.Background())
+		}
+		client.Disconnect()
+		cm.RemoveClient(deviceId)
+	}
+	
+	// Clear from device connection manager
+	dcm := whatsapp.GetDeviceConnectionManager()
+	dcm.RemoveConnection(deviceId)
+	
+	// Send logout notification
+	websocket.Broadcast <- websocket.BroadcastMessage{
+		Code:    "DEVICE_LOGGED_OUT",
+		Message: "Device logged out",
+		Result: map[string]interface{}{
+			"deviceId": deviceId,
+			"status":   "offline",
+		},
 	}
 	
 	return c.JSON(utils.ResponseData{

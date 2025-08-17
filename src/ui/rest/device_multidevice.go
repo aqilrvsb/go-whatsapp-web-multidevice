@@ -6,7 +6,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/tracker"
 	"context"
 	"fmt"
 )
@@ -21,10 +20,6 @@ func (handler *App) DeviceConnect(c *fiber.Ctx) error {
 			Message: "Device ID is required",
 		})
 	}
-	
-	// Clear any logout flag since user wants to reconnect
-	lt := tracker.GetLogoutTracker()
-	lt.RemoveLoggedOut(deviceID)
 	
 	// Get user from context
 	userID := c.Locals("userID")

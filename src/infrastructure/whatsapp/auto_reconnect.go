@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/tracker"
 	"github.com/sirupsen/logrus"
 )
 
@@ -68,13 +67,6 @@ func (ar *AutoReconnectService) TryReconnectOfflineDevices() {
 		
 		// Skip platform devices - this should not happen due to WHERE clause, but double check
 		if platform != "" {
-			continue
-		}
-		
-		// Check if device was intentionally logged out
-		lt := tracker.GetLogoutTracker()
-		if lt.IsLoggedOut(deviceID) {
-			logrus.Debugf("Skipping logged out device %s", name)
 			continue
 		}
 		
