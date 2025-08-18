@@ -3635,7 +3635,33 @@
                         case 'LOGIN_SUCCESS':
                             // Device paired successfully (but not fully connected yet)
                             console.log('Device paired:', data.message);
-                            // Don't close modal yet, wait for full connection
+                            
+                            // Close QR modal
+                            const loginQrModalElement = document.getElementById('qrModal');
+                            if (loginQrModalElement) {
+                                const loginQrModal = bootstrap.Modal.getInstance(loginQrModalElement);
+                                if (loginQrModal) {
+                                    loginQrModal.hide();
+                                }
+                            }
+                            
+                            // Clear QR refresh interval
+                            if (qrRefreshInterval) {
+                                clearInterval(qrRefreshInterval);
+                                qrRefreshInterval = null;
+                            }
+                            
+                            // Show success message
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'QR Code Scanned!',
+                                text: 'WhatsApp is connecting... Please wait.',
+                                timer: 3000,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                            
+                            // Don't reload yet, wait for full connection
                             break;
                             
                         case 'QR_CONNECTED':

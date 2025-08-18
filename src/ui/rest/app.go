@@ -20,6 +20,7 @@ import (
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/broadcast"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp/multidevice"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/models"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/usecase"
@@ -1632,8 +1633,23 @@ func (handler *App) SimpleLogout(c *fiber.Ctx) error {
 	// Try to disconnect client if exists (optional)
 	cm := whatsapp.GetClientManager()
 	if client, err := cm.GetClient(deviceId); err == nil && client != nil {
+		// Properly logout from WhatsApp before disconnecting
+		err = client.Logout(context.Background())
+		if err != nil {
+			logrus.Warnf("Failed to logout from WhatsApp: %v", err)
+		}
+		
+		// Disconnect the client
 		client.Disconnect()
+		
+		// Remove from client manager
 		cm.RemoveClient(deviceId)
+		
+		// Also remove from device manager
+		dm := multidevice.GetDeviceManager()
+		dm.UnregisterDevice(deviceId)
+		
+		logrus.Infof("Device %s disconnected from WhatsApp", deviceId)
 	}
 	
 	logrus.Infof("Device %s successfully logged out", deviceId)
