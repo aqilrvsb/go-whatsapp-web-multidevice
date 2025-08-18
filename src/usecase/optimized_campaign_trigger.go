@@ -30,7 +30,7 @@ func NewOptimizedCampaignTrigger(db *sql.DB) *OptimizedCampaignTrigger {
 func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 	// Process campaigns with timezone handling
 	
-	// Query campaigns that are ready to send - MySQL compatible
+	// Query campaigns that are ready to send - Fixed like sequences (no CONVERT_TZ)
 	query := `
 		SELECT c.id, c.user_id, c.title, c.message, c.niche, 
 			COALESCE(c.target_status, 'all') AS target_status, 
@@ -40,11 +40,11 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 		WHERE c.status = 'pending'
 		AND (
 			-- If scheduled_at exists, use it
-			(c.scheduled_at IS NOT NULL AND c.scheduled_at <= CURRENT_TIMESTAMP)
+			(c.scheduled_at IS NOT NULL AND c.scheduled_at <= NOW())
 			OR
-			-- Fallback to old columns - MySQL version
+			-- Fallback to old columns - Simple comparison without CONVERT_TZ
 			(c.scheduled_at IS NULL AND 
-			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kuala_Lumpur'))
+			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= NOW())
 		)
 		ORDER BY COALESCE(c.scheduled_at, STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s'))
 	`
@@ -76,10 +76,11 @@ func (oct *OptimizedCampaignTrigger) ProcessCampaigns() error {
 		go oct.executeCampaign(&campaign)
 	}
 	
-	// logrus.Infof("Found and triggered %d campaigns", campaignCount)
+	if campaignCount > 0 {
+		logrus.Infof("Found and triggered %d campaigns", campaignCount)
+	}
 	return nil
 }
-
 // executeCampaign remains the same as original
 func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) {
 	logrus.Infof("Executing campaign: %s", campaign.Title)
