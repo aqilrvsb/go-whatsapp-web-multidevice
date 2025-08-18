@@ -3613,22 +3613,28 @@
         }
 
         // WebSocket Connection for Real-time Updates
+        let ws = null;
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     
-    // Store current user ID for filtering
-    const currentUserId = localStorage.getItem('userId') || '';
+            // Store current user ID for filtering
+            const currentUserId = localStorage.getItem('userId') || '';
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected successfully');
+            };
             
             ws.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
+                    console.log('WebSocket message received:', data);
             
-            // Filter messages by user if targetUserId is specified
-            if (data.targetUserId && data.targetUserId !== currentUserId) {
-                console.log('Message not for this user, ignoring');
-                return;
-            }
+                    // Filter messages by user if targetUserId is specified
+                    if (data.targetUserId && data.targetUserId !== currentUserId) {
+                        console.log('Message not for this user, ignoring');
+                        return;
+                    }
                     
                     // Handle different message types
                     switch(data.code) {
@@ -3651,14 +3657,16 @@
                                 qrRefreshInterval = null;
                             }
                             
-                            // Show success message
+                            // Show success message with auto-close
                             Swal.fire({
                                 icon: 'success',
                                 title: 'QR Code Scanned!',
                                 text: 'WhatsApp is connecting... Please wait.',
                                 timer: 3000,
                                 timerProgressBar: true,
-                                showConfirmButton: false
+                                showConfirmButton: false,
+                                allowOutsideClick: false,
+                                allowEscapeKey: false
                             });
                             
                             // Don't reload yet, wait for full connection
@@ -3730,12 +3738,34 @@
                                 console.log('Cleared QR refresh interval');
                             }
                             
-                            // Update device status immediately in UI by phone number
-                            if (phone) {
-                                updateDeviceStatusByPhone(phone, 'online');
-                            } else if (deviceId) {
-                                // Fallback to deviceId if phone not available
-                                updateDeviceStatus(deviceId, 'online');
+                            // Update device status immediately in UI
+                            // First try to find by deviceId (more reliable)
+                            let deviceFound = false;
+                            if (deviceId) {
+                                const device = devices.find(d => d.id === deviceId);
+                                if (device) {
+                                    device.status = 'online';
+                                    device.phone = phone;
+                                    device.jid = jid;
+                                    deviceFound = true;
+                                    console.log('Updated device by ID:', deviceId);
+                                }
+                            }
+                            
+                            // If not found by ID, try by phone
+                            if (!deviceFound && phone) {
+                                const device = devices.find(d => d.phone === phone);
+                                if (device) {
+                                    device.status = 'online';
+                                    device.jid = jid;
+                                    deviceFound = true;
+                                    console.log('Updated device by phone:', phone);
+                                }
+                            }
+                            
+                            // If device found, render immediately
+                            if (deviceFound) {
+                                renderDevices();
                             }
                             
                             // Show interactive SweetAlert with device info and save option
@@ -3748,20 +3778,12 @@
                                         <p><strong>Connection Details:</strong></p>
                                         <table style="width: 100%; font-size: 14px;">
                                             <tr>
-                                                <td style="padding: 5px;"><strong>Device ID:</strong></td>
-                                                <td style="padding: 5px; font-family: monospace; font-size: 12px;">${deviceId || 'Not available'}</td>
-                                            </tr>
-                                            <tr>
                                                 <td style="padding: 5px;"><strong>Phone:</strong></td>
                                                 <td style="padding: 5px;">${phone || 'Not available'}</td>
                                             </tr>
                                             <tr>
-                                                <td style="padding: 5px;"><strong>JID:</strong></td>
-                                                <td style="padding: 5px; font-family: monospace; font-size: 12px;">${jid || 'Not available'}</td>
-                                            </tr>
-                                            <tr>
                                                 <td style="padding: 5px;"><strong>Status:</strong></td>
-                                                <td style="padding: 5px; color: green;">Online</td>
+                                                <td style="padding: 5px; color: green;"><strong>Online</strong></td>
                                             </tr>
                                         </table>
                                         <hr>
@@ -3771,46 +3793,23 @@
                                 timer: 5000,
                                 timerProgressBar: true,
                                 showConfirmButton: true,
-                                confirmButtonText: 'Save & Reload Now',
+                                confirmButtonText: 'Reload Now',
                                 allowOutsideClick: false,
+                                allowEscapeKey: false,
                                 didOpen: () => {
                                     const b = Swal.getHtmlContainer().querySelector('b');
                                     timerInterval = setInterval(() => {
                                         b.textContent = Math.ceil(Swal.getTimerLeft() / 1000);
                                     }, 100);
-                                    
-                                    // Store device info in localStorage for later use if needed
-                                    if (deviceId) {
-                                        const deviceData = {
-                                            deviceId: deviceId,
-                                            phone: phone,
-                                            jid: jid,
-                                            status: 'online',
-                                            connectedAt: new Date().toISOString()
-                                        };
-                                        localStorage.setItem(`device_${deviceId}`, JSON.stringify(deviceData));
-                                        console.log('Device info saved:', deviceData);
-                                    }
                                 },
                                 willClose: () => {
                                     clearInterval(timerInterval);
+                                    // Reload the page to refresh devices
+                                    location.reload();
                                 }
                             }).then((result) => {
-                                // Update device list without reloading
-                                const device = devices.find(d => d.id === deviceId || d.id === currentScanningDeviceId);
-                                if (device) {
-                                    device.status = 'online';
-                                    device.phone = phone;
-                                    device.jid = jid;
-                                    device.lastSeen = new Date().toISOString();
-                                    renderDevices();
-                                }
-                                
-                                // Load devices to get fresh data
-                                loadDevices();
-                                
-                                // Show success message
-                                showAlert('success', 'Device connected successfully! You can now use WhatsApp.');
+                                // Reload page when user clicks button or timer expires
+                                location.reload();
                             });
                             
                             break;
