@@ -149,6 +149,21 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 	failed := 0
 	
 	for _, lead := range leads {
+		// Check if message already exists for this campaign and phone
+		var existingCount int
+		checkQuery := `
+			SELECT COUNT(*) FROM broadcast_messages 
+			WHERE campaign_id = ? 
+			AND recipient_phone = ? 
+			AND status IN ('pending', 'processing', 'queued', 'sent')
+		`
+		err := oct.db.QueryRow(checkQuery, campaign.ID, lead.Phone).Scan(&existingCount)
+		
+		if err == nil && existingCount > 0 {
+			logrus.Debugf("Message already exists for campaign %d and phone %s, skipping", campaign.ID, lead.Phone)
+			continue // Skip this lead
+		}
+		
 		// Use the device that owns this lead
 		msg := domainBroadcast.BroadcastMessage{
 			UserID:         campaign.UserID,
@@ -163,7 +178,7 @@ func (oct *OptimizedCampaignTrigger) executeCampaign(campaign *models.Campaign) 
 			// MinDelay and MaxDelay removed - will be fetched from campaigns table during processing
 		}
 		
-		err := broadcastRepo.QueueMessage(msg)
+		err = broadcastRepo.QueueMessage(msg)
 		if err != nil {
 			logrus.Errorf("Failed to queue message for %s: %v", lead.Phone, err)
 			failed++
