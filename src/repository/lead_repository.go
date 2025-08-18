@@ -53,26 +53,15 @@ func (r *leadRepository) CreateLead(lead *models.Lead) error {
 		status = "new"  // Default status
 	}
 	
-	// Debug logging
-	log.Printf("CreateLead - DeviceID: %s, UserID: %s, Name: %s, Phone: %s", lead.DeviceID, lead.UserID, lead.Name, lead.Phone)
-	log.Printf("CreateLead - Niche: %s, Status: %s, TargetStatus: %s, Platform: %s", lead.Niche, status, lead.TargetStatus, lead.Platform)
-	log.Printf("CreateLead - Journey: %s, Trigger: %s", journey, lead.Trigger)
+	var id int
+	err := r.db.QueryRow(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt).Scan(&id)
 	
-	result, err := r.db.Exec(query, lead.DeviceID, lead.UserID, lead.Name, lead.Phone, 
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.Platform, lead.CreatedAt, lead.UpdatedAt)
-	
-	if err != nil {
-		log.Printf("CreateLead - Error executing query: %v", err)
-		return err
+	if err == nil {
+		lead.ID = fmt.Sprintf("%d", id)
 	}
-	
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	
-	lead.ID = fmt.Sprintf("%d", id)
-	return nil
+		
+	return err
 }
 
 // GetLeadsByNiche gets all leads matching a niche (supports comma-separated niches)
@@ -158,7 +147,7 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 	logrus.Debugf("GetLeadsByDeviceNicheAndStatus - DeviceID: '%s', Niche: '%s' (len=%d), Status: '%s'", 
 		deviceID, niche, len(niche), status)
 	
-	rows, err := r.db.Query(query, deviceID, niche, status)
+	rows, err := r.db.Query(query, deviceID, niche, niche, status, status)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +193,6 @@ func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status 
 // GetNewLeadsForSequence gets new leads matching niche that aren't in sequence
 func (r *leadRepository) GetNewLeadsForSequence(niche, sequenceID string) ([]models.Lead, error) {
 	query := `
-
 		SELECT l.id, l.user_id, l.name, l.phone, l.niche, 
 		       l.journey, l.status, l.created_at, l.updated_at
 		FROM leads l
@@ -319,8 +307,8 @@ func (r *leadRepository) UpdateLead(id string, lead *models.Lead) error {
 		lead.TargetStatus = "prospect"
 	}
 	
-	result, err := r.db.Exec(query, lead.DeviceID, lead.Name, lead.Phone,
-		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt, id)
+	result, err := r.db.Exec(query, id, lead.DeviceID, lead.Name, lead.Phone,
+		lead.Niche, journey, status, lead.TargetStatus, lead.Trigger, lead.UpdatedAt)
 	if err != nil {
 		return err
 	}
