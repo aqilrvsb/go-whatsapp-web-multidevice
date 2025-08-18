@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -52,8 +53,23 @@ func NewCampaignRepository(db *sql.DB) CampaignRepository {
 	return &campaignRepository{db: db}
 }
 
-// CreateCampaign creates a new campaign
+// CreateCampaign creates a new campaign with duplicate prevention
 func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
+	// Check for duplicate campaign first
+	var existingCount int
+	duplicateCheckQuery := `
+		SELECT COUNT(*) FROM campaigns 
+		WHERE user_id = ? 
+		AND title = ? 
+		AND campaign_date = ?
+		AND status IN ('pending', 'triggered', 'processing')
+	`
+	
+	err := r.db.QueryRow(duplicateCheckQuery, campaign.UserID, campaign.Title, campaign.CampaignDate).Scan(&existingCount)
+	if err == nil && existingCount > 0 {
+		return fmt.Errorf("duplicate campaign: a campaign with the same title and date already exists")
+	}
+	
 	// Set defaults
 	if campaign.MinDelaySeconds == 0 {
 		campaign.MinDelaySeconds = 10
@@ -61,6 +77,21 @@ func (r *campaignRepository) CreateCampaign(campaign *models.Campaign) error {
 	if campaign.MaxDelaySeconds == 0 {
 		campaign.MaxDelaySeconds = 30
 	}
+	
+	// Auto-set schedule if empty (Malaysia time + 5 minutes)
+	if campaign.TimeSchedule == "" || campaign.TimeSchedule == "00:00:00" {
+		malaysiaTime := time.Now().UTC().Add(8 * time.Hour).Add(5 * time.Minute)
+		campaign.TimeSchedule = malaysiaTime.Format("15:04:00")
+		
+		// If campaign date is also empty, use today's date in Malaysia
+		if campaign.CampaignDate == "" {
+			campaign.CampaignDate = malaysiaTime.Format("2006-01-02")
+		}
+		
+		log.Printf("Campaign schedule auto-set: Date=%s Time=%s (Malaysia time + 5 min)", 
+			campaign.CampaignDate, campaign.TimeSchedule)
+	}
+	
 	campaign.CreatedAt = time.Now()
 	campaign.UpdatedAt = time.Now()
 	

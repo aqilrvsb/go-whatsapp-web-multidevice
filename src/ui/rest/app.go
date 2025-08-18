@@ -1183,29 +1183,6 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Parse scheduled time if provided
-	var timeSchedule string
-	var campaignDate string
-	
-	// If time_schedule is empty, set to current Malaysia time + 5 minutes
-	if request.TimeSchedule == "" {
-		// Get Malaysia time (UTC+8) plus 5 minutes
-		malaysiaTime := time.Now().UTC().Add(8 * time.Hour).Add(5 * time.Minute)
-		timeSchedule = malaysiaTime.Format("15:04:00")
-		
-		// If campaign_date is also empty or is today, use the calculated date
-		if request.CampaignDate == "" || request.CampaignDate == time.Now().Format("2006-01-02") {
-			campaignDate = malaysiaTime.Format("2006-01-02")
-		} else {
-			campaignDate = request.CampaignDate
-		}
-		
-		logrus.Infof("Campaign schedule auto-set: Date=%s Time=%s (Malaysia time + 5 min)", campaignDate, timeSchedule)
-	} else {
-		timeSchedule = request.TimeSchedule
-		campaignDate = request.CampaignDate
-	}
-	
 	// Validate and set target_status
 	targetStatus := request.TargetStatus
 	if targetStatus != "prospect" && targetStatus != "customer" && targetStatus != "all" {
@@ -1229,8 +1206,8 @@ func (handler *App) CreateCampaign(c *fiber.Ctx) error {
 		Niche:           request.Niche,
 		TargetStatus:    targetStatus,
 		ImageURL:        request.ImageURL,
-		CampaignDate:    campaignDate,
-		TimeSchedule:    timeSchedule,
+		CampaignDate:    request.CampaignDate,
+		TimeSchedule:    request.TimeSchedule,
 		MinDelaySeconds: request.MinDelaySeconds,
 		MaxDelaySeconds: request.MaxDelaySeconds,
 		Status:          "pending",
