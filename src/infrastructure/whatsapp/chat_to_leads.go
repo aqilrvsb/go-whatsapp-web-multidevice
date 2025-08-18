@@ -16,26 +16,80 @@ import (
 func AutoSaveChatsToLeads(deviceID string, userID string) error {
 	logrus.Infof("=== Starting auto-save chats to leads for device: %s ===", deviceID)
 	
-	// First try to get contacts directly from WhatsApp
-	cm := GetClientManager()
-	client, err := cm.GetClient(deviceID)
-	if err == nil && client != nil && client.IsLoggedIn() {
-		// Get all contacts from WhatsApp store
-		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
-		if err == nil && len(contacts) > 0 {
-			logrus.Infof("Found %d contacts in WhatsApp store for device %s", len(contacts), deviceID)
-			return saveContactsAsLeads(contacts, deviceID, userID)
-		}
-	}
-	
-	// Fallback to getting chats from database (now 6 months)
+	// Get chats from database with messages in last 6 months
 	chats, err := GetChatsFromDatabase(deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get chats: %v", err)
 	}
 	
-	logrus.Infof("Retrieved %d chats from database for device %s", len(chats), deviceID)
-	return saveChatsAsLeads(chats, deviceID, userID)
+	logrus.Infof("Retrieved %d chats with conversations in last 6 months for device %s", len(chats), deviceID)
+	
+	// If we have chats from database, use those (they already have 6-month filter)
+	if len(chats) > 0 {
+		return saveChatsAsLeads(chats, deviceID, userID)
+	}
+	
+	// If no chats in database, try to get from WhatsApp store but only those with recent activity
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err == nil && client != nil && client.IsLoggedIn() {
+		logrus.Info("No chats in database, checking WhatsApp store for recent conversations...")
+		
+		// Get all contacts from WhatsApp store
+		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err == nil && len(contacts) > 0 {
+			logrus.Infof("Found %d total contacts in WhatsApp store", len(contacts))
+			
+			// Filter to only contacts with recent conversations
+			recentContacts := make(map[types.JID]types.ContactInfo)
+			
+			// Check each contact for recent messages
+			for jid, contact := range contacts {
+				// Skip non-user contacts
+				if jid.Server != types.DefaultUserServer || jid.User == "status" {
+					continue
+				}
+				
+				// Check if this contact has recent messages in database
+				hasRecentMessages, err := checkRecentMessages(deviceID, jid.String())
+				if err == nil && hasRecentMessages {
+					recentContacts[jid] = contact
+				}
+			}
+			
+			logrus.Infof("Filtered to %d contacts with recent conversations", len(recentContacts))
+			
+			if len(recentContacts) > 0 {
+				return saveContactsAsLeads(recentContacts, deviceID, userID)
+			}
+		}
+	}
+	
+	logrus.Info("No contacts with recent conversations found")
+	return nil
+}
+
+// checkRecentMessages checks if a contact has messages in the last 6 months
+func checkRecentMessages(deviceID string, chatJID string) (bool, error) {
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM whatsapp_messages 
+		WHERE device_id = ? 
+		AND chat_jid = ?
+		AND timestamp > UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH))
+		LIMIT 1
+	`
+	
+	err := db.QueryRow(query, deviceID, chatJID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	
+	return count > 0, nil
 }
 
 // saveContactsAsLeads saves WhatsApp contacts directly as leads
