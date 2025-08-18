@@ -291,6 +291,19 @@
         // Activity log
         const activityLog = [];
         
+        // Log activity function
+        function logActivity(action, message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${action}: ${message}`);
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                action: action,
+                message: message,
+                type: type
+            };
+            activityLog.push(logEntry);
+            // You can extend this to send logs to server or display in UI
+        }
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('deviceId').textContent = deviceId;
