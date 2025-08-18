@@ -1,6 +1,7 @@
 package whatsapp
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -15,11 +16,109 @@ import (
 func AutoSaveChatsToLeads(deviceID string, userID string) error {
 	logrus.Infof("=== Starting auto-save chats to leads for device: %s ===", deviceID)
 	
-	// Get chats from database (now 6 months)
+	// First try to get contacts directly from WhatsApp
+	cm := GetClientManager()
+	client, err := cm.GetClient(deviceID)
+	if err == nil && client != nil && client.IsLoggedIn() {
+		// Get all contacts from WhatsApp store
+		contacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err == nil && len(contacts) > 0 {
+			logrus.Infof("Found %d contacts in WhatsApp store for device %s", len(contacts), deviceID)
+			return saveContactsAsLeads(contacts, deviceID, userID)
+		}
+	}
+	
+	// Fallback to getting chats from database (now 6 months)
 	chats, err := GetChatsFromDatabase(deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get chats: %v", err)
 	}
+	
+	logrus.Infof("Retrieved %d chats from database for device %s", len(chats), deviceID)
+	return saveChatsAsLeads(chats, deviceID, userID)
+}
+
+// saveContactsAsLeads saves WhatsApp contacts directly as leads
+func saveContactsAsLeads(contacts map[types.JID]types.ContactInfo, deviceID string, userID string) error {
+	leadRepo := repository.GetLeadRepository()
+	userRepo := repository.GetUserRepository()
+	db := userRepo.DB()
+	
+	savedCount := 0
+	skippedCount := 0
+	
+	for jid, contact := range contacts {
+		// Skip non-user contacts (groups, broadcast, etc)
+		if jid.Server != types.DefaultUserServer || jid.User == "status" {
+			continue
+		}
+		
+		phone := jid.User
+		name := ""
+		
+		// Get best available name
+		if contact.PushName != "" {
+			name = contact.PushName
+		} else if contact.BusinessName != "" {
+			name = contact.BusinessName
+		} else if contact.FullName != "" {
+			name = contact.FullName
+		} else if contact.FirstName != "" {
+			name = contact.FirstName
+		}
+		
+		if name == "" {
+			name = phone // Use phone as name if no name available
+		}
+		
+		// Check if lead already exists with same device_id, user_id, and phone
+		var existingID string
+		checkQuery := `
+			SELECT id FROM leads 
+			WHERE device_id = ? AND user_id = ? AND phone = ?
+			LIMIT 1
+		`
+		err := db.QueryRow(checkQuery, deviceID, userID, phone).Scan(&existingID)
+		
+		if err == nil && existingID != "" {
+			// Lead already exists, skip
+			skippedCount++
+			logrus.Debugf("Lead already exists for phone %s, skipping", phone)
+			continue
+		}
+		
+		// Create new lead
+		lead := &models.Lead{
+			UserID:       userID,
+			DeviceID:     deviceID,
+			Name:         name,
+			Phone:        phone,
+			Niche:        "WHATSAPP_IMPORT", // Default niche for imported contacts
+			Status:       "new",
+			TargetStatus: "prospect",
+			Trigger:      "",
+			Platform:     "whatsapp",
+			Notes:        fmt.Sprintf("Auto-imported from WhatsApp on %s", time.Now().Format("2006-01-02")),
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+		
+		err = leadRepo.CreateLead(lead)
+		if err != nil {
+			logrus.Warnf("Failed to create lead for %s: %v", phone, err)
+			continue
+		}
+		
+		savedCount++
+		logrus.Debugf("Created lead for %s (%s)", name, phone)
+	}
+	
+	logrus.Infof("=== Auto-save completed: %d saved, %d skipped (duplicates) ===", savedCount, skippedCount)
+	return nil
+}
+
+// saveChatsAsLeads saves chats from database as leads (fallback method)
+func saveChatsAsLeads(chats []map[string]interface{}, deviceID string, userID string) error {
 	
 	leadRepo := repository.GetLeadRepository()
 	userRepo := repository.GetUserRepository()
