@@ -1,8 +1,6 @@
 @echo off
-cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+cd C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
 git add -A
-git commit -m "Fix unused broadcastManager variable in cmd/rest.go"
+git commit -m "Fix broadcast history to separate campaigns and sequences queries"
 git push origin main
-echo.
-echo Push completed!
-pause
+echo Done!

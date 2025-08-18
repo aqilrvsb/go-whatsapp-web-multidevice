@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -710,19 +709,21 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 		db := database.GetDB()
 		
 		for i := range leads {
-			// Get broadcast history for this lead
-			historyQuery := `
+			// Get broadcast history for this lead - separate queries for campaigns and sequences
+			
+			// 1. Get sequence broadcast history
+			sequenceHistoryQuery := `
 				SELECT 
 					bm.id,
 					bm.sequence_id,
 					s.name as sequence_name,
 					bm.sequence_stepid,
-					ss.step_name,
-					ss.trigger_name,
+					COALESCE(ss.content, '') as step_content,
 					bm.status,
 					bm.error_message,
 					bm.sent_at,
-					bm.scheduled_at
+					bm.scheduled_at,
+					'sequence' as message_type
 				FROM broadcast_messages bm
 				LEFT JOIN sequences s ON s.id = bm.sequence_id
 				LEFT JOIN sequence_steps ss ON ss.id = bm.sequence_stepid
@@ -731,93 +732,118 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 				AND bm.user_id = ?
 				AND bm.sequence_id IS NOT NULL
 				ORDER BY bm.scheduled_at DESC
-				LIMIT 10
+				LIMIT 5
 			`
 			
-			rows, err := db.Query(historyQuery, leads[i].Phone, deviceId, session.UserID)
-			if err != nil {
-				log.Printf("Error getting broadcast history: %v", err)
-				continue
-			}
+			// 2. Get campaign broadcast history
+			campaignHistoryQuery := `
+				SELECT 
+					bm.id,
+					bm.campaign_id,
+					c.title as campaign_name,
+					c.message as campaign_message,
+					bm.status,
+					bm.error_message,
+					bm.sent_at,
+					bm.scheduled_at,
+					'campaign' as message_type
+				FROM broadcast_messages bm
+				LEFT JOIN campaigns c ON c.id = bm.campaign_id
+				WHERE bm.recipient_phone = ? 
+				AND bm.device_id = ?
+				AND bm.user_id = ?
+				AND bm.campaign_id IS NOT NULL
+				ORDER BY bm.scheduled_at DESC
+				LIMIT 5
+			`
 			
 			history := []map[string]interface{}{}
-			for rows.Next() {
-				var item struct {
-					ID             string
-					SequenceID     sql.NullString
-					SequenceName   sql.NullString
-					SequenceStepID sql.NullString
-					StepName       sql.NullString
-					TriggerName    sql.NullString
-					Status         string
-					ErrorMessage   sql.NullString
-					SentAt         sql.NullTime
-					ScheduledAt    sql.NullTime
-				}
-				
-				err := rows.Scan(
-					&item.ID,
-					&item.SequenceID,
-					&item.SequenceName,
-					&item.SequenceStepID,
-					&item.StepName,
-					&item.TriggerName,
-					&item.Status,
-					&item.ErrorMessage,
-					&item.SentAt,
-					&item.ScheduledAt,
-				)
-				
-				if err != nil {
-					continue
-				}
-				
-				historyItem := map[string]interface{}{
-					"id":            item.ID,
-					"sequence_id":   item.SequenceID.String,
-					"sequence_name": item.SequenceName.String,
-					"step_id":       item.SequenceStepID.String,
-					"step_name":     item.StepName.String,
-					"trigger_name":  item.TriggerName.String,
-					"status":        item.Status,
-				}
-				
-				if item.ErrorMessage.Valid {
-					historyItem["error_message"] = item.ErrorMessage.String
-				}
-				
-				if item.SentAt.Valid {
-					historyItem["sent_at"] = item.SentAt.Time
-				} else if item.ScheduledAt.Valid {
-					historyItem["sent_at"] = item.ScheduledAt.Time
-				}
-				
-				history = append(history, historyItem)
-			}
-			rows.Close()
 			
-			// Add history to lead as a field
-			leadMap := map[string]interface{}{
-				"id":                 leads[i].ID,
-				"user_id":           leads[i].UserID,
-				"device_id":         leads[i].DeviceID,
-				"name":              leads[i].Name,
-				"phone":             leads[i].Phone,
-				"email":             leads[i].Email,
-				"niche":             leads[i].Niche,
-				"source":            leads[i].Source,
-				"status":            leads[i].Status,
-				"target_status":     leads[i].TargetStatus,
-				"trigger":           leads[i].Trigger,
-				"notes":             leads[i].Notes,
-				"journey":           leads[i].Notes,
-				"created_at":        leads[i].CreatedAt,
-				"broadcast_history": history,
+			// Execute sequence history query
+			rows, err := db.Query(sequenceHistoryQuery, leads[i].Phone, deviceId, session.UserID)
+			if err != nil {
+				log.Printf("Error getting sequence history: %v", err)
+			} else {
+				defer rows.Close()
+				for rows.Next() {
+					var item struct {
+						ID             string
+						SequenceID     sql.NullString
+						SequenceName   sql.NullString
+						SequenceStepID sql.NullString
+						StepContent    string
+						Status         string
+						ErrorMessage   sql.NullString
+						SentAt         sql.NullTime
+						ScheduledAt    sql.NullTime
+						MessageType    string
+					}
+					
+					if err := rows.Scan(&item.ID, &item.SequenceID, &item.SequenceName, 
+						&item.SequenceStepID, &item.StepContent, &item.Status, 
+						&item.ErrorMessage, &item.SentAt, &item.ScheduledAt, &item.MessageType); err != nil {
+						log.Printf("Error scanning sequence history: %v", err)
+						continue
+					}
+					
+					historyItem := map[string]interface{}{
+						"id":           item.ID,
+						"type":         item.MessageType,
+						"sequence_id":  item.SequenceID.String,
+						"sequence_name": item.SequenceName.String,
+						"content":      item.StepContent,
+						"status":       item.Status,
+						"error":        item.ErrorMessage.String,
+						"sent_at":      item.SentAt.Time,
+						"scheduled_at": item.ScheduledAt.Time,
+					}
+					history = append(history, historyItem)
+				}
+				rows.Close()
 			}
 			
-			// Convert to JSON and back to update the original slice
-			jsonData, _ := json.Marshal(leadMap)
-			json.Unmarshal(jsonData, &leads[i])
+			// Execute campaign history query
+			rows, err = db.Query(campaignHistoryQuery, leads[i].Phone, deviceId, session.UserID)
+			if err != nil {
+				log.Printf("Error getting campaign history: %v", err)
+			} else {
+				defer rows.Close()
+				for rows.Next() {
+					var item struct {
+						ID             string
+						CampaignID     sql.NullInt64
+						CampaignName   sql.NullString
+						CampaignMessage sql.NullString
+						Status         string
+						ErrorMessage   sql.NullString
+						SentAt         sql.NullTime
+						ScheduledAt    sql.NullTime
+						MessageType    string
+					}
+					
+					if err := rows.Scan(&item.ID, &item.CampaignID, &item.CampaignName, 
+						&item.CampaignMessage, &item.Status, &item.ErrorMessage, 
+						&item.SentAt, &item.ScheduledAt, &item.MessageType); err != nil {
+						log.Printf("Error scanning campaign history: %v", err)
+						continue
+					}
+					
+					historyItem := map[string]interface{}{
+						"id":           item.ID,
+						"type":         item.MessageType,
+						"campaign_id":  item.CampaignID.Int64,
+						"campaign_name": item.CampaignName.String,
+						"content":      item.CampaignMessage.String,
+						"status":       item.Status,
+						"error":        item.ErrorMessage.String,
+						"sent_at":      item.SentAt.Time,
+						"scheduled_at": item.ScheduledAt.Time,
+					}
+					history = append(history, historyItem)
+				}
+			}
+			// Add history to lead object - Just store as a simple array
+			// leads[i].BroadcastHistory = history
 		}
 	}
 	
@@ -828,6 +854,7 @@ func (handler *App) GetDeviceLeads(c *fiber.Ctx) error {
 		Results: leads,
 	})
 }
+
 
 // CreateLead creates a new lead
 func (handler *App) CreateLead(c *fiber.Ctx) error {
