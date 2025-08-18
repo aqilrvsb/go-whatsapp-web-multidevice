@@ -205,48 +205,37 @@ func GetChatsFromDatabase(deviceID string) ([]map[string]interface{}, error) {
 	
 	// Query to get chats based on messages only (not relying on whatsapp_chats table)
 	// This ensures we only show chats WHERE messages have been exchanged
+	// MySQL compatible version
 	query := `
-		WITH recent_messages AS (
-			SELECT DISTINCT ON (chat_jid)
-				chat_jid,
-				sender_jid,
-				message_text,
-				message_type,
-				timestamp
-			FROM whatsapp_messages
-			WHERE device_id = ?
-				AND chat_jid NOT LIKE '%@g.us'  -- Exclude groups
-				AND chat_jid NOT LIKE '%@broadcast'  -- Exclude broadcasts
-				AND chat_jid != 'status@broadcast'  -- Exclude status
-				AND message_text IS NOT NULL
-				AND message_text != ''
-				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '6 months')::BIGINT
-			ORDER BY chat_jid, timestamp DESC
-		),
-		chat_counts AS (
-			SELECT chat_jid,
-				COUNT(*) AS message_count
+		SELECT 
+			wm.chat_jid,
+			COALESCE(wc.chat_name, SUBSTRING_INDEX(wm.chat_jid, '@', 1)) AS chat_name,
+			wm.message_text,
+			wm.message_type,
+			wm.timestamp,
+			(SELECT COUNT(*) FROM whatsapp_messages wm2 
+			 WHERE wm2.device_id = wm.device_id 
+			 AND wm2.chat_jid = wm.chat_jid) AS message_count
+		FROM (
+			SELECT chat_jid, MAX(timestamp) as max_timestamp
 			FROM whatsapp_messages
 			WHERE device_id = ?
 				AND chat_jid NOT LIKE '%@g.us'
 				AND chat_jid NOT LIKE '%@broadcast'
 				AND chat_jid != 'status@broadcast'
+				AND message_text IS NOT NULL
+				AND message_text != ''
+				AND timestamp > UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH))
 			GROUP BY chat_jid
-		)
-		SELECT rm.chat_jid,
-			COALESCE(c.chat_name, SPLIT_PART(rm.chat_jid, '@', 1)) AS chat_name,
-			rm.message_text,
-			rm.message_type,
-			rm.timestamp,
-			cc.message_count
-		FROM recent_messages rm
-		LEFT JOIN whatsapp_chats c ON c.device_id = ? AND c.chat_jid = rm.chat_jid
-		LEFT JOIN chat_counts cc ON cc.chat_jid = rm.chat_jid
-		WHERE cc.message_count > 0  -- Only show chats with at least one message
-		ORDER BY rm.timestamp DESC
+		) latest
+		INNER JOIN whatsapp_messages wm ON wm.chat_jid = latest.chat_jid 
+			AND wm.timestamp = latest.max_timestamp
+			AND wm.device_id = ?
+		LEFT JOIN whatsapp_chats wc ON wc.device_id = ? AND wc.chat_jid = wm.chat_jid
+		ORDER BY wm.timestamp DESC
 	`
 	
-	rows, err := db.Query(query, deviceID)
+	rows, err := db.Query(query, deviceID, deviceID, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chats: %v", err)
 	}
@@ -317,28 +306,30 @@ func GetRecentChatsOnly(deviceID string, days int) ([]map[string]interface{}, er
 	}
 	
 	// Query that only returns chats with messages in the specified time period
+	// MySQL compatible version
 	query := `
-		WITH recent_messages AS (
-			SELECT DISTINCT
-				chat_jid,
-				FIRST_VALUE(message_text) OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) AS last_message,
-				MAX(timestamp) OVER (PARTITION BY chat_jid) AS last_timestamp
+		SELECT 
+			c.chat_jid,
+			c.chat_name,
+			wm.message_text AS last_message,
+			wm.timestamp AS last_timestamp
+		FROM whatsapp_chats c
+		INNER JOIN (
+			SELECT chat_jid, MAX(timestamp) as max_timestamp
 			FROM whatsapp_messages
 			WHERE device_id = ?
-				AND timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '%d days')::BIGINT
-		)
-		SELECT c.chat_jid,
-			c.chat_name,
-			rm.last_message,
-			rm.last_timestamp
-		FROM whatsapp_chats c
-		INNER JOIN recent_messages rm ON c.chat_jid = rm.chat_jid
+				AND timestamp > UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL %d DAY))
+			GROUP BY chat_jid
+		) latest ON c.chat_jid = latest.chat_jid
+		INNER JOIN whatsapp_messages wm ON wm.chat_jid = latest.chat_jid 
+			AND wm.timestamp = latest.max_timestamp
+			AND wm.device_id = ?
 		WHERE c.device_id = ?
-		ORDER BY rm.last_timestamp DESC
+		ORDER BY wm.timestamp DESC
 	`
 	
 	formattedQuery := fmt.Sprintf(query, days)
-	rows, err := db.Query(formattedQuery, deviceID)
+	rows, err := db.Query(formattedQuery, deviceID, deviceID, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query recent chats: %v", err)
 	}
