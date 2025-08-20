@@ -65,7 +65,7 @@ func updateCampaignStatuses() {
 				COUNT(CASE WHEN status = 'sent' THEN 1 END) AS sent,
 				COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed,
 				COUNT(CASE WHEN status = 'skipped' THEN 1 END) AS skipped,
-				EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - MIN(CASE WHEN status = 'queued' THEN updated_at END)))/60 AS oldest_queued
+				TIMESTAMPDIFF(MINUTE, MIN(CASE WHEN status = 'queued' THEN updated_at END), CURRENT_TIMESTAMP) AS oldest_queued
 			FROM broadcast_messages
 			WHERE campaign_id = ?
 		`, campaignID).Scan(&total, &pending, &queued, &sent, &failed, &skipped, &oldestQueuedMinutes)
