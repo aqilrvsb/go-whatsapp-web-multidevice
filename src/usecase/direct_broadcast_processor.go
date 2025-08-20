@@ -102,7 +102,7 @@ func (p *DirectBroadcastProcessor) ProcessCampaigns() (int, error) {
 			(c.scheduled_at IS NOT NULL AND c.scheduled_at <= NOW())
 			OR
 			(c.scheduled_at IS NULL AND 
-			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= NOW())
+			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= DATE_ADD(NOW(), INTERVAL 8 HOUR))
 		)
 		LIMIT 10
 	`
