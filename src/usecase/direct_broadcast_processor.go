@@ -200,9 +200,13 @@ func (p *DirectBroadcastProcessor) processCampaignDirect(campaign *models.Campai
 			RecipientPhone: phone,
 			RecipientName:  name,
 			Type:           "text",
+			Message:        campaign.Message,
 			Content:        campaign.Message,
 			MediaURL:       campaign.ImageURL,
-			ScheduledAt:    time.Now(),
+			MinDelay:       campaign.MinDelaySeconds,
+			MaxDelay:       campaign.MaxDelaySeconds,
+			ScheduledAt:    time.Now().Add(5 * time.Minute),
+			Status:         "pending",
 		}
 		
 		if err := broadcastRepo.QueueMessage(msg); err != nil {
