@@ -25,7 +25,7 @@ func NewSequenceTriggerProcessor(db *sql.DB) *SequenceTriggerProcessor {
 	}
 }
 
-// ProcessSequenceTriggers is the main entry point - now uses Direct Broadcast only
+// ProcessSequenceTriggers is the main entry point - now processes BOTH sequences and campaigns
 func (s *SequenceTriggerProcessor) ProcessSequenceTriggers() error {
 	// CRITICAL FIX: Prevent concurrent processing
 	if !sequenceProcessorMutex.TryLock() {
@@ -46,7 +46,7 @@ func (s *SequenceTriggerProcessor) ProcessSequenceTriggers() error {
 	// Use Direct Broadcast processor
 	directProcessor := NewDirectBroadcastProcessor(s.db)
 	
-	// Process enrollments
+	// Process sequence enrollments
 	enrolledCount, err := directProcessor.ProcessDirectEnrollments()
 	if err != nil {
 		logrus.Errorf("Error in direct broadcast enrollment: %v", err)
@@ -54,8 +54,19 @@ func (s *SequenceTriggerProcessor) ProcessSequenceTriggers() error {
 	}
 	
 	if enrolledCount > 0 {
-		logrus.Infof("✅ Direct Broadcast: Enrolled %d leads in %v", 
+		logrus.Infof("✅ Sequences: Enrolled %d leads in %v", 
 			enrolledCount, time.Since(start))
+	}
+	
+	// Process campaigns too (NEW)
+	campaignCount, err := directProcessor.ProcessCampaigns()
+	if err != nil {
+		logrus.Errorf("Error in campaign processing: %v", err)
+		// Don't return error - continue even if campaigns fail
+	}
+	
+	if campaignCount > 0 {
+		logrus.Infof("✅ Campaigns: Processed %d campaigns", campaignCount)
 	}
 	
 	return nil
@@ -63,7 +74,7 @@ func (s *SequenceTriggerProcessor) ProcessSequenceTriggers() error {
 
 // StartProcessing starts the sequence trigger processing
 func (s *SequenceTriggerProcessor) StartProcessing() {
-	logrus.Info("Starting Direct Broadcast Sequence Processor...")
+	logrus.Info("Starting Direct Broadcast Processor (Sequences + Campaigns)...")
 	
 	// Process immediately on startup
 	if err := s.ProcessSequenceTriggers(); err != nil {

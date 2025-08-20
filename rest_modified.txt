@@ -1,0 +1,51 @@
+	// Start the ultra-optimized broadcast processor for 3000+ devices
+	// This processor creates broadcast-specific worker pools
+	go usecase.StartUltraOptimizedBroadcastProcessor()
+	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
+	
+	// DISABLED: Campaign trigger processor - Now handled by sequence processor
+	/*
+	go func() {
+		db := database.GetDB()
+		campaignTrigger := usecase.NewOptimizedCampaignTrigger(db)
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		
+		logrus.Info("Campaign trigger processor started (checks every minute)")
+		
+		// Process immediately on start
+		campaignTrigger.ProcessCampaigns()
+		
+		// Then process every minute
+		for range ticker.C {
+			campaignTrigger.ProcessCampaigns()
+		}
+	}()
+	*/
+	
+	// Start sequence trigger processor - NOW HANDLES BOTH SEQUENCES AND CAMPAIGNS
+	go usecase.StartSequenceTriggerProcessor()
+	logrus.Info("Unified processor started (handles both sequences and campaigns)")
+	
+	// Start campaign status monitor
+	go usecase.StartCampaignStatusMonitor()
+	logrus.Info("Campaign status monitor started")
+	
+	// Start queued message cleaner
+	go usecase.StartQueuedMessageCleaner()
+	logrus.Info("Queued message cleaner started")
+	
+	// Start broadcast coordinator
+	go usecase.StartBroadcastCoordinator()
+	logrus.Info("Broadcast coordinator started")
+	
+	// Start broadcast worker processor - CRITICAL FOR WORKER POOL
+	go usecase.StartBroadcastWorkerProcessor()
+	
+	// Start cleanup worker for stuck messages
+	go repository.StartCleanupWorker()
+	logrus.Info("Broadcast worker processor started - using Worker Pool System")
+	
+	// Start campaign completion checker
+	go usecase.StartCampaignCompletionChecker()
+	logrus.Info("Campaign completion checker started")

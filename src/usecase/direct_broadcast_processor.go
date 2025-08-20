@@ -27,7 +27,6 @@ func NewDirectBroadcastProcessor(db *sql.DB) *DirectBroadcastProcessor {
 		batchSize: 100,
 	}
 }
-
 // ProcessDirectEnrollments finds leads with triggers and enrolls them directly
 func (p *DirectBroadcastProcessor) ProcessDirectEnrollments() (int, error) {
 	// Find leads with triggers that match active sequence entry points
@@ -89,6 +88,132 @@ func (p *DirectBroadcastProcessor) ProcessDirectEnrollments() (int, error) {
 	return enrolledCount, nil
 }
 
+// ProcessCampaigns checks and processes ready campaigns (NEW FUNCTION)
+func (p *DirectBroadcastProcessor) ProcessCampaigns() (int, error) {
+	// Query campaigns that are ready to send
+	query := `
+		SELECT c.id, c.user_id, c.title, c.message, c.niche, 
+			COALESCE(c.target_status, 'all') AS target_status, 
+			COALESCE(c.image_url, '') AS image_url, 
+			c.min_delay_seconds, c.max_delay_seconds
+		FROM campaigns c
+		WHERE c.status = 'pending'
+		AND (
+			(c.scheduled_at IS NOT NULL AND c.scheduled_at <= NOW())
+			OR
+			(c.scheduled_at IS NULL AND 
+			 STR_TO_DATE(CONCAT(c.campaign_date, ' ', COALESCE(c.time_schedule, '00:00:00')), '%Y-%m-%d %H:%i:%s') <= NOW())
+		)
+		LIMIT 10
+	`
+
+	rows, err := p.db.Query(query)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query campaigns: %w", err)
+	}
+	defer rows.Close()
+
+	processedCount := 0
+	for rows.Next() {
+		var campaign models.Campaign
+		err := rows.Scan(
+			&campaign.ID, &campaign.UserID, &campaign.Title, &campaign.Message,
+			&campaign.Niche, &campaign.TargetStatus, &campaign.ImageURL,
+			&campaign.MinDelaySeconds, &campaign.MaxDelaySeconds,
+		)
+		if err != nil {
+			logrus.Errorf("Failed to scan campaign: %v", err)
+			continue
+		}
+
+		logrus.Infof("Processing campaign: %s (ID: %d)", campaign.Title, campaign.ID)
+		
+		// Process campaign using same direct enrollment approach
+		enrolledCount, err := p.processCampaignDirect(&campaign)
+		if err != nil {
+			logrus.Errorf("Failed to process campaign %s: %v", campaign.Title, err)
+			continue
+		}
+
+		// Update campaign status
+		if enrolledCount > 0 {
+			p.db.Exec("UPDATE campaigns SET status = 'triggered', updated_at = NOW() WHERE id = ?", campaign.ID)
+			logrus.Infof("Campaign %s triggered: %d messages queued", campaign.Title, enrolledCount)
+		} else {
+			p.db.Exec("UPDATE campaigns SET status = 'finished', updated_at = NOW() WHERE id = ?", campaign.ID)
+			logrus.Infof("Campaign %s finished: No matching leads found", campaign.Title)
+		}
+
+		processedCount++
+	}
+
+	return processedCount, nil
+}
+
+// processCampaignDirect enrolls campaign leads directly to broadcast_messages
+func (p *DirectBroadcastProcessor) processCampaignDirect(campaign *models.Campaign) (int, error) {
+	// Get broadcast repository
+	broadcastRepo := repository.GetBroadcastRepository()
+	
+	// Find matching leads
+	query := `
+		SELECT DISTINCT 
+			l.id, l.phone, l.name, l.device_id, l.user_id
+		FROM leads l
+		INNER JOIN user_devices ud ON l.device_id = ud.id
+		WHERE ud.user_id = ?
+		AND (ud.status = 'connected' OR ud.status = 'online' OR ud.platform IS NOT NULL)
+		AND l.niche LIKE CONCAT('%', ?, '%')
+		AND (? = 'all' OR l.target_status = ?)
+		AND NOT EXISTS (
+			SELECT 1 FROM broadcast_messages bm
+			WHERE bm.campaign_id = ?
+			AND bm.recipient_phone = l.phone
+			AND bm.status IN ('pending', 'processing', 'queued', 'sent')
+		)
+		LIMIT 1000
+	`
+	
+	targetStatus := campaign.TargetStatus
+	if targetStatus == "" {
+		targetStatus = "all"
+	}
+	
+	rows, err := p.db.Query(query, campaign.UserID, campaign.Niche, targetStatus, targetStatus, campaign.ID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query leads: %w", err)
+	}
+	defer rows.Close()
+	
+	enrolledCount := 0
+	for rows.Next() {
+		var leadID, phone, name, deviceID, userID string
+		if err := rows.Scan(&leadID, &phone, &name, &deviceID, &userID); err != nil {
+			continue
+		}
+		
+		// Create broadcast message
+		msg := domainBroadcast.BroadcastMessage{
+			UserID:         userID,
+			DeviceID:       deviceID,
+			CampaignID:     &campaign.ID,
+			RecipientPhone: phone,
+			RecipientName:  name,
+			Type:           "text",
+			Content:        campaign.Message,
+			MediaURL:       campaign.ImageURL,
+			ScheduledAt:    time.Now(),
+		}
+		
+		if err := broadcastRepo.QueueMessage(msg); err != nil {
+			logrus.Debugf("Failed to queue message for %s: %v", phone, err)
+		} else {
+			enrolledCount++
+		}
+	}
+	
+	return enrolledCount, nil
+}
 // enrollDirectBroadcast creates all messages directly in broadcast_messages
 func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead models.Lead, trigger string) error {
 	tx, err := p.db.Begin()
@@ -181,7 +306,6 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			}
 
 			// Create broadcast message with proper sequence references
-			// Use current sequence ID, but fallback to original if empty
 			sequenceIDToUse := currentSequenceID
 			if sequenceIDToUse == "" {
 				sequenceIDToUse = originalSequenceID
@@ -191,7 +315,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 				UserID:         lead.UserID,
 				DeviceID:       lead.DeviceID,
 				SequenceID:     &sequenceIDToUse,
-				SequenceStepID: &step.ID,  // Re-enable this since we validated step.ID above
+				SequenceStepID: &step.ID,
 				RecipientPhone: lead.Phone,
 				RecipientName:  lead.Name,
 				Message:        step.Content,
@@ -207,16 +331,6 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 			if step.MediaURL.Valid && step.MediaURL.String != "" {
 				msg.MediaURL = step.MediaURL.String
 				msg.ImageURL = step.MediaURL.String
-			}
-
-			// Debug log before queueing
-			logrus.Debugf("Queueing message - UserID: '%s', DeviceID: '%s', SequenceID: '%s', StepID: '%s'", 
-				msg.UserID, msg.DeviceID, *msg.SequenceID, *msg.SequenceStepID)
-			
-			// Validate both IDs are set
-			if *msg.SequenceID == "" || *msg.SequenceStepID == "" {
-				logrus.Errorf("WARNING: Creating message with empty IDs - SequenceID: '%s', StepID: '%s'", 
-					*msg.SequenceID, *msg.SequenceStepID)
 			}
 
 			allMessages = append(allMessages, msg)
@@ -238,7 +352,7 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 		}
 		rows.Close()
 
-		// Find next linked sequence (don't check active status for linked sequences)
+		// Find next linked sequence
 		currentSequenceID = ""
 		if lastStepNextTrigger != "" && !strings.Contains(lastStepNextTrigger, "_day") {
 			var nextSequenceID string
@@ -256,9 +370,8 @@ func (p *DirectBroadcastProcessor) enrollDirectBroadcast(sequenceID string, lead
 		}
 	}
 
-	// Insert all messages using repository (handles UUIDs properly)
+	// Insert all messages using repository
 	for _, msg := range allMessages {
-		// Repository will handle ID generation and NULL values
 		err := broadcastRepo.QueueMessage(msg)
 		if err != nil {
 			logrus.Errorf("Failed to queue message for %s: %v", msg.RecipientPhone, err)
