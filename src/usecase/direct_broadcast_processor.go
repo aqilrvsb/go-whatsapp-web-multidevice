@@ -162,7 +162,7 @@ func (p *DirectBroadcastProcessor) processCampaignDirect(campaign *models.Campai
 		FROM leads l
 		INNER JOIN user_devices ud ON l.device_id = ud.id
 		WHERE ud.user_id = ?
-		AND (ud.status = 'connected' OR ud.status = 'online' OR ud.platform IS NOT NULL)
+		-- Device status check removed to allow campaigns to work with offline devices
 		AND l.niche LIKE CONCAT('%', ?, '%')
 		AND (? = 'all' OR l.target_status = ?)
 		AND NOT EXISTS (
