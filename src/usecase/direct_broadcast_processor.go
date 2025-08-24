@@ -205,7 +205,7 @@ func (p *DirectBroadcastProcessor) processCampaignDirect(campaign *models.Campai
 			MediaURL:       campaign.ImageURL,
 			MinDelay:       campaign.MinDelaySeconds,
 			MaxDelay:       campaign.MaxDelaySeconds,
-			ScheduledAt:    time.Now().Add(5 * time.Minute),
+			ScheduledAt:    time.Now().Add(5 * time.Minute).Add(8 * time.Hour),
 			Status:         "pending",
 		}
 		
