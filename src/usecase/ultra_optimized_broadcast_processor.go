@@ -46,6 +46,21 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	broadcastRepo := repository.GetBroadcastRepository()
 	userRepo := repository.GetUserRepository()
 	
+	// First, clean up old messages (older than 1 day)
+	db := database.GetDB()
+	result, err := db.Exec(`
+		DELETE FROM broadcast_messages 
+		WHERE status = 'pending'
+		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
+		LIMIT 1000
+	`)
+	if err == nil {
+		rowsDeleted, _ := result.RowsAffected()
+		if rowsDeleted > 0 {
+			logrus.Infof("🗑️ Cleaned up %d old messages (older than 1 day)", rowsDeleted)
+		}
+	}
+	
 	// Get all devices with pending messages
 	logrus.Debug("🔍 Fetching devices with pending messages...")
 	devices, err := broadcastRepo.GetDevicesWithPendingMessages()

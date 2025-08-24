@@ -432,7 +432,7 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		AND processing_worker_id IS NULL
 		AND scheduled_at IS NOT NULL
 		AND scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
-		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 HOUR), INTERVAL 8 HOUR)
+		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 8 HOUR)
 		ORDER BY scheduled_at ASC, group_id, group_order
 		LIMIT ?
 	`, workerID, deviceID, limit)
