@@ -388,7 +388,7 @@ func (r *BroadcastRepository) GetDevicesWithPendingMessages() ([]string, error) 
 		SELECT DISTINCT device_id 
 		FROM broadcast_messages 
 		WHERE status = 'pending' 
-		AND (scheduled_at IS NULL OR scheduled_at <= NOW())
+		AND (scheduled_at IS NULL OR scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR))
 		ORDER BY device_id
 	`
 	

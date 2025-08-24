@@ -22,34 +22,44 @@ func StartUltraOptimizedBroadcastProcessor() {
 		ticker:  time.NewTicker(5 * time.Second), // Check every 5 seconds
 	}
 	
-	logrus.Info("Ultra-optimized broadcast processor started (MySQL 5.7 compatible with worker locking)")
+	logrus.Info("🚀 Ultra-optimized broadcast processor starting...")
+	logrus.Info("✅ UltraOptimizedBroadcastProcessor initialized successfully")
+	logrus.Info("⏰ Will check for messages every 5 seconds")
 	
 	// Process immediately on start
+	logrus.Info("🔄 Running initial message check...")
 	processor.processMessages()
 	
 	// Then process periodically
+	logrus.Info("♻️ Starting periodic processing loop...")
 	for range processor.ticker.C {
+		logrus.Debug("⏰ Ticker fired - checking for messages...")
 		processor.processMessages()
 	}
 }
 
 func (p *UltraOptimizedBroadcastProcessor) processMessages() {
+	startTime := time.Now()
+	logrus.Debug("📥 UltraOptimizedBroadcastProcessor.processMessages() started")
+	
 	// Get repository instance
 	broadcastRepo := repository.GetBroadcastRepository()
 	userRepo := repository.GetUserRepository()
 	
 	// Get all devices with pending messages
+	logrus.Debug("🔍 Fetching devices with pending messages...")
 	devices, err := broadcastRepo.GetDevicesWithPendingMessages()
 	if err != nil {
-		logrus.Errorf("Failed to get devices with pending messages: %v", err)
+		logrus.Errorf("❌ Failed to get devices with pending messages: %v", err)
 		return
 	}
 	
 	if len(devices) == 0 {
+		logrus.Debug("💤 No devices with pending messages found")
 		return
 	}
 	
-	// logrus.Infof("Found %d devices with pending messages", len(devices))
+	logrus.Infof("📱 Found %d devices with pending messages", len(devices))
 	
 	messageCount := 0
 	campaignPools := make(map[int]bool)
@@ -57,40 +67,51 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	
 	// Process each device using GetPendingMessagesAndLock for atomic locking
 	for _, deviceID := range devices {
+		logrus.Debugf("🔐 Processing device: %s", deviceID)
+		
 		// Use GetPendingMessagesAndLock to atomically claim messages
 		messages, err := broadcastRepo.GetPendingMessagesAndLock(deviceID, 100)
 		if err != nil {
-			logrus.Errorf("Failed to get pending messages for device %s: %v", deviceID, err)
+			logrus.Errorf("❌ Failed to get pending messages for device %s: %v", deviceID, err)
 			continue
 		}
 		
 		if len(messages) == 0 {
+			logrus.Debugf("💤 No messages to process for device %s", deviceID)
 			continue
 		}
+		
+		logrus.Infof("📨 Found %d messages for device %s", len(messages), deviceID)
 		
 		// Get device details
 		device, err := userRepo.GetDeviceByID(deviceID)
 		if err != nil {
-			logrus.Errorf("Failed to get device %s: %v", deviceID, err)
+			logrus.Errorf("❌ Failed to get device %s: %v", deviceID, err)
 			continue
 		}
+		
+		logrus.Debugf("📱 Device %s - Status: %s, Platform: %s", deviceID, device.Status, device.Platform)
 		
 		// Check if device is online (platform devices always considered online)
 		if device.Platform == "" && device.Status != "connected" && device.Status != "online" {
 			// Skip this WhatsApp Web device - mark messages as skipped
+			logrus.Warnf("⚠️ Device %s is offline (status: %s), skipping messages", deviceID, device.Status)
 			db := database.GetDB()
 			db.Exec(`UPDATE broadcast_messages SET status = 'skipped', error_message = 'Device offline' 
 					 WHERE device_id = ? AND status = 'processing'`, deviceID)
 			continue
 		}
 		
+		logrus.Infof("✅ Device %s is online, processing messages...", deviceID)
+		
 		// Process each message
 		for _, msg := range messages {
 			// Create pool if needed
 			if msg.CampaignID != nil && !campaignPools[*msg.CampaignID] {
+				logrus.Infof("🎯 Creating campaign pool for campaign ID: %d", *msg.CampaignID)
 				_, err := p.manager.StartBroadcastPool("campaign", fmt.Sprintf("%d", *msg.CampaignID))
 				if err != nil {
-					logrus.Errorf("Failed to start campaign pool: %v", err)
+					logrus.Errorf("❌ Failed to start campaign pool: %v", err)
 					continue
 				}
 				campaignPools[*msg.CampaignID] = true
@@ -100,12 +121,14 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 				db.Exec(`UPDATE campaigns SET status = 'processing', 
 						 updated_at = NOW() 
 						 WHERE id = ?`, *msg.CampaignID)
+				logrus.Infof("📊 Updated campaign %d status to 'processing'", *msg.CampaignID)
 			}
 			
 			if msg.SequenceID != nil && !sequencePools[*msg.SequenceID] {
+				logrus.Infof("🔄 Creating sequence pool for sequence ID: %s", *msg.SequenceID)
 				_, err := p.manager.StartBroadcastPool("sequence", *msg.SequenceID)
 				if err != nil {
-					logrus.Errorf("Failed to start sequence pool: %v", err)
+					logrus.Errorf("❌ Failed to start sequence pool: %v", err)
 					continue
 				}
 				sequencePools[*msg.SequenceID] = true
@@ -116,27 +139,35 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 			if msg.CampaignID != nil {
 				broadcastType = "campaign"
 				broadcastID = fmt.Sprintf("%d", *msg.CampaignID)
+				logrus.Debugf("📮 Processing campaign message %s for %s", msg.ID, msg.RecipientPhone)
 			} else if msg.SequenceID != nil {
 				broadcastType = "sequence"
 				broadcastID = *msg.SequenceID
+				logrus.Debugf("📮 Processing sequence message %s for %s", msg.ID, msg.RecipientPhone)
 			}
 			
 			if broadcastType != "" {
+				logrus.Debugf("📤 Queueing message %s to %s pool %s", msg.ID, broadcastType, broadcastID)
 				err = p.manager.QueueMessageToBroadcast(broadcastType, broadcastID, &msg)
 				if err != nil {
-					logrus.Errorf("Failed to queue message: %v", err)
+					logrus.Errorf("❌ Failed to queue message %s: %v", msg.ID, err)
 					// Update to failed
 					db := database.GetDB()
 					db.Exec(`UPDATE broadcast_messages SET status = 'failed', error_message = ? WHERE id = ?`, 
 						err.Error(), msg.ID)
 				} else {
 					messageCount++
+					logrus.Debugf("✅ Successfully queued message %s", msg.ID)
 				}
+			} else {
+				logrus.Warnf("⚠️ Message %s has no campaign or sequence ID, skipping", msg.ID)
 			}
 		}
 	}
 	
 	if messageCount > 0 {
-		logrus.Infof("Queued %d messages to broadcast pools (with worker locking)", messageCount)
+		logrus.Infof("✨ Queued %d messages to broadcast pools in %v", messageCount, time.Since(startTime))
+	} else {
+		logrus.Debugf("💤 No messages queued in this cycle (took %v)", time.Since(startTime))
 	}
 }

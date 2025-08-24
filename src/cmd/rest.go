@@ -160,8 +160,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	
 	// Start the ultra-optimized broadcast processor for 3000+ devices
 	// This processor creates broadcast-specific worker pools
+	logrus.Info("🚀 Starting UltraOptimizedBroadcastProcessor...")
 	go usecase.StartUltraOptimizedBroadcastProcessor()
-	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
+	logrus.Info("✅ Ultra-optimized broadcast processor started (3000+ device support)")
 	
 	// Start campaign trigger processor using optimized version
 	go func() {
