@@ -190,9 +190,9 @@ func restServer(_ *cobra.Command, _ []string) {
 	go usecase.StartCampaignStatusMonitor()
 	logrus.Info("Campaign status monitor started")
 	
-	// Start queued message cleaner
-	go usecase.StartQueuedMessageCleaner()
-	logrus.Info("Queued message cleaner started")
+	// DISABLED: Queued message cleaner - causing deadlocks with broadcast processor
+	// go usecase.StartQueuedMessageCleaner()
+	// logrus.Info("Queued message cleaner started")
 	
 	// Start broadcast coordinator
 	go usecase.StartBroadcastCoordinator()

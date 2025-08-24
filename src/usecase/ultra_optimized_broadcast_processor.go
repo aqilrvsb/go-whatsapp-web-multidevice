@@ -122,8 +122,8 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	sequencePools := make(map[string]bool)
 	
 	// Process each device using GetPendingMessagesAndLock for atomic locking
-	for _, deviceID := range devices {
-		logrus.Debugf("🔐 Processing device: %s", deviceID)
+	for i, deviceID := range devices {
+		logrus.Debugf("🔐 Processing device %d/%d: %s", i+1, len(devices), deviceID)
 		
 		// Use GetPendingMessagesAndLock to atomically claim messages
 		messages, err := broadcastRepo.GetPendingMessagesAndLock(deviceID, 100)
@@ -133,7 +133,18 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 		}
 		
 		if len(messages) == 0 {
-			logrus.Debugf("💤 No messages to process for device %s", deviceID)
+			// Let's check why no messages were claimed
+			var pendingCount int
+			db.QueryRow(`
+				SELECT COUNT(*) FROM broadcast_messages 
+				WHERE device_id = ? AND status = 'pending'
+			`, deviceID).Scan(&pendingCount)
+			
+			if pendingCount > 0 {
+				logrus.Warnf("⚠️ Device %s has %d pending messages but none were claimed (possible time window issue)", deviceID, pendingCount)
+			} else {
+				logrus.Debugf("💤 No messages to process for device %s", deviceID)
+			}
 			continue
 		}
 		
