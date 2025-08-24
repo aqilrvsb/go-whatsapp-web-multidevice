@@ -48,13 +48,29 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	
 	// First, clean up old messages (older than 1 day)
 	db := database.GetDB()
+	
+	// Check how many old messages exist
+	var oldCount int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM broadcast_messages 
+		WHERE status = 'pending'
+		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
+	`).Scan(&oldCount)
+	if err == nil && oldCount > 0 {
+		logrus.Infof("🔍 Found %d old messages to clean up", oldCount)
+	}
+	
+	// Delete old messages
 	result, err := db.Exec(`
 		DELETE FROM broadcast_messages 
 		WHERE status = 'pending'
 		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
 		LIMIT 1000
 	`)
-	if err == nil {
+	if err != nil {
+		// Log error but continue processing
+		logrus.Warnf("⚠️ Failed to clean old messages: %v", err)
+	} else {
 		rowsDeleted, _ := result.RowsAffected()
 		if rowsDeleted > 0 {
 			logrus.Infof("🗑️ Cleaned up %d old messages (older than 1 day)", rowsDeleted)
@@ -75,6 +91,31 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	}
 	
 	logrus.Infof("📱 Found %d devices with pending messages", len(devices))
+	
+	// Check message ages for debugging
+	var debugInfo struct {
+		Total      int
+		TooOld     int
+		InWindow   int
+		MinAge     string
+		MaxAge     string
+	}
+	
+	err = db.QueryRow(`
+		SELECT 
+			COUNT(*) as total,
+			SUM(CASE WHEN scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY) THEN 1 ELSE 0 END) as too_old,
+			SUM(CASE WHEN scheduled_at >= DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY) THEN 1 ELSE 0 END) as in_window,
+			TIMESTAMPDIFF(HOUR, MAX(scheduled_at), DATE_ADD(NOW(), INTERVAL 8 HOUR)) as min_age_hours,
+			TIMESTAMPDIFF(HOUR, MIN(scheduled_at), DATE_ADD(NOW(), INTERVAL 8 HOUR)) as max_age_hours
+		FROM broadcast_messages
+		WHERE status = 'pending'
+	`).Scan(&debugInfo.Total, &debugInfo.TooOld, &debugInfo.InWindow, &debugInfo.MinAge, &debugInfo.MaxAge)
+	
+	if err == nil {
+		logrus.Infof("📊 Pending messages: Total=%d, TooOld=%d, InWindow=%d, Age=%s-%s hours", 
+			debugInfo.Total, debugInfo.TooOld, debugInfo.InWindow, debugInfo.MinAge, debugInfo.MaxAge)
+	}
 	
 	messageCount := 0
 	campaignPools := make(map[int]bool)
