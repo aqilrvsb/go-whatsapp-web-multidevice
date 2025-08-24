@@ -420,6 +420,42 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 	// Generate unique worker ID for this operation
 	workerID := fmt.Sprintf("%s_%d_%s", deviceID, time.Now().UnixNano(), uuid.New().String()[:8])
 	
+	// Debug: Check why messages aren't being claimed
+	var debugInfo struct {
+		TotalPending int
+		WithinWindow int
+		ServerNow    string
+		MalaysiaNow  string
+		WindowStart  string
+		WindowEnd    string
+	}
+	
+	err := r.db.QueryRow(`
+		SELECT 
+			COUNT(*) as total_pending,
+			SUM(CASE 
+				WHEN scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR) 
+				AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 8 HOUR)
+				THEN 1 ELSE 0 
+			END) as within_window,
+			NOW() as server_now,
+			DATE_ADD(NOW(), INTERVAL 8 HOUR) as malaysia_now,
+			DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 8 HOUR) as window_start,
+			DATE_ADD(NOW(), INTERVAL 8 HOUR) as window_end
+		FROM broadcast_messages
+		WHERE device_id = ?
+		AND status = 'pending'
+		AND processing_worker_id IS NULL
+		AND scheduled_at IS NOT NULL
+	`, deviceID).Scan(&debugInfo.TotalPending, &debugInfo.WithinWindow, 
+		&debugInfo.ServerNow, &debugInfo.MalaysiaNow, 
+		&debugInfo.WindowStart, &debugInfo.WindowEnd)
+	
+	if err == nil && debugInfo.TotalPending > 0 && debugInfo.WithinWindow == 0 {
+		logrus.Warnf("🕐 Device %s time window mismatch: %d pending but 0 within window. Window: %s to %s", 
+			deviceID, debugInfo.TotalPending, debugInfo.WindowStart, debugInfo.WindowEnd)
+	}
+	
 	// STEP 1: Atomically claim messages by updating their status (MySQL 5.7 compatible)
 	result, err := r.db.Exec(`
 		UPDATE broadcast_messages 
@@ -432,7 +468,6 @@ func (r *BroadcastRepository) GetPendingMessagesAndLock(deviceID string, limit i
 		AND processing_worker_id IS NULL
 		AND scheduled_at IS NOT NULL
 		AND scheduled_at <= DATE_ADD(NOW(), INTERVAL 8 HOUR)
-		AND scheduled_at >= DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 8 HOUR)
 		ORDER BY scheduled_at ASC, group_id, group_order
 		LIMIT ?
 	`, workerID, deviceID, limit)

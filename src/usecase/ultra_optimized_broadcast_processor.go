@@ -49,9 +49,20 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	// First, clean up old messages (older than 1 day)
 	db := database.GetDB()
 	
+	// TEMPORARY: Delete ALL pending messages to clear the bootloop
+	result, err := db.Exec(`DELETE FROM broadcast_messages WHERE status = 'pending'`)
+	if err != nil {
+		logrus.Errorf("❌ Failed to delete pending messages: %v", err)
+	} else {
+		rowsDeleted, _ := result.RowsAffected()
+		if rowsDeleted > 0 {
+			logrus.Infof("🗑️ Deleted %d pending messages to clear bootloop", rowsDeleted)
+		}
+	}
+	
 	// Check how many old messages exist
 	var oldCount int
-	err := db.QueryRow(`
+	err = db.QueryRow(`
 		SELECT COUNT(*) FROM broadcast_messages 
 		WHERE status = 'pending'
 		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
@@ -61,7 +72,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	}
 	
 	// Delete old messages
-	result, err := db.Exec(`
+	result, err = db.Exec(`
 		DELETE FROM broadcast_messages 
 		WHERE status = 'pending'
 		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)

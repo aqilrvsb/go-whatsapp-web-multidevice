@@ -55,9 +55,9 @@ func (g *GreetingProcessor) getSimpleGreeting(name string) string {
 		name = cleanedName
 	}
 	
-	// Get current hour and add 5 hours for Malaysia time adjustment
+	// Get current hour and add 8 hours for Malaysia time adjustment (UTC+8)
 	hour := time.Now().Hour()
-	hour = (hour + 5) % 24
+	hour = (hour + 8) % 24
 	
 	var greeting string
 	
