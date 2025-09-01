@@ -144,11 +144,6 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	// Device management endpoints
 	app.Put("/api/devices/:id/update-jid", rest.UpdateDeviceJID)
 	
-	// Team Member Management endpoints
-	app.Get("/api/team-members", rest.GetAllTeamMembers)
-	app.Post("/api/team-members", rest.CreateTeamMember)
-	app.Put("/api/team-members/:id", rest.UpdateTeamMember)
-	app.Delete("/api/team-members/:id", rest.DeleteTeamMember)
 	app.Post("/api/campaigns/:id/device/:deviceId/retry-failed", rest.RetryCampaignFailedMessages)
 	
 	// AI Lead Management Routes
