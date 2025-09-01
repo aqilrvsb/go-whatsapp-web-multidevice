@@ -109,9 +109,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	rest.InitRestSequence(app, sequenceUsecase)
 	rest.InitRestMonitoring(app) // Add monitoring endpoints
 	rest.InitWorkerControlAPI(app) // Add worker control endpoints
-	rest.InitTeamRoutes(app, database.GetDB()) // Add team member routes
 	rest.InitRedisCleanupAPI(app) // Add Redis cleanup endpoints
-	rest.InitWebhookLead(app) // Add webhook endpoint for creating leads
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{

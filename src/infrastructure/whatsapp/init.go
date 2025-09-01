@@ -14,7 +14,6 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/repository"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/websocket"
-	"github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -270,9 +269,6 @@ func handleMessage(ctx context.Context, evt *events.Message) {
 
 	// Handle auto-reply if configured
 	handleAutoReply(evt)
-
-	// Forward to webhook if configured
-	handleWebhookForward(ctx, evt)
 }
 
 func buildMessageMetaParts(evt *events.Message) []string {
@@ -316,17 +312,7 @@ func handleAutoReply(evt *events.Message) {
 	}
 }
 
-func handleWebhookForward(ctx context.Context, evt *events.Message) {
-	if len(config.WhatsappWebhook) > 0 &&
-		!strings.Contains(evt.Info.SourceString(), "broadcast") &&
-		!isFromMySelf(evt.Info.SourceString()) {
-		go func(evt *events.Message) {
-			if err := forwardToWebhook(ctx, evt); err != nil {
-				logrus.Error("Failed forward to webhook: ", err)
-			}
-		}(evt)
-	}
-}
+
 
 func handleReceipt(ctx context.Context, evt *events.Receipt) {
 	if evt.Type == types.ReceiptTypeRead || evt.Type == types.ReceiptTypeReadSelf {
