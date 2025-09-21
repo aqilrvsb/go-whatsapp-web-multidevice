@@ -65,7 +65,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	
 	// Check how many old messages exist
 	var oldCount int
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		SELECT COUNT(*) FROM broadcast_messages 
 		WHERE status = 'pending'
 		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
@@ -75,7 +75,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	}
 	
 	// Delete old messages
-	result, err = db.Exec(`
+	result, err := db.Exec(`
 		DELETE FROM broadcast_messages 
 		WHERE status = 'pending'
 		AND scheduled_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 1 DAY)
