@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/antipattern"
+	"github.com/sirupsen/logrus"
 )
 
 // PlatformSender handles sending messages via external platforms
@@ -165,7 +166,7 @@ func (ps *PlatformSender) sendWablasImage(token, phone, caption, imageURL string
 
 // sendViaWhacenter sends message via Whacenter API
 func (ps *PlatformSender) sendViaWhacenter(deviceID, phone, message, imageURL string) error {
-	apiURL := "https://app.whacenter.com/api/send"
+	apiURL := "https://api.whacenter.com/api/send"
 	
 	// Format phone number (remove 62 prefix if exists, add it back)
 	phone = strings.TrimPrefix(phone, "62")
@@ -209,18 +210,26 @@ func (ps *PlatformSender) sendViaWhacenter(deviceID, phone, message, imageURL st
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 	
+	// Log the raw response for debugging
+	logrus.Debugf("WhatsCenter raw response: %s", string(respBody))
+	
 	// Parse response
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return fmt.Errorf("failed to parse response: %w, body: %s", err, string(respBody))
 	}
 	
+	// Log parsed response
+	logrus.Debugf("WhatsCenter parsed response: %+v", result)
+	
 	// Check status
 	if status, ok := result["status"].(bool); ok && !status {
 		if msg, ok := result["msg"].(string); ok {
+			logrus.Errorf("WhatsCenter error - status: false, msg: %s, full response: %+v", msg, result)
 			return fmt.Errorf("whacenter error: %s", msg)
 		}
-		return fmt.Errorf("whacenter returned false status")
+		logrus.Errorf("WhatsCenter error - status: false, no msg field, full response: %+v", result)
+		return fmt.Errorf("whacenter returned false status, response: %+v", result)
 	}
 	
 	return nil
