@@ -1,7 +1,7 @@
 @echo off
 echo Building WhatsApp Multi-Device without CGO...
 
-cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main
+cd /d C:\Users\aqilz\go-whatsapp-web-multidevice-main
 
 echo [1/3] Setting environment variables...
 set CGO_ENABLED=0
