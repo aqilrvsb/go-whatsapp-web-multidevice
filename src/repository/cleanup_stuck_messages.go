@@ -11,13 +11,14 @@ func CleanupStuckMessages() {
 	db := database.GetDB()
 	
 	// Reset messages stuck in processing for more than 5 minutes
+	// Fixed: Use Malaysia time for comparison since processing_started_at is in Malaysia time
 	result, err := db.Exec(`
 		UPDATE broadcast_messages 
 		SET processing_worker_id = NULL,
 			processing_started_at = NULL,
 			status = 'pending'
 		WHERE status = 'processing'
-		AND processing_started_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+		AND processing_started_at < DATE_SUB(DATE_ADD(NOW(), INTERVAL 8 HOUR), INTERVAL 5 MINUTE)
 	`)
 	
 	if err != nil {
