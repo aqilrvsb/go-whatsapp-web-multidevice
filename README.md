@@ -2,7 +2,33 @@
 
 A comprehensive WhatsApp broadcast system supporting multi-device operations, campaign management, and automated messaging sequences.
 
-## Latest Update (August 12, 2025) - Timezone Consistency Fix
+## Latest Update (September 24, 2025) - Extended Time Window to 3 Hours
+
+### 🔧 Updated: Processing Time Window Extended
+
+**Change Made**:
+- Extended time window from 1 hour to 3 hours for better reliability
+- Messages can now recover within 3 hours instead of 1 hour
+- Prevents messages from being stuck during longer downtimes
+
+**Code Changes**:
+```sql
+-- Time window (in GetPendingMessages):
+AND scheduled_at >= DATE_SUB(?, INTERVAL 3 HOUR)
+```
+
+**Files Modified**:
+- `src/repository/broadcast_repository.go` - Updated time window in GetPendingMessages() method
+- Changed `INTERVAL 1 HOUR` to `INTERVAL 3 HOUR`
+
+**Result**:
+- Better recovery from extended system downtime
+- More flexible message processing window
+- Reduced risk of permanently stuck messages
+
+---
+
+## Previous Update (August 12, 2025) - Timezone Consistency Fix
 
 ### 🔧 Fixed: Processing Timestamps & Time Window
 
