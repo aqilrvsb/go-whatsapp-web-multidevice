@@ -1,0 +1,61 @@
+// GetLeadsByDeviceNicheAndStatus gets leads for a specific device matching niche and status
+func (r *leadRepository) GetLeadsByDeviceNicheAndStatus(deviceID, niche, status string) ([]models.Lead, error) {
+	// Trim whitespace from niche to avoid matching issues
+	niche = strings.TrimSpace(niche)
+	
+	query := `
+		SELECT id, device_id, user_id, name, phone, niche, journey, status, target_status, ` + "`trigger`" + `, created_at, updated_at
+		FROM leads
+		WHERE device_id = ?
+		AND (? = '' OR niche LIKE CONCAT('%', ?, '%'))
+		AND (? = '' OR target_status = ?)
+		ORDER BY created_at DESC
+	`
+	
+	// Debug logging
+	logrus.Debugf("GetLeadsByDeviceNicheAndStatus - DeviceID: '%s', Niche: '%s' (len=%d), Status: '%s'", 
+		deviceID, niche, len(niche), status)
+	
+	// Fixed: Pass all 5 parameters that the query expects
+	rows, err := r.db.Query(query, deviceID, niche, niche, status, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var leads []models.Lead
+	var foundCount int
+	for rows.Next() {
+		var lead models.Lead
+		var journey sql.NullString
+		var targetStatus sql.NullString
+		var trigger sql.NullString
+		
+		err := rows.Scan(&lead.ID, &lead.DeviceID, &lead.UserID, &lead.Name, &lead.Phone,
+			&lead.Niche, &journey, &lead.Status, &targetStatus, &trigger,
+			&lead.CreatedAt, &lead.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		
+		// Journey field is stored in DB but not in model, skip it
+		
+		if targetStatus.Valid {
+			lead.TargetStatus = targetStatus.String
+		}
+		
+		if trigger.Valid {
+			lead.Trigger = trigger.String
+		}
+		
+		// Debug: Show what niche was found
+		logrus.Debugf("Found lead with niche: '%s' (searching for '%s')", lead.Niche, niche)
+		
+		leads = append(leads, lead)
+		foundCount++
+	}
+	
+	logrus.Debugf("GetLeadsByDeviceNicheAndStatus - Found %d leads with niche containing '%s'", foundCount, niche)
+	
+	return leads, nil
+}

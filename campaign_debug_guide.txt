@@ -1,0 +1,31 @@
+#!/bin/bash
+# Debug campaign processing
+
+echo "=== CAMPAIGN DEBUG CHECKLIST ==="
+echo ""
+
+echo "1. Check if campaign processor is running (should run every 1 minute):"
+echo "   Look for: 'Processing campaign: [name]' in logs"
+echo ""
+
+echo "2. Common issues:"
+echo "   a) Campaign status is not 'pending' (already triggered/finished)"
+echo "   b) Campaign date/time is in the future"
+echo "   c) No leads matching niche + target_status"
+echo "   d) All devices are offline"
+echo "   e) Timezone mismatch"
+echo ""
+
+echo "3. To manually trigger a campaign:"
+echo "   UPDATE campaigns SET status = 'pending' WHERE id = [campaign_id];"
+echo ""
+
+echo "4. To check what the processor sees:"
+echo "   - Run the debug_campaign.sql queries"
+echo "   - Check server logs for 'ProcessCampaigns' entries"
+echo ""
+
+echo "5. Quick fixes:"
+echo "   - Ensure at least one device is 'online' or 'connected'"
+echo "   - Verify leads exist with matching niche/status"
+echo "   - Check campaign_date and time_schedule are correct"
