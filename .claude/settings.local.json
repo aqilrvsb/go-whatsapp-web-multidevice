@@ -15,7 +15,8 @@
       "Bash($env:GOOS=\"linux\")",
       "Bash($env:GOARCH=\"amd64\")",
       "Bash(cat:*)",
-      "Bash(where go)"
+      "Bash(where go)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
