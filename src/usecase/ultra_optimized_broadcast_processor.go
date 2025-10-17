@@ -44,8 +44,7 @@ func (p *UltraOptimizedBroadcastProcessor) processMessages() {
 	
 	// Get repository instance
 	broadcastRepo := repository.GetBroadcastRepository()
-	userRepo := repository.GetUserRepository()
-	
+
 	// First, clean up old messages (older than 1 day)
 	db := database.GetDB()
 	

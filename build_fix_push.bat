@@ -1,24 +1,38 @@
 @echo off
-echo Building locally...
-cd /d C:\Users\ROGSTRIX\go-whatsapp-web-multidevice-main\src
-go build -o whatsapp.exe
+echo ========================================
+echo Building without CGO for Linux...
+echo ========================================
+
+cd /d %~dp0
+
+echo [1/4] Setting environment variables...
+set CGO_ENABLED=0
+set GOOS=linux
+set GOARCH=amd64
+
+echo [2/4] Building application...
+cd src
+go build -ldflags="-s -w" -o ../whatsapp main.go
 if %errorlevel% neq 0 (
-    echo Build failed!
+    echo [ERROR] Build failed!
     pause
     exit /b 1
 )
 
-echo Build successful!
+echo [SUCCESS] Build successful!
 cd ..
 
-echo Adding changes...
-git add -A
+echo.
+echo [3/4] Committing changes...
+git add .
+git commit -m "Fix: Remove device status checks for Whacenter - Build without CGO"
 
-echo Committing...
-git commit -m "Fix build error - use correct type domainSequence.UpdateSequenceRequest"
+echo.
+echo [4/4] Pushing to GitHub...
+git push -f origin master:main
 
-echo Pushing to GitHub...
-git push origin main
-
-echo Done!
+echo.
+echo ========================================
+echo DONE! Railway will auto-deploy now.
+echo ========================================
 pause

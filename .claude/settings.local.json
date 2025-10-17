@@ -19,7 +19,10 @@
       "Bash(git pull:*)",
       "Bash(sqlite3:*)",
       "Bash(mysql:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(export CGO_ENABLED=0)",
+      "Bash(export GOOS=linux)",
+      "Bash(export GOARCH=amd64:*)"
     ],
     "deny": [],
     "ask": []
