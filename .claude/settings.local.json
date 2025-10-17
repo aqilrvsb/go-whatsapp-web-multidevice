@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(set CGO_ENABLED=0)",
+      "Bash(set GOOS=linux)",
+      "Bash(set GOARCH=amd64)",
+      "Bash(go build:*)",
+      "Bash($env:CGO_ENABLED=0)",
+      "Bash($env:GOOS=\"linux\")",
+      "Bash($env:GOARCH=\"amd64\")",
+      "Bash(cat:*)",
+      "Bash(where go)",
+      "Bash(git pull:*)",
+      "Bash(sqlite3:*)",
+      "Bash(mysql:*)",
+      "Bash(psql:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
