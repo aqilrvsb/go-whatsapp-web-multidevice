@@ -4748,33 +4748,25 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Calculate overall totals using the same logic as summary page - UPDATED
+	// Calculate overall totals using EXACT same logic as Detail Sequences
+	// IMPORTANT: Do NOT apply date filters to overall stats - match Detail Sequences behavior
 	overallQuery := `
-		SELECT 
+		SELECT
 			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) as total,
-			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '') 
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '')
 				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as done_send,
-			COUNT(DISTINCT CASE WHEN status = 'failed' 
+			COUNT(DISTINCT CASE WHEN status = 'failed'
 				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as failed_send,
-			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued') 
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued')
 				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) as remaining_send,
 			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) as total_leads
 		FROM broadcast_messages
 		WHERE sequence_id = ?`
-	
+
 	overallArgs := []interface{}{sequenceId}
-	
-	// Add date filters if provided
-	if startDate != "" && endDate != "" {
-		overallQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-		overallArgs = append(overallArgs, startDate, endDate)
-	} else if startDate != "" {
-		overallQuery += ` AND DATE(scheduled_at) >= ?`
-		overallArgs = append(overallArgs, startDate)
-	} else if endDate != "" {
-		overallQuery += ` AND DATE(scheduled_at) <= ?`
-		overallArgs = append(overallArgs, endDate)
-	}
+
+	// NOTE: Removed date filtering from overall query to match Detail Sequences
+	// Date filters are only applied to per-device/per-step breakdowns below
 	
 	var totalMessages, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeadsCount int
 	err = db.QueryRow(overallQuery, overallArgs...).Scan(
@@ -6079,8 +6071,8 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get stats using the SAME logic as Detail Sequences and Device Report
-	// This counts unique message records (step + phone + device combinations)
+	// Get stats using EXACT same logic as Detail Sequences
+	// IMPORTANT: Do NOT apply date filters to overall stats - match Detail Sequences behavior
 	statsQuery := `
 		SELECT
 			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
@@ -6092,21 +6084,12 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS remaining,
 			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) AS total_leads
 		FROM broadcast_messages
-		WHERE sequence_id = ? AND user_id = ?
+		WHERE sequence_id = ?
 	`
-	statsArgs := []interface{}{sequenceID, session.UserID}
+	statsArgs := []interface{}{sequenceID}
 
-	// Add date filters if provided (use scheduled_at like Detail Sequences)
-	if startDate != "" && endDate != "" {
-		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-		statsArgs = append(statsArgs, startDate, endDate)
-	} else if startDate != "" {
-		statsQuery += ` AND DATE(scheduled_at) >= ?`
-		statsArgs = append(statsArgs, startDate)
-	} else if endDate != "" {
-		statsQuery += ` AND DATE(scheduled_at) <= ?`
-		statsArgs = append(statsArgs, endDate)
-	}
+	// NOTE: Removed date filtering from overall stats to match Detail Sequences
+	// Detail Sequences shows ALL data without date filtering in the main table
 
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
 	err = db.QueryRow(statsQuery, statsArgs...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
