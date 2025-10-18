@@ -6209,6 +6209,15 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
 
+	// Validate sequence ID
+	if sequenceID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Sequence ID is required",
+		})
+	}
+
+	log.Printf("GetSequenceReportNew called for sequence: %s", sequenceID)
+
 	// Get session
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {
@@ -6284,9 +6293,12 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
 	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
 	if err != nil {
-		log.Printf("Error getting sequence stats: %v", err)
+		log.Printf("Error getting sequence stats for %s: %v", sequenceID, err)
 		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
 	}
+
+	log.Printf("[REPORT] Sequence %s - Sent: %d, Failed: %d, Remaining: %d, Total: %d, Leads: %d",
+		sequenceID, totalDoneSend, totalFailedSend, totalRemainingSend, totalShouldSend, totalLeads)
 
 	// Calculate should send as sum
 	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
@@ -6408,6 +6420,15 @@ func (handler *App) SequenceReportPage(c *fiber.Ctx) error {
 func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
 
+	// Validate sequence ID
+	if sequenceID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Sequence ID is required",
+		})
+	}
+
+	log.Printf("GetSequenceProgressNew called for sequence: %s", sequenceID)
+
 	// Get session
 	sessionToken := c.Cookies("session_token")
 	if sessionToken == "" {
@@ -6480,9 +6501,12 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
 	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
 	if err != nil {
-		log.Printf("Error getting sequence stats: %v", err)
+		log.Printf("Error getting sequence stats for %s: %v", sequenceID, err)
 		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
 	}
+
+	log.Printf("[PROGRESS] Sequence %s - Sent: %d, Failed: %d, Remaining: %d, Total: %d, Leads: %d",
+		sequenceID, totalDoneSend, totalFailedSend, totalRemainingSend, totalShouldSend, totalLeads)
 
 	// Calculate should send as sum
 	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
