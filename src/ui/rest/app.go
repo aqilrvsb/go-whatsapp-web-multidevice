@@ -6298,14 +6298,15 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		totalFlows = 0
 	}
 
-	// Get device breakdown
+	// Get device breakdown - group by device_id to avoid duplicates
 	deviceQuery := `
-		SELECT DISTINCT
+		SELECT
 			bm.device_id,
-			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name
+			COALESCE(MAX(ud.device_name), MAX(bm.device_name), 'Unknown Device') as device_name
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ?
+		GROUP BY bm.device_id
 	`
 
 	deviceRows, err := db.Query(deviceQuery, sequenceID)
@@ -6489,8 +6490,8 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	// Get step-wise breakdown (same query pattern as Detail Sequences)
 	stepQuery := `
 		SELECT
-			ss.step_name,
-			ss.step_number,
+			COALESCE(ss.content, CONCAT('Day ', ss.day_number)) as step_name,
+			ss.day_number,
 			COUNT(DISTINCT CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id)) AS should_send,
 			COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '')
 				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) AS sent,
@@ -6501,8 +6502,8 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		FROM sequence_steps ss
 		LEFT JOIN broadcast_messages bm ON ss.id = bm.sequence_stepid
 		WHERE ss.sequence_id = ?
-		GROUP BY ss.id, ss.step_name, ss.step_number
-		ORDER BY ss.step_number
+		GROUP BY ss.id, ss.day_number, ss.content
+		ORDER BY ss.day_number
 	`
 
 	rows, err := db.Query(stepQuery, sequenceID)
