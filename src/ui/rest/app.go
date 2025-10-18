@@ -6079,18 +6079,44 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get total unique leads (unique phone numbers only, not phone+device)
-	totalLeadsQuery := `
-		SELECT COUNT(DISTINCT recipient_phone)
+	// Get stats using the SAME logic as Detail Sequences and Device Report
+	// This counts unique message records (step + phone + device combinations)
+	statsQuery := `
+		SELECT
+			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed'
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS failed,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS remaining,
+			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) AS total_leads
 		FROM broadcast_messages
 		WHERE sequence_id = ? AND user_id = ?
 	`
-	var totalLeads int
-	err = db.QueryRow(totalLeadsQuery, sequenceID, session.UserID).Scan(&totalLeads)
-	if err != nil {
-		log.Printf("Error getting total leads: %v", err)
-		totalLeads = 0
+	statsArgs := []interface{}{sequenceID, session.UserID}
+
+	// Add date filters if provided (use scheduled_at like Detail Sequences)
+	if startDate != "" && endDate != "" {
+		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+		statsArgs = append(statsArgs, startDate, endDate)
+	} else if startDate != "" {
+		statsQuery += ` AND DATE(scheduled_at) >= ?`
+		statsArgs = append(statsArgs, startDate)
+	} else if endDate != "" {
+		statsQuery += ` AND DATE(scheduled_at) <= ?`
+		statsArgs = append(statsArgs, endDate)
 	}
+
+	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
+	err = db.QueryRow(statsQuery, statsArgs...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
+	if err != nil {
+		log.Printf("Error getting sequence stats: %v", err)
+		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
+	}
+
+	// Ensure shouldSend is sum of all statuses (same as Detail Sequences)
+	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
 
 	// Get total number of flows/steps in this sequence
 	var totalFlows int
@@ -6181,9 +6207,13 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 		Code:    "SUCCESS",
 		Message: "Sequence progress retrieved successfully",
 		Results: map[string]interface{}{
-			"messages":    messages,
-			"total_leads": totalLeads,
-			"total_flows": totalFlows,
+			"messages":        messages,
+			"total_leads":     totalLeads,
+			"total_flows":     totalFlows,
+			"should_send":     totalShouldSend,
+			"done_send":       totalDoneSend,
+			"failed_send":     totalFailedSend,
+			"remaining_send":  totalRemainingSend,
 		},
 	})
 }
