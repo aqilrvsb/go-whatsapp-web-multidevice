@@ -133,6 +133,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/sequences/:id/step/:stepId/resend", rest.ResendSequenceStepAllDevices)
 	app.Get("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	app.Post("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
+	app.Get("/api/sequences/:id/progress", rest.GetSequenceProgress)
 	
 	// Public routes (no auth required)
 	app.Get("/:device_name", rest.PublicDeviceDashboard)
@@ -6011,6 +6012,168 @@ func (handler *App) UpdateSequencePendingMessages(c *fiber.Ctx) error {
 		Results: map[string]interface{}{
 			"total_updated": totalUpdated,
 			"steps_updated": len(changedSteps),
+		},
+	})
+}
+
+// GetSequenceProgress returns accurate sequence progress data from broadcast_messages table
+func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	// Get session
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to connect to database",
+		})
+	}
+	defer db.Close()
+
+	// Verify sequence belongs to user
+	var sequenceUserID string
+	err = db.QueryRow("SELECT user_id FROM sequences WHERE id = ?", sequenceID).Scan(&sequenceUserID)
+	if err != nil || sequenceUserID != session.UserID {
+		return c.Status(403).JSON(utils.ResponseData{
+			Status:  403,
+			Code:    "FORBIDDEN",
+			Message: "Access denied",
+		})
+	}
+
+	// Get total leads (unique phone numbers) that should receive messages
+	totalLeadsQuery := `
+		SELECT COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id))
+		FROM broadcast_messages
+		WHERE sequence_id = ? AND user_id = ?
+	`
+	var totalLeads int
+	err = db.QueryRow(totalLeadsQuery, sequenceID, session.UserID).Scan(&totalLeads)
+	if err != nil {
+		log.Printf("Error getting total leads: %v", err)
+	}
+
+	// Build query for progress data with date filtering
+	progressQuery := `
+		SELECT
+			bm.sequence_stepid,
+			bm.status,
+			bm.recipient_phone,
+			bm.device_id,
+			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name,
+			bm.sent_at,
+			bm.error_message
+		FROM broadcast_messages bm
+		LEFT JOIN user_devices ud ON bm.device_id = ud.id
+		WHERE bm.sequence_id = ? AND bm.user_id = ?
+	`
+	args := []interface{}{sequenceID, session.UserID}
+
+	// Add date filters if provided
+	if startDate != "" && endDate != "" {
+		progressQuery += ` AND (DATE(bm.sent_at) BETWEEN ? AND ? OR (bm.sent_at IS NULL AND DATE(bm.created_at) BETWEEN ? AND ?))`
+		args = append(args, startDate, endDate, startDate, endDate)
+	} else if startDate != "" {
+		progressQuery += ` AND (DATE(bm.sent_at) >= ? OR (bm.sent_at IS NULL AND DATE(bm.created_at) >= ?))`
+		args = append(args, startDate, startDate)
+	} else if endDate != "" {
+		progressQuery += ` AND (DATE(bm.sent_at) <= ? OR (bm.sent_at IS NULL AND DATE(bm.created_at) <= ?))`
+		args = append(args, endDate, endDate)
+	}
+
+	progressQuery += ` ORDER BY bm.created_at DESC`
+
+	rows, err := db.Query(progressQuery, args...)
+	if err != nil {
+		log.Printf("Error querying progress: %v", err)
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to fetch progress data",
+		})
+	}
+	defer rows.Close()
+
+	// Collect all messages
+	type MessageData struct {
+		SequenceStepID string         `json:"sequence_stepid"`
+		Status         string         `json:"status"`
+		RecipientPhone string         `json:"recipient_phone"`
+		DeviceID       string         `json:"device_id"`
+		DeviceName     string         `json:"device_name"`
+		SentAt         sql.NullTime   `json:"sent_at"`
+		ErrorMessage   sql.NullString `json:"error_message"`
+		CompletedAt    sql.NullTime   `json:"completed_at"` // Use sent_at as completed_at
+	}
+
+	messages := []MessageData{}
+	for rows.Next() {
+		var msg MessageData
+		err := rows.Scan(
+			&msg.SequenceStepID,
+			&msg.Status,
+			&msg.RecipientPhone,
+			&msg.DeviceID,
+			&msg.DeviceName,
+			&msg.SentAt,
+			&msg.ErrorMessage,
+		)
+		if err != nil {
+			log.Printf("Error scanning message: %v", err)
+			continue
+		}
+
+		// Set completed_at to sent_at for compatibility with frontend
+		msg.CompletedAt = msg.SentAt
+
+		messages = append(messages, msg)
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Sequence progress retrieved successfully",
+		Results: map[string]interface{}{
+			"messages":    messages,
+			"total_leads": totalLeads,
 		},
 	})
 }

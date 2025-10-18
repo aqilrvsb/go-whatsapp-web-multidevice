@@ -380,39 +380,38 @@
         function applyDateFilter() {
             const startDate = document.getElementById('filterStartDate').value;
             const endDate = document.getElementById('filterEndDate').value;
-            
-            if (!allContactsData) {
-                return;
+
+            // Reload data from server with date filters
+            let url = `/api/sequences/${sequenceId}/progress`;
+            const params = [];
+
+            if (startDate) {
+                params.push(`start_date=${startDate}`);
             }
-            
-            // Filter contacts based on completed_at date
-            if (startDate || endDate) {
-                contactsData = allContactsData.filter(contact => {
-                    if (!contact.completed_at) {
-                        // If no completed_at, don't include in filtered results for done/failed
-                        return false;
+            if (endDate) {
+                params.push(`end_date=${endDate}`);
+            }
+
+            if (params.length > 0) {
+                url += '?' + params.join('&');
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'SUCCESS') {
+                        contactsData = data.results.messages || [];
+
+                        // When filtering, keep the original total leads count
+                        // but recalculate done/failed based on filtered data
+                        calculateContactStats(true); // Pass true to indicate filtering
+                        displayFlowCards();
+                        displayTimeline();
                     }
-                    
-                    const completedDate = contact.completed_at.split('T')[0];
-                    
-                    if (startDate && endDate) {
-                        return completedDate >= startDate && completedDate <= endDate;
-                    } else if (startDate) {
-                        return completedDate >= startDate;
-                    } else if (endDate) {
-                        return completedDate <= endDate;
-                    }
-                    
-                    return true;
+                })
+                .catch(error => {
+                    console.error('Error loading filtered data:', error);
                 });
-            } else {
-                contactsData = [...allContactsData];
-            }
-            
-            // Recalculate stats with filtered data
-            calculateContactStats(true); // Pass true to indicate filtering
-            displayFlowCards();
-            displayTimeline();
         }
 
         function clearDateFilter() {
@@ -489,12 +488,21 @@
         }
 
         function loadSequenceContacts() {
-            return fetch(`/api/sequences/${sequenceId}/contacts`)
+            return fetch(`/api/sequences/${sequenceId}/progress`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 'SUCCESS') {
-                        allContactsData = data.results || [];
+                        allContactsData = data.results.messages || [];
                         contactsData = [...allContactsData]; // Create a copy
+
+                        // Update total leads from API response
+                        const totalLeadsFromAPI = data.results.total_leads || 0;
+                        if (totalLeadsFromAPI > 0) {
+                            totalShouldSend = totalLeadsFromAPI;
+                            document.getElementById('totalShouldSend').textContent = totalShouldSend;
+                            document.getElementById('totalLeads').textContent = totalLeadsFromAPI;
+                        }
+
                         calculateContactStats(false);
                     }
                 })
