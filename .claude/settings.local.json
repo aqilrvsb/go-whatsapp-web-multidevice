@@ -22,7 +22,8 @@
       "Bash(psql:*)",
       "Bash(export CGO_ENABLED=0)",
       "Bash(export GOOS=linux)",
-      "Bash(export GOARCH=amd64:*)"
+      "Bash(export GOARCH=amd64:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

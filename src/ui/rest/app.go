@@ -4575,15 +4575,15 @@ func (handler *App) GetSequenceDeviceReport(c *fiber.Ctx) error {
 	
 	// Get devices that have messages for this sequence
 	deviceQuery := `
-		SELECT DISTINCT 
+		SELECT DISTINCT
 			bm.device_id,
-			COALESCE(ud.device_name, 'Unknown Device') as device_name,
+			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name,
 			COALESCE(ud.status, 'unknown') as device_status,
-			COALESCE(ud.platform, '') as platform,
+			COALESCE(ud.platform, 'Whacenter') as platform,
 			COALESCE(ud.jid, '') as jid
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
-		WHERE bm.sequence_id = ? 
+		WHERE bm.sequence_id = ?
 		AND bm.user_id = ?`
 	
 	args := []interface{}{sequenceId, session.UserID}
