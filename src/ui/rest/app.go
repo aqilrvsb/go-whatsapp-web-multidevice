@@ -6220,7 +6220,7 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	}
 
 	userRepo := repository.GetUserRepository()
-	session, err := userRepo.GetSession(sessionToken)
+	_, err := userRepo.GetSession(sessionToken)
 	if err != nil {
 		return c.Status(401).JSON(utils.ResponseData{
 			Status:  401,
@@ -6408,23 +6408,57 @@ func (handler *App) SequenceReportPage(c *fiber.Ctx) error {
 func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
 
-	// Get sequence details
-	var sequence struct {
-		ID           int64  `db:"id"`
-		SequenceName string `db:"sequence_name"`
-		Niche        string `db:"niche"`
-		Status       string `db:"status"`
+	// Get session
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Unauthorized",
+		})
 	}
 
-	err := handler.db.Get(&sequence, `
-		SELECT id, sequence_name, niche, status
-		FROM sequences
-		WHERE id = ?
-	`, sequenceID)
+	userRepo := repository.GetUserRepository()
+	_, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid session",
+		})
+	}
 
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+
+	db, err := sql.Open("mysql", mysqlURI)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch sequence details",
+			"error": "Failed to connect to database",
+		})
+	}
+	defer db.Close()
+
+	// Get sequence details
+	var sequenceName, niche, status string
+	err = db.QueryRow(`
+		SELECT sequence_name, niche, status
+		FROM sequences
+		WHERE id = ?
+	`, sequenceID).Scan(&sequenceName, &niche, &status)
+
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Sequence not found",
 		})
 	}
 
@@ -6443,20 +6477,15 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		WHERE sequence_id = ?
 	`
 
-	var stats struct {
-		Total      int `db:"total"`
-		DoneSend   int `db:"done_send"`
-		Failed     int `db:"failed"`
-		Remaining  int `db:"remaining"`
-		TotalLeads int `db:"total_leads"`
+	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
+	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
+	if err != nil {
+		log.Printf("Error getting sequence stats: %v", err)
+		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
 	}
 
-	err = handler.db.Get(&stats, statsQuery, sequenceID)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Failed to fetch statistics",
-		})
-	}
+	// Calculate should send as sum
+	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
 
 	// Get step-wise breakdown (same query pattern as Detail Sequences)
 	stepQuery := `
@@ -6477,20 +6506,31 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		ORDER BY ss.step_number
 	`
 
-	var stepBreakdown []struct {
-		StepName   string `db:"step_name"`
-		StepNumber int    `db:"step_number"`
-		ShouldSend int    `db:"should_send"`
-		Sent       int    `db:"sent"`
-		Failed     int    `db:"failed"`
-		Remaining  int    `db:"remaining"`
-	}
-
-	err = handler.db.Select(&stepBreakdown, stepQuery, sequenceID)
+	rows, err := db.Query(stepQuery, sequenceID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Failed to fetch step breakdown",
 		})
+	}
+	defer rows.Close()
+
+	type StepBreakdown struct {
+		StepName   string
+		StepNumber int
+		ShouldSend int
+		Sent       int
+		Failed     int
+		Remaining  int
+	}
+
+	var stepBreakdown []StepBreakdown
+	for rows.Next() {
+		var step StepBreakdown
+		if err := rows.Scan(&step.StepName, &step.StepNumber, &step.ShouldSend, &step.Sent, &step.Failed, &step.Remaining); err != nil {
+			log.Printf("Error scanning step: %v", err)
+			continue
+		}
+		stepBreakdown = append(stepBreakdown, step)
 	}
 
 	// Get recent activity (last 100 messages)
@@ -6500,7 +6540,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			bm.status,
 			bm.error_message,
 			bm.created_at,
-			ss.step_name,
+			COALESCE(ss.step_name, '') as step_name,
 			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name
 		FROM broadcast_messages bm
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
@@ -6510,39 +6550,44 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		LIMIT 100
 	`
 
-	var recentActivity []struct {
-		RecipientPhone string  `db:"recipient_phone"`
-		Status         string  `db:"status"`
-		ErrorMessage   *string `db:"error_message"`
-		CreatedAt      string  `db:"created_at"`
-		StepName       string  `db:"step_name"`
-		DeviceName     string  `db:"device_name"`
+	activityRows, err := db.Query(activityQuery, sequenceID)
+	if err != nil {
+		log.Printf("Error getting recent activity: %v", err)
 	}
 
-	err = handler.db.Select(&recentActivity, activityQuery, sequenceID)
-	if err != nil {
-		// Non-critical, just log the error
-		recentActivity = []struct {
-			RecipientPhone string  `db:"recipient_phone"`
-			Status         string  `db:"status"`
-			ErrorMessage   *string `db:"error_message"`
-			CreatedAt      string  `db:"created_at"`
-			StepName       string  `db:"step_name"`
-			DeviceName     string  `db:"device_name"`
-		}{}
+	type RecentActivity struct {
+		RecipientPhone string
+		Status         string
+		ErrorMessage   *string
+		CreatedAt      string
+		StepName       string
+		DeviceName     string
+	}
+
+	var recentActivity []RecentActivity
+	if activityRows != nil {
+		defer activityRows.Close()
+		for activityRows.Next() {
+			var activity RecentActivity
+			if err := activityRows.Scan(&activity.RecipientPhone, &activity.Status, &activity.ErrorMessage, &activity.CreatedAt, &activity.StepName, &activity.DeviceName); err != nil {
+				log.Printf("Error scanning activity: %v", err)
+				continue
+			}
+			recentActivity = append(recentActivity, activity)
+		}
 	}
 
 	return c.JSON(fiber.Map{
-		"sequence_id":   sequence.ID,
-		"sequence_name": sequence.SequenceName,
-		"niche":         sequence.Niche,
-		"status":        sequence.Status,
+		"sequence_id":   sequenceID,
+		"sequence_name": sequenceName,
+		"niche":         niche,
+		"status":        status,
 		"overall_stats": fiber.Map{
-			"should_send": stats.Total,
-			"sent":        stats.DoneSend,
-			"failed":      stats.Failed,
-			"remaining":   stats.Remaining,
-			"total_leads": stats.TotalLeads,
+			"should_send": totalShouldSend,
+			"sent":        totalDoneSend,
+			"failed":      totalFailedSend,
+			"remaining":   totalRemainingSend,
+			"total_leads": totalLeads,
 		},
 		"step_breakdown":  stepBreakdown,
 		"recent_activity": recentActivity,
@@ -6554,19 +6599,43 @@ func (handler *App) SequenceProgressPage(c *fiber.Ctx) error {
 	user := c.Locals("user")
 	sequenceID := c.Params("id")
 
-	// Get sequence details for page context
-	var sequence struct {
-		ID           int64  `db:"id"`
-		SequenceName string `db:"sequence_name"`
-		Niche        string `db:"niche"`
-		Status       string `db:"status"`
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
 	}
 
-	err := handler.db.Get(&sequence, `
-		SELECT id, sequence_name, niche, status
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).SendString("Failed to connect to database")
+	}
+	defer db.Close()
+
+	// Get sequence details for page context
+	type Sequence struct {
+		ID           string
+		SequenceName string
+		Niche        string
+		Status       string
+	}
+
+	var sequence Sequence
+	sequence.ID = sequenceID
+	err = db.QueryRow(`
+		SELECT sequence_name, niche, status
 		FROM sequences
 		WHERE id = ?
-	`, sequenceID)
+	`, sequenceID).Scan(&sequence.SequenceName, &sequence.Niche, &sequence.Status)
 
 	if err != nil {
 		return c.Status(404).SendString("Sequence not found")
