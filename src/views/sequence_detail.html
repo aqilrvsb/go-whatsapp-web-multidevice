@@ -497,10 +497,20 @@
 
                         // Update total leads from API response
                         const totalLeadsFromAPI = data.results.total_leads || 0;
-                        if (totalLeadsFromAPI > 0) {
-                            totalShouldSend = totalLeadsFromAPI;
-                            document.getElementById('totalShouldSend').textContent = totalShouldSend;
-                            document.getElementById('totalLeads').textContent = totalLeadsFromAPI;
+                        const totalFlowsFromAPI = data.results.total_flows || totalFlows;
+
+                        // Total "should send" is unique leads (not lead × flows)
+                        // Each lead should receive messages, but we count unique leads
+                        totalShouldSend = totalLeadsFromAPI;
+
+                        // Update displays
+                        document.getElementById('totalShouldSend').textContent = totalShouldSend;
+                        document.getElementById('totalLeads').textContent = totalLeadsFromAPI;
+
+                        // Update total flows if we got it from API
+                        if (totalFlowsFromAPI > 0) {
+                            totalFlows = totalFlowsFromAPI;
+                            document.getElementById('totalFlows').textContent = totalFlows;
                         }
 
                         calculateContactStats(false);
@@ -513,68 +523,83 @@
 
         function calculateContactStats(isFiltered) {
             if (!contactsData) return;
-            
+
             // Reset counters
             totalDoneSend = 0;
             totalFailedSend = 0;
-            
-            // Reset flow stats
+            let totalPending = 0;
+
+            // Reset flow stats - each flow should send to all unique leads
             Object.keys(flowStats).forEach(stepId => {
                 flowStats[stepId] = {
-                    shouldSend: totalShouldSend, // Each flow should send to all leads
+                    shouldSend: totalShouldSend, // Number of unique leads
                     doneSend: 0,
                     failedSend: 0,
                     remaining: 0
                 };
             });
-            
-            // Count by status and group by sequence_stepid
-            // When filtered, only count contacts with completed_at in the date range
-            contactsData.forEach(contact => {
-                if (contact.status === 'sent') {
+
+            // Count MESSAGES by status (not unique contacts)
+            // Each message in contactsData represents one message attempt
+            contactsData.forEach(msg => {
+                if (msg.status === 'sent') {
                     totalDoneSend++;
-                    if (contact.sequence_stepid && flowStats[contact.sequence_stepid]) {
-                        flowStats[contact.sequence_stepid].doneSend++;
+                    if (msg.sequence_stepid && flowStats[msg.sequence_stepid]) {
+                        flowStats[msg.sequence_stepid].doneSend++;
                     }
-                } else if (contact.status === 'failed') {
+                } else if (msg.status === 'failed' || msg.status === 'error') {
                     totalFailedSend++;
-                    if (contact.sequence_stepid && flowStats[contact.sequence_stepid]) {
-                        flowStats[contact.sequence_stepid].failedSend++;
+                    if (msg.sequence_stepid && flowStats[msg.sequence_stepid]) {
+                        flowStats[msg.sequence_stepid].failedSend++;
                     }
+                } else if (msg.status === 'pending' || msg.status === 'processing') {
+                    totalPending++;
                 }
             });
-            
-            // When not filtered, calculate remaining normally
-            // When filtered, remaining is based on what's left after filtering
+
+            // When not filtered, calculate remaining from all data
+            // When filtered, remaining is based on filtered data
             if (!isFiltered) {
-                // Normal calculation: total should send minus done and failed from all contacts
+                // Count all messages from unfiltered data
                 const allDone = allContactsData.filter(c => c.status === 'sent').length;
-                const allFailed = allContactsData.filter(c => c.status === 'failed').length;
-                totalRemainingSend = totalShouldSend - allDone - allFailed;
+                const allFailed = allContactsData.filter(c => c.status === 'failed' || c.status === 'error').length;
+                const allPending = allContactsData.filter(c => c.status === 'pending' || c.status === 'processing').length;
+
+                // Remaining = total messages that should exist minus sent/failed
+                // Total messages = totalShouldSend (unique leads) × totalFlows (number of flows)
+                const totalMessagesShouldExist = totalShouldSend * totalFlows;
+                totalRemainingSend = totalMessagesShouldExist - allDone - allFailed;
+
+                // Make sure it's not negative
+                if (totalRemainingSend < 0) totalRemainingSend = 0;
             } else {
-                // When filtered, show remaining as total minus what's shown in the filter
-                totalRemainingSend = totalShouldSend - totalDoneSend - totalFailedSend;
+                // When filtered, show remaining as total messages minus what's in the filter
+                const totalMessagesShouldExist = totalShouldSend * totalFlows;
+                totalRemainingSend = totalMessagesShouldExist - totalDoneSend - totalFailedSend;
+                if (totalRemainingSend < 0) totalRemainingSend = 0;
             }
-            
+
             // Calculate remaining for each flow
             Object.keys(flowStats).forEach(stepId => {
                 if (!isFiltered) {
-                    // Count all done/failed for this step from unfiltered data
-                    const allStepDone = allContactsData.filter(c => 
+                    // Count messages for this step from unfiltered data
+                    const allStepDone = allContactsData.filter(c =>
                         c.sequence_stepid === stepId && c.status === 'sent'
                     ).length;
-                    const allStepFailed = allContactsData.filter(c => 
-                        c.sequence_stepid === stepId && c.status === 'failed'
+                    const allStepFailed = allContactsData.filter(c =>
+                        c.sequence_stepid === stepId && (c.status === 'failed' || c.status === 'error')
                     ).length;
                     flowStats[stepId].remaining = flowStats[stepId].shouldSend - allStepDone - allStepFailed;
+                    if (flowStats[stepId].remaining < 0) flowStats[stepId].remaining = 0;
                 } else {
                     // When filtered, use filtered counts
-                    flowStats[stepId].remaining = flowStats[stepId].shouldSend - 
-                                                  flowStats[stepId].doneSend - 
+                    flowStats[stepId].remaining = flowStats[stepId].shouldSend -
+                                                  flowStats[stepId].doneSend -
                                                   flowStats[stepId].failedSend;
+                    if (flowStats[stepId].remaining < 0) flowStats[stepId].remaining = 0;
                 }
             });
-            
+
             // Update display
             document.getElementById('totalDoneSend').textContent = totalDoneSend;
             document.getElementById('totalFailedSend').textContent = totalFailedSend;

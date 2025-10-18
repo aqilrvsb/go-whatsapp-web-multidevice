@@ -6079,9 +6079,9 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get total leads (unique phone numbers) that should receive messages
+	// Get total unique leads (unique phone numbers only, not phone+device)
 	totalLeadsQuery := `
-		SELECT COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id))
+		SELECT COUNT(DISTINCT recipient_phone)
 		FROM broadcast_messages
 		WHERE sequence_id = ? AND user_id = ?
 	`
@@ -6089,6 +6089,15 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 	err = db.QueryRow(totalLeadsQuery, sequenceID, session.UserID).Scan(&totalLeads)
 	if err != nil {
 		log.Printf("Error getting total leads: %v", err)
+		totalLeads = 0
+	}
+
+	// Get total number of flows/steps in this sequence
+	var totalFlows int
+	err = db.QueryRow("SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = ?", sequenceID).Scan(&totalFlows)
+	if err != nil {
+		log.Printf("Error getting total flows: %v", err)
+		totalFlows = 0
 	}
 
 	// Build query for progress data with date filtering
@@ -6174,6 +6183,7 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 		Results: map[string]interface{}{
 			"messages":    messages,
 			"total_leads": totalLeads,
+			"total_flows": totalFlows,
 		},
 	})
 }
