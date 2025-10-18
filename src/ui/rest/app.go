@@ -3094,19 +3094,19 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 	
 	// Get broadcast message statistics grouped by device for this campaign
 	messageQuery := `
-		SELECT 
+		SELECT
 			bm.device_id,
-			ud.device_name,
-			ud.status as device_status,
+			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name,
+			COALESCE(ud.status, 'unknown') as device_status,
 			COUNT(*) as total_messages,
 			COUNT(CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '') THEN 1 END) as success_count,
 			COUNT(CASE WHEN bm.status = 'failed' THEN 1 END) as failed_count,
 			COUNT(CASE WHEN bm.status = 'pending' THEN 1 END) as pending_count
 		FROM broadcast_messages bm
 		LEFT JOIN user_devices ud ON ud.id = bm.device_id
-		WHERE bm.campaign_id = ? 
+		WHERE bm.campaign_id = ?
 		AND bm.user_id = ?
-		GROUP BY bm.device_id, ud.device_name, ud.status
+		GROUP BY bm.device_id, COALESCE(ud.device_name, bm.device_name, 'Unknown Device'), COALESCE(ud.status, 'unknown')
 		ORDER BY total_messages DESC
 	`
 	
@@ -3174,17 +3174,17 @@ func (handler *App) GetCampaignDeviceReport(c *fiber.Ctx) error {
 		
 		// Get lead distribution by device
 		leadQuery := `
-			SELECT 
+			SELECT
 				l.device_id,
-				ud.device_name,
-				ud.status as device_status,
+				COALESCE(ud.device_name, l.device_name, 'Unknown Device') as device_name,
+				COALESCE(ud.status, 'unknown') as device_status,
 				COUNT(*) as lead_count
 			FROM leads l
 			LEFT JOIN user_devices ud ON ud.id = l.device_id
-			WHERE l.user_id = ? 
+			WHERE l.user_id = ?
 			AND l.niche LIKE CONCAT('%', ?, '%')
 			AND (? = 'all' OR l.target_status = ?)
-			GROUP BY l.device_id, ud.device_name, ud.status
+			GROUP BY l.device_id, COALESCE(ud.device_name, l.device_name, 'Unknown Device'), COALESCE(ud.status, 'unknown')
 			ORDER BY lead_count DESC
 		`
 		
