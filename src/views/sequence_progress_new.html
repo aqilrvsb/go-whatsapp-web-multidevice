@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Progress Overview</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 1600px;
+            margin-top: 30px;
+        }
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .table thead th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            color: #495057;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        .badge-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 10px;
+        }
+        .back-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 10px 25px;
+            border-radius: 25px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .activity-item {
+            border-left: 3px solid #dee2e6;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+        .activity-item:hover {
+            background: #e9ecef;
+        }
+        .activity-sent {
+            border-left-color: #28a745;
+        }
+        .activity-failed {
+            border-left-color: #dc3545;
+        }
+        .activity-pending {
+            border-left-color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Back Button -->
+        <div class="mb-3">
+            <a href="/dashboard" class="btn back-btn">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading progress overview...</p>
+        </div>
+
+        <!-- Content (Hidden until loaded) -->
+        <div id="contentArea" style="display: none;">
+            <!-- Sequence Info Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-1"><i class="fas fa-chart-line"></i> Sequence Progress Overview</h4>
+                    <p class="mb-0" id="sequenceInfo">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="row">
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-paper-plane"></i> Should Send</div>
+                        <div class="stat-number text-primary" id="totalShouldSend">0</div>
+                        <small class="text-muted">Total Messages</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-check-circle"></i> Sent</div>
+                        <div class="stat-number text-success" id="totalSent">0</div>
+                        <small class="text-muted" id="sentPercentage">0%</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-times-circle"></i> Failed</div>
+                        <div class="stat-number text-danger" id="totalFailed">0</div>
+                        <small class="text-muted" id="failedPercentage">0%</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-clock"></i> Remaining</div>
+                        <div class="stat-number text-warning" id="totalRemaining">0</div>
+                        <small class="text-muted" id="remainingPercentage">0%</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-users"></i> Total Leads</div>
+                        <div class="stat-number text-info" id="totalLeads">0</div>
+                        <small class="text-muted">Unique Recipients</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-percentage"></i> Success Rate</div>
+                        <div class="stat-number text-success" id="successRate">0%</div>
+                        <small class="text-muted">Sent vs Total</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overall Progress Bar -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="mb-3">Overall Progress</h6>
+                    <div class="progress progress-bar-custom">
+                        <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div class="row mt-3 text-center">
+                        <div class="col-4">
+                            <small class="text-muted">Sent: <strong id="progressSent">0%</strong></small>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Failed: <strong id="progressFailed">0%</strong></small>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Remaining: <strong id="progressRemaining">0%</strong></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Step Breakdown Table -->
+                <div class="col-lg-7">
+                    <div class="table-container">
+                        <h5 class="mb-3"><i class="fas fa-list-ol"></i> Step-wise Progress</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Step</th>
+                                        <th>Step Name</th>
+                                        <th class="text-center">Should Send</th>
+                                        <th class="text-center">Sent</th>
+                                        <th class="text-center">Failed</th>
+                                        <th class="text-center">Remaining</th>
+                                        <th class="text-center">Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stepTableBody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="col-lg-5">
+                    <div class="table-container">
+                        <h5 class="mb-3"><i class="fas fa-history"></i> Recent Activity (Last 100)</h5>
+                        <div style="max-height: 600px; overflow-y: auto;">
+                            <div id="recentActivityList">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Get sequence ID from URL
+        const urlPath = window.location.pathname;
+        const sequenceId = urlPath.split('/')[2];
+
+        // Fetch data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSequenceProgress();
+        });
+
+        async function loadSequenceProgress() {
+            try {
+                const response = await fetch(`/api/sequences/${sequenceId}/progress-new`);
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch progress data');
+                }
+
+                const data = await response.json();
+
+                // Hide loading, show content
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('contentArea').style.display = 'block';
+
+                // Populate sequence info
+                document.getElementById('sequenceInfo').textContent =
+                    `${data.sequence_name} - ${data.niche} - Status: ${data.status}`;
+
+                // Populate overall statistics
+                const shouldSend = data.overall_stats.should_send || 0;
+                const sent = data.overall_stats.sent || 0;
+                const failed = data.overall_stats.failed || 0;
+                const remaining = data.overall_stats.remaining || 0;
+                const totalLeads = data.overall_stats.total_leads || 0;
+
+                document.getElementById('totalShouldSend').textContent = shouldSend.toLocaleString();
+                document.getElementById('totalSent').textContent = sent.toLocaleString();
+                document.getElementById('totalFailed').textContent = failed.toLocaleString();
+                document.getElementById('totalRemaining').textContent = remaining.toLocaleString();
+                document.getElementById('totalLeads').textContent = totalLeads.toLocaleString();
+
+                // Calculate percentages
+                const sentPercent = shouldSend > 0 ? ((sent / shouldSend) * 100).toFixed(1) : 0;
+                const failedPercent = shouldSend > 0 ? ((failed / shouldSend) * 100).toFixed(1) : 0;
+                const remainingPercent = shouldSend > 0 ? ((remaining / shouldSend) * 100).toFixed(1) : 0;
+                const successRate = shouldSend > 0 ? ((sent / shouldSend) * 100).toFixed(1) : 0;
+
+                document.getElementById('sentPercentage').textContent = `${sentPercent}%`;
+                document.getElementById('failedPercentage').textContent = `${failedPercent}%`;
+                document.getElementById('remainingPercentage').textContent = `${remainingPercent}%`;
+                document.getElementById('successRate').textContent = `${successRate}%`;
+
+                // Update progress bar
+                document.getElementById('progressBar').style.width = `${sentPercent}%`;
+                document.getElementById('progressSent').textContent = `${sentPercent}%`;
+                document.getElementById('progressFailed').textContent = `${failedPercent}%`;
+                document.getElementById('progressRemaining').textContent = `${remainingPercent}%`;
+
+                // Populate step breakdown table
+                const stepTableBody = document.getElementById('stepTableBody');
+                stepTableBody.innerHTML = '';
+
+                if (data.step_breakdown && data.step_breakdown.length > 0) {
+                    data.step_breakdown.forEach(step => {
+                        const stepShouldSend = step.ShouldSend || 0;
+                        const stepSent = step.Sent || 0;
+                        const stepFailed = step.Failed || 0;
+                        const stepRemaining = step.Remaining || 0;
+                        const stepProgress = stepShouldSend > 0 ?
+                            ((stepSent / stepShouldSend) * 100).toFixed(1) : 0;
+
+                        const row = `
+                            <tr>
+                                <td><span class="badge bg-secondary">${step.StepNumber}</span></td>
+                                <td><strong>${step.StepName || 'Unnamed Step'}</strong></td>
+                                <td class="text-center"><span class="badge bg-primary">${stepShouldSend}</span></td>
+                                <td class="text-center"><span class="badge bg-success">${stepSent}</span></td>
+                                <td class="text-center"><span class="badge bg-danger">${stepFailed}</span></td>
+                                <td class="text-center"><span class="badge bg-warning text-dark">${stepRemaining}</span></td>
+                                <td class="text-center">
+                                    <div class="progress" style="height: 20px; min-width: 100px;">
+                                        <div class="progress-bar bg-success" role="progressbar"
+                                             style="width: ${stepProgress}%"
+                                             aria-valuenow="${stepProgress}"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                            ${stepProgress}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                        stepTableBody.innerHTML += row;
+                    });
+                } else {
+                    stepTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <i class="fas fa-info-circle"></i> No step data available
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                // Populate recent activity
+                const recentActivityList = document.getElementById('recentActivityList');
+                recentActivityList.innerHTML = '';
+
+                if (data.recent_activity && data.recent_activity.length > 0) {
+                    data.recent_activity.forEach(activity => {
+                        const statusClass = activity.Status === 'sent' ? 'activity-sent' :
+                                          activity.Status === 'failed' ? 'activity-failed' : 'activity-pending';
+                        const statusIcon = activity.Status === 'sent' ? 'fa-check-circle text-success' :
+                                         activity.Status === 'failed' ? 'fa-times-circle text-danger' :
+                                         'fa-clock text-warning';
+                        const errorMsg = activity.ErrorMessage ? `<br><small class="text-danger">${activity.ErrorMessage}</small>` : '';
+                        const date = new Date(activity.CreatedAt).toLocaleString();
+
+                        const item = `
+                            <div class="activity-item ${statusClass}">
+                                <div class="d-flex justify-content-between">
+                                    <strong><i class="fas ${statusIcon}"></i> ${activity.RecipientPhone}</strong>
+                                    <small class="text-muted">${date}</small>
+                                </div>
+                                <small class="text-muted">
+                                    ${activity.StepName} - ${activity.DeviceName}
+                                    ${errorMsg}
+                                </small>
+                            </div>
+                        `;
+                        recentActivityList.innerHTML += item;
+                    });
+                } else {
+                    recentActivityList.innerHTML = `
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-info-circle"></i> No recent activity
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading sequence progress:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Error loading progress: ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

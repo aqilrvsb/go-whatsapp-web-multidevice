@@ -134,7 +134,11 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Get("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	app.Post("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	app.Get("/api/sequences/:id/progress", rest.GetSequenceProgress)
-	
+	app.Get("/api/sequences/:id/report-new", rest.GetSequenceReportNew)
+	app.Get("/sequences/:id/report", rest.SequenceReportPage)
+	app.Get("/api/sequences/:id/progress-new", rest.GetSequenceProgressNew)
+	app.Get("/sequences/:id/progress", rest.SequenceProgressPage)
+
 	// Public routes (no auth required)
 	app.Get("/:device_name", rest.PublicDeviceDashboard)
 	app.Get("/api/public/device/:device_name/info", rest.GetPublicDeviceInfo)
@@ -6198,5 +6202,379 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 			"failed_send":     totalFailedSend,
 			"remaining_send":  totalRemainingSend,
 		},
+	})
+}
+
+// GetSequenceReportNew - NEW CLEAN API endpoint that matches Detail Sequences EXACTLY
+func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+
+	// Get session
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "No session token",
+		})
+	}
+
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Status(401).JSON(utils.ResponseData{
+			Status:  401,
+			Code:    "UNAUTHORIZED",
+			Message: "Invalid session",
+		})
+	}
+
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to connect to database",
+		})
+	}
+	defer db.Close()
+
+	// Get sequence info
+	sequenceRepo := repository.GetSequenceRepository()
+	sequence, err := sequenceRepo.GetSequenceByID(sequenceID)
+	if err != nil {
+		return c.Status(404).JSON(utils.ResponseData{
+			Status:  404,
+			Code:    "NOT_FOUND",
+			Message: "Sequence not found",
+		})
+	}
+
+	// EXACT same query as Detail Sequences
+	statsQuery := `
+		SELECT
+			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed'
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS failed,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS remaining,
+			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) AS total_leads
+		FROM broadcast_messages
+		WHERE sequence_id = ?
+	`
+
+	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
+	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
+	if err != nil {
+		log.Printf("Error getting sequence stats: %v", err)
+		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
+	}
+
+	// Calculate should send as sum
+	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
+
+	// Get total flows
+	var totalFlows int
+	err = db.QueryRow("SELECT COUNT(*) FROM sequence_steps WHERE sequence_id = ?", sequenceID).Scan(&totalFlows)
+	if err != nil {
+		totalFlows = 0
+	}
+
+	// Get device breakdown
+	deviceQuery := `
+		SELECT DISTINCT
+			bm.device_id,
+			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name
+		FROM broadcast_messages bm
+		LEFT JOIN user_devices ud ON ud.id = bm.device_id
+		WHERE bm.sequence_id = ?
+	`
+
+	deviceRows, err := db.Query(deviceQuery, sequenceID)
+	if err != nil {
+		return c.Status(500).JSON(utils.ResponseData{
+			Status:  500,
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to get devices",
+		})
+	}
+	defer deviceRows.Close()
+
+	devices := []map[string]interface{}{}
+	for deviceRows.Next() {
+		var deviceID, deviceName string
+		if err := deviceRows.Scan(&deviceID, &deviceName); err != nil {
+			continue
+		}
+
+		// Get stats for this device
+		deviceStatsQuery := `
+			SELECT
+				COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
+				COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '')
+					THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS done_send,
+				COUNT(DISTINCT CASE WHEN status = 'failed'
+					THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS failed
+			FROM broadcast_messages
+			WHERE sequence_id = ? AND device_id = ?
+		`
+
+		var deviceTotal, deviceDone, deviceFailed int
+		err = db.QueryRow(deviceStatsQuery, sequenceID, deviceID).Scan(&deviceTotal, &deviceDone, &deviceFailed)
+		if err != nil {
+			continue
+		}
+
+		deviceShouldSend := deviceDone + deviceFailed
+
+		devices = append(devices, map[string]interface{}{
+			"device_id":    deviceID,
+			"device_name":  deviceName,
+			"should_send":  deviceShouldSend,
+			"done_send":    deviceDone,
+			"failed_send":  deviceFailed,
+			"remaining":    deviceShouldSend - deviceDone - deviceFailed,
+		})
+	}
+
+	return c.JSON(utils.ResponseData{
+		Status:  200,
+		Code:    "SUCCESS",
+		Message: "Sequence report retrieved successfully",
+		Results: map[string]interface{}{
+			"sequence":      sequence,
+			"total_flows":   totalFlows,
+			"should_send":   totalShouldSend,
+			"done_send":     totalDoneSend,
+			"failed_send":   totalFailedSend,
+			"remaining":     totalRemainingSend,
+			"total_leads":   totalLeads,
+			"devices":       devices,
+		},
+	})
+}
+
+// SequenceReportPage - NEW HTML page for sequence report
+func (handler *App) SequenceReportPage(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+
+	// Get session
+	sessionToken := c.Cookies("session_token")
+	if sessionToken == "" {
+		return c.Redirect("/login")
+	}
+
+	userRepo := repository.GetUserRepository()
+	session, err := userRepo.GetSession(sessionToken)
+	if err != nil {
+		return c.Redirect("/login")
+	}
+
+	user, _ := userRepo.GetUserByID(session.UserID)
+
+	// Get sequence
+	sequenceRepo := repository.GetSequenceRepository()
+	sequence, err := sequenceRepo.GetSequenceByID(sequenceID)
+	if err != nil {
+		return c.Redirect("/sequences")
+	}
+
+	return c.Render("views/sequence_report_new", fiber.Map{
+		"Title":    "Sequence Report",
+		"Sequence": sequence,
+		"User":     user,
+	})
+}
+
+// GetSequenceProgressNew - NEW Progress Overview API (matches Detail Sequences exactly)
+func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+
+	// Get sequence details
+	var sequence struct {
+		ID           int64  `db:"id"`
+		SequenceName string `db:"sequence_name"`
+		Niche        string `db:"niche"`
+		Status       string `db:"status"`
+	}
+
+	err := handler.db.Get(&sequence, `
+		SELECT id, sequence_name, niche, status
+		FROM sequences
+		WHERE id = ?
+	`, sequenceID)
+
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch sequence details",
+		})
+	}
+
+	// EXACT same query as Detail Sequences to ensure data consistency
+	statsQuery := `
+		SELECT
+			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
+			COUNT(DISTINCT CASE WHEN status = 'sent' AND (error_message IS NULL OR error_message = '')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS done_send,
+			COUNT(DISTINCT CASE WHEN status = 'failed'
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS failed,
+			COUNT(DISTINCT CASE WHEN status IN ('pending', 'queued')
+				THEN CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id) END) AS remaining,
+			COUNT(DISTINCT CONCAT(recipient_phone, '|', device_id)) AS total_leads
+		FROM broadcast_messages
+		WHERE sequence_id = ?
+	`
+
+	var stats struct {
+		Total      int `db:"total"`
+		DoneSend   int `db:"done_send"`
+		Failed     int `db:"failed"`
+		Remaining  int `db:"remaining"`
+		TotalLeads int `db:"total_leads"`
+	}
+
+	err = handler.db.Get(&stats, statsQuery, sequenceID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch statistics",
+		})
+	}
+
+	// Get step-wise breakdown (same query pattern as Detail Sequences)
+	stepQuery := `
+		SELECT
+			ss.step_name,
+			ss.step_number,
+			COUNT(DISTINCT CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id)) AS should_send,
+			COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '')
+				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) AS sent,
+			COUNT(DISTINCT CASE WHEN bm.status = 'failed'
+				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) AS failed,
+			COUNT(DISTINCT CASE WHEN bm.status IN ('pending', 'queued')
+				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) AS remaining
+		FROM sequence_steps ss
+		LEFT JOIN broadcast_messages bm ON ss.id = bm.sequence_stepid
+		WHERE ss.sequence_id = ?
+		GROUP BY ss.id, ss.step_name, ss.step_number
+		ORDER BY ss.step_number
+	`
+
+	var stepBreakdown []struct {
+		StepName   string `db:"step_name"`
+		StepNumber int    `db:"step_number"`
+		ShouldSend int    `db:"should_send"`
+		Sent       int    `db:"sent"`
+		Failed     int    `db:"failed"`
+		Remaining  int    `db:"remaining"`
+	}
+
+	err = handler.db.Select(&stepBreakdown, stepQuery, sequenceID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch step breakdown",
+		})
+	}
+
+	// Get recent activity (last 100 messages)
+	activityQuery := `
+		SELECT
+			bm.recipient_phone,
+			bm.status,
+			bm.error_message,
+			bm.created_at,
+			ss.step_name,
+			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name
+		FROM broadcast_messages bm
+		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
+		LEFT JOIN user_devices ud ON bm.device_id = ud.id
+		WHERE bm.sequence_id = ?
+		ORDER BY bm.created_at DESC
+		LIMIT 100
+	`
+
+	var recentActivity []struct {
+		RecipientPhone string  `db:"recipient_phone"`
+		Status         string  `db:"status"`
+		ErrorMessage   *string `db:"error_message"`
+		CreatedAt      string  `db:"created_at"`
+		StepName       string  `db:"step_name"`
+		DeviceName     string  `db:"device_name"`
+	}
+
+	err = handler.db.Select(&recentActivity, activityQuery, sequenceID)
+	if err != nil {
+		// Non-critical, just log the error
+		recentActivity = []struct {
+			RecipientPhone string  `db:"recipient_phone"`
+			Status         string  `db:"status"`
+			ErrorMessage   *string `db:"error_message"`
+			CreatedAt      string  `db:"created_at"`
+			StepName       string  `db:"step_name"`
+			DeviceName     string  `db:"device_name"`
+		}{}
+	}
+
+	return c.JSON(fiber.Map{
+		"sequence_id":   sequence.ID,
+		"sequence_name": sequence.SequenceName,
+		"niche":         sequence.Niche,
+		"status":        sequence.Status,
+		"overall_stats": fiber.Map{
+			"should_send": stats.Total,
+			"sent":        stats.DoneSend,
+			"failed":      stats.Failed,
+			"remaining":   stats.Remaining,
+			"total_leads": stats.TotalLeads,
+		},
+		"step_breakdown":  stepBreakdown,
+		"recent_activity": recentActivity,
+	})
+}
+
+// SequenceProgressPage - NEW Progress Overview HTML page
+func (handler *App) SequenceProgressPage(c *fiber.Ctx) error {
+	user := c.Locals("user")
+	sequenceID := c.Params("id")
+
+	// Get sequence details for page context
+	var sequence struct {
+		ID           int64  `db:"id"`
+		SequenceName string `db:"sequence_name"`
+		Niche        string `db:"niche"`
+		Status       string `db:"status"`
+	}
+
+	err := handler.db.Get(&sequence, `
+		SELECT id, sequence_name, niche, status
+		FROM sequences
+		WHERE id = ?
+	`, sequenceID)
+
+	if err != nil {
+		return c.Status(404).SendString("Sequence not found")
+	}
+
+	return c.Render("views/sequence_progress_new", fiber.Map{
+		"Title":    "Sequence Progress",
+		"Sequence": sequence,
+		"User":     user,
 	})
 }

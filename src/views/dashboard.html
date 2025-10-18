@@ -6443,10 +6443,13 @@
                                                         </td>
                                                         <td>
                                                             <button class="btn btn-sm btn-outline-primary" onclick="window.open('/sequences/${sequence.id}', '_blank')" title="View Details">
-                                                                <i class="bi bi-eye"></i>
+                                                                <i class="bi bi-eye"></i> Details
                                                             </button>
-                                                            <button class="btn btn-sm btn-outline-success" onclick="showSequenceDeviceReport(${JSON.stringify(sequence).replace(/"/g, '&quot;')})" title="Device Report">
-                                                                <i class="bi bi-phone"></i> Report
+                                                            <button class="btn btn-sm btn-outline-info" onclick="window.open('/sequences/${sequence.id}/report', '_blank')" title="NEW Device Report (Accurate)">
+                                                                <i class="bi bi-phone"></i> Report NEW
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-warning" onclick="window.open('/sequences/${sequence.id}/progress', '_blank')" title="NEW Progress Overview (Accurate)">
+                                                                <i class="bi bi-chart-line"></i> Progress NEW
                                                             </button>
                                                         </td>
                                                     </tr>
