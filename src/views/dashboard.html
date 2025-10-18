@@ -6937,17 +6937,12 @@
             // Show loading state
             document.getElementById('deviceReportTableBody').innerHTML = '<tr><td colspan="7" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading device report...</td></tr>';
             
-            // Build URL with date filters
+            // Build URL WITHOUT date filters to match Detail Sequences behavior
+            // Device Report should show ALL data, not filtered by date
             let url = `/api/sequences/${sequence.id}/device-report`;
-            const params = new URLSearchParams();
-            
-            // Use the current date filters from the input fields
-            if (currentStartDate) params.append('start_date', currentStartDate);
-            if (currentEndDate) params.append('end_date', currentEndDate);
-            
-            if (params.toString()) {
-                url += '?' + params.toString();
-            }
+
+            // NOTE: Removed date filtering to match Detail Sequences table
+            // Both should show all-time data for consistency
             
             // Fetch device report data for sequence
             fetch(url, { credentials: 'include' })
@@ -7167,18 +7162,10 @@
                     });
             } else if (currentSequenceForReport) {
                 // Refresh sequence report
-                const currentStartDate = document.getElementById('sequenceStartDate').value;
-                const currentEndDate = document.getElementById('sequenceEndDate').value;
-                
+                // Build URL WITHOUT date filters to match Detail Sequences
                 let url = `/api/sequences/${currentSequenceForReport.id}/device-report`;
-                const params = new URLSearchParams();
-                
-                if (currentStartDate) params.append('start_date', currentStartDate);
-                if (currentEndDate) params.append('end_date', currentEndDate);
-                
-                if (params.toString()) {
-                    url += '?' + params.toString();
-                }
+
+                // NOTE: Removed date filtering to show all-time data
                 
                 fetch(url, { credentials: 'include' })
                     .then(response => response.json())
