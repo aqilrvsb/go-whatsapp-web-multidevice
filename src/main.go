@@ -8,8 +8,8 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/cmd"
 )
 
-// Force rebuild: 2025-08-10 v1.2.1-syntax-fix
-// This comment forces Go to recompile with updated embedded files including syntax fixes
+// Force rebuild: 2025-10-18 v1.2.2-fix-device-report-query
+// CRITICAL FIX: Device Report now uses same query as Detail Sequences (no date filters)
 
 //go:embed views/index.html
 var embedIndex embed.FS
