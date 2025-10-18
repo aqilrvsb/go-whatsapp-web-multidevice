@@ -6357,7 +6357,7 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"sequence_id":   sequence.ID,
-		"sequence_name": sequence.SequenceName,
+		"sequence_name": sequence.Name,
 		"niche":         sequence.Niche,
 		"status":        sequence.Status,
 		"overall_stats": fiber.Map{
@@ -6450,7 +6450,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	// Get sequence details
 	var sequenceName, niche, status string
 	err = db.QueryRow(`
-		SELECT sequence_name, niche, status
+		SELECT name, niche, status
 		FROM sequences
 		WHERE id = ?
 	`, sequenceID).Scan(&sequenceName, &niche, &status)
@@ -6631,7 +6631,7 @@ func (handler *App) SequenceProgressPage(c *fiber.Ctx) error {
 	var sequence Sequence
 	sequence.ID = sequenceID
 	err = db.QueryRow(`
-		SELECT sequence_name, niche, status
+		SELECT name, niche, status
 		FROM sequences
 		WHERE id = ?
 	`, sequenceID).Scan(&sequence.SequenceName, &sequence.Niche, &sequence.Status)
