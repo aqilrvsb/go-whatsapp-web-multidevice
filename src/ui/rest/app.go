@@ -6346,29 +6346,28 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		deviceShouldSend := deviceDone + deviceFailed
 
 		devices = append(devices, map[string]interface{}{
-			"device_id":    deviceID,
-			"device_name":  deviceName,
-			"should_send":  deviceShouldSend,
-			"done_send":    deviceDone,
-			"failed_send":  deviceFailed,
-			"remaining":    deviceShouldSend - deviceDone - deviceFailed,
+			"device_id":   deviceID,
+			"device_name": deviceName,
+			"should_send": deviceShouldSend,
+			"sent":        deviceDone,
+			"failed":      deviceFailed,
+			"remaining":   deviceShouldSend - deviceDone - deviceFailed,
 		})
 	}
 
-	return c.JSON(utils.ResponseData{
-		Status:  200,
-		Code:    "SUCCESS",
-		Message: "Sequence report retrieved successfully",
-		Results: map[string]interface{}{
-			"sequence":      sequence,
-			"total_flows":   totalFlows,
-			"should_send":   totalShouldSend,
-			"done_send":     totalDoneSend,
-			"failed_send":   totalFailedSend,
-			"remaining":     totalRemainingSend,
-			"total_leads":   totalLeads,
-			"devices":       devices,
+	return c.JSON(fiber.Map{
+		"sequence_id":   sequence.ID,
+		"sequence_name": sequence.SequenceName,
+		"niche":         sequence.Niche,
+		"status":        sequence.Status,
+		"overall_stats": fiber.Map{
+			"should_send": totalShouldSend,
+			"sent":        totalDoneSend,
+			"failed":      totalFailedSend,
+			"remaining":   totalRemainingSend,
+			"total_leads": totalLeads,
 		},
+		"device_breakdown": devices,
 	})
 }
 
