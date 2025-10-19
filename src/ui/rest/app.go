@@ -6868,21 +6868,21 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 						continue
 					}
 
-					// Check if there's a response in tbl_aitransaction within 5 hours
+					// Check if there's a response in tbl_aitransaction on the same DATE (ignoring time)
 					responseQuery := `
 						SELECT COUNT(*)
 						FROM tbl_aitransaction
 						WHERE prospect_num = ?
 						AND marketer_id = ?
-						AND STR_TO_DATE(date_prospect, '%Y-%m-%d %H:%i:%s')
-							BETWEEN ? AND DATE_ADD(?, INTERVAL 5 HOUR)
+						AND DATE(STR_TO_DATE(date_prospect, '%Y-%m-%d %H:%i:%s')) = DATE(?)
 					`
 
 					var count int
-					err = db2.QueryRow(responseQuery, recipientPhone, deviceName, scheduledAt, scheduledAt).Scan(&count)
+					err = db2.QueryRow(responseQuery, recipientPhone, deviceName, scheduledAt).Scan(&count)
 					if err == nil && count > 0 {
 						// Mark this prospect as having responded
 						responseMap[recipientPhone] = true
+						log.Printf("  -> Response found for %s on device %s", recipientPhone, deviceName)
 					}
 				}
 				messagesRows.Close()
