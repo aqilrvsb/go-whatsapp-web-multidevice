@@ -52,18 +52,18 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 	}
 	
 	// Step 2: Find all device+phone combinations and their highest day
-	// Group by device_id AND recipient_phone to track each device-lead pair separately
+	// Group by device_name AND recipient_phone to track each device-lead pair separately
 	leadsQuery := `
-		SELECT 
+		SELECT
 			bm.recipient_phone,
 			bm.recipient_name,
-			bm.device_id,
+			bm.device_name,
 			bm.user_id,
 			MAX(ss.day_number) as highest_day
 		FROM broadcast_messages bm
 		JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		WHERE bm.sequence_id = ?
-		GROUP BY bm.device_id, bm.recipient_phone, bm.recipient_name, bm.user_id
+		GROUP BY bm.device_name, bm.recipient_phone, bm.recipient_name, bm.user_id
 	`
 	
 	rows, err := s.db.Query(leadsQuery, sequenceID)
@@ -75,15 +75,15 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 	type leadProgress struct {
 		Phone      string
 		Name       string
-		DeviceID   string
+		DeviceName string
 		UserID     string
 		HighestDay int
 	}
-	
+
 	var leads []leadProgress
 	for rows.Next() {
 		var lead leadProgress
-		err := rows.Scan(&lead.Phone, &lead.Name, &lead.DeviceID, &lead.UserID, &lead.HighestDay)
+		err := rows.Scan(&lead.Phone, &lead.Name, &lead.DeviceName, &lead.UserID, &lead.HighestDay)
 		if err != nil {
 			logrus.Warnf("⚠️ Error scanning lead: %v", err)
 			continue
@@ -106,17 +106,17 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 	for _, lead := range leads {
 		// Skip if already up-to-date
 		if lead.HighestDay >= templateMaxDay {
-			logrus.Debugf("✅ Device %s + Phone %s already at day %d (template: %d) - skipping", 
-				lead.DeviceID[:8], lead.Phone, lead.HighestDay, templateMaxDay)
+			logrus.Debugf("✅ Device %s + Phone %s already at day %d (template: %d) - skipping",
+				lead.DeviceName, lead.Phone, lead.HighestDay, templateMaxDay)
 			continue
 		}
-		
+
 		// Calculate days to create
 		startFromDay := lead.HighestDay + 1
 		daysToCreate := templateMaxDay - lead.HighestDay
-		
-		logrus.Infof("📝 Device %s + Phone %s: Creating days %d to %d (%d messages)", 
-			lead.DeviceID[:8], lead.Phone, startFromDay, templateMaxDay, daysToCreate)
+
+		logrus.Infof("📝 Device %s + Phone %s: Creating days %d to %d (%d messages)",
+			lead.DeviceName, lead.Phone, startFromDay, templateMaxDay, daysToCreate)
 		
 		// Get steps from (highest_day + 1) to templateMaxDay
 		stepsQuery := `
@@ -171,18 +171,18 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 			// Double-check: Skip if this day already exists for this device+phone
 			var existingCount int
 			checkQuery := `
-				SELECT COUNT(*) 
+				SELECT COUNT(*)
 				FROM broadcast_messages bm
 				JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 				WHERE bm.sequence_id = ?
 				AND bm.recipient_phone = ?
-				AND bm.device_id = ?
+				AND bm.device_name = ?
 				AND ss.day_number = ?
 			`
-			err = s.db.QueryRow(checkQuery, sequenceID, lead.Phone, lead.DeviceID, step.DayNumber).Scan(&existingCount)
+			err = s.db.QueryRow(checkQuery, sequenceID, lead.Phone, lead.DeviceName, step.DayNumber).Scan(&existingCount)
 			if err == nil && existingCount > 0 {
-				logrus.Debugf("⏭️ Day %d already exists for device %s + phone %s - skipping", 
-					step.DayNumber, lead.DeviceID[:8], lead.Phone)
+				logrus.Debugf("⏭️ Day %d already exists for device %s + phone %s - skipping",
+					step.DayNumber, lead.DeviceName, lead.Phone)
 				continue
 			}
 			
@@ -196,7 +196,8 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 			msg := domainBroadcast.BroadcastMessage{
 				ID:             uuid.New().String(),
 				UserID:         lead.UserID,
-				DeviceID:       lead.DeviceID,
+				DeviceID:       lead.DeviceName, // Set DeviceID to device_name for consistency
+				DeviceName:     lead.DeviceName,
 				SequenceID:     &sequenceID,
 				SequenceStepID: &step.ID,
 				RecipientPhone: lead.Phone,
@@ -230,15 +231,15 @@ func (s *SequenceFlowUpdater) FlowUpdate(sequenceID string) (int, int, error) {
 			// Move to next day (add 24 hours)
 			scheduleDate = scheduleDate.Add(24 * time.Hour)
 			
-			logrus.Debugf("✅ Created Day %d for %s (device: %s) - scheduled for %v", 
-				step.DayNumber, lead.Phone, lead.DeviceID[:8], scheduleDate)
+			logrus.Debugf("✅ Created Day %d for %s (device: %s) - scheduled for %v",
+				step.DayNumber, lead.Phone, lead.DeviceName, scheduleDate)
 		}
 		stepRows.Close()
 		
 		if messagesCreatedForLead > 0 {
 			totalLeadsUpdated++
-			logrus.Infof("✅ Device %s + Phone %s: Created %d new messages (Days %d-%d)", 
-				lead.DeviceID[:8], lead.Phone, messagesCreatedForLead, startFromDay, startFromDay+messagesCreatedForLead-1)
+			logrus.Infof("✅ Device %s + Phone %s: Created %d new messages (Days %d-%d)",
+				lead.DeviceName, lead.Phone, messagesCreatedForLead, startFromDay, startFromDay+messagesCreatedForLead-1)
 		}
 	}
 	
