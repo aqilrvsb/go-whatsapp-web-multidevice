@@ -2370,17 +2370,22 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				WHERE sequence_id = ?`
 			
 			args := []interface{}{sequence.ID}
-			
-			if startDate != "" && endDate != "" {
-			query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
-			args = append(args, startDate, endDate)
-		} else if startDate != "" {
-			query += ` AND DATE(scheduled_at) >= ?`
-			args = append(args, startDate)
-		} else if endDate != "" {
-			query += ` AND DATE(scheduled_at) <= ?`
-			args = append(args, endDate)
-		}
+
+			// If no date filter provided, default to today
+			if startDate == "" && endDate == "" {
+				today := time.Now().Format("2006-01-02")
+				query += ` AND DATE(scheduled_at) = ?`
+				args = append(args, today)
+			} else if startDate != "" && endDate != "" {
+				query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+				args = append(args, startDate, endDate)
+			} else if startDate != "" {
+				query += ` AND DATE(scheduled_at) >= ?`
+				args = append(args, startDate)
+			} else if endDate != "" {
+				query += ` AND DATE(scheduled_at) <= ?`
+				args = append(args, endDate)
+			}
 			
 			err = db.QueryRow(query, args...).Scan(&shouldSend, &doneSend, &failedSend, &remainingSend, &totalLeads)
 			
@@ -2430,8 +2435,13 @@ func (handler *App) GetSequenceSummary(c *fiber.Ctx) error {
 				AND sequence_id IS NOT NULL`
 			
 			uniqueLeadsArgs := []interface{}{session.UserID}
-			
-			if startDate != "" && endDate != "" {
+
+			// If no date filter provided, default to today
+			if startDate == "" && endDate == "" {
+				today := time.Now().Format("2006-01-02")
+				uniqueLeadsQuery += ` AND DATE(scheduled_at) = ?`
+				uniqueLeadsArgs = append(uniqueLeadsArgs, today)
+			} else if startDate != "" && endDate != "" {
 				uniqueLeadsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 				uniqueLeadsArgs = append(uniqueLeadsArgs, startDate, endDate)
 			} else if startDate != "" {
@@ -6293,8 +6303,12 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	`
 	statsArgs := []interface{}{sequenceID}
 
-	// Apply date filters if provided
-	if startDate != "" && endDate != "" {
+	// Apply date filters if provided, default to today if no filter
+	if startDate == "" && endDate == "" {
+		today := time.Now().Format("2006-01-02")
+		statsQuery += ` AND DATE(scheduled_at) = ?`
+		statsArgs = append(statsArgs, today)
+	} else if startDate != "" && endDate != "" {
 		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 		statsArgs = append(statsArgs, startDate, endDate)
 	} else if startDate != "" {
@@ -6366,8 +6380,12 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		`
 		deviceStatsArgs := []interface{}{sequenceID, deviceID}
 
-		// Apply same date filters to device stats
-		if startDate != "" && endDate != "" {
+		// Apply same date filters to device stats, default to today
+		if startDate == "" && endDate == "" {
+			today := time.Now().Format("2006-01-02")
+			deviceStatsQuery += ` AND DATE(scheduled_at) = ?`
+			deviceStatsArgs = append(deviceStatsArgs, today)
+		} else if startDate != "" && endDate != "" {
 			deviceStatsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 			deviceStatsArgs = append(deviceStatsArgs, startDate, endDate)
 		} else if startDate != "" {
@@ -6529,8 +6547,12 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	`
 	statsArgs := []interface{}{sequenceID}
 
-	// Apply date filters if provided
-	if startDate != "" && endDate != "" {
+	// Apply date filters if provided, default to today if no filter
+	if startDate == "" && endDate == "" {
+		today := time.Now().Format("2006-01-02")
+		statsQuery += ` AND DATE(scheduled_at) = ?`
+		statsArgs = append(statsArgs, today)
+	} else if startDate != "" && endDate != "" {
 		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 		statsArgs = append(statsArgs, startDate, endDate)
 	} else if startDate != "" {
@@ -6572,8 +6594,12 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	`
 	stepArgs := []interface{}{sequenceID}
 
-	// Apply date filters to step breakdown
-	if startDate != "" && endDate != "" {
+	// Apply date filters to step breakdown, default to today
+	if startDate == "" && endDate == "" {
+		today := time.Now().Format("2006-01-02")
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.scheduled_at) = ?)`
+		stepArgs = append(stepArgs, today)
+	} else if startDate != "" && endDate != "" {
 		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.scheduled_at) BETWEEN ? AND ?)`
 		stepArgs = append(stepArgs, startDate, endDate)
 	} else if startDate != "" {
@@ -6632,8 +6658,12 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	`
 	activityArgs := []interface{}{sequenceID}
 
-	// Apply date filters to activity
-	if startDate != "" && endDate != "" {
+	// Apply date filters to activity, default to today
+	if startDate == "" && endDate == "" {
+		today := time.Now().Format("2006-01-02")
+		activityQuery += ` AND DATE(bm.scheduled_at) = ?`
+		activityArgs = append(activityArgs, today)
+	} else if startDate != "" && endDate != "" {
 		activityQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
 		activityArgs = append(activityArgs, startDate, endDate)
 	} else if startDate != "" {
