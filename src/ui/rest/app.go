@@ -6346,6 +6346,8 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 			COALESCE(MAX(bm.device_name), 'Unknown Device') as device_name
 		FROM broadcast_messages bm
 		WHERE bm.sequence_id = ?
+		AND bm.device_name IS NOT NULL
+		AND bm.device_name != ''
 		GROUP BY bm.device_id
 	`
 
