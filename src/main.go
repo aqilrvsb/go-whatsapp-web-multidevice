@@ -8,9 +8,10 @@ import (
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/cmd"
 )
 
-// Force rebuild: 2025-10-18 v1.3.0-new-accurate-pages
-// NEW FEATURE: Created 2 brand new pages (Report & Progress) with accurate data matching Detail Sequences
-// Both new pages use EXACT same SQL query as Detail Sequences to ensure 100% data consistency
+// Force rebuild: 2025-10-19 v1.3.1-scheduled-at-fix
+// CRITICAL FIX: Standardized all pages to use scheduled_at for date filtering (not created_at)
+// All 3 pages now show matching numbers: Detail Sequences, Report NEW, Progress NEW
+// scheduled_at = actual send date, created_at = record creation date
 
 //go:embed views/index.html
 var embedIndex embed.FS

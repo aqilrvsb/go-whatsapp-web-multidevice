@@ -27,7 +27,8 @@
       "Bash(c:UsersaqilzDocumentsgo-whatsapp-web-multidevice-mainbuild_fix_push.bat)",
       "Bash(cmd.exe /c \"c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\build_fix_push.bat\")",
       "Bash(powershell -Command \"cd ''c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\src''; $env:CGO_ENABLED=''0''; $env:GOOS=''linux''; $env:GOARCH=''amd64''; go build -ldflags=''-s -w'' -o ../whatsapp main.go\")",
-      "Bash(powershell -Command \"cd ''c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\src''; $env:CGO_ENABLED=''0''; $env:GOOS=''linux''; $env:GOARCH=''amd64''; & go build -ldflags=''-s -w'' -o ../whatsapp main.go\")"
+      "Bash(powershell -Command \"cd ''c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\src''; $env:CGO_ENABLED=''0''; $env:GOOS=''linux''; $env:GOARCH=''amd64''; & go build -ldflags=''-s -w'' -o ../whatsapp main.go\")",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []
