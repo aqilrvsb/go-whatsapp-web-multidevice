@@ -6789,6 +6789,10 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 
 	// Calculate responses for each step from AI transaction database
 	mysqlURI2 := os.Getenv("MYSQL_URI2")
+	log.Printf("=== RESPONSE TRACKING DEBUG ===")
+	log.Printf("MYSQL_URI2 environment variable: %s", mysqlURI2)
+	log.Printf("Is empty: %v", mysqlURI2 == "")
+
 	if mysqlURI2 != "" {
 		// Convert mysql:// URL to DSN format if needed
 		if strings.HasPrefix(mysqlURI2, "mysql://") {
