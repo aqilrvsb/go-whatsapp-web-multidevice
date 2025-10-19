@@ -98,25 +98,6 @@
             width: 3rem;
             height: 3rem;
         }
-        .activity-item {
-            border-left: 3px solid #dee2e6;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            background: #f8f9fa;
-        }
-        .activity-item:hover {
-            background: #e9ecef;
-        }
-        .activity-sent {
-            border-left-color: #28a745;
-        }
-        .activity-failed {
-            border-left-color: #dc3545;
-        }
-        .activity-pending {
-            border-left-color: #ffc107;
-        }
     </style>
 </head>
 <body>
@@ -241,46 +222,30 @@
                 </div>
             </div>
 
-            <div class="row">
-                <!-- Step Breakdown Table -->
-                <div class="col-lg-7">
-                    <div class="table-container">
-                        <h5 class="mb-3"><i class="fas fa-list-ol"></i> Step-wise Progress</h5>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Step</th>
-                                        <th>Step Name</th>
-                                        <th>Image</th>
-                                        <th class="text-center">Should Send</th>
-                                        <th class="text-center">Sent</th>
-                                        <th class="text-center">Sent %</th>
-                                        <th class="text-center">Failed</th>
-                                        <th class="text-center">Failed %</th>
-                                        <th class="text-center">Remaining</th>
-                                        <th class="text-center">Remaining %</th>
-                                        <th class="text-center">Progress</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="stepTableBody">
-                                    <!-- Populated by JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="col-lg-5">
-                    <div class="table-container">
-                        <h5 class="mb-3"><i class="fas fa-history"></i> Recent Activity (Last 100)</h5>
-                        <div style="max-height: 600px; overflow-y: auto;">
-                            <div id="recentActivityList">
-                                <!-- Populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
+            <!-- Step Breakdown Table -->
+            <div class="table-container">
+                <h5 class="mb-3"><i class="fas fa-list-ol"></i> Step-wise Progress</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Step</th>
+                                <th>Step Name</th>
+                                <th>Image</th>
+                                <th class="text-center">Should Send</th>
+                                <th class="text-center">Sent</th>
+                                <th class="text-center">Sent %</th>
+                                <th class="text-center">Failed</th>
+                                <th class="text-center">Failed %</th>
+                                <th class="text-center">Remaining</th>
+                                <th class="text-center">Remaining %</th>
+                                <th class="text-center">Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stepTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -449,42 +414,6 @@
                                 <i class="fas fa-info-circle"></i> No step data available
                             </td>
                         </tr>
-                    `;
-                }
-
-                // Populate recent activity
-                const recentActivityList = document.getElementById('recentActivityList');
-                recentActivityList.innerHTML = '';
-
-                if (data.recent_activity && data.recent_activity.length > 0) {
-                    data.recent_activity.forEach(activity => {
-                        const statusClass = activity.Status === 'sent' ? 'activity-sent' :
-                                          activity.Status === 'failed' ? 'activity-failed' : 'activity-pending';
-                        const statusIcon = activity.Status === 'sent' ? 'fa-check-circle text-success' :
-                                         activity.Status === 'failed' ? 'fa-times-circle text-danger' :
-                                         'fa-clock text-warning';
-                        const errorMsg = activity.ErrorMessage ? `<br><small class="text-danger">${activity.ErrorMessage}</small>` : '';
-                        const date = new Date(activity.CreatedAt).toLocaleString();
-
-                        const item = `
-                            <div class="activity-item ${statusClass}">
-                                <div class="d-flex justify-content-between">
-                                    <strong><i class="fas ${statusIcon}"></i> ${activity.RecipientPhone}</strong>
-                                    <small class="text-muted">${date}</small>
-                                </div>
-                                <small class="text-muted">
-                                    ${activity.StepName} - ${activity.DeviceName}
-                                    ${errorMsg}
-                                </small>
-                            </div>
-                        `;
-                        recentActivityList.innerHTML += item;
-                    });
-                } else {
-                    recentActivityList.innerHTML = `
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-info-circle"></i> No recent activity
-                        </div>
                     `;
                 }
 
