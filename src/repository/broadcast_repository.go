@@ -90,21 +90,20 @@ func (r *BroadcastRepository) QueueMessage(msg domainBroadcast.BroadcastMessage)
 		// Still need to fetch device_name
 		err := r.db.QueryRow("SELECT device_name FROM user_devices WHERE id = ?", msg.DeviceID).Scan(&deviceName)
 		if err != nil {
-			// If device_name not found, use empty string (don't fail the insert)
-			// This is OK for platform devices (Whacenter/Wablas) that don't need device_name
-			logrus.Warnf("Could not fetch device_name for device %s: %v", msg.DeviceID, err)
-			deviceName = ""
+			// If device_name not found, use device_id as fallback
+			// This is for platform devices (Whacenter/Wablas)
+			logrus.Infof("Device %s not found in user_devices, using device_id as device_name (platform device)", msg.DeviceID)
+			deviceName = msg.DeviceID
 		}
 	} else {
 		// Try to fetch user_id and device_name from user_devices
 		err := r.db.QueryRow("SELECT user_id, device_name FROM user_devices WHERE id = ?", msg.DeviceID).Scan(&userID, &deviceName)
 		if err != nil {
 			// PLATFORM FIX: If device not found in user_devices, it might be a platform device
-			// For platform devices (Whacenter/Wablas), device_name is optional
-			// Log warning but don't fail - allow the insert to continue
-			logrus.Warnf("Could not fetch user_id/device_name for device %s: %v - continuing with empty values for platform device", msg.DeviceID, err)
+			// For platform devices (Whacenter/Wablas), use device_id as device_name
+			logrus.Infof("Device %s not found in user_devices, using device_id as device_name (platform device)", msg.DeviceID)
 			userID = ""
-			deviceName = ""
+			deviceName = msg.DeviceID
 			// Don't return error - continue with insert
 		}
 	}
