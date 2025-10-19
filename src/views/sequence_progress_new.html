@@ -199,6 +199,20 @@
                         <small class="text-muted">Sent vs Total</small>
                     </div>
                 </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-reply"></i> Total Response</div>
+                        <div class="stat-number text-primary" id="totalResponse">0</div>
+                        <small class="text-muted">Total Replies</small>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="stat-card text-center">
+                        <div class="stat-label"><i class="fas fa-chart-line"></i> Response %</div>
+                        <div class="stat-number text-success" id="responseRate">0%</div>
+                        <small class="text-muted">Response vs Sent</small>
+                    </div>
+                </div>
             </div>
 
             <!-- Overall Progress Bar -->
@@ -348,6 +362,21 @@
                 document.getElementById('failedPercentage').textContent = `${failedPercent}%`;
                 document.getElementById('remainingPercentage').textContent = `${remainingPercent}%`;
                 document.getElementById('successRate').textContent = `${successRate}%`;
+
+                // Calculate total responses from all steps
+                let totalResponses = 0;
+                if (data.step_breakdown && data.step_breakdown.length > 0) {
+                    data.step_breakdown.forEach(step => {
+                        totalResponses += (step.TotalResponses || 0);
+                    });
+                }
+
+                // Calculate response rate
+                const responseRate = sent > 0 ? ((totalResponses / sent) * 100).toFixed(1) : 0;
+
+                // Update response stats
+                document.getElementById('totalResponse').textContent = totalResponses.toLocaleString();
+                document.getElementById('responseRate').textContent = `${responseRate}%`;
 
                 // Update progress bar
                 document.getElementById('progressBar').style.width = `${sentPercent}%`;
