@@ -6343,9 +6343,8 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	deviceQuery := `
 		SELECT
 			bm.device_id,
-			COALESCE(MAX(ud.device_name), MAX(bm.device_name), 'Unknown Device') as device_name
+			COALESCE(MAX(bm.device_name), 'Unknown Device') as device_name
 		FROM broadcast_messages bm
-		LEFT JOIN user_devices ud ON ud.id = bm.device_id
 		WHERE bm.sequence_id = ?
 		GROUP BY bm.device_id
 	`
@@ -6650,10 +6649,9 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			bm.error_message,
 			bm.created_at,
 			COALESCE(ss.step_name, '') as step_name,
-			COALESCE(ud.device_name, bm.device_name, 'Unknown Device') as device_name
+			COALESCE(bm.device_name, 'Unknown Device') as device_name
 		FROM broadcast_messages bm
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
-		LEFT JOIN user_devices ud ON bm.device_id = ud.id
 		WHERE bm.sequence_id = ?
 	`
 	activityArgs := []interface{}{sequenceID}
