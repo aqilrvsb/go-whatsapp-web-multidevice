@@ -6753,6 +6753,8 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	}
 
 	var stepBreakdown []map[string]interface{}
+	stepIDMap := make(map[int]int) // Map step_number to index in stepBreakdown
+
 	for rows.Next() {
 		var stepName string
 		var stepNumber int
@@ -6765,12 +6767,13 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		}
 
 		step := map[string]interface{}{
-			"StepName":   stepName,
-			"StepNumber": stepNumber,
-			"ShouldSend": shouldSend,
-			"Sent":       sent,
-			"Failed":     failed,
-			"Remaining":  remaining,
+			"StepName":       stepName,
+			"StepNumber":     stepNumber,
+			"ShouldSend":     shouldSend,
+			"Sent":           sent,
+			"Failed":         failed,
+			"Remaining":      remaining,
+			"TotalResponses": 0, // Will be calculated below
 		}
 
 		// Add MediaURL as string or null
@@ -6780,7 +6783,74 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			step["MediaURL"] = nil
 		}
 
+		stepIDMap[stepNumber] = len(stepBreakdown)
 		stepBreakdown = append(stepBreakdown, step)
+	}
+
+	// Calculate responses for each step from AI transaction database
+	mysqlURI2 := os.Getenv("MYSQL_URI2")
+	if mysqlURI2 != "" {
+		// Convert mysql:// URL to DSN format if needed
+		if strings.HasPrefix(mysqlURI2, "mysql://") {
+			mysqlURI2 = strings.TrimPrefix(mysqlURI2, "mysql://")
+			parts := strings.Split(mysqlURI2, "@")
+			if len(parts) == 2 {
+				userPass := parts[0]
+				hostDb := parts[1]
+				mysqlURI2 = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+			}
+		}
+
+		db2, err := sql.Open("mysql", mysqlURI2)
+		if err == nil {
+			defer db2.Close()
+
+			// For each step, calculate responses
+			for i, step := range stepBreakdown {
+				stepNumber := step["StepNumber"].(int)
+
+				// Query to count responses within 1 hour of scheduled_at
+				responseQuery := `
+					SELECT COUNT(DISTINCT ai.prospect_num)
+					FROM tbl_aitransaction ai
+					INNER JOIN broadcast_messages bm ON
+						bm.recipient_phone = ai.prospect_num AND
+						bm.device_name = ai.marketer_id
+					WHERE bm.sequence_id = ?
+					AND bm.status = 'sent'
+					AND DATE(STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) = DATE(bm.scheduled_at)
+					AND TIMESTAMPDIFF(SECOND, bm.scheduled_at, STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) BETWEEN 0 AND 3600
+				`
+				responseArgs := []interface{}{sequenceID}
+
+				// Apply same date filters
+				if startDate == "" && endDate == "" {
+					today := time.Now().Format("2006-01-02")
+					responseQuery += ` AND DATE(bm.scheduled_at) = ?`
+					responseArgs = append(responseArgs, today)
+				} else if startDate != "" && endDate != "" {
+					responseQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
+					responseArgs = append(responseArgs, startDate, endDate)
+				} else if startDate != "" {
+					responseQuery += ` AND DATE(bm.scheduled_at) >= ?`
+					responseArgs = append(responseArgs, startDate)
+				} else if endDate != "" {
+					responseQuery += ` AND DATE(bm.scheduled_at) <= ?`
+					responseArgs = append(responseArgs, endDate)
+				}
+
+				var totalResponses int
+				err = db2.QueryRow(responseQuery, responseArgs...).Scan(&totalResponses)
+				if err != nil {
+					log.Printf("Error counting responses for step %d: %v", stepNumber, err)
+					totalResponses = 0
+				}
+
+				stepBreakdown[i]["TotalResponses"] = totalResponses
+			}
+		} else {
+			log.Printf("Could not connect to MYSQL_URI2: %v", err)
+		}
 	}
 
 	// Get recent activity with date filtering (last 100 messages)
