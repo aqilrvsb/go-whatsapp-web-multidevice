@@ -135,6 +135,7 @@ func InitRestApp(app *fiber.App, service domainApp.IAppUsecase) App {
 	app.Post("/api/sequences/:id/update-pending-messages", rest.UpdateSequencePendingMessages)
 	app.Get("/api/sequences/:id/progress", rest.GetSequenceProgress)
 	app.Get("/api/sequences/:id/report-new", rest.GetSequenceReportNew)
+	app.Get("/api/sequences/:id/leads", rest.GetSequenceLeads)
 	app.Get("/sequences/:id/report", rest.SequenceReportPage)
 	app.Get("/api/sequences/:id/progress-new", rest.GetSequenceProgressNew)
 	app.Get("/sequences/:id/progress", rest.SequenceProgressPage)
@@ -6429,6 +6430,122 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		},
 		"device_breakdown": devices,
 	})
+}
+
+// GetSequenceLeads - API endpoint to get leads by device and status
+func (handler *App) GetSequenceLeads(c *fiber.Ctx) error {
+	sequenceID := c.Params("id")
+	deviceID := c.Query("device_id")
+	statusFilter := c.Query("status_filter")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	// Validate required parameters
+	if sequenceID == "" || deviceID == "" || statusFilter == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "sequence_id, device_id, and status_filter are required",
+		})
+	}
+
+	// Get MySQL connection
+	mysqlURI := os.Getenv("MYSQL_URI")
+	if mysqlURI == "" {
+		mysqlURI = os.Getenv("DB_URI")
+	}
+
+	if strings.HasPrefix(mysqlURI, "mysql://") {
+		mysqlURI = strings.TrimPrefix(mysqlURI, "mysql://")
+		parts := strings.Split(mysqlURI, "@")
+		if len(parts) == 2 {
+			userPass := parts[0]
+			hostDb := parts[1]
+			mysqlURI = userPass + "@tcp(" + strings.Replace(hostDb, "/", ")/", 1) + "?parseTime=true&charset=utf8mb4"
+		}
+	}
+
+	db, err := sql.Open("mysql", mysqlURI)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to connect to database",
+		})
+	}
+	defer db.Close()
+
+	// Build query based on status filter
+	query := `
+		SELECT DISTINCT
+			recipient_phone as phone,
+			recipient_name as name,
+			status,
+			error_message
+		FROM broadcast_messages
+		WHERE sequence_id = ? AND device_id = ?
+	`
+	args := []interface{}{sequenceID, deviceID}
+
+	// Add status filter
+	if statusFilter == "sent" {
+		query += ` AND status = 'sent' AND (error_message IS NULL OR error_message = '')`
+	} else if statusFilter == "failed" {
+		query += ` AND status = 'failed'`
+	} else if statusFilter == "remaining" {
+		query += ` AND status IN ('pending', 'queued')`
+	}
+	// If 'all', no additional status filter
+
+	// Apply date filters with default to today
+	if startDate == "" && endDate == "" {
+		today := time.Now().Format("2006-01-02")
+		query += ` AND DATE(scheduled_at) = ?`
+		args = append(args, today)
+	} else if startDate != "" && endDate != "" {
+		query += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+		args = append(args, startDate, endDate)
+	} else if startDate != "" {
+		query += ` AND DATE(scheduled_at) >= ?`
+		args = append(args, startDate)
+	} else if endDate != "" {
+		query += ` AND DATE(scheduled_at) <= ?`
+		args = append(args, endDate)
+	}
+
+	query += ` ORDER BY recipient_phone LIMIT 1000`
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		log.Printf("Error querying leads: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch leads",
+		})
+	}
+	defer rows.Close()
+
+	leads := []map[string]interface{}{}
+	for rows.Next() {
+		var phone, name, status string
+		var errorMessage sql.NullString
+
+		if err := rows.Scan(&phone, &name, &status, &errorMessage); err != nil {
+			log.Printf("Error scanning lead: %v", err)
+			continue
+		}
+
+		lead := map[string]interface{}{
+			"phone":  phone,
+			"name":   name,
+			"status": status,
+		}
+
+		if errorMessage.Valid {
+			lead["error_message"] = errorMessage.String
+		} else {
+			lead["error_message"] = ""
+		}
+
+		leads = append(leads, lead)
+	}
+
+	return c.JSON(leads)
 }
 
 // SequenceReportPage - NEW HTML page for sequence report

@@ -217,8 +217,11 @@
                                 <th>Device Name</th>
                                 <th class="text-center">Should Send</th>
                                 <th class="text-center">Sent</th>
+                                <th class="text-center">Sent %</th>
                                 <th class="text-center">Failed</th>
+                                <th class="text-center">Failed %</th>
                                 <th class="text-center">Remaining</th>
+                                <th class="text-center">Remaining %</th>
                                 <th class="text-center">Progress</th>
                             </tr>
                         </thead>
@@ -226,6 +229,43 @@
                             <!-- Populated by JavaScript -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lead Details Modal -->
+    <div class="modal fade" id="leadDetailsModal" tabindex="-1" aria-labelledby="leadDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="leadDetailsModalLabel">Lead Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="leadDetailsLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div id="leadDetailsContent" style="display: none;">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Phone Number</th>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>Error Message</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leadDetailsTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -342,13 +382,41 @@
                         const deviceProgress = deviceShouldSend > 0 ?
                             ((deviceSent / deviceShouldSend) * 100).toFixed(1) : 0;
 
+                        // Calculate percentages
+                        const sentPercent = deviceShouldSend > 0 ? ((deviceSent / deviceShouldSend) * 100).toFixed(1) : 0;
+                        const failedPercent = deviceShouldSend > 0 ? ((deviceFailed / deviceShouldSend) * 100).toFixed(1) : 0;
+                        const remainingPercent = deviceShouldSend > 0 ? ((deviceRemaining / deviceShouldSend) * 100).toFixed(1) : 0;
+
                         const row = `
                             <tr>
                                 <td><strong>${device.device_name || 'Unknown Device'}</strong></td>
-                                <td class="text-center"><span class="badge bg-primary">${deviceShouldSend}</span></td>
-                                <td class="text-center"><span class="badge bg-success">${deviceSent}</span></td>
-                                <td class="text-center"><span class="badge bg-danger">${deviceFailed}</span></td>
-                                <td class="text-center"><span class="badge bg-warning text-dark">${deviceRemaining}</span></td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary" style="cursor: pointer;"
+                                          onclick="showLeadDetails('${device.device_id}', 'all', '${device.device_name}')">
+                                        ${deviceShouldSend}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-success" style="cursor: pointer;"
+                                          onclick="showLeadDetails('${device.device_id}', 'sent', '${device.device_name}')">
+                                        ${deviceSent}
+                                    </span>
+                                </td>
+                                <td class="text-center"><small class="text-muted">${sentPercent}%</small></td>
+                                <td class="text-center">
+                                    <span class="badge bg-danger" style="cursor: pointer;"
+                                          onclick="showLeadDetails('${device.device_id}', 'failed', '${device.device_name}')">
+                                        ${deviceFailed}
+                                    </span>
+                                </td>
+                                <td class="text-center"><small class="text-muted">${failedPercent}%</small></td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning text-dark" style="cursor: pointer;"
+                                          onclick="showLeadDetails('${device.device_id}', 'remaining', '${device.device_name}')">
+                                        ${deviceRemaining}
+                                    </span>
+                                </td>
+                                <td class="text-center"><small class="text-muted">${remainingPercent}%</small></td>
                                 <td class="text-center">
                                     <div class="progress" style="height: 20px; min-width: 100px;">
                                         <div class="progress-bar bg-success" role="progressbar"
@@ -367,7 +435,7 @@
                 } else {
                     deviceTableBody.innerHTML = `
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="9" class="text-center text-muted py-4">
                                 <i class="fas fa-info-circle"></i> No device data available
                             </td>
                         </tr>
@@ -382,6 +450,86 @@
                         Error loading report: ${error.message}
                     </div>
                 `;
+            }
+        }
+
+        // Show lead details modal
+        async function showLeadDetails(deviceId, statusFilter, deviceName) {
+            // Open modal
+            const modal = new bootstrap.Modal(document.getElementById('leadDetailsModal'));
+            document.getElementById('leadDetailsModalLabel').textContent =
+                `Leads - ${deviceName} - ${statusFilter.toUpperCase()}`;
+
+            // Show loading, hide content
+            document.getElementById('leadDetailsLoading').style.display = 'block';
+            document.getElementById('leadDetailsContent').style.display = 'none';
+
+            modal.show();
+
+            try {
+                // Build API URL
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                const params = new URLSearchParams();
+                params.append('device_id', deviceId);
+                params.append('status_filter', statusFilter);
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+
+                const apiUrl = `/api/sequences/${sequenceId}/leads?${params.toString()}`;
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch lead details');
+                }
+
+                const leads = await response.json();
+
+                // Hide loading, show content
+                document.getElementById('leadDetailsLoading').style.display = 'none';
+                document.getElementById('leadDetailsContent').style.display = 'block';
+
+                // Populate table
+                const tableBody = document.getElementById('leadDetailsTableBody');
+                tableBody.innerHTML = '';
+
+                if (leads && leads.length > 0) {
+                    leads.forEach(lead => {
+                        const row = `
+                            <tr>
+                                <td>${lead.phone}</td>
+                                <td>${lead.name || '-'}</td>
+                                <td>
+                                    <span class="badge ${lead.status === 'sent' ? 'bg-success' : lead.status === 'failed' ? 'bg-danger' : 'bg-warning'}">
+                                        ${lead.status}
+                                    </span>
+                                </td>
+                                <td><small class="text-muted">${lead.error_message || '-'}</small></td>
+                            </tr>
+                        `;
+                        tableBody.innerHTML += row;
+                    });
+                } else {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">
+                                No leads found
+                            </td>
+                        </tr>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Error loading lead details:', error);
+                document.getElementById('leadDetailsLoading').style.display = 'none';
+                document.getElementById('leadDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Error loading leads: ${error.message}
+                    </div>
+                `;
+                document.getElementById('leadDetailsContent').style.display = 'block';
             }
         }
     </script>
