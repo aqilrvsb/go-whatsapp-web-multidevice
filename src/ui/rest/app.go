@@ -6699,6 +6699,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		SELECT
 			COALESCE(ss.content, CONCAT('Day ', ss.day_number)) as step_name,
 			ss.day_number,
+			ss.media_url,
 			COUNT(DISTINCT CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id)) AS should_send,
 			COUNT(DISTINCT CASE WHEN bm.status = 'sent' AND (bm.error_message IS NULL OR bm.error_message = '')
 				THEN CONCAT(bm.sequence_stepid, '|', bm.recipient_phone, '|', bm.device_id) END) AS sent,
@@ -6729,7 +6730,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	}
 
 	stepQuery += `
-		GROUP BY ss.id, ss.day_number, ss.content
+		GROUP BY ss.id, ss.day_number, ss.content, ss.media_url
 		ORDER BY ss.day_number
 	`
 
@@ -6744,6 +6745,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	type StepBreakdown struct {
 		StepName   string
 		StepNumber int
+		MediaURL   sql.NullString
 		ShouldSend int
 		Sent       int
 		Failed     int
@@ -6753,7 +6755,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	var stepBreakdown []StepBreakdown
 	for rows.Next() {
 		var step StepBreakdown
-		if err := rows.Scan(&step.StepName, &step.StepNumber, &step.ShouldSend, &step.Sent, &step.Failed, &step.Remaining); err != nil {
+		if err := rows.Scan(&step.StepName, &step.StepNumber, &step.MediaURL, &step.ShouldSend, &step.Sent, &step.Failed, &step.Remaining); err != nil {
 			log.Printf("Error scanning step: %v", err)
 			continue
 		}

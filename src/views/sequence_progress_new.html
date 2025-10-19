@@ -252,10 +252,14 @@
                                     <tr>
                                         <th>Step</th>
                                         <th>Step Name</th>
+                                        <th>Image</th>
                                         <th class="text-center">Should Send</th>
                                         <th class="text-center">Sent</th>
+                                        <th class="text-center">Sent %</th>
                                         <th class="text-center">Failed</th>
+                                        <th class="text-center">Failed %</th>
                                         <th class="text-center">Remaining</th>
+                                        <th class="text-center">Remaining %</th>
                                         <th class="text-center">Progress</th>
                                     </tr>
                                 </thead>
@@ -397,14 +401,30 @@
                         const stepProgress = stepShouldSend > 0 ?
                             ((stepSent / stepShouldSend) * 100).toFixed(1) : 0;
 
+                        // Calculate percentages
+                        const sentPercent = stepShouldSend > 0 ? ((stepSent / stepShouldSend) * 100).toFixed(1) : 0;
+                        const failedPercent = stepShouldSend > 0 ? ((stepFailed / stepShouldSend) * 100).toFixed(1) : 0;
+                        const remainingPercent = stepShouldSend > 0 ? ((stepRemaining / stepShouldSend) * 100).toFixed(1) : 0;
+
+                        // Display image if available
+                        let imageHTML = '-';
+                        if (step.MediaURL) {
+                            imageHTML = `<img src="${step.MediaURL}" alt="Step media" style="max-width: 100px; max-height: 100px; border-radius: 5px; cursor: pointer;"
+                                             onclick="window.open('${step.MediaURL}', '_blank')">`;
+                        }
+
                         const row = `
                             <tr>
                                 <td><span class="badge bg-secondary">${step.StepNumber}</span></td>
                                 <td><strong>${step.StepName || 'Unnamed Step'}</strong></td>
+                                <td class="text-center">${imageHTML}</td>
                                 <td class="text-center"><span class="badge bg-primary">${stepShouldSend}</span></td>
                                 <td class="text-center"><span class="badge bg-success">${stepSent}</span></td>
+                                <td class="text-center"><small class="text-muted">${sentPercent}%</small></td>
                                 <td class="text-center"><span class="badge bg-danger">${stepFailed}</span></td>
+                                <td class="text-center"><small class="text-muted">${failedPercent}%</small></td>
                                 <td class="text-center"><span class="badge bg-warning text-dark">${stepRemaining}</span></td>
+                                <td class="text-center"><small class="text-muted">${remainingPercent}%</small></td>
                                 <td class="text-center">
                                     <div class="progress" style="height: 20px; min-width: 100px;">
                                         <div class="progress-bar bg-success" role="progressbar"
@@ -423,7 +443,7 @@
                 } else {
                     stepTableBody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">
+                            <td colspan="11" class="text-center text-muted py-4">
                                 <i class="fas fa-info-circle"></i> No step data available
                             </td>
                         </tr>
