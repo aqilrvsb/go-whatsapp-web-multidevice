@@ -6208,6 +6208,8 @@ func (handler *App) GetSequenceProgress(c *fiber.Ctx) error {
 // GetSequenceReportNew - NEW CLEAN API endpoint that matches Detail Sequences EXACTLY
 func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 
 	// Validate sequence ID
 	if sequenceID == "" {
@@ -6216,7 +6218,7 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("GetSequenceReportNew called for sequence: %s", sequenceID)
+	log.Printf("GetSequenceReportNew called for sequence: %s, startDate: %s, endDate: %s", sequenceID, startDate, endDate)
 
 	// Get session
 	sessionToken := c.Cookies("session_token")
@@ -6275,7 +6277,7 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		})
 	}
 
-	// EXACT same query as Detail Sequences
+	// Build stats query with optional date filtering
 	statsQuery := `
 		SELECT
 			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
@@ -6289,9 +6291,22 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 		FROM broadcast_messages
 		WHERE sequence_id = ?
 	`
+	statsArgs := []interface{}{sequenceID}
+
+	// Apply date filters if provided
+	if startDate != "" && endDate != "" {
+		statsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+		statsArgs = append(statsArgs, startDate, endDate)
+	} else if startDate != "" {
+		statsQuery += ` AND DATE(created_at) >= ?`
+		statsArgs = append(statsArgs, startDate)
+	} else if endDate != "" {
+		statsQuery += ` AND DATE(created_at) <= ?`
+		statsArgs = append(statsArgs, endDate)
+	}
 
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
-	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
+	err = db.QueryRow(statsQuery, statsArgs...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
 	if err != nil {
 		log.Printf("Error getting sequence stats for %s: %v", sequenceID, err)
 		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
@@ -6338,7 +6353,7 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 			continue
 		}
 
-		// Get stats for this device
+		// Get stats for this device with date filtering
 		deviceStatsQuery := `
 			SELECT
 				COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
@@ -6349,9 +6364,22 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 			FROM broadcast_messages
 			WHERE sequence_id = ? AND device_id = ?
 		`
+		deviceStatsArgs := []interface{}{sequenceID, deviceID}
+
+		// Apply same date filters to device stats
+		if startDate != "" && endDate != "" {
+			deviceStatsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+			deviceStatsArgs = append(deviceStatsArgs, startDate, endDate)
+		} else if startDate != "" {
+			deviceStatsQuery += ` AND DATE(created_at) >= ?`
+			deviceStatsArgs = append(deviceStatsArgs, startDate)
+		} else if endDate != "" {
+			deviceStatsQuery += ` AND DATE(created_at) <= ?`
+			deviceStatsArgs = append(deviceStatsArgs, endDate)
+		}
 
 		var deviceTotal, deviceDone, deviceFailed int
-		err = db.QueryRow(deviceStatsQuery, sequenceID, deviceID).Scan(&deviceTotal, &deviceDone, &deviceFailed)
+		err = db.QueryRow(deviceStatsQuery, deviceStatsArgs...).Scan(&deviceTotal, &deviceDone, &deviceFailed)
 		if err != nil {
 			continue
 		}
@@ -6419,6 +6447,8 @@ func (handler *App) SequenceReportPage(c *fiber.Ctx) error {
 // GetSequenceProgressNew - NEW Progress Overview API (matches Detail Sequences exactly)
 func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	sequenceID := c.Params("id")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 
 	// Validate sequence ID
 	if sequenceID == "" {
@@ -6427,7 +6457,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("GetSequenceProgressNew called for sequence: %s", sequenceID)
+	log.Printf("GetSequenceProgressNew called for sequence: %s, startDate: %s, endDate: %s", sequenceID, startDate, endDate)
 
 	// Get session
 	sessionToken := c.Cookies("session_token")
@@ -6483,7 +6513,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		})
 	}
 
-	// EXACT same query as Detail Sequences to ensure data consistency
+	// Build stats query with optional date filtering
 	statsQuery := `
 		SELECT
 			COUNT(DISTINCT CONCAT(sequence_stepid, '|', recipient_phone, '|', device_id)) AS total,
@@ -6497,9 +6527,22 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		FROM broadcast_messages
 		WHERE sequence_id = ?
 	`
+	statsArgs := []interface{}{sequenceID}
+
+	// Apply date filters if provided
+	if startDate != "" && endDate != "" {
+		statsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+		statsArgs = append(statsArgs, startDate, endDate)
+	} else if startDate != "" {
+		statsQuery += ` AND DATE(created_at) >= ?`
+		statsArgs = append(statsArgs, startDate)
+	} else if endDate != "" {
+		statsQuery += ` AND DATE(created_at) <= ?`
+		statsArgs = append(statsArgs, endDate)
+	}
 
 	var totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads int
-	err = db.QueryRow(statsQuery, sequenceID).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
+	err = db.QueryRow(statsQuery, statsArgs...).Scan(&totalShouldSend, &totalDoneSend, &totalFailedSend, &totalRemainingSend, &totalLeads)
 	if err != nil {
 		log.Printf("Error getting sequence stats for %s: %v", sequenceID, err)
 		totalShouldSend, totalDoneSend, totalFailedSend, totalRemainingSend, totalLeads = 0, 0, 0, 0, 0
@@ -6511,7 +6554,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 	// Calculate should send as sum
 	totalShouldSend = totalDoneSend + totalFailedSend + totalRemainingSend
 
-	// Get step-wise breakdown (same query pattern as Detail Sequences)
+	// Get step-wise breakdown with date filtering
 	stepQuery := `
 		SELECT
 			COALESCE(ss.content, CONCAT('Day ', ss.day_number)) as step_name,
@@ -6526,11 +6569,27 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		FROM sequence_steps ss
 		LEFT JOIN broadcast_messages bm ON ss.id = bm.sequence_stepid
 		WHERE ss.sequence_id = ?
+	`
+	stepArgs := []interface{}{sequenceID}
+
+	// Apply date filters to step breakdown
+	if startDate != "" && endDate != "" {
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) BETWEEN ? AND ?)`
+		stepArgs = append(stepArgs, startDate, endDate)
+	} else if startDate != "" {
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) >= ?)`
+		stepArgs = append(stepArgs, startDate)
+	} else if endDate != "" {
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) <= ?)`
+		stepArgs = append(stepArgs, endDate)
+	}
+
+	stepQuery += `
 		GROUP BY ss.id, ss.day_number, ss.content
 		ORDER BY ss.day_number
 	`
 
-	rows, err := db.Query(stepQuery, sequenceID)
+	rows, err := db.Query(stepQuery, stepArgs...)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Failed to fetch step breakdown",
@@ -6557,7 +6616,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		stepBreakdown = append(stepBreakdown, step)
 	}
 
-	// Get recent activity (last 100 messages)
+	// Get recent activity with date filtering (last 100 messages)
 	activityQuery := `
 		SELECT
 			bm.recipient_phone,
@@ -6570,11 +6629,27 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
 		LEFT JOIN user_devices ud ON bm.device_id = ud.id
 		WHERE bm.sequence_id = ?
+	`
+	activityArgs := []interface{}{sequenceID}
+
+	// Apply date filters to activity
+	if startDate != "" && endDate != "" {
+		activityQuery += ` AND DATE(bm.created_at) BETWEEN ? AND ?`
+		activityArgs = append(activityArgs, startDate, endDate)
+	} else if startDate != "" {
+		activityQuery += ` AND DATE(bm.created_at) >= ?`
+		activityArgs = append(activityArgs, startDate)
+	} else if endDate != "" {
+		activityQuery += ` AND DATE(bm.created_at) <= ?`
+		activityArgs = append(activityArgs, endDate)
+	}
+
+	activityQuery += `
 		ORDER BY bm.created_at DESC
 		LIMIT 100
 	`
 
-	activityRows, err := db.Query(activityQuery, sequenceID)
+	activityRows, err := db.Query(activityQuery, activityArgs...)
 	if err != nil {
 		log.Printf("Error getting recent activity: %v", err)
 	}

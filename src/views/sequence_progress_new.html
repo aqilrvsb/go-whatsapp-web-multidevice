@@ -146,6 +146,34 @@
                 </div>
             </div>
 
+            <!-- Date Filter Card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="mb-3"><i class="fas fa-filter"></i> Date Filter</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100" onclick="applyDateFilter()">
+                                <i class="fas fa-search"></i> Apply Filter
+                            </button>
+                            <button class="btn btn-outline-secondary w-100 mt-2" onclick="clearDateFilter()">
+                                <i class="fas fa-times"></i> Clear Filter
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted" id="filterStatus">Showing all-time data</small>
+                    </div>
+                </div>
+            </div>
+
             <!-- Statistics Cards -->
             <div class="row">
                 <div class="col-lg-2 col-md-4">
@@ -262,12 +290,55 @@
 
         // Fetch data on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Set max date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').max = today;
+            document.getElementById('endDate').max = today;
+
             loadSequenceProgress();
         });
 
+        function applyDateFilter() {
+            loadSequenceProgress();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            loadSequenceProgress();
+        }
+
         async function loadSequenceProgress() {
             try {
-                const response = await fetch(`/api/sequences/${sequenceId}/progress-new`);
+                // Build API URL with date filters
+                let apiUrl = `/api/sequences/${sequenceId}/progress-new`;
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                const params = new URLSearchParams();
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+
+                if (params.toString()) {
+                    apiUrl += '?' + params.toString();
+                }
+
+                // Update filter status
+                if (startDate && endDate) {
+                    document.getElementById('filterStatus').textContent =
+                        `Showing data from ${startDate} to ${endDate}`;
+                } else if (startDate) {
+                    document.getElementById('filterStatus').textContent =
+                        `Showing data from ${startDate} onwards`;
+                } else if endDate) {
+                    document.getElementById('filterStatus').textContent =
+                        `Showing data until ${endDate}`;
+                } else {
+                    document.getElementById('filterStatus').textContent =
+                        'Showing all-time data';
+                }
+
+                const response = await fetch(apiUrl);
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch progress data');
