@@ -6822,113 +6822,77 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			for i, step := range stepBreakdown {
 				stepNumber := step["StepNumber"].(int)
 
-				// Query to count responses within 5 hours of scheduled_at (changed from 1 hour)
-				responseQuery := `
-					SELECT COUNT(DISTINCT ai.prospect_num)
-					FROM tbl_aitransaction ai
-					INNER JOIN broadcast_messages bm ON
-						bm.recipient_phone = ai.prospect_num AND
-						bm.device_name = ai.marketer_id
-					WHERE bm.sequence_id = ?
-					AND bm.status = 'sent'
-					AND DATE(STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) = DATE(bm.scheduled_at)
-					AND TIMESTAMPDIFF(SECOND, bm.scheduled_at, STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) BETWEEN 0 AND 18000
+				// First, get all sent messages for this step from main database
+				messagesQuery := `
+					SELECT recipient_phone, device_name, scheduled_at
+					FROM broadcast_messages
+					WHERE sequence_id = ?
+					AND sequence_stepid = ?
+					AND status = 'sent'
 				`
-				responseArgs := []interface{}{sequenceID}
+				messagesArgs := []interface{}{sequenceID, stepNumber}
 
 				// Apply same date filters
 				if startDate == "" && endDate == "" {
 					today := time.Now().Format("2006-01-02")
-					responseQuery += ` AND DATE(bm.scheduled_at) = ?`
-					responseArgs = append(responseArgs, today)
+					messagesQuery += ` AND DATE(scheduled_at) = ?`
+					messagesArgs = append(messagesArgs, today)
 				} else if startDate != "" && endDate != "" {
-					responseQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
-					responseArgs = append(responseArgs, startDate, endDate)
+					messagesQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
+					messagesArgs = append(messagesArgs, startDate, endDate)
 				} else if startDate != "" {
-					responseQuery += ` AND DATE(bm.scheduled_at) >= ?`
-					responseArgs = append(responseArgs, startDate)
+					messagesQuery += ` AND DATE(scheduled_at) >= ?`
+					messagesArgs = append(messagesArgs, startDate)
 				} else if endDate != "" {
-					responseQuery += ` AND DATE(bm.scheduled_at) <= ?`
-					responseArgs = append(responseArgs, endDate)
+					messagesQuery += ` AND DATE(scheduled_at) <= ?`
+					messagesArgs = append(messagesArgs, endDate)
 				}
 
 				log.Printf("Querying responses for step %d, sequence %s", stepNumber, sequenceID)
-				var totalResponses int
-				err = db2.QueryRow(responseQuery, responseArgs...).Scan(&totalResponses)
+
+				// Get sent messages from main database
+				messagesRows, err := db.Query(messagesQuery, messagesArgs...)
 				if err != nil {
-					log.Printf("Error counting responses for step %d: %v", stepNumber, err)
-					totalResponses = 0
-				} else {
-					log.Printf("Step %d: Found %d responses", stepNumber, totalResponses)
+					log.Printf("Error getting messages for step %d: %v", stepNumber, err)
+					stepBreakdown[i]["TotalResponses"] = 0
+					continue
 				}
 
+				// Track unique responses
+				responseMap := make(map[string]bool)
+
+				for messagesRows.Next() {
+					var recipientPhone, deviceName string
+					var scheduledAt time.Time
+					if err := messagesRows.Scan(&recipientPhone, &deviceName, &scheduledAt); err != nil {
+						continue
+					}
+
+					// Check if there's a response in tbl_aitransaction within 5 hours
+					responseQuery := `
+						SELECT COUNT(*)
+						FROM tbl_aitransaction
+						WHERE prospect_num = ?
+						AND marketer_id = ?
+						AND STR_TO_DATE(date_prospect, '%Y-%m-%d %H:%i:%s')
+							BETWEEN ? AND DATE_ADD(?, INTERVAL 5 HOUR)
+					`
+
+					var count int
+					err = db2.QueryRow(responseQuery, recipientPhone, deviceName, scheduledAt, scheduledAt).Scan(&count)
+					if err == nil && count > 0 {
+						// Mark this prospect as having responded
+						responseMap[recipientPhone] = true
+					}
+				}
+				messagesRows.Close()
+
+				totalResponses := len(responseMap)
+				log.Printf("Step %d: Found %d responses", stepNumber, totalResponses)
 				stepBreakdown[i]["TotalResponses"] = totalResponses
 			}
 		} else {
 			log.Printf("Could not connect to MYSQL_URI2: %v", err)
-		}
-	}
-
-	// Get recent activity with date filtering (last 100 messages)
-	activityQuery := `
-		SELECT
-			bm.recipient_phone,
-			bm.status,
-			bm.error_message,
-			bm.created_at,
-			COALESCE(ss.step_name, '') as step_name,
-			COALESCE(bm.device_name, 'Unknown Device') as device_name
-		FROM broadcast_messages bm
-		LEFT JOIN sequence_steps ss ON bm.sequence_stepid = ss.id
-		WHERE bm.sequence_id = ?
-	`
-	activityArgs := []interface{}{sequenceID}
-
-	// Apply date filters to activity, default to today
-	if startDate == "" && endDate == "" {
-		today := time.Now().Format("2006-01-02")
-		activityQuery += ` AND DATE(bm.scheduled_at) = ?`
-		activityArgs = append(activityArgs, today)
-	} else if startDate != "" && endDate != "" {
-		activityQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
-		activityArgs = append(activityArgs, startDate, endDate)
-	} else if startDate != "" {
-		activityQuery += ` AND DATE(bm.scheduled_at) >= ?`
-		activityArgs = append(activityArgs, startDate)
-	} else if endDate != "" {
-		activityQuery += ` AND DATE(bm.scheduled_at) <= ?`
-		activityArgs = append(activityArgs, endDate)
-	}
-
-	activityQuery += `
-		ORDER BY bm.created_at DESC
-		LIMIT 100
-	`
-
-	activityRows, err := db.Query(activityQuery, activityArgs...)
-	if err != nil {
-		log.Printf("Error getting recent activity: %v", err)
-	}
-
-	type RecentActivity struct {
-		RecipientPhone string
-		Status         string
-		ErrorMessage   *string
-		CreatedAt      string
-		StepName       string
-		DeviceName     string
-	}
-
-	var recentActivity []RecentActivity
-	if activityRows != nil {
-		defer activityRows.Close()
-		for activityRows.Next() {
-			var activity RecentActivity
-			if err := activityRows.Scan(&activity.RecipientPhone, &activity.Status, &activity.ErrorMessage, &activity.CreatedAt, &activity.StepName, &activity.DeviceName); err != nil {
-				log.Printf("Error scanning activity: %v", err)
-				continue
-			}
-			recentActivity = append(recentActivity, activity)
 		}
 	}
 
@@ -6944,8 +6908,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			"remaining":   totalRemainingSend,
 			"total_leads": totalLeads,
 		},
-		"step_breakdown":  stepBreakdown,
-		"recent_activity": recentActivity,
+		"step_breakdown": stepBreakdown,
 	})
 }
 
