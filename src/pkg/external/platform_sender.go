@@ -26,34 +26,89 @@ type PlatformSender struct {
 func NewPlatformSender() *PlatformSender {
 	return &PlatformSender{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second, // Increased from 30s to 120s for slow APIs
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 30 * time.Second, // Increased TLS handshake timeout
+			},
 		},
 		messageRandomizer: antipattern.NewMessageRandomizer(),
 		greetingProcessor: antipattern.NewGreetingProcessor(),
 	}
 }
 
+// retryWithBackoff retries a function with exponential backoff
+func (ps *PlatformSender) retryWithBackoff(fn func() error, maxRetries int, platform string) error {
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Try the function
+		err := fn()
+		if err == nil {
+			// Success!
+			if attempt > 0 {
+				logrus.Infof("[%s] Request succeeded after %d retries", platform, attempt)
+			}
+			return nil
+		}
+
+		lastErr = err
+
+		// If this was the last attempt, return the error
+		if attempt == maxRetries {
+			logrus.Errorf("[%s] Failed after %d retries: %v", platform, maxRetries, err)
+			return lastErr
+		}
+
+		// Check if error is retryable
+		errStr := err.Error()
+		isRetryable := strings.Contains(errStr, "timeout") ||
+			strings.Contains(errStr, "TLS handshake") ||
+			strings.Contains(errStr, "EOF") ||
+			strings.Contains(errStr, "connection reset") ||
+			strings.Contains(errStr, "broken pipe")
+
+		if !isRetryable {
+			// Don't retry for non-network errors
+			logrus.Warnf("[%s] Non-retryable error: %v", platform, err)
+			return err
+		}
+
+		// Calculate backoff delay: 2^attempt seconds (2s, 4s, 8s)
+		backoffDelay := time.Duration(1<<uint(attempt)) * 2 * time.Second
+		logrus.Warnf("[%s] Attempt %d failed: %v. Retrying in %v...", platform, attempt+1, err, backoffDelay)
+		time.Sleep(backoffDelay)
+	}
+
+	return lastErr
+}
+
 // SendMessage sends a message via external platform
 // NOTE: Anti-spam is already applied by BroadcastWorker - we just send raw content
 func (ps *PlatformSender) SendMessage(platform, instance, phone, recipientName, message, imageURL, deviceID string) error {
 	// NO ANTI-SPAM HERE - Already handled by BroadcastWorker
-	
+
 	_ = time.Now() // startTime - for future use
 	var err error
-	
+
 	switch platform {
 	case "Wablas":
 		err = ps.sendViaWablas(instance, phone, message, imageURL)
 	case "Whacenter":
-		err = ps.sendViaWhacenter(instance, phone, message, imageURL)
+		// Retry Whacenter with backoff (3 retries max)
+		err = ps.retryWithBackoff(func() error {
+			return ps.sendViaWhacenter(instance, phone, message, imageURL)
+		}, 3, "Whacenter")
 	default:
 		err = fmt.Errorf("unknown platform: %s", platform)
 	}
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
