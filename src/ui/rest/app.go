@@ -6752,13 +6752,34 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 		Remaining  int
 	}
 
-	var stepBreakdown []StepBreakdown
+	var stepBreakdown []map[string]interface{}
 	for rows.Next() {
-		var step StepBreakdown
-		if err := rows.Scan(&step.StepName, &step.StepNumber, &step.MediaURL, &step.ShouldSend, &step.Sent, &step.Failed, &step.Remaining); err != nil {
+		var stepName string
+		var stepNumber int
+		var mediaURL sql.NullString
+		var shouldSend, sent, failed, remaining int
+
+		if err := rows.Scan(&stepName, &stepNumber, &mediaURL, &shouldSend, &sent, &failed, &remaining); err != nil {
 			log.Printf("Error scanning step: %v", err)
 			continue
 		}
+
+		step := map[string]interface{}{
+			"StepName":   stepName,
+			"StepNumber": stepNumber,
+			"ShouldSend": shouldSend,
+			"Sent":       sent,
+			"Failed":     failed,
+			"Remaining":  remaining,
+		}
+
+		// Add MediaURL as string or null
+		if mediaURL.Valid {
+			step["MediaURL"] = mediaURL.String
+		} else {
+			step["MediaURL"] = nil
+		}
+
 		stepBreakdown = append(stepBreakdown, step)
 	}
 
