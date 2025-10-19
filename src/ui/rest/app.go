@@ -6801,15 +6801,24 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 			}
 		}
 
+		log.Printf("Connecting to MYSQL_URI2 for response tracking...")
 		db2, err := sql.Open("mysql", mysqlURI2)
 		if err == nil {
 			defer db2.Close()
+
+			// Test connection
+			err = db2.Ping()
+			if err != nil {
+				log.Printf("MYSQL_URI2 connection failed on ping: %v", err)
+			} else {
+				log.Printf("MYSQL_URI2 connection successful!")
+			}
 
 			// For each step, calculate responses
 			for i, step := range stepBreakdown {
 				stepNumber := step["StepNumber"].(int)
 
-				// Query to count responses within 1 hour of scheduled_at
+				// Query to count responses within 5 hours of scheduled_at (changed from 1 hour)
 				responseQuery := `
 					SELECT COUNT(DISTINCT ai.prospect_num)
 					FROM tbl_aitransaction ai
@@ -6819,7 +6828,7 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 					WHERE bm.sequence_id = ?
 					AND bm.status = 'sent'
 					AND DATE(STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) = DATE(bm.scheduled_at)
-					AND TIMESTAMPDIFF(SECOND, bm.scheduled_at, STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) BETWEEN 0 AND 3600
+					AND TIMESTAMPDIFF(SECOND, bm.scheduled_at, STR_TO_DATE(ai.date_prospect, '%Y-%m-%d %H:%i:%s')) BETWEEN 0 AND 18000
 				`
 				responseArgs := []interface{}{sequenceID}
 
@@ -6839,11 +6848,14 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 					responseArgs = append(responseArgs, endDate)
 				}
 
+				log.Printf("Querying responses for step %d, sequence %s", stepNumber, sequenceID)
 				var totalResponses int
 				err = db2.QueryRow(responseQuery, responseArgs...).Scan(&totalResponses)
 				if err != nil {
 					log.Printf("Error counting responses for step %d: %v", stepNumber, err)
 					totalResponses = 0
+				} else {
+					log.Printf("Step %d: Found %d responses", stepNumber, totalResponses)
 				}
 
 				stepBreakdown[i]["TotalResponses"] = totalResponses
