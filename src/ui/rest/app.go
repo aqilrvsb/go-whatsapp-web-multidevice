@@ -6295,13 +6295,13 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 
 	// Apply date filters if provided
 	if startDate != "" && endDate != "" {
-		statsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 		statsArgs = append(statsArgs, startDate, endDate)
 	} else if startDate != "" {
-		statsQuery += ` AND DATE(created_at) >= ?`
+		statsQuery += ` AND DATE(scheduled_at) >= ?`
 		statsArgs = append(statsArgs, startDate)
 	} else if endDate != "" {
-		statsQuery += ` AND DATE(created_at) <= ?`
+		statsQuery += ` AND DATE(scheduled_at) <= ?`
 		statsArgs = append(statsArgs, endDate)
 	}
 
@@ -6368,13 +6368,13 @@ func (handler *App) GetSequenceReportNew(c *fiber.Ctx) error {
 
 		// Apply same date filters to device stats
 		if startDate != "" && endDate != "" {
-			deviceStatsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+			deviceStatsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 			deviceStatsArgs = append(deviceStatsArgs, startDate, endDate)
 		} else if startDate != "" {
-			deviceStatsQuery += ` AND DATE(created_at) >= ?`
+			deviceStatsQuery += ` AND DATE(scheduled_at) >= ?`
 			deviceStatsArgs = append(deviceStatsArgs, startDate)
 		} else if endDate != "" {
-			deviceStatsQuery += ` AND DATE(created_at) <= ?`
+			deviceStatsQuery += ` AND DATE(scheduled_at) <= ?`
 			deviceStatsArgs = append(deviceStatsArgs, endDate)
 		}
 
@@ -6531,13 +6531,13 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 
 	// Apply date filters if provided
 	if startDate != "" && endDate != "" {
-		statsQuery += ` AND DATE(created_at) BETWEEN ? AND ?`
+		statsQuery += ` AND DATE(scheduled_at) BETWEEN ? AND ?`
 		statsArgs = append(statsArgs, startDate, endDate)
 	} else if startDate != "" {
-		statsQuery += ` AND DATE(created_at) >= ?`
+		statsQuery += ` AND DATE(scheduled_at) >= ?`
 		statsArgs = append(statsArgs, startDate)
 	} else if endDate != "" {
-		statsQuery += ` AND DATE(created_at) <= ?`
+		statsQuery += ` AND DATE(scheduled_at) <= ?`
 		statsArgs = append(statsArgs, endDate)
 	}
 
@@ -6574,13 +6574,13 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 
 	// Apply date filters to step breakdown
 	if startDate != "" && endDate != "" {
-		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) BETWEEN ? AND ?)`
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.scheduled_at) BETWEEN ? AND ?)`
 		stepArgs = append(stepArgs, startDate, endDate)
 	} else if startDate != "" {
-		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) >= ?)`
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.scheduled_at) >= ?)`
 		stepArgs = append(stepArgs, startDate)
 	} else if endDate != "" {
-		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.created_at) <= ?)`
+		stepQuery += ` AND (bm.id IS NULL OR DATE(bm.scheduled_at) <= ?)`
 		stepArgs = append(stepArgs, endDate)
 	}
 
@@ -6634,13 +6634,13 @@ func (handler *App) GetSequenceProgressNew(c *fiber.Ctx) error {
 
 	// Apply date filters to activity
 	if startDate != "" && endDate != "" {
-		activityQuery += ` AND DATE(bm.created_at) BETWEEN ? AND ?`
+		activityQuery += ` AND DATE(bm.scheduled_at) BETWEEN ? AND ?`
 		activityArgs = append(activityArgs, startDate, endDate)
 	} else if startDate != "" {
-		activityQuery += ` AND DATE(bm.created_at) >= ?`
+		activityQuery += ` AND DATE(bm.scheduled_at) >= ?`
 		activityArgs = append(activityArgs, startDate)
 	} else if endDate != "" {
-		activityQuery += ` AND DATE(bm.created_at) <= ?`
+		activityQuery += ` AND DATE(bm.scheduled_at) <= ?`
 		activityArgs = append(activityArgs, endDate)
 	}
 
