@@ -352,27 +352,55 @@ func (r *UserRepository) GetUserDevice(userID, deviceID string) (*models.UserDev
 func (r *UserRepository) GetDeviceByID(deviceID string) (*models.UserDevice, error) {
 	var device models.UserDevice
 	query := `
-		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status, 
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status,
 		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
 		       created_at, COALESCE(updated_at, created_at), last_seen, COALESCE(platform, '')
 		FROM user_devices
 		WHERE id = ?
 	`
-	
+
 	err := r.db.QueryRow(query, deviceID).Scan(
 		&device.ID, &device.UserID, &device.DeviceName, &device.Phone,
 		&device.JID, &device.Status, &device.MinDelaySeconds, &device.MaxDelaySeconds,
 		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen, &device.Platform,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("device not found")
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get device: %w", err)
 	}
-	
+
+	return &device, nil
+}
+
+// GetDeviceByName gets a device by device_name (for platform devices and broadcast messages)
+func (r *UserRepository) GetDeviceByName(deviceName string) (*models.UserDevice, error) {
+	var device models.UserDevice
+	query := `
+		SELECT id, user_id, device_name, COALESCE(phone, ''), COALESCE(jid, ''), status,
+		       COALESCE(min_delay_seconds, 5), COALESCE(max_delay_seconds, 15),
+		       created_at, COALESCE(updated_at, created_at), last_seen, COALESCE(platform, '')
+		FROM user_devices
+		WHERE device_name = ?
+	`
+
+	err := r.db.QueryRow(query, deviceName).Scan(
+		&device.ID, &device.UserID, &device.DeviceName, &device.Phone,
+		&device.JID, &device.Status, &device.MinDelaySeconds, &device.MaxDelaySeconds,
+		&device.CreatedAt, &device.UpdatedAt, &device.LastSeen, &device.Platform,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found by name: %s", deviceName)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device by name: %w", err)
+	}
+
 	return &device, nil
 }
 

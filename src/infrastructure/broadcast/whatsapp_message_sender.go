@@ -36,13 +36,15 @@ func NewWhatsAppMessageSender() *WhatsAppMessageSender {
 
 // SendMessage sends a message via WhatsApp with self-healing capabilities
 // NOTE: Anti-spam is handled by BroadcastWorker, not here
+// deviceID parameter is actually device_name from broadcast_messages table
 func (w *WhatsAppMessageSender) SendMessage(deviceID string, msg *broadcast.BroadcastMessage) error {
 	// Check if this is a platform device (Wablas/Whacenter)
+	// deviceID here is actually device_name, so we look up by device_name
 	userRepo := repository.GetUserRepository()
-	device, err := userRepo.GetDeviceByID(deviceID)
+	device, err := userRepo.GetDeviceByName(deviceID)
 	if err != nil {
-		logrus.Errorf("Failed to get device %s: %v", deviceID, err)
-		return fmt.Errorf("device not found: %v", err)
+		logrus.Errorf("Failed to get device by name %s: %v", deviceID, err)
+		return fmt.Errorf("device not found by name %s: %v", deviceID, err)
 	}
 	
 	// Only process line breaks, NO anti-spam here
