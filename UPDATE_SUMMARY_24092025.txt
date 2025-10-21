@@ -1,0 +1,65 @@
+==========================================
+WhatsApp Broadcast System - Update Summary
+Date: September 24, 2025
+==========================================
+
+✅ COMPLETED TASKS:
+
+1. TIME WINDOW EXTENSION (3 HOURS)
+   --------------------------------
+   • Changed from: 1 HOUR window restriction
+   • Changed to: 3 HOUR window restriction
+   • File modified: src/repository/broadcast_repository.go (line 165)
+   • Purpose: Allow messages to recover within 3 hours instead of 1 hour
+   • Benefit: Better recovery from extended system downtime
+
+2. CHANGES PUSHED TO GITHUB
+   ------------------------
+   • Repository: https://github.com/aqilrvsb/go-whatsapp-web-multidevice.git
+   • Commit: "feat: Extend time window from 1 hour to 3 hours for better message recovery"
+   • Files updated:
+     - README.md (added new update section)
+     - src/repository/broadcast_repository.go (changed time window)
+
+3. APPLICATION REBUILT
+   -------------------
+   • Successfully compiled new whatsapp.exe
+   • Build completed without errors
+   • Ready to deploy
+
+==========================================
+NOTES ON FAILED MESSAGES:
+==========================================
+• Checked database for failed messages today (24/09/2025)
+• Found 0 failed messages (already processed)
+• Current status:
+  - pending: 185 messages
+  - processing: 5 messages
+  - queued: 4 messages
+  - sent: 18 messages
+
+==========================================
+WHAT THE 3-HOUR WINDOW DOES:
+==========================================
+The time window restriction in GetPendingMessages() ensures that:
+• Only messages scheduled within the last 3 hours are picked up for processing
+• Messages older than 3 hours won't be processed (to prevent very old messages from being sent)
+• This allows recovery from downtime up to 3 hours
+• Prevents permanently stuck messages during extended maintenance windows
+
+==========================================
+NEXT STEPS:
+==========================================
+1. Stop the current running whatsapp.exe application
+2. Replace with the newly built whatsapp.exe
+3. Restart the application
+4. Monitor the logs to confirm the 3-hour window is working
+
+==========================================
+VERIFICATION:
+==========================================
+You can verify the change is active by checking:
+• Log messages will show messages being picked up from up to 3 hours ago
+• Database queries will include messages with scheduled_at >= DATE_SUB(NOW(), INTERVAL 3 HOUR)
+
+==========================================

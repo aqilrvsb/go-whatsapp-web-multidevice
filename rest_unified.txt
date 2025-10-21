@@ -1,0 +1,51 @@
+	// Start the ultra-optimized broadcast processor for 3000+ devices
+	// This processor creates broadcast-specific worker pools
+	go usecase.StartUltraOptimizedBroadcastProcessor()
+	logrus.Info("Ultra-optimized broadcast processor started (3000+ device support)")
+	
+	// UNIFIED APPROACH: Start unified trigger processor for both sequences and campaigns
+	go func() {
+		db := database.GetDB()
+		unifiedProcessor := usecase.NewUnifiedTriggerProcessor(db)
+		go unifiedProcessor.StartProcessing()
+		logrus.Info("Unified trigger processor started (handles both sequences and campaigns)")
+	}()
+	
+	// COMMENTED OUT: Individual processors replaced by unified processor
+	/*
+	// Start campaign trigger processor using optimized version
+	go func() {
+		db := database.GetDB()
+		campaignTrigger := usecase.NewOptimizedCampaignTrigger(db)
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		
+		logrus.Info("Campaign trigger processor started (checks every minute)")
+		
+		// Process immediately on start
+		campaignTrigger.ProcessCampaigns()
+		
+		// Then process every minute
+		for range ticker.C {
+			campaignTrigger.ProcessCampaigns()
+		}
+	}()
+	
+	// Start sequence trigger processor for trigger-based flow
+	go usecase.StartSequenceTriggerProcessor()
+	logrus.Info("Sequence trigger processor started")
+	*/
+	
+	// Start campaign status monitor
+	go usecase.StartCampaignStatusMonitor()
+	logrus.Info("Campaign status monitor started")
+	
+	// Start queued message cleaner
+	go usecase.StartQueuedMessageCleaner()
+	logrus.Info("Queued message cleaner started")
+	
+	// Start broadcast coordinator
+	go usecase.StartBroadcastCoordinator()
+	logrus.Info("Broadcast coordinator started")
+	
+	// Start broadcast worker processor - CRITICAL FOR WORKER POOL

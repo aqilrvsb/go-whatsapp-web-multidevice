@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(set CGO_ENABLED=0)",
+      "Bash(set GOOS=linux)",
+      "Bash(set GOARCH=amd64)",
+      "Bash(go build:*)",
+      "Bash($env:CGO_ENABLED=0)",
+      "Bash($env:GOOS=\"linux\")",
+      "Bash($env:GOARCH=\"amd64\")",
+      "Bash(cat:*)",
+      "Bash(where go)",
+      "Bash(git pull:*)",
+      "Bash(sqlite3:*)",
+      "Bash(mysql:*)",
+      "Bash(psql:*)",
+      "Bash(export CGO_ENABLED=0)",
+      "Bash(export GOOS=linux)",
+      "Bash(export GOARCH=amd64:*)",
+      "Bash(find:*)",
+      "Bash(c:UsersaqilzDocumentsgo-whatsapp-web-multidevice-mainbuild_fix_push.bat)",
+      "Bash(cmd.exe /c \"c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\build_fix_push.bat\")",
+      "Bash(powershell -Command \"cd ''c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\src''; $env:CGO_ENABLED=''0''; $env:GOOS=''linux''; $env:GOARCH=''amd64''; go build -ldflags=''-s -w'' -o ../whatsapp main.go\")",
+      "Bash(powershell -Command \"cd ''c:\\Users\\aqilz\\Documents\\go-whatsapp-web-multidevice-main\\src''; $env:CGO_ENABLED=''0''; $env:GOOS=''linux''; $env:GOARCH=''amd64''; & go build -ldflags=''-s -w'' -o ../whatsapp main.go\")",
+      "Bash(git branch:*)",
+      "Bash(git revert:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
